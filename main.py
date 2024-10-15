@@ -5,9 +5,12 @@ from api import crew
 app = FastAPI()
 
 # Allow requests from the Next.js frontend
+# For local dev: allow_orgins=["http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://aibtcdev-frontend.replit.app"],  # Allow access from frontend
+    allow_origins=[
+        "https://aibtcdev-frontend.replit.app"
+    ],  # Allow access from frontend
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
     allow_headers=["*"],  # Allows all headers
