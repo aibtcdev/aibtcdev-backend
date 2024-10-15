@@ -1,0 +1,30 @@
+{pkgs}: {
+  deps = [
+    pkgs.bash
+    pkgs.dbus
+    pkgs.which
+    pkgs.re2
+    pkgs.oneDNN
+    pkgs.cacert
+    pkgs.geckodriver
+    pkgs.geos
+    pkgs.borgbackup
+    pkgs.libffi
+    pkgs.libxcrypt
+    pkgs.arrow-cpp
+    pkgs.coreutils
+    pkgs.libuv
+    pkgs.zlib
+    pkgs.grpc
+    pkgs.c-ares
+    pkgs.gnupg
+    pkgs.glibcLocales
+    pkgs.gitFull
+    pkgs.util-linux
+    pkgs.rustc
+    pkgs.pkg-config
+    pkgs.openssl
+    pkgs.libiconv
+    pkgs.cargo
+  ];
+}
