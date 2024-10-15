@@ -1,7 +1,7 @@
-from backend.db.supabase_client import supabase
 from crewai import Agent, Task, Crew, Process
 from dotenv import load_dotenv
-from backend.tools.tools_factory import initialize_tools, get_agent_tools
+from db.supabase_client import supabase
+from tools.tools_factory import initialize_tools, get_agent_tools
 
 
 load_dotenv()
@@ -23,12 +23,16 @@ def fetch_crew_data(crew_id: int):
     Raises:
         ValueError: If no agents or tasks are found for the specified crew.
     """
-    agents_response = supabase.from_('agents').select('*').eq('crew_id', crew_id).execute()
-    tasks_response = supabase.from_('tasks').select('*').eq('crew_id', crew_id).execute()
-    
+    agents_response = (
+        supabase.from_("agents").select("*").eq("crew_id", crew_id).execute()
+    )
+    tasks_response = (
+        supabase.from_("tasks").select("*").eq("crew_id", crew_id).execute()
+    )
+
     if not agents_response.data or not tasks_response.data:
         raise ValueError("No agents or tasks found for the specified crew.")
-    
+
     return agents_response.data, tasks_response.data
 
 
@@ -37,7 +41,7 @@ def execute_crew(crew_id: int, input_str: str):
     """
     Execute a crew by fetching agents and tasks for a given crew_id,
     refine the tasks using a hardcoded manager agent, and manage the flow of outputs.
-    
+
     Args:
         crew_id (int): ID of the crew to be executed.
         input_str (str): User input to be incorporated into the initial task.
@@ -45,7 +49,7 @@ def execute_crew(crew_id: int, input_str: str):
     Returns:
         str: The result of the crew's execution.
     """
-    
+
     # FETCH AGENTS AND TASKS FROM THE CREW_ID
     agents_data, tasks_data = fetch_crew_data(crew_id)
 
@@ -53,11 +57,11 @@ def execute_crew(crew_id: int, input_str: str):
     agents = {}
 
     for agent_data in agents_data:
-        agent_role = agent_data.get('role')
-        agent_goal = agent_data.get('goal')
-        agent_backstory = agent_data.get('backstory')
-        agent_tool_names = agent_data.get('agent_tools', [])
-        
+        agent_role = agent_data.get("role")
+        agent_goal = agent_data.get("goal")
+        agent_backstory = agent_data.get("backstory")
+        agent_tool_names = agent_data.get("agent_tools", [])
+
         agent_tools = get_agent_tools(agent_tool_names, tools_map)
 
         # CREATE THE AGENT WITH THE FETCHED DETAILS
@@ -68,9 +72,9 @@ def execute_crew(crew_id: int, input_str: str):
             verbose=True,
             memory=True,
             allow_delegation=False,
-            tools=agent_tools  # Assign tools (can be empty)
+            tools=agent_tools,  # Assign tools (can be empty)
         )
-        agents[agent_data['id']] = agent
+        agents[agent_data["id"]] = agent
 
     # MANAGER AGENT
     manager_agent = Agent(
@@ -79,7 +83,7 @@ def execute_crew(crew_id: int, input_str: str):
         backstory="You are responsible for optimizing the crew's workflow and ensuring tasks are well-structured.",
         verbose=True,
         memory=True,
-        tools=[]  # No special tools needed for the manager
+        tools=[],  # No special tools needed for the manager
     )
 
     # CREATE TASKS FROM THE DATABASE AND PASS THEM TO THE MANAGER FOR REFINEMENT
@@ -87,27 +91,31 @@ def execute_crew(crew_id: int, input_str: str):
     task_outputs = {}
 
     for task_data in tasks_data:
-        agent_id = task_data['agent_id']
-        
+        agent_id = task_data["agent_id"]
+
         if agent_id not in agents:
-            raise ValueError(f"Agent with id {agent_id} not found for task {task_data['id']}.")
-        task_description = task_data.get('description')
-        task_expected_output = task_data.get('expected_output')
+            raise ValueError(
+                f"Agent with id {agent_id} not found for task {task_data['id']}."
+            )
+        task_description = task_data.get("description")
+        task_expected_output = task_data.get("expected_output")
 
         # If this is the first task, inject user input into the description
         if not task_outputs:  # If no tasks have been executed yet
             task_description = f"{task_description}\n\nuser_input: {input_str}"
 
         # Manager refines task descriptions and expected output
-        refined_task_description = f"Refined by Manager: {str(task_description)}" 
-        refined_task_expected_output = f"Manager's expected outcome: {str(task_expected_output)}" 
+        refined_task_description = f"Refined by Manager: {str(task_description)}"
+        refined_task_expected_output = (
+            f"Manager's expected outcome: {str(task_expected_output)}"
+        )
 
         # CREATE THE TASK WITH REFINED DETAILS
         task = Task(
             description=refined_task_description,
             expected_output=refined_task_expected_output,
             agent=agents[agent_id],
-            async_execution=False
+            async_execution=False,
         )
         tasks.append(task)
 
@@ -118,7 +126,7 @@ def execute_crew(crew_id: int, input_str: str):
         backstory="You are responsible for gathering the outputs of all the agents and presenting a comprehensive final result.",
         verbose=True,
         memory=True,
-        tools=[]  # No special tools needed for the compiler
+        tools=[],  # No special tools needed for the compiler
     )
 
     # TASK FOR RESULT COMPILER TO COMPILE THE RESULTS
@@ -126,7 +134,7 @@ def execute_crew(crew_id: int, input_str: str):
         description="Access the crew's memory and compile a final report from the outputs of all tasks.",
         expected_output="A final summary report compiled from all task outputs.",
         agent=compiler_agent,
-        async_execution=False
+        async_execution=False,
     )
 
     # ADD COMPILER AGENT AND TASK
@@ -139,15 +147,14 @@ def execute_crew(crew_id: int, input_str: str):
         tasks=tasks,
         manager_agent=manager_agent,
         process=Process.sequential,  # Ensure sequential execution of tasks
-        memory=True
+        memory=True,
     )
-    
+
     # EXECUTE THE CREW AND RETURN RESULTS
     print("\n--- Crew Execution Started ---")
-    
+
     # Manager overseeing the crew execution and collecting results
-    result = crew.kickoff(inputs={'user_input': input_str})
+    result = crew.kickoff(inputs={"user_input": input_str})
 
     # The final result will come after all agents finish their tasks
     return result
-
