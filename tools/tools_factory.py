@@ -1,5 +1,6 @@
 from crewai_tools import SerperDevTool
 from .get_btc_data import GetBitcoinData
+from .get_lunar_data import GetLunarData
 
 # from .fetch_contract_code import FetchContractCodeTool
 
@@ -9,7 +10,11 @@ def initialize_tools():
     Initialize and return a dictionary of available tools.
     """
     # NAMES SHOULD BE EXACTLY WHAT'S IN THE FRONTEND
-    return {"web_search": SerperDevTool(), "bitcoin_data": GetBitcoinData()}
+    return {
+        "web_search": SerperDevTool(),
+        "bitcoin_data": GetBitcoinData(),
+        "lunar_data": GetLunarData(),
+    }
 
 
 def get_agent_tools(tool_names, tools_map):
