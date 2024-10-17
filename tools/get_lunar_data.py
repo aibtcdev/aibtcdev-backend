@@ -7,7 +7,7 @@ class GetLunarData(BaseTool):
     name: str = "GetLunarData"
     description: str = (
         "Fetches data for a specific token from LunarCrush including price, market cap, "
-        "24h trading volume, and percentage changes."
+        "24h trading volume, percentage changes and alt rank."
     )
 
     def _run(self, token_contract_addr: str) -> str:
