@@ -1,0 +1,3 @@
+[submodule "agent-tools-ts"]
+	path = agent-tools-ts
+	url = git@github.com:aibtcdev/agent-tools-ts.git
