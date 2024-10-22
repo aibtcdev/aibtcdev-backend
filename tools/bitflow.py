@@ -3,7 +3,7 @@ from .bun import BunScriptRunner
 
 
 class ExecuteBitflowTradeTool(BaseTool):
-    """Tool for fetching contract code directly using user input."""
+    """Tool for executing a market order to buy the specified amount of the token."""
 
     def __init__(self):
         super().__init__(
