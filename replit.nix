@@ -1,6 +1,7 @@
 {pkgs}: {
   deps = [
     pkgs.bash
+    pkgs.bun
     pkgs.dbus
     pkgs.which
     pkgs.re2
