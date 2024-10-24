@@ -1,6 +1,9 @@
+# from .get_btc_data import GetBitcoinData
 from crewai_tools import SerperDevTool
-from .get_btc_data import GetBitcoinData
-from .get_lunar_data import GetLunarData
+from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
+from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
+from .lunarcrush import LunarCrushGetTokenData
+
 
 # from .fetch_contract_code import FetchContractCodeTool
 
@@ -11,9 +14,13 @@ def initialize_tools():
     """
     # NAMES SHOULD BE EXACTLY WHAT'S IN THE FRONTEND
     return {
-        "web_search": SerperDevTool(),
-        "bitcoin_data": GetBitcoinData(),
-        "lunar_data": GetLunarData(),
+        "alex_get_price_history": AlexGetPriceHistory(),
+        "alex_get_swap_info": AlexGetSwapInfo(),
+        "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
+        "bitflow_get_available_tokens": BitflowGetAvailableTokens(),
+        "bitflow_execute_trade": BitflowExecuteTradeTool(),
+        "lunarcrush_get_token_data": LunarCrushGetTokenData(),
+        "web_search_experimental": SerperDevTool(),
     }
 
 

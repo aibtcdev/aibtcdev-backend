@@ -3,8 +3,8 @@ import requests
 from crewai_tools import BaseTool
 
 
-class GetLunarData(BaseTool):
-    name: str = "GetLunarData"
+class LunarCrushGetTokenData(BaseTool):
+    name: str = "LunarCrush: Get Token Data"
     description: str = (
         "Fetches data for a specific token from LunarCrush including price, market cap, "
         "24h trading volume, percentage changes and alt rank."
