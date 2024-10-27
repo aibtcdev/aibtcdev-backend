@@ -10,16 +10,6 @@ from services.chat_services import (
 router = APIRouter()
 
 
-def validate_function_arguments(args_str: str) -> Dict[str, Any]:
-    """Safely evaluate function arguments"""
-    try:
-        return ast.literal_eval(args_str)
-    except (SyntaxError, ValueError) as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid function arguments: {str(e)}"
-        )
-
-
 @router.post("/chat")
 async def chat_endpoint(
     request: ChatRequest,

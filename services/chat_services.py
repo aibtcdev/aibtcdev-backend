@@ -9,7 +9,7 @@ from lib.lunarcrush import LunarcrushApi
 from cachetools import TTLCache
 import os
 import tiktoken
-from crews.chat import UserChatSpecialistCrew
+from crews.chat_static import UserChatSpecialistStaticCrew
 
 # Load environment variables
 load_dotenv()
@@ -100,7 +100,7 @@ class UserChatSpecialistCrewManager:
         self.tool_manager = ToolManager()
 
     def kickoff_conversation(self, user_input: str, session_id: str) -> str:
-        crew_class = UserChatSpecialistCrew()
+        crew_class = UserChatSpecialistStaticCrew()
         crew_class.setup_agents()
         crew_class.setup_tasks(user_input)
         crew = crew_class.create_crew()

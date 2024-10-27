@@ -13,7 +13,6 @@ class UserChatSpecialistCrew(AIBTC_Crew):
         )
         self.crews = build_all_crews()
         self.tools = [cls() for cls in create_crew_tool_classes(self.crews)]
-        print(self.tools)
 
     def setup_agents(self):
         chat_specialist = Agent(
@@ -76,14 +75,14 @@ def create_tool_class(crew):
         super(BaseTool, self).__init__(
             name=crew["name"],
             description=crew["description"],
-            args={"user_input": {"type": "string"}},
+            # args={"user_input": {"type": "string"}},
         )
 
-    def _run(self, user_input):
+    def _run(self):
         """Example run method based on crew logic."""
         try:
             # Dynamically call the crew's kickoff method or similar logic.
-            result = crew["crew"]().kickoff()
+            result = crew["crew"].kickoff()
             return result
         except Exception as e:
             return f"Error executing crew function: {e}"
