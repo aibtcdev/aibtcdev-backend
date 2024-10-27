@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api import crew
+from api import chat
 
 app = FastAPI()
 
@@ -18,6 +19,9 @@ app.add_middleware(
 
 # Include the crew routes
 app.include_router(crew.router)
+
+# Include the chat routes
+app.include_router(chat.router)
 
 
 @app.get("/")
