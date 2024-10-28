@@ -1,6 +1,7 @@
 import requests
 from crewai_tools import BaseTool
 from textwrap import dedent
+from lib.alex import AlexApi
 
 
 class AlexGetPriceHistory(BaseTool):
@@ -23,27 +24,9 @@ class AlexGetPriceHistory(BaseTool):
         Returns:
             str: A formatted string containing the token price history.
         """
-        url = f"https://api.alexgo.io/v1/price_history/{token_address}?limit=100"
-        headers = {
-            "Accept": "application/json",
-        }
+        obj = AlexApi()
 
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(
-                f"Failed to get token price history: {response.status_text}"
-            )
-
-        data = response.json()
-
-        price_history = data.get("prices", [])
-        formatted_history = "\n".join(
-            f"Block Height: {price['block_height']}, Price: {price['avg_price_usd']}"
-            for price in price_history
-        )
-
-        return f"Token: {data['token']}\n{formatted_history}"
+        return obj.get_price_history(token_address)
 
 
 class AlexGetSwapInfo(BaseTool):
@@ -55,67 +38,38 @@ class AlexGetSwapInfo(BaseTool):
 
     def _run(self) -> str:
         """
-        Retrieve all swap data from the Alex API and return a formatted string.
+        Retrieve all pairs from the Alex API and return a formatted string.
 
         Returns:
             str: A formatted string containing all swap data.
         """
-        url = "https://api.alexgo.io/v1/allswaps"
-        headers = {
-            "Accept": "application/json",
-        }
+        obj = AlexApi
+        pairs = obj.get_pairs()
 
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(f"Failed to get all swaps: {response.status_text}")
-
-        data = response.json()
-
-        formatted_swaps = "\n".join(
-            dedent(
-                f"""Pool ID: {swap['id']}, Quote: {swap['quote']}, Symbol: {swap['quoteSymbol']}, Address: {swap['quoteId']}"""
-            ).strip()
-            for swap in data
-        )
-
-        return formatted_swaps
+        return [
+            {"token": pair["wrapped_token_y"], "token_pool_id": pair["pool_id"]}
+            for pair in pairs
+            if pair["wrapped_token_x"] == "STX"
+        ]
 
 
 class AlexGetTokenPoolVolume(BaseTool):
     def __init__(self):
         super().__init__(
             name="ALEX: Get Token Pool Volume",
-            description="Retrieve pool volume data for a specified pool token ID.",
-            args={"pool_token_id": {"type": "string"}},
+            description="Retrieve pool volume data for a specified token pool ID.",
+            args={"token_pool_id": {"type": "string"}},
         )
 
-    def _run(self, pool_token_id: str) -> str:
+    def _run(self, token_pool_id: str) -> str:
         """
         Retrieve pool volume data for a specified pool token ID.
 
         Args:
-            pool_token_id (str): The pool token ID.
+            token_pool_id (str): The token pool ID.
 
         Returns:
             str: A formatted string containing the pool volume data.
         """
-        url = f"https://api.alexgo.io/v1/pool_volume/{pool_token_id}?limit=100"
-        headers = {
-            "Accept": "application/json",
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(f"Failed to get pool volume: {response.status_text}")
-
-        data = response.json()
-
-        volume_values = data.get("volume_values", [])
-        formatted_volume = "\n".join(
-            f"Block Height: {volume['block_height']}, Volume: {volume['volume_24h']}"
-            for volume in volume_values
-        )
-
-        return f"Token: {data['token']}\n{formatted_volume}"
+        obj = AlexApi()
+        return obj.get_token_pool_price(token_pool_id)

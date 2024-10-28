@@ -28,5 +28,5 @@ class BitflowExecuteTradeTool(BaseTool):
 
     def _run(self, fee, amount, tokenA, tokenB):
         return BunScriptRunner.bun_run(
-            "stacks-bitflow", "exec-swap.ts", f"{fee} {amount} {tokenA} {tokenB}"
+            "stacks-bitflow", "exec-swap.ts", fee, amount, tokenA, tokenB
         )
