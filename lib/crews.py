@@ -22,9 +22,6 @@ class AIBTC_Crew:
             process=Process.sequential,
             verbose=True,
             memory=True,
-            # embedder=self.embedder,
-            # step_callback=crew_step_callback,
-            # task_callback=crew_task_callback,
         )
 
     def render_crew(self):
