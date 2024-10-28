@@ -6,6 +6,7 @@ class AlexApi:
     def __init__(self):
         # Base URL for the Hiro API
         self.base_url = "https://api.alexgo.io/"
+        self.limits = 500
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make a GET request to the Hiro API."""
@@ -39,7 +40,9 @@ class AlexApi:
         """Retrieve historical price data for a specified cryptocurrency symbol."""
         try:
             # Make a GET request to the price history endpoint
-            prices = self._get(f"v1/price_history/{token_address}?limit=1000")["prices"]
+            prices = self._get(f"v1/price_history/{token_address}?limit={self.limits}")[
+                "prices"
+            ]
             return [
                 {"price": price["avg_price_usd"], "block": price["block_height"]}
                 for price in prices
@@ -61,16 +64,48 @@ class AlexApi:
         """Retrieve pool volume data for a specified pool token ID."""
         try:
             # Make a GET request to the pool volume endpoint
-            return self._get(f"v1/pool_volume/{pool_token_id}?limit=1000")
+            return self._get(f"v1/pool_volume/{pool_token_id}?limit={self.limits}")[
+                "volume_values"
+            ]
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Failed to get pool volume: {str(e)}")
+
+    def get_token_pool_agg_history(self, token_address: str, pool_token_id: str) -> str:
+        """Retrieve historical price data for a specified cryptocurrency symbol."""
+        try:
+            # Make a GET request to the price history endpoint
+            prices = self._get(f"v1/price_history/{token_address}?limit={self.limits}")[
+                "prices"
+            ]
+            volume = self._get(f"v1/pool_volume/{pool_token_id}?limit={self.limits}")[
+                "volume_values"
+            ]
+            # Create a dictionary to map block heights to volumes
+            volume_dict = {v["block_height"]: v["volume_24h"] for v in volume}
+
+            # Combine price and volume data based on block height
+            combined_data = [
+                {
+                    "price": price["avg_price_usd"],
+                    "block": price["block_height"],
+                    "volume_24h": volume_dict.get(
+                        price["block_height"], None
+                    ),  # Use None if no volume data
+                }
+                for price in prices
+            ]
+
+            return combined_data
+        except Exception as e:
+            # Raise an exception with a custom error message
+            raise Exception(f"Failed to get token price history: {str(e)}")
 
     def get_token_pool_price(self, pool_token_id: str) -> str:
         """Retrieve pool volume data for a specified pool token ID."""
         try:
             # Make a GET request to the pool volume endpoint
-            return self._get(f"v1/pool_token_price/{pool_token_id}?limit=1000")
+            return self._get(f"v1/pool_token_price/{pool_token_id}?limit={self.limits}")
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Failed to get pool volume: {str(e)}")
@@ -79,13 +114,7 @@ class AlexApi:
         """Retrieve tvl data for a specified token."""
         try:
             # Make a GET request to the tvl endpoint
-            return self._get(f"/v1/stats/tvl/{pool_token_id}?limit=1000")
+            return self._get(f"/v1/stats/tvl/{pool_token_id}?limit={self.limits}")
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Failed to get pool volume: {str(e)}")
-
-
-obj = AlexApi()
-# print(obj.get_pairs())
-# print(obj.get_price_history("SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-alex"))
-print(obj.get_token_pool_price("43"))
