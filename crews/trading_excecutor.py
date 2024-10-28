@@ -22,7 +22,6 @@ class TokenTradingExecutorCrew(AIBTC_Crew):
             tools=[
                 AgentTools.execute_buy_trade,
                 AgentTools.execute_sell_trade,
-                AgentTools.get_wallet_balance,
             ],
             backstory=dedent(
                 f"""
@@ -44,19 +43,12 @@ class TokenTradingExecutorCrew(AIBTC_Crew):
         )
         self.add_task(know_about_analysis_results)
 
-        get_my_wallet_balance_task = Task(
-            description=f"This task will retrieve the current balance of the wallet for the specified cryptocurrency. Get the current balance of the wallet for {crypto_symbol}.",
-            expected_output="A dictionary with details about the wallet balance.",
-            agent=self.agents[0],  # market_data_agent
-        )
-        self.add_task(get_my_wallet_balance_task)
-
         execute_trade_task = Task(
             description=dedent(
                 f"""
                 Execute a trade for {crypto_symbol} based on trading signals provided by the Token Trading Analyzer crew.
                 This task will execute a trade for the specified cryptocurrency based on trading signals provided by the Token Trading Analyzer crew.
-                The trade will be executed with position size management to optimize profits. Only ever do 1 STX when buying and when selling sell all of what i own.
+                The trade will be executed with position size management to optimize profits. Only ever do 1 STX when buying and when selling sell 10% of what I own.
                 """
             ),
             expected_output="A dictionary with details about the executed trade.",
@@ -112,19 +104,6 @@ class AgentTools:
 
         except Exception as e:
             raise Exception(f"Buy trade execution error: {str(e)}")
-
-    @staticmethod
-    @tool("Get Wallet Balance")
-    def get_wallet_balance() -> Dict:
-        """Get the current balance of the wallet for the tokens."""
-        try:
-            return BunScriptRunner.bun_run(
-                "stacks-wallet",
-                "get-my-wallet-balance.ts",
-            )
-
-        except Exception as e:
-            raise Exception(f"Sell trade execution error: {str(e)}")
 
     @classmethod
     def get_all_tools(cls):
