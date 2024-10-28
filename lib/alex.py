@@ -39,7 +39,11 @@ class AlexApi:
         """Retrieve historical price data for a specified cryptocurrency symbol."""
         try:
             # Make a GET request to the price history endpoint
-            return self._get(f"v1/price_history/{token_address}?limit=1000")
+            prices = self._get(f"v1/price_history/{token_address}?limit=1000")["prices"]
+            return [
+                {"price": price["avg_price_usd"], "block": price["block_height"]}
+                for price in prices
+            ]
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Failed to get token price history: {str(e)}")
@@ -61,3 +65,27 @@ class AlexApi:
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Failed to get pool volume: {str(e)}")
+
+    def get_token_pool_price(self, pool_token_id: str) -> str:
+        """Retrieve pool volume data for a specified pool token ID."""
+        try:
+            # Make a GET request to the pool volume endpoint
+            return self._get(f"v1/pool_token_price/{pool_token_id}?limit=1000")
+        except Exception as e:
+            # Raise an exception with a custom error message
+            raise Exception(f"Failed to get pool volume: {str(e)}")
+
+    def get_token_tvl(self, pool_token_id: str) -> str:
+        """Retrieve tvl data for a specified token."""
+        try:
+            # Make a GET request to the tvl endpoint
+            return self._get(f"/v1/stats/tvl/{pool_token_id}?limit=1000")
+        except Exception as e:
+            # Raise an exception with a custom error message
+            raise Exception(f"Failed to get pool volume: {str(e)}")
+
+
+obj = AlexApi()
+# print(obj.get_pairs())
+# print(obj.get_price_history("SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-alex"))
+print(obj.get_token_pool_price("43"))
