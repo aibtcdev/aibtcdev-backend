@@ -5,6 +5,7 @@ from crewai_tools import tool, Tool
 from services.crew_services import build_all_crews
 import inspect
 from .trading_analyzer import TokenTradingAnalyzerCrew
+from .trading_excecutor import TokenTradingExecutorCrew
 
 
 class UserChatSpecialistStaticCrew(AIBTC_Crew):
@@ -63,6 +64,21 @@ class AgentTools:
             crew_class = TokenTradingAnalyzerCrew()
             crew_class.setup_agents()
             crew_class.setup_tasks(crypto_symbol)
+            crew = crew_class.create_crew()
+            crew.planning = True
+            result = crew.kickoff()
+            return result
+        except Exception as e:
+            return f"Error executing Trading Analyzer Crew: {e}"
+
+    @staticmethod
+    @tool("Execute Trading Executor Crew")
+    def execute_trading_executor_crew(analysis_results: str, crypto_symbol: str):
+        """Execute the Trading Executor Crew to execute trades based on trading signals provided by the Token Trading Analyzer crew."""
+        try:
+            crew_class = TokenTradingExecutorCrew()
+            crew_class.setup_agents()
+            crew_class.setup_tasks(analysis_results, crypto_symbol)
             crew = crew_class.create_crew()
             crew.planning = True
             result = crew.kickoff()

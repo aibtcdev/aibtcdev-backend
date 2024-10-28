@@ -6,7 +6,7 @@ class BunScriptRunner:
     script_dir = "src"
 
     @staticmethod
-    def bun_run(contract_name: str, script_name: str, arg: str = None):
+    def bun_run(contract_name: str, script_name: str, *args):
         """Runs a TypeScript script using bun with an optional positional argument."""
         command = [
             "bun",
@@ -15,8 +15,7 @@ class BunScriptRunner:
         ]
 
         # Append the optional argument if provided
-        if arg is not None:
-            command.append(arg)
+        command.extend(args)
 
         try:
             result = subprocess.run(
@@ -28,4 +27,4 @@ class BunScriptRunner:
             )
             return {"output": result.stdout, "error": None, "success": True}
         except subprocess.CalledProcessError as e:
-            return {"output": None, "error": e.stderr, "success": False}
+            return {"output": e.stdout, "error": e.stderr, "success": False}

@@ -1,10 +1,9 @@
 import inspect
-import streamlit as st
 from crewai import Agent, Task
 from crewai_tools import tool, Tool
 from textwrap import dedent
 from lib.crews import AIBTC_Crew
-import requests
+from lib.velar import VelarApi
 
 
 class TokenTradingAnalyzerCrew(AIBTC_Crew):
@@ -20,9 +19,8 @@ class TokenTradingAnalyzerCrew(AIBTC_Crew):
             role="Market Data Retriever",
             goal="Collect historical and real-time price data for the specified cryptocurrency, broken down by Stacks block intervals. Ensure accuracy by retrieving prices from multiple DEXs and identifying anomalies.",
             tools=[
-                AgentTools.get_crypto_price_history,
+                AgentTools.get_crypto_history,
                 AgentTools.get_all_swaps,
-                AgentTools.get_pool_volume,
             ],
             backstory=(
                 "You are a specialized market data retriever with access to various decentralized exchanges (DEXs). "
@@ -91,79 +89,22 @@ class TokenTradingAnalyzerCrew(AIBTC_Crew):
 # Agent Tools
 class AgentTools:
     @staticmethod
-    @tool("Get Token Price History")
-    def get_crypto_price_history(token_address: str):
+    @tool("Get Token Price, Volume, TVL History")
+    def get_crypto_history(token_symbol: str):
         """Retrieve historical price data for a specified cryptocurrency symbol."""
-        url = f"https://api.alexgo.io/v1/price_history/{token_address}?limit=100"
-        headers = {
-            "Accept": "application/json",
-        }
+        obj = VelarApi()
+        token_stx_pools = obj.get_token_stx_pools(token_symbol.upper())
+        pool_agg = obj.get_pool_stats_history_agg(token_stx_pools[0]["id"], "month")
 
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(
-                f"Failed to get token price history: {response.status_text}"
-            )
-
-        data = response.json()
-
-        price_history = data.get("prices", [])
-        formatted_history = "\n".join(
-            f"Block Height: {price['block_height']}, Price: {price['avg_price_usd']}"
-            for price in price_history
-        )
-
-        return f"Token: {data['token']}\n{formatted_history}"
+        return pool_agg
 
     @staticmethod
     @tool("Get All Avaliable Token Info")
     def get_all_swaps():
-        """Retrieve all swap data from the Alex API and return a formatted string."""
-        url = "https://api.alexgo.io/v1/allswaps"
-        headers = {
-            "Accept": "application/json",
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(f"Failed to get all swaps: {response.status_text}")
-
-        data = response.json()
-
-        formatted_swaps = "\n".join(
-            dedent(
-                f"""Pool ID: {swap['id']}, Quote: {swap['quote']}, Symbol: {swap['quoteSymbol']}, Address: {swap['quoteId']}"""
-            ).strip()
-            for swap in data
-        )
-
-        return formatted_swaps
-
-    @staticmethod
-    @tool("Get Token Pool Volume History")
-    def get_pool_volume(pool_token_id: str):
-        """Retrieve pool volume data for a specified pool token ID."""
-        url = f"https://api.alexgo.io/v1/pool_volume/{pool_token_id}?limit=100"
-        headers = {
-            "Accept": "application/json",
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if not response.ok:
-            raise Exception(f"Failed to get pool volume: {response.status_text}")
-
-        data = response.json()
-
-        volume_values = data.get("volume_values", [])
-        formatted_volume = "\n".join(
-            f"Block Height: {volume['block_height']}, Volume: {volume['volume_24h']}"
-            for volume in volume_values
-        )
-
-        return f"Token: {data['token']}\n{formatted_volume}"
+        """Retrieve all available token information from the Velar API."""
+        obj = VelarApi()
+        tokens = obj.get_tokens()
+        return tokens
 
     @classmethod
     def get_all_tools(cls):
