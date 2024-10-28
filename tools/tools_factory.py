@@ -2,7 +2,7 @@
 from crewai_tools import SerperDevTool
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
-from .lunarcrush import LunarCrushGetTokenData
+from .lunarcrush import LunarCrushGetTokenData, LunarCrushSearch
 
 
 # from .fetch_contract_code import FetchContractCodeTool
@@ -20,6 +20,7 @@ def initialize_tools():
         "bitflow_get_available_tokens": BitflowGetAvailableTokens(),
         "bitflow_execute_trade": BitflowExecuteTradeTool(),
         "lunarcrush_get_token_data": LunarCrushGetTokenData(),
+        "lunarcrush_search": LunarCrushSearch(),
         "web_search_experimental": SerperDevTool(),
     }
 

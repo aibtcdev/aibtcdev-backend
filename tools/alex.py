@@ -33,7 +33,7 @@ class AlexGetSwapInfo(BaseTool):
     def __init__(self):
         super().__init__(
             name="ALEX: Get All Avaliable Token Info",
-            description="Retrieve all swap data from the Alex API.",
+            description="Retrieve all pair data from the Alex API.",
         )
 
     def _run(self) -> str:
@@ -41,7 +41,7 @@ class AlexGetSwapInfo(BaseTool):
         Retrieve all pairs from the Alex API and return a formatted string.
 
         Returns:
-            str: A formatted string containing all swap data.
+            str: A formatted string containing all pair data.
         """
         obj = AlexApi
         pairs = obj.get_pairs()
