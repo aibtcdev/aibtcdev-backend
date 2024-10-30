@@ -237,6 +237,7 @@ def build_single_crew(agents_data, tasks_data):
         agent_backstory = agent_data.get("backstory")
         agent_tool_names = agent_data.get("agent_tools", [])
 
+        # TODO remove hardcoded 0
         tools_map = initialize_tools("0")
 
         agent_tools = get_agent_tools(agent_tool_names, tools_map)
