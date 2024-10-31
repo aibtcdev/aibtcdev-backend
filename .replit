@@ -1,11 +1,12 @@
-modules = ["python-3.12"]
+modules = ["python-3.12", "node-"]
+build = "git submodule init && git submodule update --remote && cd agent-tools-ts && bun install"
 run = ["uvicorn", "main:app", "--host", "0.0.0.0", "--reload"]
 
 [nix]
 channel = "stable-24_05"
 
 [deployment]
-build = "git submodule init && git submodule update --remote"
+build = "git submodule init && git submodule update --remote && cd agent-tools-ts && bun install"
 run = ["uvicorn", "main:app", "--host", "0.0.0.0"]
 deploymentTarget = "gce"
 
