@@ -73,7 +73,7 @@ class AgentTools:
         """Execute a market buy order with position size management. Tokens are formatted as token-${token_symbol}. Ex. token-stx token-welsh token-alex"""
         try:
             result = BunScriptRunner.bun_run(
-                "stacks-bitflow", "exec-swap.ts", "0.04", amount, "token-stx", token
+                "0" "stacks-bitflow", "exec-swap.ts", "0.04", amount, "token-stx", token
             )
 
             return {
@@ -92,7 +92,7 @@ class AgentTools:
         """Execute a market sell order with position size management. Tokens are formatted as token-${token_symbol}. Ex. token-stx token-welsh token-alex"""
         try:
             result = BunScriptRunner.bun_run(
-                "stacks-bitflow", "exec-swap.ts", "0.04", amount, token, "token-stx"
+                "0" "stacks-bitflow", "exec-swap.ts", "0.04", amount, token, "token-stx"
             )
 
             return {
