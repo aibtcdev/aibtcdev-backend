@@ -10,11 +10,11 @@ class BitflowGetAvailableTokens(BaseTool):
         )
 
     def _run(self):
-        return BunScriptRunner.bun_run("stacks-bitflow", "get-tokens.ts")
+        return BunScriptRunner.bun_run("0", "stacks-bitflow", "get-tokens.ts")
 
 
 class BitflowExecuteTradeTool(BaseTool):
-    def __init__(self):
+    def __init__(self, account_index):
         super().__init__(
             name="Bitflow: Execute Swap/Trade",
             description="Execute a market order to buy the specified amount of the token",
@@ -25,8 +25,15 @@ class BitflowExecuteTradeTool(BaseTool):
                 "tokenB": {"type": "string"},
             },
         )
+        self.account_index = account_index
 
     def _run(self, fee, amount, tokenA, tokenB):
         return BunScriptRunner.bun_run(
-            "stacks-bitflow", "exec-swap.ts", fee, amount, tokenA, tokenB
+            self.account_index,
+            "stacks-bitflow",
+            "exec-swap.ts",
+            fee,
+            amount,
+            tokenA,
+            tokenB,
         )

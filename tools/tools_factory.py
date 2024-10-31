@@ -8,7 +8,7 @@ from .lunarcrush import LunarCrushGetTokenData, LunarCrushSearch
 # from .fetch_contract_code import FetchContractCodeTool
 
 
-def initialize_tools():
+def initialize_tools(account_index: str = "0"):
     """
     Initialize and return a dictionary of available tools.
     """
@@ -18,7 +18,7 @@ def initialize_tools():
         "alex_get_swap_info": AlexGetSwapInfo(),
         "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
         "bitflow_get_available_tokens": BitflowGetAvailableTokens(),
-        "bitflow_execute_trade": BitflowExecuteTradeTool(),
+        "bitflow_execute_trade": BitflowExecuteTradeTool(account_index),
         "lunarcrush_get_token_data": LunarCrushGetTokenData(),
         "lunarcrush_search": LunarCrushSearch(),
         "web_search_experimental": SerperDevTool(),

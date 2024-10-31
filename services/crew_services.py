@@ -4,10 +4,6 @@ from tools.tools_factory import initialize_tools, get_agent_tools
 from dotenv import load_dotenv
 
 load_dotenv()
-tools_map = initialize_tools()
-
-# CHECK IF THE TOOLS ARE THERE OR NOT (ONLY FOR DEBUGGING)
-print("Available tools:", tools_map)
 
 
 def fetch_all_crews():
@@ -74,7 +70,7 @@ def fetch_crew_data(crew_id: int):
 
 
 # FUNCTION TO EXECUTE THE CREW
-def execute_crew(crew_id: int, input_str: str):
+def execute_crew(account_index: str, crew_id: int, input_str: str):
     """
     Execute a crew by fetching agents and tasks for a given crew_id,
     refine the tasks using a hardcoded manager agent, and manage the flow of outputs.
@@ -86,6 +82,8 @@ def execute_crew(crew_id: int, input_str: str):
     Returns:
         str: The result of the crew's execution.
     """
+
+    tools_map = initialize_tools(account_index)
 
     # FETCH AGENTS AND TASKS FROM THE CREW_ID
     agents_data, tasks_data = fetch_crew_data(crew_id)
@@ -230,6 +228,9 @@ def build_single_crew(agents_data, tasks_data):
     """
     Build a single crew with the given agents and tasks data.
     """
+
+    tools_map = initialize_tools("0")
+
     # CREATE AGENTS AND INDEX THEM BY AGENT_ID
     agents = {}
 

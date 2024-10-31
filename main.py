@@ -12,6 +12,7 @@ app.add_middleware(
     allow_origins=[
         "https://aibtcdev-frontend.replit.app",
         "https://sprint.aibtc.dev",
+        "*"
     ],  # Allow access from frontend
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
