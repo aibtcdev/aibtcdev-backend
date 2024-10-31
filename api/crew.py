@@ -4,16 +4,17 @@ from .verify_profile import verify_profile
 
 router = APIRouter()
 
+
 @router.post("/execute_crew/{crew_id}")
 async def execute_crew_endpoint(
     crew_id: int,
     input_str: str = Body(...),
-    account_index: int = Depends(verify_profile)
+    account_index: int = Depends(verify_profile),
 ):
     try:
         # Execute the crew logic with the provided input string
-        result = await execute_crew(crew_id, input_str)
-        
+        result = await execute_crew(account_index, crew_id, input_str)
+
         return {"result": result}
 
     except Exception as e:
