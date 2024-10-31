@@ -41,6 +41,6 @@ class VelarGetTokens(BaseTool):
         Returns:
             str: A formatted string containing all tokens.
         """
-        obj = VelarApi
+        obj = VelarApi()
 
         return obj.get_tokens()
