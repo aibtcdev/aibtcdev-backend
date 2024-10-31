@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Body, Depends
 from services.crew_services import execute_crew
+from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile
 
 router = APIRouter()
@@ -16,6 +17,23 @@ async def execute_crew_endpoint(
         result = await execute_crew(account_index, crew_id, input_str)
 
         return {"result": result}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+
+
+@router.get("/tools")
+async def get_avaliable_tools():
+    try:
+        # Execute the crew logic with the provided input string
+        tools_map = initialize_tools("0")
+        # print(tools_map)
+        response = {
+            tool_name: tool_instance.description
+            for tool_name, tool_instance in tools_map.items()
+        }
+
+        return response
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
