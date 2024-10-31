@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # set up a simple app to respond to server health check
 app = FastAPI()
+routes_initialized = False
 
 # setup CORS origins
 # TODO: use after confirming it works
@@ -27,7 +28,7 @@ async def health():
     return {"message": "A healthy server is a happy server!"}
 
 
-@app.get("/initialize")
+@app.get("/init")
 async def initialize():
     global routes_initialized
 
