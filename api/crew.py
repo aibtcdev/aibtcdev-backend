@@ -25,9 +25,7 @@ async def execute_crew_endpoint(
 @router.get("/tools")
 async def get_avaliable_tools():
     try:
-        # Execute the crew logic with the provided input string
         tools_map = initialize_tools("0")
-        # print(tools_map)
         response = {
             tool_name: tool_instance.description
             for tool_name, tool_instance in tools_map.items()
