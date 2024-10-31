@@ -1,16 +1,26 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api import crew
+from api import chat
 
-# from api import chat
+# set up a simple app to respond to server health check
+pass_health_check = FastAPI()
+
+
+@pass_health_check.get("/")
+async def root():
+    return {"message": "A healthy server is a happy server!"}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load heavy routers after the app starts
+    # sleep to let health check complete
+    await asyncio.sleep(10)
+    # load the routes
     app.include_router(crew.router)
-    # app.include_router(chat.router)
+    app.include_router(chat.router)
     yield
     # can add cleanup code here
 
