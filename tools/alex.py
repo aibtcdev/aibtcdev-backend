@@ -43,7 +43,7 @@ class AlexGetSwapInfo(BaseTool):
         Returns:
             str: A formatted string containing all pair data.
         """
-        obj = AlexApi
+        obj = AlexApi()
         pairs = obj.get_pairs()
 
         return [
