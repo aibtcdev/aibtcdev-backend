@@ -30,8 +30,8 @@ class VelarGetPriceHistory(BaseTool):
 class VelarGetTokens(BaseTool):
     def __init__(self):
         super().__init__(
-            name="ALEX: Get All Avaliable Token Info",
-            description="Retrieve all pair data from the Alex API.",
+            name="Velar: Get All Avaliable Token Info",
+            description="Retrieve a list of tokens from the Velar API.",
         )
 
     def _run(self) -> str:

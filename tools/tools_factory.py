@@ -14,7 +14,7 @@ def initialize_tools(account_index: str = "0"):
     """
     Initialize and return a dictionary of available tools.
     """
-    # NAMES SHOULD BE EXACTLY WHAT'S IN THE FRONTEND
+    # this will be exposed by an endpoint for the frontend to get the available tools
     return {
         "alex_get_price_history": AlexGetPriceHistory(),
         "alex_get_swap_info": AlexGetSwapInfo(),
