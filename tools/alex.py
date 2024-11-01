@@ -7,7 +7,7 @@ from lib.alex import AlexApi
 class AlexGetPriceHistory(BaseTool):
     def __init__(self):
         super().__init__(
-            name="ALEX: Get Token Price History",
+            name="ALEX: Get Token Price History (500 Blocks)",
             description=(
                 "Retrieve historical price data for a specified cryptocurrency symbol."
             ),
@@ -32,7 +32,7 @@ class AlexGetPriceHistory(BaseTool):
 class AlexGetSwapInfo(BaseTool):
     def __init__(self):
         super().__init__(
-            name="ALEX: Get All Avaliable Token Info",
+            name="ALEX: Get STX Trading Pairs",
             description="Retrieve all pair data from the Alex API.",
         )
 
@@ -56,7 +56,7 @@ class AlexGetSwapInfo(BaseTool):
 class AlexGetTokenPoolVolume(BaseTool):
     def __init__(self):
         super().__init__(
-            name="ALEX: Get Token Pool Volume",
+            name="ALEX: Get Pool Price Data (500 Blocks)",
             description="Retrieve pool volume data for a specified token pool ID.",
             args={"token_pool_id": {"type": "string"}},
         )
