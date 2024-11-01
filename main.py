@@ -1,31 +1,41 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import crew
-from api import chat
 
+# set up a simple app to respond to server health check
 app = FastAPI()
+routes_initialized = False
 
-# Allow requests from the Next.js frontend
-# For local dev: allow_orgins=["http://localhost:3000"]
+# setup CORS origins
+# TODO: use after confirming it works
+cors_origins = [
+    "https://sprint.aibtc.dev",
+    "https://aibtcdev-frontend.replit.app",
+]
+
+
+# setup middleware to allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://aibtcdev-frontend.replit.app",
-        "https://sprint.aibtc.dev",
-        "*"
-    ],  # Allow access from frontend
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-# Include the crew routes
-app.include_router(crew.router)
-
-# Include the chat routes
-app.include_router(chat.router)
 
 
 @app.get("/")
-async def root():
-    return {"message": "CrewAI execution API is running!"}
+async def health():
+    return {"message": "A healthy server is a happy server!"}
+
+
+@app.get("/init")
+async def initialize():
+    global routes_initialized
+
+    if not routes_initialized:
+        from api import crew
+
+        app.include_router(crew.router)
+        routes_initialized = True
+        return {"message": "Routes loaded and initialized!"}
+    return {"message": "Routes already initialized!"}
