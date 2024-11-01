@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,9 +35,16 @@ async def initialize():
     global routes_initialized
 
     if not routes_initialized:
+        # load env vars and init langtrace
+        load_dotenv()
+        from langtrace_python_sdk import langtrace
+
+        langtrace.init()
+        # load crew endpoints and initialize routes
         from api import crew
 
         app.include_router(crew.router)
+        # set global flag to prevent reinitialization
         routes_initialized = True
         return {"message": "Routes loaded and initialized!"}
     return {"message": "Routes already initialized!"}
