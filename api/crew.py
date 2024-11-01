@@ -14,7 +14,7 @@ async def execute_crew_endpoint(
 ):
     try:
         # Execute the crew logic with the provided input string
-        result = await execute_crew(account_index, crew_id, input_str)
+        result = execute_crew(account_index, crew_id, input_str)
 
         return {"result": result}
 
