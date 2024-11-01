@@ -5,7 +5,7 @@ from lib.velar import VelarApi
 class VelarGetPriceHistory(BaseTool):
     def __init__(self):
         super().__init__(
-            name="Velar: Get Token Price History",
+            name="VELAR: Get Token Price History",
             description=(
                 "Retrieve historical price data for a specified cryptocurrency symbol."
             ),
@@ -30,7 +30,7 @@ class VelarGetPriceHistory(BaseTool):
 class VelarGetTokens(BaseTool):
     def __init__(self):
         super().__init__(
-            name="Velar: Get All Avaliable Token Info",
+            name="VELAR: Get Available Tokens",
             description="Retrieve a list of tokens from the Velar API.",
         )
 

@@ -8,7 +8,7 @@ from typing import Any, Optional, Type
 class BitflowGetAvailableTokens(BaseTool):
     def __init__(self):
         super().__init__(
-            name="Bitflow: Get available tokens list",
+            name="BITFLOW: Get Available Tokens",
             description="Get the list of available tokens for trading",
         )
 
@@ -26,7 +26,7 @@ class BitflowExecuteTradeToolSchema(BaseModel):
 
 
 class BitflowExecuteTradeTool(BaseTool):
-    name: str = "Bitflow: Execute Swap/Trade"
+    name: str = "BITFLOW: Execute Token Swap"
     description: str = (
         "Execute a market order to buy the specified amount of the token."
     )
