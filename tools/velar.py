@@ -7,7 +7,9 @@ class VelarGetPriceHistory(BaseTool):
         super().__init__(
             name="VELAR: Get Token Price History",
             description=(
-                "Retrieve historical price data for a specified cryptocurrency symbol."
+                "Retrieve monthly price history for a token's STX trading pair. "
+                "Input: Token symbol (e.g., 'ALEX', 'DIKO'). "
+                "Returns: Array of price points with timestamps and USD values."
             ),
             args={"token_symbol": {"type": "string"}},
         )
@@ -31,7 +33,10 @@ class VelarGetTokens(BaseTool):
     def __init__(self):
         super().__init__(
             name="VELAR: Get Available Tokens",
-            description="Retrieve a list of tokens from the Velar API.",
+            description=(
+                "Get all available tokens tradeable on Velar DEX. "
+                "Returns: List of tokens with their contract addresses and metadata."
+            ),
         )
 
     def _run(self) -> str:

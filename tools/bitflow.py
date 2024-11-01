@@ -9,7 +9,10 @@ class BitflowGetAvailableTokens(BaseTool):
     def __init__(self):
         super().__init__(
             name="BITFLOW: Get Available Tokens",
-            description="Get the list of available tokens for trading",
+            description=(
+                "Get all tokens available for trading on Bitflow DEX. "
+                "Returns: List of supported tokens with their contract addresses."
+            ),
         )
 
     def _run(self):
@@ -28,7 +31,9 @@ class BitflowExecuteTradeToolSchema(BaseModel):
 class BitflowExecuteTradeTool(BaseTool):
     name: str = "BITFLOW: Execute Token Swap"
     description: str = (
-        "Execute a market order to buy the specified amount of the token."
+        "Execute a token swap transaction on Bitflow DEX. "
+        "Inputs: fee (in STX), amount to trade, source token, target token. "
+        "Returns: Transaction ID of the executed swap."
     )
     args_schema: Type[BaseModel] = BitflowExecuteTradeToolSchema
     account_index: Optional[str] = None

@@ -9,7 +9,9 @@ class AlexGetPriceHistory(BaseTool):
         super().__init__(
             name="ALEX: Get Token Price History (500 Blocks)",
             description=(
-                "Retrieve historical price data for a specified cryptocurrency symbol."
+                "Retrieve price history for the last 500 blocks for a token. "
+                "Input: Token contract address. "
+                "Returns: Array of price points with block heights and USD values."
             ),
             args={"token_address": {"type": "string"}},
         )
@@ -33,7 +35,10 @@ class AlexGetSwapInfo(BaseTool):
     def __init__(self):
         super().__init__(
             name="ALEX: Get STX Trading Pairs",
-            description="Retrieve all pair data from the Alex API.",
+            description=(
+                "Get all STX trading pairs available on ALEX DEX. "
+                "Returns: List of tokens and their pool IDs that can be traded against STX."
+            ),
         )
 
     def _run(self) -> str:
@@ -57,7 +62,11 @@ class AlexGetTokenPoolVolume(BaseTool):
     def __init__(self):
         super().__init__(
             name="ALEX: Get Pool Price Data (500 Blocks)",
-            description="Retrieve pool volume data for a specified token pool ID.",
+            description=(
+                "Get price data for the last 500 blocks for a specific liquidity pool. "
+                "Input: Pool ID from ALEX DEX. "
+                "Returns: Price history with block heights and volumes."
+            ),
             args={"token_pool_id": {"type": "string"}},
         )
 
