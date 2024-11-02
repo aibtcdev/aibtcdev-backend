@@ -2,6 +2,7 @@
 from crewai_tools import SerperDevTool
 
 from tools.velar import VelarGetPriceHistory, VelarGetTokens
+from tools.wallet import WalletGetMyAddress, WalletGetMyBalance
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
 from .lunarcrush import LunarCrushGetTokenData, LunarCrushSearch
@@ -26,6 +27,8 @@ def initialize_tools(account_index: str = "0"):
         "web_search_experimental": SerperDevTool(),
         "velar_get_token_price_history": VelarGetPriceHistory(),
         "velar_get_tokens": VelarGetTokens(),
+        "wallet_get_my_balance": WalletGetMyBalance(account_index),
+        "wallet_get_my_address": WalletGetMyAddress(account_index),
     }
 
 
