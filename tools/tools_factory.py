@@ -1,14 +1,19 @@
 # from .get_btc_data import GetBitcoinData
 from crewai_tools import SerperDevTool
 
-from tools.velar import VelarGetPriceHistory, VelarGetTokens
-from tools.wallet import WalletGetMyAddress, WalletGetMyBalance
+from .velar import VelarGetPriceHistory, VelarGetTokens
+from .wallet import WalletGetMyAddress, WalletGetMyBalance
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
 from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
     LunarCrushTokenMetadataTool,
+)
+from .transactions import (
+    StacksTransactionStatusTool,
+    StacksTransactionTool,
+    StacksTransactionByAddressTool,
 )
 
 
@@ -34,6 +39,9 @@ def initialize_tools(account_index: str = "0"):
         "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(account_index),
         "wallet_get_my_address": WalletGetMyAddress(account_index),
+        "stacks_transaction_status": StacksTransactionStatusTool(),
+        "stacks_transaction": StacksTransactionTool(),
+        "stacks_transaction_by_address": StacksTransactionByAddressTool(),
     }
 
 
