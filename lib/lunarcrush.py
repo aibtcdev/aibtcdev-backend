@@ -43,7 +43,16 @@ class LunarcrushApi:
             return self._get(f"coins/{token_contract_addr}/v1")["data"]
         except Exception as e:
             # Raise an exception with a custom error message
-            raise Exception(f"Swap data retrieval error: {str(e)}")
+            raise Exception(f"Lunarcrush API GET request error: {str(e)}")
+
+    def get_token_metadata(self, token_contract_addr: str) -> str:
+        """Retrieve metadata data for a specific token using its contract address."""
+        try:
+            # Make a GET request to the token socials endpoint
+            return self._get(f"coins/{token_contract_addr}/meta/v1")["data"]
+        except Exception as e:
+            # Raise an exception with a custom error message
+            raise Exception(f"Lunarcrush API GET request error: {str(e)}")
 
     def get_token_social_history(self, token_contract_addr: str) -> str:
         """Retrieve social data for a specific token using its contract address."""
@@ -52,7 +61,7 @@ class LunarcrushApi:
             return self._get(f"coins/{token_contract_addr}/time-series/v1")
         except Exception as e:
             # Raise an exception with a custom error message
-            raise Exception(f"Swap data retrieval error: {str(e)}")
+            raise Exception(f"Lunarcrush API GET request error: {str(e)}")
 
     def search(self, term: str) -> str:
         """Search for a specific token using its name or symbol."""
