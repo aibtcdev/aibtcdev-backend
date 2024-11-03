@@ -15,6 +15,7 @@ from .transactions import (
     StacksTransactionTool,
     StacksTransactionByAddressTool,
 )
+from .contracts import ContractSIP10DeployTool
 
 
 # from .fetch_contract_code import FetchContractCodeTool
@@ -42,6 +43,7 @@ def initialize_tools(account_index: str = "0"):
         "stacks_transaction_status": StacksTransactionStatusTool(),
         "stacks_transaction": StacksTransactionTool(),
         "stacks_transaction_by_address": StacksTransactionByAddressTool(),
+        "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
     }
 
 
