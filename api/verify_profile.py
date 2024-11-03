@@ -4,14 +4,17 @@ from db.supabase_client import supabase
 
 load_dotenv()
 
-async def verify_profile(authorization: str = Header(...)) -> int:
+
+async def verify_profile(authorization: str = Header(...)) -> str:
     """
     Get and verify the account_index from the profile of the requesting user.
     Returns the account_index if valid.
     """
     if not authorization or not authorization.startswith("Bearer "):
         print("Authorization header is missing or invalid.")
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid authorization header"
+        )
 
     token = authorization.split(" ")[1]
     print(f"Authorization token received: {token}")
@@ -22,11 +25,13 @@ async def verify_profile(authorization: str = Header(...)) -> int:
         email = user.user.email
 
         # Retrieve the profile
-        profile_response = supabase.table('profiles') \
-            .select('account_index, email') \
-            .eq('email', email) \
-            .single() \
+        profile_response = (
+            supabase.table("profiles")
+            .select("account_index, email")
+            .eq("email", email)
+            .single()
             .execute()
+        )
 
         if profile_response.data is None:
             print("Profile not found or retrieval failed in Supabase.")
@@ -35,13 +40,15 @@ async def verify_profile(authorization: str = Header(...)) -> int:
         profile = profile_response.data
         print(f"Profile data retrieved: {profile}")
 
-        account_index = profile.get('account_index')
+        account_index = profile.get("account_index")
         if account_index is None:
             print("Account index is missing from profile data.")
-            raise HTTPException(status_code=400, detail="No account index found for profile")
+            raise HTTPException(
+                status_code=400, detail="No account index found for profile"
+            )
 
         print(f"Account index for user is {account_index}")
-        return account_index
+        return str(account_index)
 
     except HTTPException as http_ex:
         print(f"HTTPException: {http_ex.detail}")
