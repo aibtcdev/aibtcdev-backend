@@ -19,10 +19,17 @@ class BitflowGetAvailableTokens(BaseTool):
 class BitflowExecuteTradeToolSchema(BaseModel):
     """Input schema for BitflowExecuteTradeTool."""
 
-    fee: str = Field(..., description="Transaction fee for the trade")
-    amount: str = Field(..., description="Amount of the token to trade")
-    tokenA: str = Field(..., description="Token to be traded from")
-    tokenB: str = Field(..., description="Token to be traded to")
+    fee: str = Field(..., description="Transaction fee for the trade usually 0.04")
+    amount: str = Field(
+        ..., description="Amount of the token to trade in microunits. default to 1"
+    )
+    tokenA: str = Field(
+        ..., description="Token symbol that you are expecting to give up for the trade"
+    )
+    tokenB: str = Field(
+        ...,
+        description="Token symbol that you are expecting to receive after the trade",
+    )
 
 
 class BitflowExecuteTradeTool(BaseTool):
@@ -44,6 +51,6 @@ class BitflowExecuteTradeTool(BaseTool):
             "exec-swap.ts",
             fee,
             amount,
-            tokenA,
-            tokenB,
+            f"token-{tokenA.lower()}",
+            f"token-{tokenB.lower()}",
         )
