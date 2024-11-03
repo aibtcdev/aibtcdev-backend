@@ -6,8 +6,8 @@ from typing import Any, Optional, Type
 
 
 class WalletGetMyBalance(BaseTool):
-    name: str = "Wallet: Get My Balance"
-    description: str = "Get the balance of the wallet."
+    name: str = "Get my wallet balance"
+    description: str = "Get the wallet balance including stx, ft, and nfts."
     account_index: Optional[str] = None
 
     def __init__(self, account_index: str, **kwargs):
@@ -21,8 +21,8 @@ class WalletGetMyBalance(BaseTool):
 
 
 class WalletGetMyAddress(BaseTool):
-    name: str = "Wallet: Get My Address"
-    description: str = "Get the address of the wallet."
+    name: str = "Get my wallet address"
+    description: str = "Get the stx address of the wallet."
     account_index: Optional[str] = None
 
     def __init__(self, account_index: str, **kwargs):

@@ -27,5 +27,6 @@
     pkgs.openssl
     pkgs.libiconv
     pkgs.cargo
+    pkgs.libgcc
   ];
 }
