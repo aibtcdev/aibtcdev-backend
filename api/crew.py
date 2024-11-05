@@ -1,16 +1,30 @@
+from typing import Any, Dict
+import uuid
+from cachetools import TTLCache
 from fastapi import (
     APIRouter,
     HTTPException,
-    WebSocket,
-    WebSocketDisconnect,
+    Query,
+    Response,
     Depends,
     Body,
 )
+from fastapi.responses import JSONResponse
 from services.crew_services import execute_crew, execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile
 
 router = APIRouter()
+
+# Set up TTLCache with a max size and a time-to-live (TTL) of 5 minutes (300 seconds)
+connection_tokens = TTLCache(maxsize=1000, ttl=300)
+
+
+async def create_connection_token(account_index: int, request_data: Dict[str, Any]):
+    token = str(uuid.uuid4())
+    # Store token with the request data and account_index in TTLCache
+    connection_tokens[token] = {"account_index": account_index, "data": request_data}
+    return token
 
 
 @router.post("/execute_crew/{crew_id}")
@@ -29,26 +43,42 @@ async def execute_crew_endpoint(
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
 
 
-@router.websocket("/ws/execute_crew/{crew_id}")
-async def websocket_execute_crew(
-    websocket: WebSocket,
-    crew_id: int,
+@router.post("/new")
+async def get_connection_token(
     account_index: int = Depends(verify_profile),
+    request_data: Dict[str, Any] = Body(...),
 ):
-    await websocket.accept()
-    try:
-        # Receive the input string from the client
-        input_str = await websocket.receive_text()
+    token = await create_connection_token(account_index, request_data)
+    return JSONResponse(content={"connection_token": token})
 
-        # Execute the crew logic with the provided input string
-        async for result in execute_crew_stream(account_index, crew_id, input_str):
-            await websocket.send_json(result)
 
-    except WebSocketDisconnect:
-        print("Client disconnected")
-    except Exception as e:
-        await websocket.send_text(f"Execution error: {str(e)}")
-        await websocket.close()
+@router.get("/sse/execute_crew/{crew_id}")
+async def sse_execute_crew(
+    crew_id: int,
+    connection_token: str = Query(...),  # Require token as a query parameter
+):
+    # Verify and retrieve token data from TTLCache
+    token_data = connection_tokens.get(connection_token)
+    if not token_data:
+        raise HTTPException(
+            status_code=403, detail="Invalid or missing connection token"
+        )
+
+    # Extract account_index and request data from the token data
+    account_index = token_data["account_index"]
+    request_data = token_data["data"]
+
+    async def event_generator():
+        try:
+            # Use account_index and request_data with execute_crew_stream
+            async for result in execute_crew_stream(
+                account_index, crew_id, request_data
+            ):
+                yield f"data: {result}\n\n"
+        except Exception as e:
+            yield f"data: Execution error: {str(e)}\n\n"
+
+    return Response(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/tools")
