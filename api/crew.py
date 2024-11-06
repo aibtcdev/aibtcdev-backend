@@ -9,7 +9,7 @@ from fastapi import (
     Depends,
     Body,
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from services.crew_services import execute_crew, execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile
@@ -46,7 +46,7 @@ async def execute_crew_endpoint(
 @router.post("/new")
 async def get_connection_token(
     account_index: int = Depends(verify_profile),
-    request_data: Dict[str, Any] = Body(...),
+    request_data: str = Body(...),
 ):
     token = await create_connection_token(account_index, request_data)
     return JSONResponse(content={"connection_token": token})
@@ -78,7 +78,7 @@ async def sse_execute_crew(
         except Exception as e:
             yield f"data: Execution error: {str(e)}\n\n"
 
-    return Response(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/tools")
