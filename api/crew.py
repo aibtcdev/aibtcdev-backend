@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from services.crew_services import execute_crew, execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile
+import json
 
 router = APIRouter()
 
@@ -74,9 +75,11 @@ async def sse_execute_crew(
             async for result in execute_crew_stream(
                 account_index, crew_id, request_data
             ):
-                yield f"data: {result}\n\n"
+                json_result = json.dumps(result)
+                yield f"data: {json_result}\n\n"
         except Exception as e:
-            yield f"data: Execution error: {str(e)}\n\n"
+            error_message = json.dumps({"error": f"Execution error: {str(e)}"})
+            yield f"data: {error_message}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
