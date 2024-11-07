@@ -17,7 +17,7 @@ from .verify_profile import verify_profile
 router = APIRouter()
 
 # Set up TTLCache with a max size and a time-to-live (TTL) of 5 minutes (300 seconds)
-connection_tokens = TTLCache(maxsize=1000, ttl=300)
+connection_tokens = TTLCache(maxsize=1000, ttl=900)
 
 
 async def create_connection_token(account_index: int, request_data: Dict[str, Any]):
