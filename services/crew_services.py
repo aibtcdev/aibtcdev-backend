@@ -271,7 +271,16 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
 
     def crew_step_callback(step: Union[Dict[str, Any], "AgentAction"]):
         asyncio.run_coroutine_threadsafe(
-            callback_queue.put({"type": "step", "content": step.thought}), loop
+            callback_queue.put(
+                {
+                    "type": "step",
+                    "thought": step.thought,
+                    "result": step.result,
+                    "tool": step.tool,
+                    "tool_input": step.tool_input,
+                }
+            ),
+            loop,
         )
 
     def crew_task_callback(task: "TaskOutput"):
