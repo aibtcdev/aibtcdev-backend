@@ -23,18 +23,6 @@ router = APIRouter()
 
 running_tasks = {}
 
-# Set up TTLCache with a max size and a time-to-live (TTL)
-connection_tokens = TTLCache(maxsize=1000, ttl=3600)
-
-
-async def create_connection_token(profile: ProfileInfo):
-    token = str(uuid.uuid4())
-    connection_tokens[token] = {
-        "profile_id": profile.id,
-        "account_index": profile.account_index,
-    }
-    return token
-
 
 @router.get("/tools")
 async def get_avaliable_tools():
@@ -49,14 +37,6 @@ async def get_avaliable_tools():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
-
-
-@router.post("/new")
-async def get_connection_token(
-    profile: ProfileInfo = Depends(verify_profile),
-):
-    token = await create_connection_token(profile)
-    return JSONResponse(content={"connection_token": token})
 
 
 @router.get("/sse")
@@ -107,7 +87,6 @@ async def execute_crew_endpoint(
                 await output_queue.put(result)  # Put each result in the queue
                 result["crew_id"] = crew_id  # Add crew_id to each result
                 result["timestamp"] = datetime.datetime.now().isoformat()
-                print(result)
                 results_array.append(json.dumps(result))
             await output_queue.put(None)  # Signal completion
         finally:

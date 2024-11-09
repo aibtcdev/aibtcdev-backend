@@ -274,6 +274,7 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
             callback_queue.put(
                 {
                     "type": "step",
+                    "content": step.result,
                     "thought": step.thought,
                     "result": step.result,
                     "tool": step.tool,
