@@ -54,10 +54,10 @@ async def initialize_routes():
 
             load_dotenv()
 
-            # Lazy import and initialize langtrace
-            from langtrace_python_sdk import langtrace
+            # # Lazy import and initialize langtrace
+            # from langtrace_python_sdk import langtrace
 
-            langtrace.init()
+            # langtrace.init()
 
             # Import and set up routes from 'crew'
             from api import crew
