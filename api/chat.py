@@ -86,7 +86,15 @@ async def trigger_chat(
 async def sse_streaming(job_id: str):
     task_info = running_jobs.get(job_id)
     if not task_info:
-        raise HTTPException(status_code=404, detail="Task not found")
+        # Send a custom 404 error message as an SSE event
+        async def not_found_event_generator():
+            error_message = json.dumps({"type": "error", "message": "Task not found"})
+            yield f"event: error\ndata: {error_message}\n\n"
+            return  # Close the generator after sending the error
+
+        return StreamingResponse(
+            not_found_event_generator(), media_type="text/event-stream"
+        )
 
     output_queue = task_info["queue"]
 
@@ -101,8 +109,11 @@ async def sse_streaming(job_id: str):
                 json_result = json.dumps(result)
                 yield f"data: {json_result}\n\n"
         except Exception as e:
-            error_message = json.dumps({"error": f"Execution error: {str(e)}"})
-            yield f"data: {error_message}\n\n"
+            # Send any runtime error as an SSE error event
+            error_message = json.dumps(
+                {"type": "error", "message": f"Execution error: {str(e)}"}
+            )
+            yield f"event: error\ndata: {error_message}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
