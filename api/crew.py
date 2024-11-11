@@ -3,25 +3,35 @@ import datetime
 import uuid
 import json
 from fastapi.responses import JSONResponse, StreamingResponse
+from db.helpers import add_job
 from services.crew_services import execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile, ProfileInfo
-from db.supabase_client import supabase
-from cachetools import TTLCache
+from typing import List
+from lib.models import Crew
+from db.helpers import get_public_crews
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     HTTPException,
-    Query,
-    Response,
     Depends,
     Body,
 )
 
 
-router = APIRouter()
+router = APIRouter(prefix="/crew")
 
-running_tasks = {}
+running_jobs = {}
+
+
+@router.get("/public", response_model=List[Crew])
+async def public_crews():
+    try:
+        response = get_public_crews()
+        return JSONResponse(content=response)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching public crews: {str(e)}"
+        )
 
 
 @router.get("/tools")
@@ -32,18 +42,84 @@ async def get_avaliable_tools():
             tool_name: tool_instance.description
             for tool_name, tool_instance in tools_map.items()
         }
-
-        return response
-
+        return JSONResponse(content=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
 
 
-@router.get("/sse")
-async def sse_streaming(
-    task_id: str = Query(...),  # Require task_id as a query parameter
+@router.post("/{crew_id}")
+async def execute_crew_endpoint(
+    crew_id: int,
+    input_str: str = Body(...),
+    profile: ProfileInfo = Depends(verify_profile),
 ):
-    task_info = running_tasks.get(task_id)
+    # Generate a unique task ID
+    job_id = str(uuid.uuid4())
+    output_queue = asyncio.Queue()
+    results_array = []
+
+    results_array.append(
+        json.dumps(
+            {
+                "role": "user",
+                "type": "user",
+                "content": input_str,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }
+        )
+    )
+
+    async def task_wrapper():
+        try:
+            # Run the actual crew stream task, yielding output to the queue
+            async for result in execute_crew_stream(
+                str(profile.account_index), crew_id, input_str
+            ):
+                await output_queue.put(result)
+                result["crew_id"] = crew_id
+                result["timestamp"] = datetime.datetime.now().isoformat()
+                results_array.append(json.dumps(result))
+            await output_queue.put(None)  # Signal completion
+        finally:
+            add_job(
+                profile,
+                None,
+                crew_id,
+                input_str,
+                "",
+                results_array,
+            )
+            running_jobs.pop(job_id, None)
+
+    task = asyncio.create_task(task_wrapper())
+    running_jobs[job_id] = {
+        "task": task,
+        "queue": output_queue,
+        "profile": profile,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+
+    # Return the task ID immediately
+    return JSONResponse(content={"job_id": job_id})
+
+
+# Endpoint to get all background tasks for a given profile
+@router.get("/jobs")
+async def get_all_background_tasks(profile: ProfileInfo = Depends(verify_profile)):
+    tasks = []
+    for job_id, task_info in running_jobs.items():
+        if task_info["profile"].id == profile.id:
+            task = {
+                "job_id": job_id,
+                "timestamp": task_info["timestamp"],
+            }
+            tasks.append(task)
+    return JSONResponse(content=tasks)
+
+
+@router.get("/jobs/{job_id}/stream")
+async def sse_streaming(job_id: str):
+    task_info = running_jobs.get(job_id)
     if not task_info:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -66,126 +142,20 @@ async def sse_streaming(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.post("/execute_crew/{crew_id}")
-async def execute_crew_endpoint(
-    crew_id: int,
-    input_str: str = Body(...),
-    profile: ProfileInfo = Depends(verify_profile),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
-):
-    # Generate a unique task ID
-    task_id = str(uuid.uuid4())
-    output_queue = asyncio.Queue()
-    results_array = []
-
-    async def task_wrapper():
-        try:
-            # Run the actual crew stream task, yielding output to the queue
-            async for result in execute_crew_stream(
-                str(profile.account_index), crew_id, input_str
-            ):
-                await output_queue.put(result)  # Put each result in the queue
-                result["crew_id"] = crew_id  # Add crew_id to each result
-                result["timestamp"] = datetime.datetime.now().isoformat()
-                results_array.append(json.dumps(result))
-            await output_queue.put(None)  # Signal completion
-        finally:
-            # i need to store the messages in the output queue in supabase db
-            update_message(profile, results_array)
-
-            running_tasks.pop(
-                task_id, None
-            )  # Remove task from the dictionary when done
-
-    # Create and store the task with its output queue
-    task = asyncio.create_task(task_wrapper())
-    running_tasks[task_id] = {"task": task, "queue": output_queue}
-    background_tasks.add_task(task_wrapper)
-
-    # Return the task ID immediately
-    return JSONResponse(content={"task_id": task_id})
-
-
-def update_message(profile, messages):
-    # Update the message in the database
-    response = (
-        supabase.table("conversations")
-        .select("*")
-        .eq("profile_id", profile.id)
-        .execute()
-    )
-    data = response.data
-
-    if data:
-        # Conversation exists, so append to the existing messages
-        conversation_id = data[0]["id"]
-        existing_messages = data[0]["messages"]
-
-        # Append the new message to the messages array
-        updated_messages = existing_messages + messages
-
-        # Update the conversation with the appended messages
-        supabase.table("conversations").update({"messages": updated_messages}).eq(
-            "id", conversation_id
-        ).execute()
-
-    else:
-        # No conversation exists, create a new one
-        new_conversation = {
-            "profile_id": profile.id,
-            "messages": messages,
-        }
-        supabase.table("conversations").insert(new_conversation).execute()
-
-
-@router.get("/history")
-async def history(
+# Endpoint to cancel a background task given its job_id
+@router.delete("/jobs/{job_id}/cancel")
+async def cancel_task(
+    job_id: str,
     profile: ProfileInfo = Depends(verify_profile),
 ):
-    try:
-        # Retrieve existing conversation for the user if it exists
-        response = (
-            supabase.table("conversations")
-            .select("*")
-            .eq("profile_id", profile.id)
-            .execute()
-        )
-        data = response.data
-
-        if data:
-            # Conversation exists
-            conversation_id = data[0]["id"]
-            existing_messages = data[0]["messages"]
-
-            return JSONResponse(
-                content={
-                    "id": conversation_id,
-                    "messages": list(map(lambda x: json.loads(x), existing_messages)),
-                }
-            )
-
-        else:
-            # No conversation exists, create a new one
-            new_conversation = {
-                "profile_id": profile.id,
-                "messages": [],
-            }
-            supabase.table("conversations").insert(new_conversation).execute()
-
-        return JSONResponse(content={"status": "Message stored successfully"})
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to store message: {str(e)}"
-        )
-
-
-# Endpoint to cancel a background task given its task_id
-@router.post("/cancel_task/{task_id}")
-async def cancel_task(task_id: str):
-    task_info = running_tasks.get(task_id)
+    task_info = running_jobs.get(job_id)
     if not task_info:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_info["profile"].id != profile.id:
+        raise HTTPException(
+            status_code=403, detail="You do not have permission to cancel this task."
+        )
 
     task = task_info["task"]
 
@@ -194,7 +164,7 @@ async def cancel_task(task_id: str):
     try:
         await task
     except asyncio.CancelledError:
-        return {"message": "Task cancelled successfully"}
+        return JSONResponse(content={"message": "Task cancelled successfully"})
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error while cancelling task: {str(e)}"

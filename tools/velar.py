@@ -24,6 +24,7 @@ class VelarGetPriceHistory(BaseTool):
         """
         obj = VelarApi()
         token_stx_pools = obj.get_token_stx_pools(token_symbol.upper())
+        print(token_stx_pools)
         return obj.get_token_price_history(token_stx_pools[0]["id"], "month")
 
 

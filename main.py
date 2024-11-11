@@ -61,8 +61,10 @@ async def initialize_routes():
 
             # Import and set up routes from 'crew'
             from api import crew
+            from api import chat
 
             app.include_router(crew.router)
+            app.include_router(chat.router)
 
             # Mark routes as initialized
             routes_initialized = True

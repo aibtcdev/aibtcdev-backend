@@ -76,11 +76,13 @@ class VelarApi:
             # Raise an exception with a custom error message
             raise Exception(f"Swap data retrieval error: {str(e)}")
 
-    def get_token_price_history(self, token: str, interval: str = "hour") -> str:
+    def get_token_price_history(self, token: str, interval: str = "month") -> str:
         """Retrieve the price history of a specific token."""
         try:
             # Make a GET request to the price history endpoint
-            return self._get(f"watcherapp/stats/price/{token}/?interval={interval}")
+            return self._get(
+                f"watcherapp/stats/{token}/?type=price&interval={interval}"
+            )
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Token stats retrieval error: {str(e)}")

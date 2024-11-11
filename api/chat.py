@@ -1,47 +1,205 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any
-import ast
-from services.chat_services import (
-    ChatRequest,
-    crew_manager,
-    session_manager,
+import asyncio
+import datetime
+import json
+import uuid
+from fastapi import APIRouter, Body, HTTPException, Depends, Query
+from api.verify_profile import ProfileInfo, verify_profile
+from db.helpers import (
+    add_conversation,
+    add_job,
+    delete_conversation,
+    get_conversations,
+    get_detailed_conversation,
+    get_latest_conversation,
 )
+from db.supabase_client import supabase
+from fastapi.responses import JSONResponse, StreamingResponse
+from services.crew_services import execute_chat_stream
 
-router = APIRouter()
-
-
-@router.post("/chat")
-async def chat_endpoint(
-    request: ChatRequest,
-    session_id: str = Depends(session_manager.get_or_create_session),
-) -> Dict[str, str]:
-    """Handle chat messages and tool interactions"""
-    # Get session messages
-    messages = session_manager.session_data[session_id]
-
-    # Add user message
-    messages.append({"role": "user", "content": request.user_message})
-
-    # Trim messages if needed
-    session_manager.trim_messages(messages)
-
-    # Get LLM response
-    response = crew_manager.kickoff_conversation(str(messages), session_id)
-    return {"response": response.raw, "session_id": session_id}
+router = APIRouter(prefix="/chat")
+running_jobs = {}
 
 
-@router.post("/reset")
-async def reset_history(
-    session_id: str = Depends(session_manager.get_or_create_session),
-) -> Dict[str, str]:
-    """Reset conversation history for a session"""
-    session_manager.session_data[session_id] = [
-        {
-            "role": "system",
-            "content": "You are a helpful assistant. Specifically you're a Stacks blockchain "
-            "expert around Stacks blockchain. You have access to a bunch of tools "
-            "to provide extra data regarding Stacks blockchain. Use tools when needed.",
-        }
-    ]
+@router.post("/")
+async def trigger_chat(
+    input_str: str = Body(...),
+    conversation_id: str = Query(...),
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    # Generate a unique task ID
+    job_id = str(uuid.uuid4())
+    output_queue = asyncio.Queue()
+    results_array = []
 
-    return {"detail": "Conversation history reset.", "session_id": session_id}
+    results_array.append(
+        json.dumps(
+            {
+                "role": "user",
+                "type": "user",
+                "content": input_str,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }
+        )
+    )
+
+    async def task_wrapper():
+        try:
+            # Get detailed conversation history to help provide context
+            history = get_detailed_conversation(profile, conversation_id)
+
+            # Run the actual crew stream task, yielding output to the queue
+            async for result in execute_chat_stream(
+                str(profile.account_index), history, input_str
+            ):
+                # Add to the output queue for SSE streaming
+                await output_queue.put(result)
+
+                # Build object in memory for later storage in db
+                # Add some extra metadata
+                result["timestamp"] = datetime.datetime.now().isoformat()
+                results_array.append(json.dumps(result))
+            await output_queue.put(None)  # Signal completion
+        finally:
+            add_job(
+                profile,
+                conversation_id,
+                None,
+                input_str,
+                "",
+                results_array,
+            )
+            running_jobs.pop(job_id, None)
+
+    task = asyncio.create_task(task_wrapper())
+    running_jobs[job_id] = {
+        "task": task,
+        "queue": output_queue,
+        "profile": profile,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+
+    # Return the task ID immediately
+    return JSONResponse(content={"job_id": job_id})
+
+
+@router.get("/{job_id}/stream")
+async def sse_streaming(job_id: str):
+    task_info = running_jobs.get(job_id)
+    if not task_info:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    output_queue = task_info["queue"]
+
+    async def event_generator():
+        try:
+            while True:
+                # Retrieve data from the queue
+                result = await output_queue.get()
+                if result is None:  # Task completed
+                    break
+                # Yield the result as JSON for SSE
+                json_result = json.dumps(result)
+                yield f"data: {json_result}\n\n"
+        except Exception as e:
+            error_message = json.dumps({"error": f"Execution error: {str(e)}"})
+            yield f"data: {error_message}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.post("/conversations")
+async def create_conversation(
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    try:
+        new_conversation = add_conversation(profile)
+        if new_conversation.data:
+            return JSONResponse(content=new_conversation.data[0])
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create new conversation: {str(e)}",
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create new conversations: {str(e)}"
+        )
+
+
+@router.get("/conversations")
+async def get_conversations(
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    try:
+        conversations = get_conversations(profile)
+        if conversations:
+            return JSONResponse(content=conversations)
+        else:
+            new_conversation = add_conversation(profile)
+            if new_conversation.data:
+                return JSONResponse(content=new_conversation.data[0])
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create new conversation: {str(e)}",
+                )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get conversations: {str(e)}"
+        )
+
+
+@router.get("/conversations/latest")
+async def api_get_latest_conversation(
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    try:
+        conversations = get_latest_conversation(profile)
+        if conversations:
+            return JSONResponse(content=conversations)
+        else:
+            new_conversation = add_conversation(profile)
+            if new_conversation.data:
+                return JSONResponse(content=new_conversation.data[0])
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create new conversation: {str(e)}",
+                )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get conversations: {str(e)}"
+        )
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation_details(
+    conversation_id: str,
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    try:
+        # Retrieve existing conversation for the user if it exists
+        response = get_detailed_conversation(profile, conversation_id)
+        return JSONResponse(content=response)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete history: {str(e)}"
+        )
+
+
+# need a endpoint to reset the history
+@router.delete("/conversations/{conversation_id}")
+async def delete_history(
+    conversation_id: str,
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    try:
+        # Retrieve existing conversation for the user if it exists
+        delete_conversation(profile, conversation_id)
+        return JSONResponse(content={"status": "History deleted successfully"})
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete history: {str(e)}"
+        )
