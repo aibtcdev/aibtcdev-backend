@@ -1,8 +1,14 @@
 from fastapi import Header, HTTPException, Depends
 from dotenv import load_dotenv
 from db.supabase_client import supabase
+from pydantic import BaseModel
 
 load_dotenv()
+
+
+class ProfileInfo(BaseModel):
+    account_index: int
+    id: str
 
 
 async def verify_profile(authorization: str = Header(...)) -> str:
@@ -48,7 +54,7 @@ async def verify_profile(authorization: str = Header(...)) -> str:
             )
 
         print(f"Account index for user is {account_index}")
-        return str(account_index)
+        return ProfileInfo(account_index=str(account_index), id=user.user.id)
 
     except HTTPException as http_ex:
         print(f"HTTPException: {http_ex.detail}")

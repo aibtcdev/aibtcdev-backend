@@ -1,87 +1,37 @@
-from typing import Any, Dict
+import asyncio
+import datetime
 import uuid
-from cachetools import TTLCache
+import json
+from fastapi.responses import JSONResponse, StreamingResponse
+from db.helpers import add_job
+from services.crew_services import execute_crew_stream
+from tools.tools_factory import initialize_tools
+from .verify_profile import verify_profile, ProfileInfo
+from typing import List
+from lib.models import Crew
+from db.helpers import get_public_crews
 from fastapi import (
     APIRouter,
     HTTPException,
-    Query,
-    Response,
     Depends,
     Body,
 )
-from fastapi.responses import JSONResponse, StreamingResponse
-from services.crew_services import execute_crew, execute_crew_stream
-from tools.tools_factory import initialize_tools
-from .verify_profile import verify_profile
-import json
-
-router = APIRouter()
-
-# Set up TTLCache with a max size and a time-to-live (TTL) of 5 minutes (300 seconds)
-connection_tokens = TTLCache(maxsize=1000, ttl=900)
 
 
-async def create_connection_token(account_index: int, request_data: Dict[str, Any]):
-    token = str(uuid.uuid4())
-    # Store token with the request data and account_index in TTLCache
-    connection_tokens[token] = {"account_index": account_index, "data": request_data}
-    return token
+router = APIRouter(prefix="/crew")
+
+running_jobs = {}
 
 
-@router.post("/execute_crew/{crew_id}")
-async def execute_crew_endpoint(
-    crew_id: int,
-    input_str: str = Body(...),
-    account_index: str = Depends(verify_profile),
-):
+@router.get("/public", response_model=List[Crew])
+async def public_crews():
     try:
-        # Execute the crew logic with the provided input string
-        result = execute_crew(str(account_index), crew_id, input_str)
-
-        return {"result": result}
-
+        response = get_public_crews()
+        return JSONResponse(content=response)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
-
-
-@router.post("/new")
-async def get_connection_token(
-    account_index: int = Depends(verify_profile),
-    request_data: str = Body(...),
-):
-    token = await create_connection_token(account_index, request_data)
-    return JSONResponse(content={"connection_token": token})
-
-
-@router.get("/sse/execute_crew/{crew_id}")
-async def sse_execute_crew(
-    crew_id: int,
-    connection_token: str = Query(...),  # Require token as a query parameter
-):
-    # Verify and retrieve token data from TTLCache
-    token_data = connection_tokens.get(connection_token)
-    if not token_data:
         raise HTTPException(
-            status_code=403, detail="Invalid or missing connection token"
+            status_code=500, detail=f"Error fetching public crews: {str(e)}"
         )
-
-    # Extract account_index and request data from the token data
-    account_index = token_data["account_index"]
-    request_data = token_data["data"]
-
-    async def event_generator():
-        try:
-            # Use account_index and request_data with execute_crew_stream
-            async for result in execute_crew_stream(
-                account_index, crew_id, request_data
-            ):
-                json_result = json.dumps(result)
-                yield f"data: {json_result}\n\n"
-        except Exception as e:
-            error_message = json.dumps({"error": f"Execution error: {str(e)}"})
-            yield f"data: {error_message}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/tools")
@@ -92,8 +42,132 @@ async def get_avaliable_tools():
             tool_name: tool_instance.description
             for tool_name, tool_instance in tools_map.items()
         }
-
-        return response
-
+        return JSONResponse(content=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+
+
+@router.post("/{crew_id}")
+async def execute_crew_endpoint(
+    crew_id: int,
+    input_str: str = Body(...),
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    # Generate a unique task ID
+    job_id = str(uuid.uuid4())
+    output_queue = asyncio.Queue()
+    results_array = []
+
+    results_array.append(
+        json.dumps(
+            {
+                "role": "user",
+                "type": "user",
+                "content": input_str,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }
+        )
+    )
+
+    async def task_wrapper():
+        try:
+            # Run the actual crew stream task, yielding output to the queue
+            async for result in execute_crew_stream(
+                str(profile.account_index), crew_id, input_str
+            ):
+                await output_queue.put(result)
+                result["crew_id"] = crew_id
+                result["timestamp"] = datetime.datetime.now().isoformat()
+                results_array.append(json.dumps(result))
+            await output_queue.put(None)  # Signal completion
+        finally:
+            add_job(
+                profile,
+                None,
+                crew_id,
+                input_str,
+                "",
+                results_array,
+            )
+            running_jobs.pop(job_id, None)
+
+    task = asyncio.create_task(task_wrapper())
+    running_jobs[job_id] = {
+        "task": task,
+        "queue": output_queue,
+        "profile": profile,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+
+    # Return the task ID immediately
+    return JSONResponse(content={"job_id": job_id})
+
+
+# Endpoint to get all background tasks for a given profile
+@router.get("/jobs")
+async def get_all_background_tasks(profile: ProfileInfo = Depends(verify_profile)):
+    tasks = []
+    for job_id, task_info in running_jobs.items():
+        if task_info["profile"].id == profile.id:
+            task = {
+                "job_id": job_id,
+                "timestamp": task_info["timestamp"],
+            }
+            tasks.append(task)
+    return JSONResponse(content=tasks)
+
+
+@router.get("/jobs/{job_id}/stream")
+async def sse_streaming(job_id: str):
+    task_info = running_jobs.get(job_id)
+    if not task_info:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    output_queue = task_info["queue"]
+
+    async def event_generator():
+        try:
+            while True:
+                # Retrieve data from the queue
+                result = await output_queue.get()
+                if result is None:  # Task completed
+                    break
+                # Yield the result as JSON for SSE
+                json_result = json.dumps(result)
+                yield f"data: {json_result}\n\n"
+        except Exception as e:
+            error_message = json.dumps({"error": f"Execution error: {str(e)}"})
+            yield f"data: {error_message}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# Endpoint to cancel a background task given its job_id
+@router.delete("/jobs/{job_id}/cancel")
+async def cancel_task(
+    job_id: str,
+    profile: ProfileInfo = Depends(verify_profile),
+):
+    task_info = running_jobs.get(job_id)
+    if not task_info:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_info["profile"].id != profile.id:
+        raise HTTPException(
+            status_code=403, detail="You do not have permission to cancel this task."
+        )
+
+    task = task_info["task"]
+
+    # Cancel the task
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        return JSONResponse(content={"message": "Task cancelled successfully"})
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error while cancelling task: {str(e)}"
+        )
+
+    return JSONResponse(content={"message": "Task cancelled successfully"})
