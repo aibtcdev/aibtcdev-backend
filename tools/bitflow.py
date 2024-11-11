@@ -8,7 +8,7 @@ from typing import Any, Optional, Type
 class BitflowGetAvailableTokens(BaseTool):
     def __init__(self):
         super().__init__(
-            name="Bitflow: Get available tokens list",
+            name="Bitflow: Get a list of available tokens",
             description="Get the list of available tokens for trading",
         )
 
@@ -21,7 +21,8 @@ class BitflowExecuteTradeToolSchema(BaseModel):
 
     fee: str = Field(..., description="Transaction fee for the trade usually 0.04")
     amount: str = Field(
-        ..., description="Amount of the token to trade in microunits. default to 1"
+        ...,
+        description="Amount of whole tokens to trade. Default to 1",
     )
     tokenA: str = Field(
         ..., description="Token symbol that you are expecting to give up for the trade"
