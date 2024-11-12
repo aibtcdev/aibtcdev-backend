@@ -19,7 +19,10 @@ class BitflowGetAvailableTokens(BaseTool):
 class BitflowExecuteTradeToolSchema(BaseModel):
     """Input schema for BitflowExecuteTradeTool."""
 
-    fee: str = Field(..., description="Transaction fee for the trade usually 0.04")
+    slippage: str = Field(
+        ...,
+        description="Slippage amount for the trade. Default to 0.04 which equates to 4%",
+    )
     amount: str = Field(
         ...,
         description="Amount of whole tokens to trade. Default to 1",
@@ -45,12 +48,12 @@ class BitflowExecuteTradeTool(BaseTool):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self, fee, amount, tokenA, tokenB):
+    def _run(self, slippage, amount, tokenA, tokenB):
         return BunScriptRunner.bun_run(
             self.account_index,
             "stacks-bitflow",
             "exec-swap.ts",
-            fee,
+            slippage,
             amount,
             f"token-{tokenA.lower()}",
             f"token-{tokenB.lower()}",
