@@ -38,7 +38,8 @@ class ContractSIP10DeployTool(BaseTool):
     ):
         return BunScriptRunner.bun_run(
             self.account_index,
-            "sip-010-ft/deploy.ts",
+            "sip-010-ft",
+            "deploy.ts",
             token_name,
             token_symbol,
             str(token_decimals),
