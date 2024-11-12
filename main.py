@@ -64,9 +64,11 @@ async def initialize_routes():
             from api import public_crews
 
             from api import chat
+            from api import metrics
             app.include_router(crew.router)
             app.include_router(public_crews.router)
             app.include_router(chat.router)
+            app.include_router(metrics.router)
 
             # Mark routes as initialized
             routes_initialized = True
