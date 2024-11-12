@@ -45,6 +45,10 @@ class JingGetOrderSchema(BaseModel):
     """Input schema for getting order details."""
     swap_id: int = Field(..., description="ID of the order to get details for")
 
+class JingGetMarketsSchema(BaseModel):
+    """Input schema for getting available markets."""
+    pass  
+
 # Base Tool with common initialization
 class JingBaseTool(BaseTool):
     account_index: Optional[str] = None
@@ -252,4 +256,16 @@ class JingGetAskTool(JingBaseTool):
             "jing",
             "get-ask.ts",
             str(swap_id)
+        )
+    
+class JingGetMarketsTool(JingBaseTool):
+    name: str = "JingCash: Get Available Markets"
+    description: str = "Get all available trading pairs and their contract details"
+    args_schema: Type[BaseModel] = JingGetMarketsSchema
+
+    def _run(self):
+        return BunScriptRunner.bun_run(
+            self.account_index,
+            "jing",
+            "list-markets.ts"
         )
