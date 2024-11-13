@@ -62,11 +62,12 @@ async def initialize_routes():
             # Import and set up routes from 'crew'
             from api import crew
             from api import public_crews
-
+            from api import public_stats
             from api import chat
             from api import metrics
             app.include_router(crew.router)
             app.include_router(public_crews.router)
+            app.include_router(public_stats.router)
             app.include_router(chat.router)
             app.include_router(metrics.router)
 
