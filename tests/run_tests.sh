@@ -12,6 +12,7 @@ source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/test_verify_profile.sh"
 source "$SCRIPT_DIR/test_public_stats.sh"
 source "$SCRIPT_DIR/test_public_crews.sh"
+source "$SCRIPT_DIR/test_metrics.sh"
 
 # If sleep flag is true, wait 10 seconds before starting tests
 if [ "$SLEEP_BEFORE_START" = true ]; then
@@ -25,6 +26,7 @@ echo -e "\nTesting API at: $API_URL"
 test_verify_profile
 test_public_stats
 test_public_crews
+test_metrics
 
 echo "===================="
 echo "Test Summary"
