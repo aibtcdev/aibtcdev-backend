@@ -36,7 +36,7 @@ async def health():
 
     # If routes are still initializing, return a "starting" status
     if routes_initializing:
-        return {"status": "starting"}
+        return {"status": "initializing"}
 
     # If neither initialized nor initializing, start initialization in a background task
     loop = asyncio.get_event_loop()
