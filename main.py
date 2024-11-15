@@ -13,15 +13,17 @@ initialization_lock = asyncio.Lock()  # Lock to ensure single initialization
 cors_origins = [
     "https://sprint.aibtc.dev",
     "https://aibtcdev-frontend.replit.app",
+    "http://localhost:3000",  # Development environment
 ]
 
 # Setup middleware to allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 
