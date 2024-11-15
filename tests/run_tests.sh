@@ -14,6 +14,7 @@ source "$SCRIPT_DIR/test_public_stats.sh"
 source "$SCRIPT_DIR/test_public_crews.sh"
 source "$SCRIPT_DIR/test_metrics.sh"
 source "$SCRIPT_DIR/test_crew.sh"
+source "$SCRIPT_DIR/test_chat.sh"
 
 # If sleep flag is true, wait 10 seconds before starting tests
 if [ "$SLEEP_BEFORE_START" = true ]; then
@@ -29,6 +30,7 @@ test_public_stats
 test_public_crews
 test_metrics
 test_crew
+test_chat
 
 echo "===================="
 echo "Test Summary"
