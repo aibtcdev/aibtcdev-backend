@@ -10,6 +10,7 @@ export TOTAL_TESTS=0
 SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/test_verify_profile.sh"
+source "$SCRIPT_DIR/test_public_stats.sh"
 
 # If sleep flag is true, wait 10 seconds before starting tests
 if [ "$SLEEP_BEFORE_START" = true ]; then
@@ -21,6 +22,7 @@ echo -e "\nTesting API at: $API_URL"
 
 # Run all test suites
 test_verify_profile
+test_public_stats
 
 echo "===================="
 echo "Test Summary"
