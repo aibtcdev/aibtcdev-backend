@@ -9,8 +9,7 @@ export TOTAL_TESTS=0
 # Source all test files
 SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/utils.sh"
-# source "$SCRIPT_DIR/test_index.sh"
-# source "$SCRIPT_DIR/test_hiro_api.sh"
+source "$SCRIPT_DIR/test_verify_profile.sh"
 
 # If sleep flag is true, wait 10 seconds before starting tests
 if [ "$SLEEP_BEFORE_START" = true ]; then
@@ -21,8 +20,7 @@ fi
 echo -e "\nTesting API at: $API_URL"
 
 # Run all test suites
-# test_index
-# test_hiro_api
+test_verify_profile
 
 echo "===================="
 echo "Test Summary"
