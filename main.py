@@ -12,8 +12,8 @@ initialization_lock = asyncio.Lock()  # Lock to ensure single initialization
 # Setup CORS origins
 cors_origins = [
     "https://sprint.aibtc.dev",
-    "https://aibtcdev-frontend.replit.app",
-    "http://localhost:3000",  # Development environment
+    "https://sprint-faster.aibtc.dev",
+    # "http://localhost:3000",  # Development environment
 ]
 
 # Setup middleware to allow CORS
@@ -67,6 +67,7 @@ async def initialize_routes():
             from api import public_stats
             from api import chat
             from api import metrics
+
             app.include_router(crew.router)
             app.include_router(public_crews.router)
             app.include_router(public_stats.router)
