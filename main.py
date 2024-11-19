@@ -20,16 +20,18 @@ app = FastAPI()
 # Setup CORS origins
 cors_origins = [
     "https://sprint.aibtc.dev",
-    "https://aibtcdev-frontend.replit.app",
+    "https://sprint-faster.aibtc.dev",
+    # "http://localhost:3000",  # Development environment
 ]
 
 # Setup middleware to allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 
