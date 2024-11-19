@@ -1,14 +1,15 @@
 from .supabase_client import supabase
+import datetime
 
 
-def add_job(profile, conversation_id, crew_id, input_data, result, messages):
+def add_job(profile_id, conversation_id, crew_id, input_data, result, messages):
     """
     Add a new run with input, result, and thought process for a specific conversation and crew.
     """
     new_job = {
+        "profile_id": profile_id,
         "conversation_id": conversation_id,
         "crew_id": crew_id,
-        "profile_id": profile.id,
         "input": input_data,
         "result": result,
         "messages": messages,
@@ -199,6 +200,40 @@ def get_latest_conversation(profile):
         return []
 
 
+def get_enabled_crons_expanded():
+    # Retrieve the history of messages for the user
+    response = (
+        supabase.from_("crons")
+        .select("id, input, profiles(id, account_index), crew_id")
+        .eq("enabled", True)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    data = response.data
+    if data:
+        return data
+    else:
+        # No conversation exists, return an empty list
+        return []
+
+
+def get_enabled_crons():
+    # Retrieve the history of messages for the user
+    response = (
+        supabase.table("crons")
+        .select("*")
+        .eq("enabled", True)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    data = response.data
+    if data:
+        return data
+    else:
+        # No conversation exists, return an empty list
+        return []
+
+
 def get_latest_conversation_id(profile) -> int:
     # Retrieve the history of messages for the user
     response = (
@@ -235,50 +270,34 @@ def mask_email(email: str) -> str:
 
 
 def get_public_crews():
-    try:
-        # Fetch crews from the 'crews' table
-        crews_response = (
-            supabase.table("crews")
-            .select("*", count="exact")
-            .eq("is_public", True)
-            .execute()
+    crews_response = (
+        supabase.from_("crews")
+        .select(
+            "id, description, created_at, profiles(id, email, account_index), agents(id, name, role, goal, backstory, agent_tools), tasks(id, description, expected_output, agent_id, profile_id)"
         )
+        .eq("is_public", True)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    if not crews_response.data:
+        return []
 
-        if not crews_response.data:
-            return []
+    result = []
+    for crew in crews_response.data:
+        crew["description"] = crew.get("description") or "No description provided"
+        crew["creator_email"] = mask_email(crew["profiles"]["email"])
 
-        result = []
-        for crew in crews_response.data:
-            creator_response = (
-                supabase.table("profiles")
-                .select("email")
-                .eq("id", crew["profile_id"])
-                .single()
-                .execute()
-            )
-            agents_response = (
-                supabase.table("agents").select("*").eq("crew_id", crew["id"]).execute()
-            )
-
-            agents = []
-            for agent in agents_response.data:
-                tasks_response = (
-                    supabase.table("tasks")
-                    .select("*")
-                    .eq("agent_id", agent["id"])
-                    .execute()
-                )
-                agent_with_tasks = {**agent, "tasks": tasks_response.data or []}
-                agents.append(agent_with_tasks)
-
-            crew_response = {
-                **crew,
-                "creator_email": mask_email(creator_response.data.get("email", "")),
-                "agents": agents,
-            }
-            result.append(crew_response)
-
-        return result
-
-    except Exception as e:
-        raise Exception(f"Error fetching public crews: {str(e)}")
+        agents = []
+        for agent in crew["agents"]:
+            tasks = []
+            for task in crew["tasks"]:
+                if task["agent_id"] == agent["id"]:
+                    tasks.append(task)
+            agent_with_tasks = {
+                **agent,
+                "tasks": tasks,
+            }  # Add tasks to agent dictionary
+            agents.append(agent_with_tasks)
+        crew_response = {**crew, "agents": agents}
+        result.append(crew_response)
+    return result

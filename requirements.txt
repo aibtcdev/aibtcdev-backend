@@ -5,6 +5,7 @@ alembic==1.13.3
 annotated-types==0.7.0
 anyio==4.6.0
 appdirs==1.4.4
+apscheduler==3.10.4
 asgiref==3.8.1
 attrs==24.2.0
 auth0-python==4.7.2
