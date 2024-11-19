@@ -115,7 +115,11 @@ async def sse_streaming(job_id: str):
             )
             yield f"event: error\ndata: {error_message}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/conversations")
