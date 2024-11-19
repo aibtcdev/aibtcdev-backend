@@ -21,7 +21,7 @@ app = FastAPI()
 cors_origins = [
     "https://sprint.aibtc.dev",
     "https://sprint-faster.aibtc.dev",
-    # "http://localhost:3000",  # Development environment
+    "http://localhost:3000",  # Development environment
 ]
 
 # Setup middleware to allow CORS
