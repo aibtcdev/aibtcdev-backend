@@ -45,7 +45,7 @@ async def trigger_chat(
     async def task_wrapper():
         try:
             # Get detailed conversation history to help provide context
-            history = get_detailed_conversation(profile, conversation_id)
+            history = get_detailed_conversation(conversation_id)
 
             # Run the actual crew stream task, yielding output to the queue
             async for result in execute_chat_stream(
@@ -190,7 +190,7 @@ async def get_conversation_details(
 ):
     try:
         # Retrieve existing conversation for the user if it exists
-        response = get_detailed_conversation(profile, conversation_id)
+        response = get_detailed_conversation(conversation_id)
         return JSONResponse(content=response)
 
     except Exception as e:

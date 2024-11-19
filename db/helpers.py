@@ -66,47 +66,30 @@ def get_conversations(profile) -> list:
         return []
 
 
-def get_detailed_conversation(profile, conversation_id):
+def get_detailed_conversation(conversation_id):
     """
     Get detailed conversation data for a specific conversation and profile.
     """
-    conversation_response = (
-        supabase.table("conversations")
+    # Retrieve all tasks linked to this conversation
+    jobs_response = (
+        supabase.table("jobs")
         .select("*")
-        .eq("profile_id", profile.id)
-        .eq("id", conversation_id)
+        .eq("conversation_id", conversation_id)
         .order("created_at", desc=True)
         .execute()
     )
 
-    if conversation_response.data:
-        conversation_ids = [
-            conversation["id"] for conversation in conversation_response.data
-        ]
+    # Zip up the conversations data and next the tasks for the conversations
+    _with_jobs = {
+        "conversation": conversation_id,
+        "jobs": [
+            job
+            for job in jobs_response.data
+            if job["conversation_id"] == conversation_id
+        ],
+    }
 
-        # Retrieve all tasks linked to this conversation
-        jobs_response = (
-            supabase.table("jobs")
-            .select("*")
-            .in_("conversation_id", conversation_ids)
-            .order("created_at", desc=True)
-            .execute()
-        )
-
-        # Zip up the conversations data and next the tasks for the conversations
-        _with_jobs = {
-            "conversation": conversation_response.data[0],
-            "jobs": [
-                job
-                for job in jobs_response.data
-                if job["conversation_id"] == conversation_response.data[0]["id"]
-            ],
-        }
-
-        return _with_jobs
-    else:
-        # No conversation exists
-        return {}
+    return _with_jobs
 
 
 def get_detailed_conversations(profile):
