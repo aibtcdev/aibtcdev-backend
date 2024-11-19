@@ -122,6 +122,7 @@ async def sse_streaming(job_id: str):
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
             "Cache-Control": "no-cache",
+            "Transfer-Encoding": "chunked",
         },
     )
 
