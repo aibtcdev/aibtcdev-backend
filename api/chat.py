@@ -118,7 +118,11 @@ async def sse_streaming(job_id: str):
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no"},
+        headers={
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Cache-Control": "no-cache",
+        },
     )
 
 
