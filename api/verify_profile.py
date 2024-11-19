@@ -2,8 +2,12 @@ from fastapi import Header, HTTPException, Depends
 from dotenv import load_dotenv
 from db.supabase_client import supabase
 from pydantic import BaseModel
+import datetime
+import cachetools
 
 load_dotenv()
+
+cache = cachetools.TTLCache(maxsize=100, ttl=300)
 
 
 class ProfileInfo(BaseModel):
@@ -23,35 +27,48 @@ async def verify_profile(authorization: str = Header(...)) -> str:
         )
 
     token = authorization.split(" ")[1]
+    print(datetime.datetime.now())
     print(f"Authorization token received: {token}")
 
     try:
         # Get user email from the token
+        print(datetime.datetime.now())
         user = supabase.auth.get_user(token)
         email = user.user.email
+        print(datetime.datetime.now())
 
-        # Retrieve the profile
-        profile_response = (
-            supabase.table("profiles")
-            .select("account_index, email")
-            .eq("email", email)
-            .single()
-            .execute()
-        )
-
-        if profile_response.data is None:
-            print("Profile not found or retrieval failed in Supabase.")
-            raise HTTPException(status_code=404, detail="Profile not found")
-
-        profile = profile_response.data
-        print(f"Profile data retrieved: {profile}")
-
-        account_index = profile.get("account_index")
-        if account_index is None:
-            print("Account index is missing from profile data.")
-            raise HTTPException(
-                status_code=400, detail="No account index found for profile"
+        # Check if the account_index is in the cache
+        if email in cache:
+            print(f"Cache hit for email: {email}")
+            account_index = cache[email]
+        else:
+            print(f"Cache miss for email: {email}")
+            # Retrieve the profile from Supabase
+            profile_response = (
+                supabase.table("profiles")
+                .select("account_index, email")
+                .eq("email", email)
+                .single()
+                .execute()
             )
+            print(datetime.datetime.now())
+
+            if profile_response.data is None:
+                print("Profile not found or retrieval failed in Supabase.")
+                raise HTTPException(status_code=404, detail="Profile not found")
+
+            profile = profile_response.data
+            print(f"Profile data retrieved: {profile}")
+
+            account_index = profile.get("account_index")
+            if account_index is None:
+                print("Account index is missing from profile data.")
+                raise HTTPException(
+                    status_code=400, detail="No account index found for profile"
+                )
+
+            # Store the account_index in the cache
+            cache[email] = account_index
 
         print(f"Account index for user is {account_index}")
         return ProfileInfo(account_index=str(account_index), id=user.user.id)
