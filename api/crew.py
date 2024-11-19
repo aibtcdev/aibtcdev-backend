@@ -23,17 +23,6 @@ router = APIRouter(prefix="/crew")
 running_jobs = {}
 
 
-@router.get("/public", response_model=List[Crew])
-async def public_crews():
-    try:
-        response = get_public_crews()
-        return JSONResponse(content=response)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching public crews: {str(e)}"
-        )
-
-
 @router.get("/tools")
 async def get_avaliable_tools():
     try:
@@ -82,7 +71,7 @@ async def execute_crew_endpoint(
             await output_queue.put(None)  # Signal completion
         finally:
             add_job(
-                profile,
+                profile.id,
                 None,
                 crew_id,
                 input_str,

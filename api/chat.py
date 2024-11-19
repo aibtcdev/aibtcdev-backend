@@ -61,7 +61,7 @@ async def trigger_chat(
             await output_queue.put(None)  # Signal completion
         finally:
             add_job(
-                profile,
+                profile.id,
                 conversation_id,
                 None,
                 input_str,
