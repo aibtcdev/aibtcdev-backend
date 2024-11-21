@@ -256,7 +256,7 @@ def get_public_crews():
     crews_response = (
         supabase.from_("crews")
         .select(
-            "id, description, created_at, profiles(id, email, account_index), agents(id, name, role, goal, backstory, agent_tools), tasks(id, description, expected_output, agent_id, profile_id)"
+            "id, name, description, created_at, profiles(id, email, account_index), agents(id, name, role, goal, backstory, agent_tools), tasks(id, description, expected_output, agent_id, profile_id)"
         )
         .eq("is_public", True)
         .order("created_at", desc=True)
