@@ -12,7 +12,7 @@ from services.cron import execute_cron_job
 load_dotenv()
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(execute_cron_job, "interval", hours=1)  # Every 10 seconds
+scheduler.add_job(execute_cron_job, "interval", hours=1)
 scheduler.start()
 
 app = FastAPI()
