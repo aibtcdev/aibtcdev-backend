@@ -5,7 +5,7 @@ import tiktoken
 class Trimmer:
 
     def __init__(
-        self, token_model: str = "gpt-4o-mini", maxsize: int = 50000, margin: int = 500
+        self, token_model: str = "gpt-4o", maxsize: int = 50000, margin: int = 500
     ):
         self.token_model = token_model
         self.maxsize = maxsize
