@@ -3,6 +3,7 @@ import json
 import datetime
 from db.helpers import add_job, get_enabled_crons_expanded
 from services.crew_services import execute_crew_stream
+from services.bot import send_message_to_user
 
 # Define the maximum number of concurrent tasks
 MAX_CONCURRENT_TASKS = 5
@@ -60,7 +61,17 @@ async def execute_single_wrapper(
                 result["crew_id"] = crew_id
                 result["timestamp"] = datetime.datetime.now().isoformat()
                 results_array.append(json.dumps(result))
+                
+                # Send message about the result
+                message = f"🤖 Crew Stream Result:\n\nInput: {input_str}\nResult: {result}"
+                await send_message_to_user(profile_id, message)
+                
             await output_queue.put(None)  # Signal completion
+        except Exception as e:
+            # Send error message
+            error_message = f"❌ Crew Stream Failed:\n\nInput: {input_str}\nError: {str(e)}"
+            await send_message_to_user(profile_id, error_message)
+            raise e
         finally:
             add_job(
                 profile_id,

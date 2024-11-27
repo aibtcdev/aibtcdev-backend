@@ -170,21 +170,58 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError:
         await update.message.reply_text('Please provide a valid user ID (numbers only).')
 
+# Global bot instance
+_bot_app = None
+
+async def get_bot():
+    """Get the global bot instance."""
+    global _bot_app
+    if _bot_app is None:
+        _bot_app = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
+        await _bot_app.initialize()
+        await _bot_app.start()
+    return _bot_app
+
+async def send_message_to_user(profile_id: str, message: str) -> bool:
+    """Send a message to a user by their profile ID."""
+    try:
+        # Query Supabase for the user
+        result = supabase.table('telegram_users').select('telegram_user_id').eq('profile_id', profile_id).eq('is_registered', True).execute()
+        
+        if not result.data:
+            logger.warning(f'No registered Telegram user found for profile {profile_id}')
+            return False
+            
+        chat_id = result.data[0]['telegram_user_id']
+        bot_app = await get_bot()
+        await bot_app.bot.send_message(chat_id=chat_id, text=message)
+        return True
+    except Exception as e:
+        logger.error(f"Error in send_message_to_user: {str(e)}")
+        return False
+
 async def start_application():
     """Start the bot."""
+    global _bot_app
+    if _bot_app is not None:
+        return _bot_app
+    
     # Create the Application and pass it your bot's token
-    application = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
+    _bot_app = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
 
     # Add command handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help))
-    application.add_handler(CommandHandler("send", send_message))
-    application.add_handler(CommandHandler("list", list_users))
-    application.add_handler(CommandHandler("add_admin", add_admin))
-    application.add_handler(CommandHandler("list_admins", list_admins))
+    _bot_app.add_handler(CommandHandler("start", start))
+    _bot_app.add_handler(CommandHandler("help", help))
+    _bot_app.add_handler(CommandHandler("send", send_message))
+    _bot_app.add_handler(CommandHandler("list", list_users))
+    _bot_app.add_handler(CommandHandler("add_admin", add_admin))
+    _bot_app.add_handler(CommandHandler("list_admins", list_admins))
 
-    # Start the Bot
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-    return application
+    # Initialize and start the bot
+    await _bot_app.initialize()
+    await _bot_app.start()
+    
+    # Start polling
+    await _bot_app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    return _bot_app

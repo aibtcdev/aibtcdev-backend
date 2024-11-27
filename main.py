@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(execute_cron_job, "interval", hours=1)
+scheduler.add_job(execute_cron_job, "interval", minutes=1)
 scheduler.start()
 
 app = FastAPI()
@@ -52,8 +52,14 @@ async def start_bot():
 
 @app.on_event("startup")
 async def startup_event():
-    """Start the bot when the FastAPI application starts."""
-    asyncio.create_task(start_bot())
+    """Initialize services on startup."""
+    try:
+        # Start the bot
+        await start_bot()
+        logger.info("Bot started successfully")
+    except Exception as e:
+        logger.error(f"Error starting bot: {e}")
+        raise e
 
 
 # Lightweight health check endpoint
