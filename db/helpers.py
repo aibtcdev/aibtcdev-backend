@@ -279,7 +279,7 @@ def get_conversation_history(conversation_id: str) -> list:
         supabase.table("jobs")
         .select("*")
         .eq("conversation_id", conversation_id)
-        .order("created_at", desc=True)
+        .order("created_at", desc=False)
         .execute()
     )
 
