@@ -137,6 +137,41 @@ async def websocket_endpoint(
         await manager.connect_conversation(websocket, conversation_id)
         logger.debug(f"Starting WebSocket connection for conversation {conversation_id}")
 
+        # Send conversation history using the jobs from detailed conversation
+        if conversation.get("jobs"):
+            # Format history messages according to frontend expectations
+            formatted_history = []
+            for job in conversation["jobs"]:
+                if job.get("messages"):
+                    for msg in job["messages"]:
+                        if isinstance(msg, str):
+                            msg = json.loads(msg)
+                        
+                        # Skip step messages with empty thoughts
+                        if msg.get("type") == "step" and (not msg.get("thought") or msg.get("thought").strip() == ""):
+                            continue
+
+                        formatted_msg = {
+                            "role": msg.get("role"),
+                            "type": msg.get("type"),
+                            "content": msg.get("content", ""),
+                            "timestamp": msg.get("timestamp") or msg.get("created_at") or msg.get("job_started_at") or datetime.datetime.now().isoformat(),
+                            "tool": msg.get("tool"),
+                            "tool_input": msg.get("tool_input", None),
+                            "result": msg.get("result", None),
+                            "thought": msg.get("thought", None)
+                        }
+                        formatted_history.append(formatted_msg)
+
+            # Sort messages by timestamp
+            formatted_history.sort(key=lambda x: x["timestamp"])
+            
+            # Send formatted history
+            await websocket.send_json({
+                "type": "history",
+                "messages": formatted_history
+            })
+
         # Keep connection open and handle incoming messages
         try:
             while True:
