@@ -6,7 +6,7 @@ from db.supabase_client import supabase
 from tools.tools_factory import initialize_tools, get_agent_tools
 from dotenv import load_dotenv
 import asyncio
-from crewai.agents.parser import AgentAction
+from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.tasks.task_output import TaskOutput
 from lib.tokenizer import Trimmer
 
@@ -260,9 +260,15 @@ def build_single_crew(agents_data, tasks_data):
 
 
 async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
-    tools_map = initialize_tools(account_index)
-    agents_data, tasks_data = fetch_crew_data(crew_id)
     agents = {}
+    callback_queue = asyncio.Queue()
+    tools_map = initialize_tools(account_index)
+
+    try:
+        agents_data, tasks_data = fetch_crew_data(crew_id)
+    except ValueError as e:
+        yield {"type": "result", "content": "Error fetching crew data: {e}"}
+        return
 
     try:
         loop = asyncio.get_running_loop()
@@ -270,23 +276,38 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    callback_queue = asyncio.Queue()
-
-    def crew_step_callback(step: Union[Dict[str, Any], "AgentAction"]):
-        asyncio.run_coroutine_threadsafe(
-            callback_queue.put(
-                {
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.thought,
-                    "thought": step.thought,
-                    "result": step.result,
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                }
-            ),
-            loop,
-        )
+    def crew_step_callback(step: Union[Dict[str, Any], "AgentAction", "AgentFinish"]):
+        # check if step is AgentAction or AgentFinish
+        if isinstance(step, AgentAction):
+            asyncio.run_coroutine_threadsafe(
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.thought,
+                        "thought": step.thought,
+                        "result": step.result,
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                    }
+                ),
+                loop,
+            )
+        elif isinstance(step, AgentFinish):
+            asyncio.run_coroutine_threadsafe(
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.output,
+                        "thought": step.thought,
+                        "result": step.output,
+                        "tool": None,
+                        "tool_input": None,
+                    }
+                ),
+                loop,
+            )
 
     def crew_task_callback(task: "TaskOutput"):
         asyncio.run_coroutine_threadsafe(
@@ -423,21 +444,38 @@ async def execute_chat_stream(account_index: str, history: list, input_str: str)
 
     callback_queue = asyncio.Queue()
 
-    def crew_step_callback(step: Union[Dict[str, Any], "AgentAction"]):
-        asyncio.run_coroutine_threadsafe(
-            callback_queue.put(
-                {
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.thought,
-                    "thought": step.thought,
-                    "result": step.result,
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                }
-            ),
-            loop,
-        )
+    def crew_step_callback(step: Union[Dict[str, Any], "AgentAction", "AgentFinish"]):
+        # check if step is AgentAction or AgentFinish
+        if isinstance(step, AgentAction):
+            asyncio.run_coroutine_threadsafe(
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.thought,
+                        "thought": step.thought,
+                        "result": step.result,
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                    }
+                ),
+                loop,
+            )
+        elif isinstance(step, AgentFinish):
+            asyncio.run_coroutine_threadsafe(
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.output,
+                        "thought": step.thought,
+                        "result": step.output,
+                        "tool": None,
+                        "tool_input": None,
+                    }
+                ),
+                loop,
+            )
 
     def crew_task_callback(task: "TaskOutput"):
         asyncio.run_coroutine_threadsafe(

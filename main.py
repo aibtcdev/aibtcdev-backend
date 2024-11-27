@@ -8,6 +8,11 @@ from api import public_stats
 from api import chat
 from api import metrics
 from services.cron import execute_cron_job
+import asyncio
+from services.bot import start_application
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -33,6 +38,22 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+
+async def start_bot():
+    """Start the Telegram bot in the background."""
+    try:
+        application = await start_application()
+        return application
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+        raise
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the bot when the FastAPI application starts."""
+    asyncio.create_task(start_bot())
 
 
 # Lightweight health check endpoint
