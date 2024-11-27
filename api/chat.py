@@ -237,6 +237,10 @@ async def process_chat_message(
                 "type": "stream",
                 "stream_type": result.get("type", "result"),  # step, task, or result
                 "content": result.get("content", ""),
+                "tool": result.get("tool", None),
+                "tool_input": result.get("tool_input", None),
+                "result": result.get("result", None),
+                "thought": result.get("thought", None),
                 "timestamp": datetime.datetime.now().isoformat(),
                 "job_started_at": datetime.datetime.now().isoformat(),
                 "role": "assistant"
