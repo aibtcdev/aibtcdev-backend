@@ -1,20 +1,16 @@
 import os
-import logging
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from urllib.parse import urlencode
-from db.supabase_client import supabase
+from db.client import supabase
+from lib.logger import configure_logger
 
 # Load environment variables
 load_dotenv()
 
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Configure logger
+logger = configure_logger(__name__)
 
 # List of admin user IDs (you can add Telegram user IDs here)
 ADMIN_IDS = [
@@ -115,8 +111,12 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return
             
         chat_id = result.data[0]['telegram_user_id']
-        await context.bot.send_message(chat_id=chat_id, text=message)
-        await update.message.reply_text(f'Message sent to {username} successfully!')
+        bot_app = await get_bot()
+        if bot_app:
+            await bot_app.bot.send_message(chat_id=chat_id, text=message)
+            await update.message.reply_text(f'Message sent to {username} successfully!')
+        else:
+            await update.message.reply_text('Failed to send message.')
     except Exception as e:
         logger.error(f"Error in send_message: {str(e)}")
         await update.message.reply_text(f'Failed to send message: {str(e)}')
@@ -170,11 +170,15 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError:
         await update.message.reply_text('Please provide a valid user ID (numbers only).')
 
-# Global bot instance
+# Global bot instance and settings
 _bot_app = None
+BOT_ENABLED = os.getenv("TELEGRAM_BOT_ENABLED", "true").lower() == "true"
 
 async def get_bot():
     """Get the global bot instance."""
+    if not BOT_ENABLED:
+        return None
+        
     global _bot_app
     if _bot_app is None:
         _bot_app = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
@@ -184,6 +188,10 @@ async def get_bot():
 
 async def send_message_to_user(profile_id: str, message: str) -> bool:
     """Send a message to a user by their profile ID."""
+    if not BOT_ENABLED:
+        logger.info(f"Telegram bot disabled. Would have sent to {profile_id}: {message}")
+        return False
+        
     try:
         # Query Supabase for the user
         result = supabase.table('telegram_users').select('telegram_user_id').eq('profile_id', profile_id).eq('is_registered', True).execute()
@@ -194,14 +202,20 @@ async def send_message_to_user(profile_id: str, message: str) -> bool:
             
         chat_id = result.data[0]['telegram_user_id']
         bot_app = await get_bot()
-        await bot_app.bot.send_message(chat_id=chat_id, text=message)
-        return True
+        if bot_app:
+            await bot_app.bot.send_message(chat_id=chat_id, text=message)
+            return True
+        return False
     except Exception as e:
         logger.error(f"Error in send_message_to_user: {str(e)}")
         return False
 
 async def start_application():
     """Start the bot."""
+    if not BOT_ENABLED:
+        logger.info("Telegram bot disabled. Skipping initialization.")
+        return None
+        
     global _bot_app
     if _bot_app is not None:
         return _bot_app

@@ -3,22 +3,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from api import crew
-from api import public_crews
-from api import public_stats
 from api import chat
 from api import metrics
 from services.cron import execute_cron_job
 import asyncio
-from services.bot import start_application
-import logging
+import os
+from services.bot import start_application, BOT_ENABLED
+from lib.logger import configure_logger
 
-logger = logging.getLogger(__name__)
-
+# Load environment variables first
 load_dotenv()
 
+# Configure root logger
+logger = configure_logger()
+
+# Initialize scheduler with environment-controlled cron settings
 scheduler = AsyncIOScheduler()
-scheduler.add_job(execute_cron_job, "interval", hours=1)
-scheduler.start()
+CRON_ENABLED = os.getenv('CRON_ENABLED', 'true').lower() == 'true'
+CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
+
+if CRON_ENABLED:
+    scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
+    scheduler.start()
+    logger.info(f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds")
+else:
+    logger.info("Cron scheduler is disabled")
 
 app = FastAPI()
 
@@ -54,9 +63,12 @@ async def start_bot():
 async def startup_event():
     """Initialize services on startup."""
     try:
-        # Start the bot
-        await start_bot()
-        logger.info("Bot started successfully")
+        # Start the bot if enabled
+        if BOT_ENABLED:
+            await start_bot()
+            logger.info("Bot started successfully")
+        else:
+            logger.info("Telegram bot disabled. Skipping initialization.")
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
         raise e
@@ -69,7 +81,5 @@ async def health():
 
 
 app.include_router(crew.router)
-app.include_router(public_crews.router)
-app.include_router(public_stats.router)
 app.include_router(chat.router)
 app.include_router(metrics.router)

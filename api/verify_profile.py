@@ -1,12 +1,16 @@
-from fastapi import Header, HTTPException, Depends
+from fastapi import Header, HTTPException, Query
 from dotenv import load_dotenv
-from db.supabase_client import supabase
+from db.client import supabase
 from pydantic import BaseModel
-import datetime
+from lib.logger import configure_logger
 import cachetools
 
 load_dotenv()
 
+# Configure module logger
+logger = configure_logger(__name__)
+
+# Cache for profile data (5 minutes TTL)
 cache = cachetools.TTLCache(maxsize=100, ttl=300)
 
 
@@ -15,35 +19,42 @@ class ProfileInfo(BaseModel):
     id: str
 
 
-async def verify_profile(authorization: str = Header(...)) -> str:
+async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
     """
     Get and verify the account_index from the profile of the requesting user.
-    Returns the account_index if valid.
+    
+    Args:
+        authorization (str): Bearer token from request header
+        
+    Returns:
+        ProfileInfo: Object containing account_index and user ID
+        
+    Raises:
+        HTTPException: For various authentication and profile retrieval failures
     """
+    # Validate authorization header
     if not authorization or not authorization.startswith("Bearer "):
-        print("Authorization header is missing or invalid.")
+        logger.debug("Authorization header is missing or invalid")
         raise HTTPException(
             status_code=401, detail="Missing or invalid authorization header"
         )
 
-    token = authorization.split(" ")[1]
-    print(datetime.datetime.now())
-    print(f"Authorization token received: {token}")
-
     try:
-        # Get user email from the token
-        print(datetime.datetime.now())
+        # Extract and verify token
+        token = authorization.split(" ")[1]
+        logger.debug("Processing authorization token")
+        
+        # Get user from token
         user = supabase.auth.get_user(token)
         email = user.user.email
-        print(datetime.datetime.now())
-
-        # Check if the account_index is in the cache
+        
+        # Check cache first
         if email in cache:
-            print(f"Cache hit for email: {email}")
+            logger.debug(f"Cache hit for email: {email}")
             account_index = cache[email]
         else:
-            print(f"Cache miss for email: {email}")
-            # Retrieve the profile from Supabase
+            logger.debug(f"Cache miss for email: {email}")
+            # Fetch profile from database
             profile_response = (
                 supabase.table("profiles")
                 .select("account_index, email")
@@ -51,33 +62,92 @@ async def verify_profile(authorization: str = Header(...)) -> str:
                 .single()
                 .execute()
             )
-            print(datetime.datetime.now())
 
-            if profile_response.data is None:
-                print("Profile not found or retrieval failed in Supabase.")
+            if not profile_response.data:
+                logger.debug("Profile not found in database")
                 raise HTTPException(status_code=404, detail="Profile not found")
 
-            profile = profile_response.data
-            print(f"Profile data retrieved: {profile}")
-
-            account_index = profile.get("account_index")
+            account_index = profile_response.data.get("account_index")
             if account_index is None:
-                print("Account index is missing from profile data.")
+                logger.debug("Account index missing from profile")
                 raise HTTPException(
                     status_code=400, detail="No account index found for profile"
                 )
 
-            # Store the account_index in the cache
+            # Update cache
             cache[email] = account_index
+            logger.debug(f"Cached account_index for email: {email}")
 
-        print(f"Account index for user is {account_index}")
-        return ProfileInfo(account_index=str(account_index), id=user.user.id)
+        logger.debug(f"Successfully verified profile with account_index: {account_index}")
+        return ProfileInfo(account_index=account_index, id=user.user.id)
 
-    except HTTPException as http_ex:
-        print(f"HTTPException: {http_ex.detail}")
-        raise http_ex  # Propagate HTTPException as-is
-
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
-        print("Authorization failed due to unexpected error.")
-        print(f"Error details: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Authorization failed: {str(e)}")
+        logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Authorization failed")
+
+
+async def verify_profile_from_token(token: str = Query(..., description="Bearer token for authentication")) -> ProfileInfo:
+    """
+    Get and verify the account_index from the profile of the requesting user using a token query parameter.
+    
+    Args:
+        token (str): Bearer token from query parameter
+        
+    Returns:
+        ProfileInfo: Object containing account_index and user ID
+        
+    Raises:
+        HTTPException: For various authentication and profile retrieval failures
+    """
+    if not token:
+        logger.debug("Token query parameter is missing")
+        raise HTTPException(
+            status_code=401, detail="Missing token parameter"
+        )
+
+    try:
+        # Get user from token
+        logger.debug("Processing token from query parameter")
+        user = supabase.auth.get_user(token)
+        email = user.user.email
+        
+        # Check cache first
+        if email in cache:
+            logger.debug(f"Cache hit for email: {email}")
+            account_index = cache[email]
+        else:
+            logger.debug(f"Cache miss for email: {email}")
+            # Fetch profile from database
+            profile_response = (
+                supabase.table("profiles")
+                .select("account_index, email")
+                .eq("email", email)
+                .single()
+                .execute()
+            )
+
+            if not profile_response.data:
+                logger.debug("Profile not found in database")
+                raise HTTPException(status_code=404, detail="Profile not found")
+
+            account_index = profile_response.data.get("account_index")
+            if account_index is None:
+                logger.debug("Account index missing from profile")
+                raise HTTPException(
+                    status_code=400, detail="No account index found for profile"
+                )
+
+            # Update cache
+            cache[email] = account_index
+            logger.debug(f"Cached account_index for email: {email}")
+
+        logger.debug(f"Successfully verified profile with account_index: {account_index}")
+        return ProfileInfo(account_index=account_index, id=user.user.id)
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Authorization failed")

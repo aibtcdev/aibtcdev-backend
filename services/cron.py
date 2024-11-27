@@ -1,19 +1,24 @@
 import asyncio
 import json
 import datetime
+import os
 from db.helpers import add_job, get_enabled_crons_expanded
-from services.crew_services import execute_crew_stream
+from services.crews import execute_crew_stream
 from services.bot import send_message_to_user
+from lib.logger import configure_logger
 
-# Define the maximum number of concurrent tasks
-MAX_CONCURRENT_TASKS = 5
+# Configure logger
+logger = configure_logger(__name__)
+
+# Get the maximum number of concurrent cron tasks from environment variables
+CRON_MAX_CONCURRENT_TASKS = int(os.getenv('CRON_MAX_CONCURRENT_TASKS', 5))
 
 
 async def execute_cron_job():
     # log the cron
-    print("Executing cron job")
+    logger.info("Executing cron job")
     # Create a semaphore with the defined maximum concurrency
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+    semaphore = asyncio.Semaphore(CRON_MAX_CONCURRENT_TASKS)
 
     # Get all crons
     crons = get_enabled_crons_expanded()
@@ -33,7 +38,7 @@ async def execute_cron_job():
 
     # Wait for all tasks to complete
     await asyncio.gather(*tasks)
-    print("Cron job completed")
+    logger.info("Cron job completed")
 
 
 async def execute_single_wrapper(
@@ -65,9 +70,13 @@ async def execute_single_wrapper(
                 # Send message about the result
                 message = f"🤖 Crew Stream Result:\n\nInput: {input_str}\nResult: {result}"
                 await send_message_to_user(profile_id, message)
+                logger.debug(f"Crew stream result sent for crew_id={crew_id}")
                 
             await output_queue.put(None)  # Signal completion
+            logger.info(f"Crew stream completed successfully for crew_id={crew_id}")
         except Exception as e:
+            # Log the error
+            logger.error(f"Crew stream failed for crew_id={crew_id}: {str(e)}")
             # Send error message
             error_message = f"❌ Crew Stream Failed:\n\nInput: {input_str}\nError: {str(e)}"
             await send_message_to_user(profile_id, error_message)
@@ -81,6 +90,7 @@ async def execute_single_wrapper(
                 "",
                 results_array,
             )
+            logger.debug(f"Job added to history for crew_id={crew_id}")
 
     async with semaphore:
         await task_wrapper()

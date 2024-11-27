@@ -1,21 +1,5 @@
-from .supabase_client import supabase
+from .client import supabase
 import datetime
-
-
-def add_job(profile_id, conversation_id, crew_id, input_data, result, messages):
-    """
-    Add a new run with input, result, and thought process for a specific conversation and crew.
-    """
-    new_job = {
-        "profile_id": profile_id,
-        "conversation_id": conversation_id,
-        "crew_id": crew_id,
-        "input": input_data,
-        "result": result,
-        "messages": messages,
-    }
-    result = supabase.table("jobs").insert(new_job).execute()
-    return result
 
 
 def add_conversation(profile, name: str = "New Conversation"):
@@ -27,7 +11,7 @@ def add_conversation(profile, name: str = "New Conversation"):
         "name": name,
     }
     result = supabase.table("conversations").insert(new_conversation).execute()
-    return result
+    return result.data[0] if result.data else None
 
 
 def get_jobs(profile) -> list:
@@ -283,4 +267,42 @@ def get_public_crews():
             agents.append(agent_with_tasks)
         crew_response = {**crew, "agents": agents}
         result.append(crew_response)
+    return result
+
+
+def get_conversation_history(conversation_id: str) -> list:
+    """
+    Get the conversation history for a specific conversation ID.
+    Returns a list of messages in chronological order.
+    """
+    jobs_response = (
+        supabase.table("jobs")
+        .select("*")
+        .eq("conversation_id", conversation_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    history = []
+    if jobs_response.data:
+        for job in jobs_response.data:
+            if job.get("messages"):
+                history.extend(job["messages"])
+    
+    return history
+
+
+def add_job(profile_id, conversation_id, crew_id, input_data, result, messages):
+    """
+    Add a new run with input, result, and thought process for a specific conversation and crew.
+    """
+    new_job = {
+        "profile_id": profile_id,
+        "conversation_id": conversation_id,
+        "crew_id": crew_id,
+        "input": input_data,
+        "result": result,
+        "messages": messages,
+    }
+    result = supabase.table("jobs").insert(new_job).execute()
     return result

@@ -2,7 +2,7 @@ from crewai import Agent, Task
 from lib.crews import AIBTC_Crew
 from textwrap import dedent
 from crewai_tools import BaseTool
-from services.crew_services import build_all_crews
+from services.crews import build_all_crews
 
 
 class UserChatSpecialistCrew(AIBTC_Crew):

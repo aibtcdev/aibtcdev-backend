@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import uuid
 import json
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from db.helpers import add_job
-from services.crew_services import execute_crew_stream
+from services.crews import execute_crew_stream
 from tools.tools_factory import initialize_tools
-from .verify_profile import verify_profile, ProfileInfo
+from .verify_profile import verify_profile_from_token, ProfileInfo
 from typing import List
 from lib.models import Crew
 from db.helpers import get_public_crews
@@ -14,13 +14,14 @@ from fastapi import (
     APIRouter,
     HTTPException,
     Depends,
-    Body,
+    WebSocket,
+    WebSocketDisconnect,
 )
-
+from lib.websocket_manager import manager
+from logging import Logger
+logger = Logger(__name__)
 
 router = APIRouter(prefix="/crew")
-
-running_jobs = {}
 
 
 @router.get("/tools")
@@ -36,138 +37,126 @@ async def get_avaliable_tools():
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
 
 
-@router.post("/{crew_id}")
-async def execute_crew_endpoint(
+@router.websocket("/{crew_id}/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
     crew_id: int,
-    input_str: str = Body(...),
-    profile: ProfileInfo = Depends(verify_profile),
+    profile: ProfileInfo = Depends(verify_profile_from_token)
 ):
-    # Generate a unique task ID
-    job_id = str(uuid.uuid4())
-    output_queue = asyncio.Queue()
-    results_array = []
+    job_id = None
+    is_processing = False
+    is_connected = False
 
-    results_array.append(
-        json.dumps(
-            {
-                "role": "user",
-                "type": "user",
-                "content": input_str,
-                "timestamp": datetime.datetime.now().isoformat(),
-            }
-        )
-    )
-
-    async def task_wrapper():
-        try:
-            # Run the actual crew stream task, yielding output to the queue
-            async for result in execute_crew_stream(
-                str(profile.account_index), crew_id, input_str
-            ):
-                await output_queue.put(result)
-                result["crew_id"] = crew_id
-                result["timestamp"] = datetime.datetime.now().isoformat()
-                results_array.append(json.dumps(result))
-            await output_queue.put(None)  # Signal completion
-        finally:
-            add_job(
-                profile.id,
-                None,
-                crew_id,
-                input_str,
-                "",
-                results_array,
-            )
-            running_jobs.pop(job_id, None)
-
-    task = asyncio.create_task(task_wrapper())
-    running_jobs[job_id] = {
-        "task": task,
-        "queue": output_queue,
-        "profile": profile,
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
-
-    # Return the task ID immediately
-    return JSONResponse(content={"job_id": job_id})
-
-
-# Endpoint to get all background tasks for a given profile
-@router.get("/jobs")
-async def get_all_background_tasks(profile: ProfileInfo = Depends(verify_profile)):
-    tasks = []
-    for job_id, task_info in running_jobs.items():
-        if task_info["profile"].id == profile.id:
-            task = {
-                "job_id": job_id,
-                "timestamp": task_info["timestamp"],
-            }
-            tasks.append(task)
-    return JSONResponse(content=tasks)
-
-
-@router.get("/jobs/{job_id}/stream")
-async def sse_streaming(job_id: str):
-    task_info = running_jobs.get(job_id)
-    if not task_info:
-        # Send a custom 404 error message as an SSE event
-        async def not_found_event_generator():
-            error_message = json.dumps({"type": "error", "message": "Task not found"})
-            yield f"event: error\ndata: {error_message}\n\n"
-            return  # Close the generator after sending the error
-
-        return StreamingResponse(
-            not_found_event_generator(), media_type="text/event-stream"
-        )
-
-    output_queue = task_info["queue"]
-
-    async def event_generator():
-        try:
-            while True:
-                # Retrieve data from the queue
-                result = await output_queue.get()
-                if result is None:  # Task completed
-                    break
-                # Yield the result as JSON for SSE
-                json_result = json.dumps(result)
-                yield f"data: {json_result}\n\n"
-        except Exception as e:
-            # Send any runtime error as an SSE error event
-            error_message = json.dumps(
-                {"type": "error", "message": f"Execution error: {str(e)}"}
-            )
-            yield f"event: error\ndata: {error_message}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-# Endpoint to cancel a background task given its job_id
-@router.delete("/jobs/{job_id}/cancel")
-async def cancel_task(
-    job_id: str,
-    profile: ProfileInfo = Depends(verify_profile),
-):
-    task_info = running_jobs.get(job_id)
-    if not task_info:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    if task_info["profile"].id != profile.id:
-        raise HTTPException(
-            status_code=403, detail="You do not have permission to cancel this task."
-        )
-
-    task = task_info["task"]
-
-    # Cancel the task
-    task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
-        return JSONResponse(content={"message": "Task cancelled successfully"})
+        await manager.connect_job(websocket, str(crew_id))
+        is_connected = True
+        logger.debug(f"WebSocket connected for crew {crew_id}")
+        
+        while is_connected:
+            try:
+                # Wait for messages from the client
+                data = await websocket.receive_json()
+                
+                # If we're still processing a job, ignore new inputs
+                if is_processing:
+                    await manager.send_job_message(
+                        {
+                            "type": "error",
+                            "message": "Still processing previous request. Please wait for it to complete."
+                        },
+                        str(crew_id)
+                    )
+                    continue
+
+                if data.get("type") == "chat_message":
+                    is_processing = True
+                    input_str = data.get("message", "")
+                    
+                    # Generate a unique job ID
+                    job_id = str(uuid.uuid4())
+                    results_array = []
+
+                    # Add initial user message
+                    results_array.append(
+                        json.dumps({
+                            "role": "user",
+                            "type": "user",
+                            "content": input_str,
+                            "timestamp": datetime.datetime.now().isoformat()
+                        })
+                    )
+
+                    try:
+                        # Send job started message
+                        await manager.send_job_message(
+                            {
+                                "type": "job_started",
+                                "job_id": job_id,
+                                "job_started_at": datetime.datetime.now().isoformat()
+                            },
+                            str(crew_id)
+                        )
+
+                        # Run the crew stream task and stream results
+                        async for result in execute_crew_stream(
+                            str(profile.account_index), crew_id, input_str
+                        ):
+                            if not is_connected:
+                                break
+                            result["crew_id"] = crew_id
+                            result["timestamp"] = datetime.datetime.now().isoformat()
+                            results_array.append(json.dumps(result))
+                            await manager.send_job_message(result, str(crew_id))
+
+                        # Only store results if we completed successfully
+                        if is_connected:
+                            add_job(
+                                profile_id=profile.id,
+                                conversation_id=None,
+                                crew_id=crew_id,
+                                input_data=input_str,
+                                result="",
+                                messages=results_array
+                            )
+
+                    except Exception as e:
+                        logger.error(f"Error processing crew message: {str(e)}")
+                        if is_connected:
+                            await manager.broadcast_job_error(str(e), str(crew_id))
+                    finally:
+                        is_processing = False
+
+            except WebSocketDisconnect:
+                logger.info(f"WebSocket disconnected for crew {crew_id}")
+                is_connected = False
+                break
+            except json.JSONDecodeError:
+                if is_connected:
+                    await manager.broadcast_job_error("Invalid JSON message", str(crew_id))
+            except Exception as e:
+                logger.error(f"Error in WebSocket message handling: {str(e)}")
+                if is_connected:
+                    await manager.broadcast_job_error(str(e), str(crew_id))
+                is_connected = False
+                break
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for crew {crew_id}")
+    except Exception as e:
+        logger.error(f"Error in WebSocket connection: {str(e)}")
+    finally:
+        is_connected = False
+        await manager.disconnect_job(websocket, str(crew_id))
+        logger.debug(f"Cleaned up WebSocket connection for crew {crew_id}")
+
+
+@router.get("/public", response_model=List[Crew])
+async def api_get_public_crews():
+    try:
+        crews = get_public_crews()
+        return JSONResponse(content=crews)
+
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error while cancelling task: {str(e)}"
+            status_code=500, detail=f"Error fetching public crews: {str(e)}"
         )
-
-    return JSONResponse(content={"message": "Task cancelled successfully"})
