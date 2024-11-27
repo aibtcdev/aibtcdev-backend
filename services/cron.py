@@ -82,13 +82,19 @@ async def execute_single_wrapper(
             await send_message_to_user(profile_id, error_message)
             raise e
         finally:
+            logger.debug(f"Saving chat results for job {job_id}")
+
+            final_result = json.loads(results_array[-1]) if results_array else None
+            final_result_content = final_result.get("content", "") if final_result else ""
+            
             add_job(
-                profile_id,
-                None,
-                crew_id,
-                input_str,
-                "",
-                results_array,
+                profile_id=profile_id,
+                conversation_id=None,
+                crew_id=crew_id,
+                input_data=input_str,
+                tokens=final_result.get("tokens", 0) if final_result else 0,
+                result=final_result_content,
+                messages=results_array,
             )
             logger.debug(f"Job added to history for crew_id={crew_id}")
 

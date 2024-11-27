@@ -59,7 +59,7 @@ google-cloud-storage==2.18.2
 google-crc32c==1.6.0
 google-resumable-media==2.7.2
 googleapis-common-protos==1.65.0
-gotrue==2.8.1
+gotrue==2.11.0
 gptcache==0.1.44
 greenlet==3.1.1
 grpc-google-iam-v1==0.13.1
@@ -111,7 +111,7 @@ markdown-it-py==3.0.0
 MarkupSafe==2.1.5
 marshmallow==3.22.0
 mdurl==0.1.2
-mem0ai==0.1.32
+mem0ai==0.1.33
 mmh3==5.0.1
 monotonic==1.6
 more-itertools==10.5.0
@@ -150,7 +150,7 @@ poetry==1.8.3
 poetry-core==1.9.0
 poetry-plugin-export==1.8.0
 portalocker==2.10.1
-postgrest==0.16.11
+postgrest==0.18.0
 posthog==3.6.6
 proto-plus==1.24.0
 protobuf==4.25.5
@@ -207,11 +207,11 @@ sortedcontainers==2.4.0
 soupsieve==2.6
 SQLAlchemy==2.0.35
 starlette==0.40.0
-storage3==0.7.7
+storage3==0.9.0
 streamlit
 StrEnum==0.4.15
-supabase==2.7.4
-supafunc==0.5.1
+supabase==2.10.0
+supafunc==0.7.0
 sympy==1.13.3
 tabulate==0.9.0
 tenacity==8.5.0

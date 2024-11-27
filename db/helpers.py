@@ -1,11 +1,10 @@
 from .client import supabase
+from typing import Dict, List, Optional, Any, Union
 import datetime
 
 
-def add_conversation(profile, name: str = "New Conversation"):
-    """
-    Add a new conversation for a specific profile.
-    """
+def add_conversation(profile, name: str = "New Conversation") -> Optional[Dict[str, Any]]:
+    """Add a new conversation for a specific profile."""
     new_conversation = {
         "profile_id": profile.id,
         "name": name,
@@ -14,10 +13,8 @@ def add_conversation(profile, name: str = "New Conversation"):
     return result.data[0] if result.data else None
 
 
-def get_jobs(profile) -> list:
-    """
-    Get all jobs for a specific profile.
-    """
+def get_jobs(profile) -> List[Dict[str, Any]]:
+    """Get all jobs for a specific profile."""
     runs_response = (
         supabase.table("jobs")
         .select("*")
@@ -25,17 +22,11 @@ def get_jobs(profile) -> list:
         .order("created_at", desc=True)
         .execute()
     )
-
-    if runs_response.data:
-        return runs_response.data
-    else:
-        return []
+    return runs_response.data if runs_response.data else []
 
 
-def get_conversations(profile) -> list:
-    """
-    Get all conversations for a specific profile.
-    """
+def get_conversations(profile) -> List[Dict[str, Any]]:
+    """Get all conversations for a specific profile."""
     conversation_response = (
         supabase.table("conversations")
         .select("*")
@@ -43,18 +34,11 @@ def get_conversations(profile) -> list:
         .order("created_at", desc=True)
         .execute()
     )
-
-    if conversation_response.data:
-        return conversation_response.data
-    else:
-        return []
+    return conversation_response.data if conversation_response.data else []
 
 
-def get_detailed_conversation(conversation_id):
-    """
-    Get detailed conversation data for a specific conversation and profile.
-    """
-    # Retrieve all tasks linked to this conversation
+def get_detailed_conversation(conversation_id: str) -> Dict[str, Any]:
+    """Get detailed conversation data with associated jobs."""
     jobs_response = (
         supabase.table("jobs")
         .select("*")
@@ -63,8 +47,7 @@ def get_detailed_conversation(conversation_id):
         .execute()
     )
 
-    # Zip up the conversations data and next the tasks for the conversations
-    _with_jobs = {
+    return {
         "conversation": conversation_id,
         "jobs": [
             job
@@ -73,10 +56,9 @@ def get_detailed_conversation(conversation_id):
         ],
     }
 
-    return _with_jobs
 
-
-def get_detailed_conversations(profile):
+def get_detailed_conversations(profile) -> List[Dict[str, Any]]:
+    """Get all conversations with their associated jobs for a profile."""
     conversation_response = (
         supabase.table("conversations")
         .select("*")
@@ -85,72 +67,58 @@ def get_detailed_conversations(profile):
         .execute()
     )
 
-    if conversation_response.data:
-        conversation_ids = [
-            conversation["id"] for conversation in conversation_response.data
-        ]
-
-        # Retrieve all tasks linked to this conversation
-        jobs_response = (
-            supabase.table("jobs")
-            .select("*")
-            .in_("conversation_id", conversation_ids)
-            .order("created_at", asc=True)
-            .execute()
-        )
-
-        # Zip up the conversations data and next the tasks for the conversations
-        _with_jobs = [
-            {
-                "conversation": conversation,
-                "jobs": [
-                    job
-                    for job in jobs_response.data
-                    if job["conversation_id"] == conversation["id"]
-                ],
-            }
-            for conversation in conversation_response.data
-        ]
-
-        return _with_jobs
-    else:
-        # No conversation exists
+    if not conversation_response.data:
         return []
 
+    conversation_ids = [
+        conversation["id"] for conversation in conversation_response.data
+    ]
 
-def update_message(profile, messages):
+    jobs_response = (
+        supabase.table("jobs")
+        .select("*")
+        .in_("conversation_id", conversation_ids)
+        .order("created_at", desc=False)
+        .execute()
+    )
+
+    return [
+        {
+            "conversation": conversation,
+            "jobs": [
+                job
+                for job in jobs_response.data
+                if job["conversation_id"] == conversation["id"]
+            ],
+        }
+        for conversation in conversation_response.data
+    ]
+
+
+def update_message(profile, messages: List[Dict[str, Any]]) -> None:
+    """Update or create a conversation with new messages."""
     response = (
         supabase.table("conversations")
         .select("*")
         .eq("profile_id", profile.id)
         .execute()
     )
-    data = response.data
 
-    if data:
-        # Conversation exists, so append to the existing messages
-        conversation_id = data[0]["id"]
-        existing_messages = data[0]["messages"]
-
-        # Append the new message to the messages array
-        updated_messages = existing_messages + messages
-
-        # Update the conversation with the appended messages
+    if response.data:
+        conversation_id = response.data[0]["id"]
+        updated_messages = response.data[0]["messages"] + messages
         supabase.table("conversations").update({"messages": updated_messages}).eq(
             "id", conversation_id
         ).execute()
-
     else:
-        # No conversation exists, create a new one
-        new_conversation = {
+        supabase.table("conversations").insert({
             "profile_id": profile.id,
             "messages": messages,
-        }
-        supabase.table("conversations").insert(new_conversation).execute()
+        }).execute()
 
 
-def get_latest_conversation(profile):
-    # Retrieve the history of messages for the user
+def get_latest_conversation(profile) -> Optional[Dict[str, Any]]:
+    """Get the most recent conversation for a profile."""
     response = (
         supabase.table("conversations")
         .select("*")
@@ -159,84 +127,63 @@ def get_latest_conversation(profile):
         .limit(1)
         .execute()
     )
-    data = response.data
-    if data:
-        return data[0]
-    else:
-        # No conversation exists, return an empty list
-        return []
+    return response.data[0] if response.data else None
 
 
-def get_enabled_crons_expanded():
-    # Retrieve the history of messages for the user
-    response = (
+def get_enabled_crons_expanded() -> List[Dict[str, Any]]:
+    """Get all enabled cron jobs with expanded crew information."""
+    return (
         supabase.from_("crons")
         .select("id, input, profiles(id, account_index), crew_id")
         .eq("enabled", True)
         .order("created_at", desc=True)
         .execute()
+        .data
     )
-    data = response.data
-    if data:
-        return data
-    else:
-        # No conversation exists, return an empty list
-        return []
 
 
-def get_enabled_crons():
-    # Retrieve the history of messages for the user
-    response = (
+def get_enabled_crons() -> List[Dict[str, Any]]:
+    """Get all enabled cron jobs."""
+    return (
         supabase.table("crons")
         .select("*")
         .eq("enabled", True)
         .order("created_at", desc=True)
         .execute()
+        .data
     )
-    data = response.data
-    if data:
-        return data
-    else:
-        # No conversation exists, return an empty list
-        return []
 
 
-def get_latest_conversation_id(profile) -> int:
-    # Retrieve the history of messages for the user
+def get_latest_conversation_id(profile) -> Optional[str]:
+    """Get the ID of the most recent conversation for a profile."""
     response = (
         supabase.table("conversations")
         .select("id")
         .eq("profile_id", profile.id)
         .order("created_at", desc=True)
-        .limit()
+        .limit(1)
         .execute()
     )
-    data = response.data
-    if data:
-        # Conversation exists, so return the id
-        return data[0]["id"]
-    else:
-        # No conversation exists, return an empty list
-        return 0
+    return response.data[0]["id"] if response.data else None
 
 
-def delete_conversation(profile, conversation_id):
-    # Delete the conversation from the database
-    supabase.table("conversations").delete().eq("id", conversation_id).eq(
+def delete_conversation(profile, conversation_id: str) -> Dict[str, Any]:
+    """Delete a specific conversation."""
+    return supabase.table("conversations").delete().eq("id", conversation_id).eq(
         "profile_id", profile.id
     ).execute()
-    return True
 
 
 def mask_email(email: str) -> str:
-    """Mask the @stacks.id part of the email and capitalize the username."""
+    """Mask and format an email address."""
     if "@stacks.id" in email:
         username = email.split("@")[0]
         return username.upper()
     return email.upper()
 
 
-def get_public_crews():
+def get_public_crews() -> List[Dict[str, Any]]:
+    """Get all public crew configurations."""
     crews_response = (
         supabase.from_("crews")
         .select(
@@ -270,11 +217,8 @@ def get_public_crews():
     return result
 
 
-def get_conversation_history(conversation_id: str) -> list:
-    """
-    Get the conversation history for a specific conversation ID.
-    Returns a list of messages in chronological order.
-    """
+def get_conversation_history(conversation_id: str) -> List[Dict[str, Any]]:
+    """Get conversation history in chronological order."""
     jobs_response = (
         supabase.table("jobs")
         .select("*")
@@ -284,23 +228,29 @@ def get_conversation_history(conversation_id: str) -> list:
     )
 
     history = []
-    if jobs_response.data:
-        for job in jobs_response.data:
-            if job.get("messages"):
-                history.extend(job["messages"])
-    
+    for job in jobs_response.data:
+        if job.get("messages"):
+            history.extend(job["messages"])
+
     return history
 
 
-def add_job(profile_id, conversation_id, crew_id, input_data, result, messages):
-    """
-    Add a new run with input, result, and thought process for a specific conversation and crew.
-    """
+def add_job(
+    profile_id: str,
+    conversation_id: str,
+    crew_id: str,
+    input_data: Dict[str, Any],
+    result: Dict[str, Any],
+    tokens: int,
+    messages: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Add a new job with associated conversation data."""
     new_job = {
         "profile_id": profile_id,
         "conversation_id": conversation_id,
         "crew_id": crew_id,
         "input": input_data,
+        "tokens": tokens,
         "result": result,
         "messages": messages,
     }

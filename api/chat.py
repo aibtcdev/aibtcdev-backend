@@ -97,8 +97,9 @@ async def trigger_chat(
             add_job(
                 profile_id=profile.id,
                 conversation_id=conversation_id,
-                crew_id=1,  # Default crew ID for chat specialist
+                crew_id=None,  # Default crew ID for chat specialist
                 input_data=input_str,
+                tokens=final_result.get("tokens", 0) if final_result else 0,
                 result=final_result_content,
                 messages=results_array
             )
@@ -264,6 +265,7 @@ async def process_chat_message(
             conversation_id=conversation_id,
             crew_id=None,  # Default crew ID for chat specialist
             input_data=input_str,
+            tokens=final_result.get("tokens", 0) if final_result else 0,
             result=final_result_content,
             messages=[json.dumps(r) for r in results]
         )

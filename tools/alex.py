@@ -1,18 +1,20 @@
+from typing import Optional, Type
 import requests
 from crewai_tools import BaseTool
 from textwrap import dedent
 from lib.alex import AlexApi
+from pydantic import BaseModel, Field
+
+
+class AlexPriceHistorySchema(BaseModel):
+    """Input schema for AlexGetPriceHistory."""
+    token_address: str = Field(..., description="The address of the token to get price history for.")
 
 
 class AlexGetPriceHistory(BaseTool):
-    def __init__(self):
-        super().__init__(
-            name="ALEX: Get Token Price History",
-            description=(
-                "Retrieve historical price data for a specified cryptocurrency symbol."
-            ),
-            args={"token_address": {"type": "string"}},
-        )
+    name: str = "ALEX: Get Token Price History"
+    description: str = "Retrieve historical price data for a specified cryptocurrency symbol."
+    args_schema: Type[BaseModel] = AlexPriceHistorySchema
 
     def _run(self, token_address: str) -> str:
         """
@@ -25,16 +27,12 @@ class AlexGetPriceHistory(BaseTool):
             str: A formatted string containing the token price history.
         """
         obj = AlexApi()
-
         return obj.get_price_history(token_address)
 
 
 class AlexGetSwapInfo(BaseTool):
-    def __init__(self):
-        super().__init__(
-            name="ALEX: Get All Avaliable Token Info",
-            description="Retrieve all pair data from the Alex API.",
-        )
+    name: str = "ALEX: Get All Available Token Info"
+    description: str = "Retrieve all pair data from the Alex API."
 
     def _run(self) -> str:
         """
@@ -45,7 +43,6 @@ class AlexGetSwapInfo(BaseTool):
         """
         obj = AlexApi()
         pairs = obj.get_pairs()
-
         return [
             {"token": pair["wrapped_token_y"], "token_pool_id": pair["pool_id"]}
             for pair in pairs
@@ -53,13 +50,15 @@ class AlexGetSwapInfo(BaseTool):
         ]
 
 
+class AlexTokenPoolVolumeSchema(BaseModel):
+    """Input schema for AlexGetTokenPoolVolume."""
+    token_pool_id: str = Field(..., description="The token pool ID to get volume data for.")
+
+
 class AlexGetTokenPoolVolume(BaseTool):
-    def __init__(self):
-        super().__init__(
-            name="ALEX: Get Token Pool Volume",
-            description="Retrieve pool volume data for a specified token pool ID.",
-            args={"token_pool_id": {"type": "string"}},
-        )
+    name: str = "ALEX: Get Token Pool Volume"
+    description: str = "Retrieve pool volume data for a specified token pool ID."
+    args_schema: Type[BaseModel] = AlexTokenPoolVolumeSchema
 
     def _run(self, token_pool_id: str) -> str:
         """

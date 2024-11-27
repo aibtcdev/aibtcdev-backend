@@ -222,7 +222,7 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
     final_result = await kickoff_future
     while not callback_queue.empty():
         yield await callback_queue.get()
-    yield {"type": "result", "content": final_result.raw}
+    yield {"type": "result", "content": final_result.raw, "tokens": final_result.token_usage.total_tokens}
 
 def extract_filtered_content(history: List) -> str:
     """Extract and filter content from chat history."""
@@ -330,4 +330,4 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
     final_result = await kickoff_future
     while not callback_queue.empty():
         yield await callback_queue.get()
-    yield {"type": "result", "content": final_result.raw}
+    yield {"type": "result", "content": final_result.raw, "tokens": final_result.token_usage.total_tokens}

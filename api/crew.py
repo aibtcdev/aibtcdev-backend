@@ -108,16 +108,18 @@ async def websocket_endpoint(
                             results_array.append(json.dumps(result))
                             await manager.send_job_message(result, str(crew_id))
 
-                        # Only store results if we completed successfully
-                        if is_connected:
-                            add_job(
-                                profile_id=profile.id,
-                                conversation_id=None,
-                                crew_id=crew_id,
-                                input_data=input_str,
-                                result="",
-                                messages=results_array
-                            )
+                        final_result = json.loads(results_array[-1]) if results_array else None
+                        final_result_content = final_result.get("content", "") if final_result else ""
+        
+                        add_job(
+                            profile_id=profile.id,
+                            conversation_id=None,
+                            crew_id=crew_id,
+                            input_data=input_str,
+                            tokens=final_result.get("tokens", 0) if final_result else 0,
+                            result=final_result_content,
+                            messages=results_array
+                        )
 
                     except Exception as e:
                         logger.error(f"Error processing crew message: {str(e)}")
