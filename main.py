@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(execute_cron_job, "interval", minutes=1)
+scheduler.add_job(execute_cron_job, "interval", hours=1)
 scheduler.start()
 
 app = FastAPI()
