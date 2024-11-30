@@ -53,7 +53,7 @@ class ContractSIP10SendToolSchema(BaseModel):
 
     contract_address: str = Field(..., description="Contract address of the token. Format: contract_address.contract_name")
     recipient: str = Field(..., description="Recipient address to send tokens to.")
-    amount: int = Field(..., description="Amount of tokens to send.")
+    amount: int = Field(..., description="Amount of tokens to send. Needs to be in micro format based on decimals of token.")
 
 
 class ContractSIP10SendTool(BaseTool):
@@ -79,4 +79,32 @@ class ContractSIP10SendTool(BaseTool):
             contract_address,
             recipient,
             str(amount),
+        )
+
+
+class ContractSIP10InfoToolSchema(BaseModel):
+    """Input schema for ContractSIP10InfoTool."""
+
+    contract_address: str = Field(..., description="Contract address of the token. Format: contract_address.contract_name")
+
+
+class ContractSIP10InfoTool(BaseTool):
+    name: str = "Get fungible token information."
+    description: str = "Get token information including name, symbol, decimals, and supply."
+    args_schema: Type[BaseModel] = ContractSIP10InfoToolSchema
+    account_index: Optional[str] = None
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(
+        self,
+        contract_address: str,
+    ) -> str:
+        return BunScriptRunner.bun_run(
+            self.account_index,
+            "sip-010-ft",
+            "get-token-info.ts",
+            contract_address,
         )

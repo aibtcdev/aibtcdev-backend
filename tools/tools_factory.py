@@ -15,7 +15,7 @@ from .transactions import (
     StacksTransactionTool,
     StacksTransactionByAddressTool,
 )
-from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool
+from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
 
 
 def initialize_tools(account_index: str = "0"):
@@ -43,6 +43,7 @@ def initialize_tools(account_index: str = "0"):
         "stacks_transaction_by_address": StacksTransactionByAddressTool(),
         "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
         "contract_sip10_send": ContractSIP10SendTool(account_index),
+        "contract_sip10_info": ContractSIP10InfoTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
     }
