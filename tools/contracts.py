@@ -53,7 +53,7 @@ class ContractSIP10SendToolSchema(BaseModel):
 
     contract_address: str = Field(..., description="Contract address of the token. Format: contract_address.contract_name")
     recipient: str = Field(..., description="Recipient address to send tokens to.")
-    amount: int = Field(..., description="Amount of tokens to send. Needs to be in micro format based on decimals of token.")
+    amount: int = Field(..., description="Amount of tokens to send. Needs to be in microunits based on decimals of token.")
 
 
 class ContractSIP10SendTool(BaseTool):
