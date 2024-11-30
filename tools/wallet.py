@@ -63,3 +63,40 @@ class WalletGetMyAddress(BaseTool):
         return BunScriptRunner.bun_run(
             self.account_index, "stacks-wallet", "get-my-wallet-address.ts"
         )
+
+
+class WalletSendSTXSchema(BaseModel):
+    """Input schema for WalletSendSTX."""
+    recipient: str = Field(..., description="Recipient STX address.")
+    amount: int = Field(..., description="Amount of STX to send (in microSTX).")
+    fee: Optional[int] = Field(200, description="Transaction fee in microSTX. Default is 200.")
+    memo: Optional[str] = Field("", description="Optional memo to include with the transaction.")
+
+
+class WalletSendSTX(BaseTool):
+    """Tool for sending STX tokens."""
+    name: str = "Send STX tokens"
+    description: str = "Send STX tokens from your wallet to a recipient address."
+    args_schema: Type[BaseModel] = WalletSendSTXSchema
+    account_index: Optional[str] = None
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(
+        self,
+        recipient: str,
+        amount: int,
+        fee: Optional[int] = 200,
+        memo: Optional[str] = "",
+    ) -> str:
+        return BunScriptRunner.bun_run(
+            self.account_index,
+            "stacks-wallet",
+            "transfer-my-stx.ts",
+            recipient,
+            str(amount),
+            str(fee),
+            memo,
+        )
