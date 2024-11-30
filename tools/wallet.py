@@ -68,7 +68,7 @@ class WalletGetMyAddress(BaseTool):
 class WalletSendSTXSchema(BaseModel):
     """Input schema for WalletSendSTX."""
     recipient: str = Field(..., description="Recipient STX address.")
-    amount: int = Field(..., description="Amount of STX to send (in microSTX).")
+    amount: int = Field(..., description="Amount of STX to send not in microSTX. Default is 1.")
     fee: Optional[int] = Field(200, description="Transaction fee in microSTX. Default is 200.")
     memo: Optional[str] = Field("", description="Optional memo to include with the transaction.")
 
