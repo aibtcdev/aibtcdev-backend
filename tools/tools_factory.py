@@ -1,10 +1,10 @@
-# from .get_btc_data import GetBitcoinData
 from crewai_tools import SerperDevTool
-
+from .get_btc_data import GetBitcoinData
 from .velar import VelarGetPriceHistory, VelarGetTokens
-from .wallet import WalletGetMyAddress, WalletGetMyBalance
+from .wallet import WalletGetMyAddress, WalletGetMyBalance, WalletSendSTX
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
+from .fetch_contract_code import FetchContractCodeTool
 from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
@@ -15,10 +15,7 @@ from .transactions import (
     StacksTransactionTool,
     StacksTransactionByAddressTool,
 )
-from .contracts import ContractSIP10DeployTool
-
-
-# from .fetch_contract_code import FetchContractCodeTool
+from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
 
 
 def initialize_tools(account_index: str = "0"):
@@ -40,10 +37,15 @@ def initialize_tools(account_index: str = "0"):
         "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(account_index),
         "wallet_get_my_address": WalletGetMyAddress(account_index),
+        "wallet_send_stx": WalletSendSTX(account_index),
         "stacks_transaction_status": StacksTransactionStatusTool(),
         "stacks_transaction": StacksTransactionTool(),
         "stacks_transaction_by_address": StacksTransactionByAddressTool(),
         "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
+        "contract_sip10_send": ContractSIP10SendTool(account_index),
+        "contract_sip10_info": ContractSIP10InfoTool(account_index),
+        "fetch_contract_code": FetchContractCodeTool(),
+        "get_btc_data": GetBitcoinData(),
     }
 
 

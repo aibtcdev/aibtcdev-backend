@@ -1,11 +1,8 @@
 from pydantic import BaseModel
 from typing import List
 
-
-# Pydantic models for response structure
 class Creator(BaseModel):
     email: str
-
 
 class Task(BaseModel):
     id: int
@@ -13,7 +10,6 @@ class Task(BaseModel):
     expected_output: str
     agent_id: int
     profile_id: str
-
 
 class Agent(BaseModel):
     id: int
@@ -23,7 +19,6 @@ class Agent(BaseModel):
     backstory: str
     agent_tools: List[str]
     tasks: List[Task]
-
 
 class Crew(BaseModel):
     id: int

@@ -1,25 +1,33 @@
-# THIS TOOL HELPS TO GET MARKET DATA OF BITCOIN
-
+from typing import Type
 import os
 import requests
 from crewai_tools import BaseTool
+from pydantic import BaseModel
+
+
+class GetBitcoinDataSchema(BaseModel):
+    """Input schema for GetBitcoinData tool.
+    This tool doesn't require any input parameters but we still define the schema for consistency.
+    """
+    pass
 
 
 class GetBitcoinData(BaseTool):
+    """Tool for fetching current Bitcoin market data from CoinMarketCap."""
     name: str = "GetBitcoinData"
-    description: str = (
-        "Fetches Bitcoin data including price, market cap, 24h trading volume, and percentage changes."
-    )
+    description: str = "Fetches Bitcoin data including price, market cap, 24h trading volume, and percentage changes."
+    args_schema: Type[BaseModel] = GetBitcoinDataSchema
 
     def _run(self) -> str:
         """
-        Fetches Bitcoin data using the CoinMarketCap API and returns the data as a formatted string.
+        Fetches Bitcoin data using the CoinMarketCap API.
 
-        The API key is fetched from the environment variable 'CMC_API_KEY'.
+        Required Environment Variables:
+            CMC_API_KEY: CoinMarketCap API key for authentication
 
         Returns:
-        str -- A formatted string containing Bitcoin price, market cap, trading volume,
-               and percentage changes.
+            str: A formatted string containing Bitcoin price, market cap, trading volume,
+                and percentage changes. Returns an error message if the API call fails.
         """
         # Get the API key from the environment variable
         api_key = os.getenv("CMC_API_KEY")
@@ -40,8 +48,6 @@ class GetBitcoinData(BaseTool):
         try:
             # Make the API request
             response = requests.get(url, headers=headers, params=parameters)
-
-            # Check if the request was successful
             response.raise_for_status()  # Raise an exception for HTTP errors
 
             # Parse the JSON response
@@ -60,10 +66,9 @@ class GetBitcoinData(BaseTool):
                 f"Bitcoin Price: ${price:.2f}\n"
                 f"Market Cap: ${market_cap:.2f}\n"
                 f"24h Trading Volume: ${volume_24h:.2f}\n"
-                f"24h Change: {percent_change_24h}%\n"
-                f"7d Change: {percent_change_7d}%"
+                f"24h Change: {percent_change_24h:.2f}%\n"
+                f"7d Change: {percent_change_7d:.2f}%"
             )
 
         except requests.RequestException as e:
-            # Handle any API or network errors
             return f"Error fetching Bitcoin data: {e}"

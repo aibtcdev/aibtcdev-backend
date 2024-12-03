@@ -1,76 +1,85 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from api import crew
+from api import chat
+from api import metrics
+from services.cron import execute_cron_job
 import asyncio
+import os
+from services.bot import start_application, BOT_ENABLED
+from lib.logger import configure_logger
 
-# Set up a simple app to respond to server health check
+# Load environment variables first
+load_dotenv()
+
+# Configure root logger
+logger = configure_logger()
+
+# Initialize scheduler with environment-controlled cron settings
+scheduler = AsyncIOScheduler()
+CRON_ENABLED = os.getenv('CRON_ENABLED', 'true').lower() == 'true'
+CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
+
+if CRON_ENABLED:
+    scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
+    scheduler.start()
+    logger.info(f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds")
+else:
+    logger.info("Cron scheduler is disabled")
+
 app = FastAPI()
-routes_initialized = False
-routes_initializing = False  # New flag to indicate initialization in progress
-initialization_lock = asyncio.Lock()  # Lock to ensure single initialization
 
 # Setup CORS origins
 cors_origins = [
     "https://sprint.aibtc.dev",
-    "https://aibtcdev-frontend.replit.app",
+    "https://sprint-faster.aibtc.dev",
+    "http://localhost:3000",  # Development environment
 ]
 
 # Setup middleware to allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+
+async def start_bot():
+    """Start the Telegram bot in the background."""
+    try:
+        application = await start_application()
+        return application
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+        raise
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    try:
+        # Start the bot if enabled
+        if BOT_ENABLED:
+            await start_bot()
+            logger.info("Bot started successfully")
+        else:
+            logger.info("Telegram bot disabled. Skipping initialization.")
+    except Exception as e:
+        logger.error(f"Error starting bot: {e}")
+        raise e
 
 
 # Lightweight health check endpoint
 @app.get("/")
 async def health():
-    # Check if routes are already initialized
-    if routes_initialized:
-        return {"status": "healthy"}
-
-    # If routes are still initializing, return a "starting" status
-    if routes_initializing:
-        return {"status": "starting"}
-
-    # If neither initialized nor initializing, start initialization in a background task
-    loop = asyncio.get_event_loop()
-    loop.create_task(initialize_routes())
-    return {"status": "starting"}  # Indicate server is in the process of starting up
+    return {"status": "healthy"}
 
 
-# Background initialization function with lock to prevent re-entry
-async def initialize_routes():
-    global routes_initialized, routes_initializing
-
-    # Only allow one task to initialize at a time
-    async with initialization_lock:
-        # Double-check in case initialization happened while waiting for the lock
-        if not routes_initialized:
-            routes_initializing = True  # Set initializing status
-
-            load_dotenv()
-
-            # # Lazy import and initialize langtrace
-            # from langtrace_python_sdk import langtrace
-
-            # langtrace.init()
-
-            # Import and set up routes from 'crew'
-            from api import crew
-            from api import public_crews
-            from api import public_stats
-            from api import chat
-            from api import metrics
-            app.include_router(crew.router)
-            app.include_router(public_crews.router)
-            app.include_router(public_stats.router)
-            app.include_router(chat.router)
-            app.include_router(metrics.router)
-
-            # Mark routes as initialized
-            routes_initialized = True
-            routes_initializing = False  # Clear initializing flag
+app.include_router(crew.router)
+app.include_router(chat.router)
+app.include_router(metrics.router)
