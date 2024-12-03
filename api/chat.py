@@ -16,6 +16,7 @@ from db.helpers import (
 from db.client import supabase
 from fastapi.responses import JSONResponse
 from services.crews import execute_chat_stream
+from services.bot import send_message_to_user
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
 import functools
@@ -314,6 +315,37 @@ async def process_chat_message(
         await output_queue.put(None)
         if job_id in running_jobs:
             del running_jobs[job_id]
+
+@router.post("/test-telegram")
+async def test_telegram_message(
+    message: str = Body(default="Test message from API", embed=True),
+    profile: ProfileInfo = Depends(verify_profile),
+) -> JSONResponse:
+    """
+    Send a test message to the logged-in user via Telegram bot.
+    Requires user to be authenticated and have a registered Telegram account.
+    """
+    try:
+        success = await send_message_to_user(profile.id, message)
+        if success:
+            return JSONResponse(
+                content={"status": "success", "message": "Test message sent successfully"},
+                status_code=200,
+            )
+        else:
+            return JSONResponse(
+                content={
+                    "status": "error",
+                    "message": "Failed to send message. Make sure your Telegram account is registered.",
+                },
+                status_code=400,
+            )
+    except Exception as e:
+        logger.error(f"Error sending test telegram message: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while sending telegram message",
+        )
 
 @router.post("/conversations")
 async def create_conversation(
