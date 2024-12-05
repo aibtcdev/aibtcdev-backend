@@ -9,13 +9,13 @@ from services.cron import execute_cron_job
 import asyncio
 import os
 from services.bot import start_application, BOT_ENABLED
-from lib.logger import configure_logger
+import logging
 
 # Load environment variables first
 load_dotenv()
 
-# Configure root logger
-logger = configure_logger()
+# Configure module logger
+logger = logging.getLogger('uvicorn.error')
 
 # Initialize scheduler with environment-controlled cron settings
 scheduler = AsyncIOScheduler()

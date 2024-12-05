@@ -3,7 +3,13 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from urllib.parse import urlencode
-from db.client import supabase
+from db.helpers import (
+    get_telegram_user,
+    update_telegram_user,
+    get_telegram_user_by_username,
+    get_all_registered_telegram_users,
+    get_telegram_user_by_profile
+)
 from lib.logger import configure_logger
 
 # Load environment variables
@@ -37,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         telegram_user_id = context.args[0]
         
         # Check if user exists with this profile_id
-        result = supabase.table('telegram_users').select('*').eq('id', telegram_user_id).execute()
+        result = get_telegram_user(telegram_user_id)
         
         if not result.data:
             await update.message.reply_text(
@@ -55,7 +61,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         }
         
         # Update the user data for the existing profile_id
-        result = supabase.table('telegram_users').update(user_data).eq('id', telegram_user_id).execute()
+        result = update_telegram_user(telegram_user_id, user_data)
         
         is_user_admin = is_admin(user_id)
         admin_status = "You are an admin!" if is_user_admin else "You are not an admin."
@@ -103,8 +109,8 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     message = ' '.join(context.args[1:])
     
     try:
-        # Query Supabase for the user
-        result = supabase.table('telegram_users').select('telegram_user_id').eq('username', username).eq('is_registered', True).execute()
+        # Query for the user
+        result = get_telegram_user_by_username(username)
         
         if not result.data:
             await update.message.reply_text(f'Registered user with username {username} not found.')
@@ -128,8 +134,8 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     try:
-        # Query Supabase for all registered users
-        result = supabase.table('telegram_users').select('username,telegram_user_id').eq('is_registered', True).execute()
+        # Query for all registered users
+        result = get_all_registered_telegram_users()
         
         if not result.data:
             await update.message.reply_text('No registered users found.')
@@ -193,8 +199,8 @@ async def send_message_to_user(profile_id: str, message: str) -> bool:
         return False
         
     try:
-        # Query Supabase for the user
-        result = supabase.table('telegram_users').select('telegram_user_id').eq('profile_id', profile_id).eq('is_registered', True).execute()
+        # Query for the user
+        result = get_telegram_user_by_profile(profile_id)
         
         if not result.data:
             logger.warning(f'No registered Telegram user found for profile {profile_id}')
