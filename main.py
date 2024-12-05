@@ -6,7 +6,6 @@ from api import crew
 from api import chat
 from api import metrics
 from services.cron import execute_cron_job
-import asyncio
 import os
 from services.bot import start_application, BOT_ENABLED
 import logging

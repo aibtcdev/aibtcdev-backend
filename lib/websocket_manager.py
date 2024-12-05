@@ -1,6 +1,5 @@
 from typing import Dict, Set
 from fastapi import WebSocket
-import json
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)

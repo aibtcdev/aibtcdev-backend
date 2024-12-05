@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Type
 from crewai_tools import BaseTool
 from .bun import BunScriptRunner
 from pydantic import BaseModel, Field

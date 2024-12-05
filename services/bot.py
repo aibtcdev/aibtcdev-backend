@@ -11,6 +11,15 @@ from db.helpers import (
     get_telegram_user_by_profile
 )
 from lib.logger import configure_logger
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+from db.helpers import (
+    get_telegram_user,
+    update_telegram_user,
+    get_telegram_user_by_username,
+    get_all_registered_telegram_users,
+    get_telegram_user_by_profile
+)
 
 # Load environment variables
 load_dotenv()

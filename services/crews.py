@@ -1,4 +1,3 @@
-import json
 from textwrap import dedent
 from typing import Any, Dict, List, Tuple, Union
 from crewai import Agent, Task, Crew, Process
@@ -26,6 +25,7 @@ MANAGER_AGENT_CONFIG = {
     "tools": [],
 }
 
+
 def create_manager_agent() -> Agent:
     """Create a standard manager agent with common configuration."""
     return Agent(**MANAGER_AGENT_CONFIG)
@@ -43,23 +43,27 @@ def create_agent(agent_data: Dict, tools_map: Dict) -> Agent:
         tools=agent_tools,
     )
 
+
 def create_task(task_data: Dict, agent: Agent, input_str: str = None) -> Task:
     """Create a task from task data and agent."""
     task_description = task_data.get("description")
     task_expected_output = task_data.get("expected_output")
-    
+
     if input_str:
         task_description = f"{task_description}\n\nuser_input: {input_str}"
-    
+
     refined_task_description = f"Refined by Manager: {str(task_description)}"
-    refined_task_expected_output = f"Manager's expected outcome: {str(task_expected_output)}"
-    
+    refined_task_expected_output = (
+        f"Manager's expected outcome: {str(task_expected_output)}"
+    )
+
     return Task(
         description=refined_task_description,
         expected_output=refined_task_expected_output,
         agent=agent,
         async_execution=False,
     )
+
 
 def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
     """Create a crew with common configuration."""
@@ -70,7 +74,7 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
         process=Process.sequential,
         memory=True,
         verbose=crewai_verbose,
-        **kwargs
+        **kwargs,
     )
 
 def fetch_all_crews() -> Dict:
@@ -95,6 +99,7 @@ def fetch_all_crews() -> Dict:
             print(f"Skipping crew {crew_id}: {e}")
     return crews_data
 
+
 def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
     """Fetch agents and tasks for the specified crew from Supabase."""
     agents_response = get_crew_agents(crew_id)
@@ -111,27 +116,44 @@ def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[int, Agent]:
         for agent_data in agents_data
     }
 
-def build_tasks_list(tasks_data: List, agents: Dict[int, Agent], input_str: str = None) -> List[Task]:
+
+def build_tasks_list(
+    tasks_data: List, agents: Dict[int, Agent], input_str: str = None
+) -> List[Task]:
     """Build a list of tasks from tasks data."""
     tasks = []
     for task_data in tasks_data:
         agent_id = task_data["agent_id"]
         if agent_id not in agents:
-            raise ValueError(f"Agent with id {agent_id} not found for task {task_data['id']}.")
+            raise ValueError(
+                f"Agent with id {agent_id} not found for task {task_data['id']}."
+            )
         tasks.append(create_task(task_data, agents[agent_id], input_str))
     return tasks
+
+def extract_filtered_content(history: List) -> str:
+    """Extract and filter content from chat history."""
+    filtered_content = []
+    for message in history:
+        if isinstance(message, str):
+            filtered_content.append(message)
+        elif isinstance(message, dict):
+            if message.get("role") == "assistant" and message.get("type") == "result":
+                filtered_content.append(message.get("content", ""))
+    return "\n".join(filtered_content)
+
 
 def execute_crew(account_index: str, crew_id: int, input_str: str) -> str:
     """Execute a crew synchronously."""
     tools_map = initialize_tools(account_index)
     agents_data, tasks_data = fetch_crew_data(crew_id)
-    
+
     agents = build_agents_dict(agents_data, tools_map)
     tasks = build_tasks_list(tasks_data, agents, input_str)
     crew = create_crew(list(agents.values()), tasks)
-    
-    print("\n--- Crew Execution Started ---")
+
     return crew.kickoff(inputs={"user_input": input_str})
+
 
 def build_all_crews():
     """Build all crews ready to execute."""
@@ -146,6 +168,7 @@ def build_all_crews():
         for k, v in crews_data.items()
     ]
 
+
 def build_single_crew(agents_data: List, tasks_data: List) -> Crew:
     """Build a single crew with the given agents and tasks data."""
     tools_map = initialize_tools("0")
@@ -153,11 +176,12 @@ def build_single_crew(agents_data: List, tasks_data: List) -> Crew:
     tasks = build_tasks_list(tasks_data, agents)
     return create_crew(list(agents.values()), tasks)
 
+
 async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
     """Execute a crew with streaming output."""
     callback_queue = asyncio.Queue()
     tools_map = initialize_tools(account_index)
-    
+
     try:
         agents_data, tasks_data = fetch_crew_data(crew_id)
     except ValueError as e:
@@ -173,34 +197,42 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
     def crew_step_callback(step: Union[Dict[str, Any], AgentAction, AgentFinish]):
         if isinstance(step, AgentAction):
             asyncio.run_coroutine_threadsafe(
-                callback_queue.put({
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.thought,
-                    "thought": step.thought,
-                    "result": step.result,
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                }), loop)
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.thought,
+                        "thought": step.thought,
+                        "result": step.result,
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                    }
+                ),
+                loop,
+            )
         elif isinstance(step, AgentFinish):
             asyncio.run_coroutine_threadsafe(
-                callback_queue.put({
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.output,
-                    "thought": step.thought,
-                    "result": step.output,
-                    "tool": None,
-                    "tool_input": None,
-                }), loop)
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.output,
+                        "thought": step.thought,
+                        "result": step.output,
+                        "tool": None,
+                        "tool_input": None,
+                    }
+                ),
+                loop,
+            )
 
     def crew_task_callback(task: TaskOutput):
         asyncio.run_coroutine_threadsafe(
-            callback_queue.put({
-                "type": "task",
-                "role": "assistant",
-                "content": task.summary
-            }), loop)
+            callback_queue.put(
+                {"type": "task", "role": "assistant", "content": task.summary}
+            ),
+            loop,
+        )
 
     agents = build_agents_dict(agents_data, tools_map)
     tasks = build_tasks_list(tasks_data, agents, input_str)
@@ -208,7 +240,7 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
         list(agents.values()),
         tasks,
         step_callback=crew_step_callback,
-        task_callback=crew_task_callback
+        task_callback=crew_task_callback,
     )
 
     kickoff_future = loop.run_in_executor(None, crew.kickoff, {"user_input": input_str})
@@ -223,18 +255,12 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
     final_result = await kickoff_future
     while not callback_queue.empty():
         yield await callback_queue.get()
-    yield {"type": "result", "content": final_result.raw, "tokens": final_result.token_usage.total_tokens}
+    yield {
+        "type": "result",
+        "content": final_result.raw,
+        "tokens": final_result.token_usage.total_tokens,
+    }
 
-def extract_filtered_content(history: List) -> str:
-    """Extract and filter content from chat history."""
-    filtered_content = []
-    for message in history:
-        if isinstance(message, str):
-            filtered_content.append(message)
-        elif isinstance(message, dict):
-            if message.get("role") == "assistant" and message.get("type") == "result":
-                filtered_content.append(message.get("content", ""))
-    return "\n".join(filtered_content)
 
 async def execute_chat_stream(account_index: str, history: List, input_str: str):
     """Execute a chat stream with history."""
@@ -251,34 +277,42 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
     def chat_step_callback(step: Union[Dict[str, Any], AgentAction, AgentFinish]):
         if isinstance(step, AgentAction):
             asyncio.run_coroutine_threadsafe(
-                callback_queue.put({
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.thought,
-                    "thought": step.thought,
-                    "result": step.result,
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                }), loop)
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.thought,
+                        "thought": step.thought,
+                        "result": step.result,
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                    }
+                ),
+                loop,
+            )
         elif isinstance(step, AgentFinish):
             asyncio.run_coroutine_threadsafe(
-                callback_queue.put({
-                    "type": "step",
-                    "role": "assistant",
-                    "content": step.output,
-                    "thought": step.thought,
-                    "result": step.output,
-                    "tool": None,
-                    "tool_input": None,
-                }), loop)
+                callback_queue.put(
+                    {
+                        "type": "step",
+                        "role": "assistant",
+                        "content": step.output,
+                        "thought": step.thought,
+                        "result": step.output,
+                        "tool": None,
+                        "tool_input": None,
+                    }
+                ),
+                loop,
+            )
 
     def chat_task_callback(task: TaskOutput):
         asyncio.run_coroutine_threadsafe(
-            callback_queue.put({
-                "type": "task",
-                "role": "assistant",
-                "content": task.summary
-            }), loop)
+            callback_queue.put(
+                {"type": "task", "role": "assistant", "content": task.summary}
+            ),
+            loop,
+        )
 
     chat_specialist = Agent(
         role="Chat Specialist",
@@ -290,7 +324,8 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
         allow_delegation=True,
     )
 
-    task_description = dedent(f"""
+    task_description = dedent(
+        f"""
         Review the user's input and chat history, then respond appropriately.
         
         Chat History:
@@ -304,7 +339,8 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
         2. Takes into account any relevant context from the chat history
         3. Uses available tools when necessary to gather information or perform actions
         4. Maintains a consistent and helpful tone throughout the interaction
-    """).strip()
+    """
+    ).strip()
 
     review_user_input = Task(
         description=task_description,
@@ -316,7 +352,7 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
         [chat_specialist],
         [review_user_input],
         step_callback=chat_step_callback,
-        task_callback=chat_task_callback
+        task_callback=chat_task_callback,
     )
 
     kickoff_future = loop.run_in_executor(None, crew.kickoff)
@@ -331,4 +367,8 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
     final_result = await kickoff_future
     while not callback_queue.empty():
         yield await callback_queue.get()
-    yield {"type": "result", "content": final_result.raw, "tokens": final_result.token_usage.total_tokens}
+    yield {
+        "type": "result",
+        "content": final_result.raw,
+        "tokens": final_result.token_usage.total_tokens,
+    }

@@ -9,7 +9,6 @@ from typing import Dict, List, Optional, Any
 from api.verify_profile import ProfileInfo, verify_profile, verify_profile_from_token
 from db.helpers import (
     add_conversation,
-    add_job,
     delete_conversation,
     get_conversations,
     get_detailed_conversation,

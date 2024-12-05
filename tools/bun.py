@@ -1,11 +1,6 @@
-"""
-Bun Script Runner for TypeScript execution.
-Provides a clean interface for running TypeScript scripts using Bun runtime.
-"""
-
 import subprocess
 import os
-from typing import Dict, Union, List, Optional
+from typing import Dict, Union, List
 
 
 class BunScriptRunner:

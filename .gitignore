@@ -4,3 +4,4 @@ __pycache__
 .aider*
 shell.nix
 .DS_Store
+tweets.db

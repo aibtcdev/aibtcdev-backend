@@ -1,10 +1,11 @@
-from crewai_tools import SerperDevTool
+from crewai_tools import SerperDevTool, DallETool
 from .get_btc_data import GetBitcoinData
 from .velar import VelarGetPriceHistory, VelarGetTokens
 from .wallet import WalletGetMyAddress, WalletGetMyBalance, WalletSendSTX
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowGetAvailableTokens, BitflowExecuteTradeTool
 from .fetch_contract_code import FetchContractCodeTool
+from .stxcity import STXCityBondingTool
 from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
@@ -46,6 +47,8 @@ def initialize_tools(account_index: str = "0"):
         "contract_sip10_info": ContractSIP10InfoTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
+        "image_generation": DallETool(),
+        "deploy_bonding_curve": STXCityBondingTool(account_index),
     }
 
 

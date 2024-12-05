@@ -1,15 +1,13 @@
-import asyncio
 import datetime
 import uuid
 import json
 from fastapi.responses import JSONResponse
-from db.helpers import add_job
+from db.helpers import add_job, get_public_crews
 from services.crews import execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile_from_token, ProfileInfo
 from typing import List, Dict, Any
 from lib.models import Crew
-from db.helpers import get_public_crews
 from fastapi import (
     APIRouter,
     HTTPException,

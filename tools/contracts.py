@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import Dict, Type, Union
 from crewai_tools import BaseTool
 from .bun import BunScriptRunner
 from pydantic import BaseModel, Field
@@ -22,7 +22,7 @@ class ContractSIP10DeployTool(BaseTool):
     name: str = "Deploy a new token with its contract."
     description: str = "Deploy a new token with its contract."
     args_schema: Type[BaseModel] = ContractSIP10DeployToolSchema
-    account_index: Optional[str] = None
+    account_index: str = "0"
 
     def __init__(self, account_index: str, **kwargs):
         super().__init__(**kwargs)
@@ -35,7 +35,7 @@ class ContractSIP10DeployTool(BaseTool):
         token_decimals,
         token_url,
         token_max_supply,
-    ):
+    ) -> Dict[str, str | bool | None]:
         return BunScriptRunner.bun_run(
             self.account_index,
             "sip-010-ft",
@@ -60,7 +60,7 @@ class ContractSIP10SendTool(BaseTool):
     name: str = "Send fungible tokens to a recipient."
     description: str = "Send fungible tokens from your wallet to a recipient address."
     args_schema: Type[BaseModel] = ContractSIP10SendToolSchema
-    account_index: Optional[str] = None
+    account_index: str = "0"
 
     def __init__(self, account_index: str, **kwargs):
         super().__init__(**kwargs)
@@ -71,7 +71,7 @@ class ContractSIP10SendTool(BaseTool):
         contract_address: str,
         recipient: str,
         amount: int,
-    ) -> str:
+    ) -> Dict[str, Union[str, bool, None]]:
         return BunScriptRunner.bun_run(
             self.account_index,
             "sip-010-ft",
@@ -92,7 +92,7 @@ class ContractSIP10InfoTool(BaseTool):
     name: str = "Get fungible token information."
     description: str = "Get token information including name, symbol, decimals, and supply."
     args_schema: Type[BaseModel] = ContractSIP10InfoToolSchema
-    account_index: Optional[str] = None
+    account_index: str = "0"
 
     def __init__(self, account_index: str, **kwargs):
         super().__init__(**kwargs)
@@ -101,7 +101,7 @@ class ContractSIP10InfoTool(BaseTool):
     def _run(
         self,
         contract_address: str,
-    ) -> str:
+    ) -> Dict[str, Union[str, bool, None]]:
         return BunScriptRunner.bun_run(
             self.account_index,
             "sip-010-ft",
