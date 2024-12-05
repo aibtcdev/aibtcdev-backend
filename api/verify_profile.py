@@ -1,23 +1,16 @@
 from fastapi import Header, HTTPException, Query
-from dotenv import load_dotenv
+from db.helpers import get_user_from_token, get_profile_by_email
 from db.client import supabase
 from pydantic import BaseModel
 from lib.logger import configure_logger
-import cachetools
-
-load_dotenv()
+from cachetools import TTLCache
+from lib.models import ProfileInfo
 
 # Configure module logger
 logger = configure_logger(__name__)
 
 # Cache for profile data (5 minutes TTL)
-cache = cachetools.TTLCache(maxsize=100, ttl=300)
-
-
-class ProfileInfo(BaseModel):
-    account_index: int
-    id: str
-
+cache = TTLCache(maxsize=100, ttl=300)
 
 async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
     """
@@ -45,7 +38,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         logger.debug("Processing authorization token")
         
         # Get user from token
-        user = supabase.auth.get_user(token)
+        user = get_user_from_token(token)
         email = user.user.email
         
         # Check cache first
@@ -55,13 +48,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         else:
             logger.debug(f"Cache miss for email: {email}")
             # Fetch profile from database
-            profile_response = (
-                supabase.table("profiles")
-                .select("account_index, email")
-                .eq("email", email)
-                .single()
-                .execute()
-            )
+            profile_response = get_profile_by_email(email)
 
             if not profile_response.data:
                 logger.debug("Profile not found in database")
@@ -110,7 +97,7 @@ async def verify_profile_from_token(token: str = Query(..., description="Bearer 
     try:
         # Get user from token
         logger.debug("Processing token from query parameter")
-        user = supabase.auth.get_user(token)
+        user = get_user_from_token(token)
         email = user.user.email
         
         # Check cache first
@@ -120,13 +107,7 @@ async def verify_profile_from_token(token: str = Query(..., description="Bearer 
         else:
             logger.debug(f"Cache miss for email: {email}")
             # Fetch profile from database
-            profile_response = (
-                supabase.table("profiles")
-                .select("account_index, email")
-                .eq("email", email)
-                .single()
-                .execute()
-            )
+            profile_response = get_profile_by_email(email)
 
             if not profile_response.data:
                 logger.debug("Profile not found in database")

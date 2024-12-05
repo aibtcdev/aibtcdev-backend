@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 # Load environment variables from a .env file
 load_dotenv()
 
-
 class LunarcrushApi:
 
     def __init__(self):
