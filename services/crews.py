@@ -2,6 +2,7 @@ import json
 from textwrap import dedent
 from typing import Any, Dict, List, Tuple, Union
 from crewai import Agent, Task, Crew, Process
+from db.helpers import get_all_crews, get_crew_agents, get_crew_tasks
 from db.client import supabase
 from tools.tools_factory import initialize_tools, get_agent_tools
 from dotenv import load_dotenv
@@ -74,7 +75,7 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
 
 def fetch_all_crews() -> Dict:
     """Fetch all crews and their respective agents and tasks from Supabase."""
-    crews_response = supabase.from_("crews").select("id, name, description").execute()
+    crews_response = get_all_crews()
     if not crews_response.data:
         raise ValueError("No crews found in the database.")
 
@@ -96,12 +97,12 @@ def fetch_all_crews() -> Dict:
 
 def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
     """Fetch agents and tasks for the specified crew from Supabase."""
-    agents_response = supabase.from_("agents").select("*").eq("crew_id", crew_id).execute()
-    tasks_response = supabase.from_("tasks").select("*").eq("crew_id", crew_id).execute()
+    agents_response = get_crew_agents(crew_id)
+    tasks_response = get_crew_tasks(crew_id)
 
-    if not agents_response.data or not tasks_response.data:
+    if not agents_response or not tasks_response:
         raise ValueError("No agents or tasks found for the specified crew.")
-    return agents_response.data, tasks_response.data
+    return agents_response, tasks_response
 
 def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[int, Agent]:
     """Build a dictionary of agents from agents data."""

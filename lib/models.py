@@ -1,6 +1,11 @@
 from pydantic import BaseModel
 from typing import List
 
+
+class ProfileInfo(BaseModel):
+    account_index: int
+    id: str
+
 class Creator(BaseModel):
     email: str
 
