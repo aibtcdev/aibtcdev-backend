@@ -2,12 +2,11 @@ import datetime
 import uuid
 import json
 from fastapi.responses import JSONResponse
-from db.helpers import add_job, get_public_crews
+from db.helpers import add_job
 from services.crews import execute_crew_stream
 from tools.tools_factory import initialize_tools
 from .verify_profile import verify_profile_from_token, ProfileInfo
-from typing import List, Dict, Any
-from lib.models import Crew
+from typing import Dict
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -160,29 +159,6 @@ async def websocket_endpoint(
         is_connected = False
         await manager.disconnect_job(websocket, str(crew_id))
         logger.debug(f"Cleaned up WebSocket connection for crew {crew_id}")
-
-
-@router.get("/public", response_model=List[Crew])
-async def api_get_public_crews() -> JSONResponse:
-    """Get a list of all public crews.
-    
-    Returns:
-        JSONResponse: List of public crews with their configurations
-        
-    Raises:
-        HTTPException: If there's an error fetching the crews
-    """
-    logger.debug("Fetching public crews")
-    try:
-        crews = get_public_crews()
-        logger.debug(f"Successfully retrieved {len(crews)} public crews")
-        return JSONResponse(content=crews)
-
-    except Exception as e:
-        logger.error(f"Error fetching public crews: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching public crews: {str(e)}"
-        )
 
 @router.get("/tools")
 async def get_avaliable_tools() -> Dict[str, str]:

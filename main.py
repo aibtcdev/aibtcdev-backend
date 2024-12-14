@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from api import crew
 from api import chat
-from api import metrics
 from services.cron import execute_cron_job
 import os
 from services.bot import start_application, BOT_ENABLED
@@ -82,4 +81,3 @@ async def health():
 
 app.include_router(crew.router)
 app.include_router(chat.router)
-app.include_router(metrics.router)

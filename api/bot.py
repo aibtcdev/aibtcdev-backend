@@ -1,25 +1,8 @@
-import asyncio
-import datetime
-import json
-import uuid
-from fastapi import APIRouter, Body, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Body, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Dict, List, Optional, Any
-from api.verify_profile import ProfileInfo, verify_profile, verify_profile_from_token
-from db.helpers import (
-    add_conversation,
-    add_job,
-    delete_conversation,
-    get_conversations,
-    get_detailed_conversation,
-    get_latest_conversation,
-    get_conversation_history,
-)
+from api.verify_profile import ProfileInfo, verify_profile
 from lib.logger import configure_logger
 from services.bot import send_message_to_user
-from lib.websocket_manager import manager
-from services.chat import process_chat_message, running_jobs
 
 # Configure logger
 logger = configure_logger(__name__)

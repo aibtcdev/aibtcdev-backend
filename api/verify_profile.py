@@ -1,7 +1,5 @@
 from fastapi import Header, HTTPException, Query
 from db.helpers import get_user_from_token, get_profile_by_email
-from db.client import supabase
-from pydantic import BaseModel
 from lib.logger import configure_logger
 from cachetools import TTLCache
 from lib.models import ProfileInfo
