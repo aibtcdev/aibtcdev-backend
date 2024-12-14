@@ -9,7 +9,6 @@ from services.twitter import execute_twitter_job
 import os
 from services.bot import start_application, BOT_ENABLED
 import logging
-from lib.twitter import TwitterService
 
 # Load environment variables first
 load_dotenv()
@@ -19,9 +18,9 @@ logger = logging.getLogger('uvicorn.error')
 
 # Initialize scheduler with environment-controlled cron settings
 scheduler = AsyncIOScheduler()
-CRON_ENABLED = os.getenv('CRON_ENABLED', 'true').lower() == 'true'
+CRON_ENABLED = os.getenv('CRON_ENABLED', 'false').lower() == 'true'
 CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
-TWITTER_ENABLED = os.getenv('TWITTER_ENABLED', 'true').lower() == 'true'
+TWITTER_ENABLED = os.getenv('TWITTER_ENABLED', 'false').lower() == 'true'
 TWITTER_INTERVAL_SECONDS = int(os.getenv('TWITTER_INTERVAL_SECONDS', 120))
 
 if CRON_ENABLED:

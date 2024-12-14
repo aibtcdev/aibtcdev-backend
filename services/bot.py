@@ -186,7 +186,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Global bot instance and settings
 _bot_app = None
-BOT_ENABLED = os.getenv("TELEGRAM_BOT_ENABLED", "true").lower() == "true"
+BOT_ENABLED = os.getenv("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
 
 async def get_bot():
     """Get the global bot instance."""
