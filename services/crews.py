@@ -10,6 +10,10 @@ import os
 from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.tasks.task_output import TaskOutput
 from lib.tokenizer import Trimmer
+from lib.logger import configure_logger
+
+logger = configure_logger(__name__)
+
 
 load_dotenv()
 

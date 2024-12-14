@@ -1,141 +1,171 @@
-from pytwitter import Api
-from pytwitter.models import Tweet, User, Response
-from lib.debug import dump_object
+from typing import Dict, List, Optional, TypedDict
+import os
+from lib.twitter import TwitterService
+from lib.db import TweetDB
+from services.flow import execute_twitter_stream
 from lib.logger import configure_logger
-from typing import Optional, List, Dict
+from dotenv import load_dotenv
 
+# Configure logger
 logger = configure_logger(__name__)
 
-class TwitterService:
-    def __init__(self, 
-                 consumer_key: str,
-                 consumer_secret: str,
-                 access_token: str,
-                 access_secret: str,
-                 client_id: str,
-                 client_secret: str
-                 ):
-        """Initialize the Twitter service with API credentials."""
-        self.consumer_key = consumer_key
-        self.consumer_secret = consumer_secret
-        self.access_token = access_token
-        self.access_secret = access_secret
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.client = None
+class UserProfile(TypedDict):
+    """Type definition for user profile data."""
+    name: str    # User's full name
+    age: int     # User's age
+    email: str   # User's email address
 
-    async def initialize(self) -> None:
-        """Initialize the Twitter client."""
+class TwitterMentionHandler:
+    """Handles Twitter mention processing and responses."""
+    
+    def __init__(self):
+        """Initialize Twitter components and configuration."""
+        self.tweet_db = TweetDB()
+        self.twitter_service = TwitterService(
+            consumer_key=os.getenv("TWITTER_CONSUMER_KEY", ""),
+            consumer_secret=os.getenv("TWITTER_CONSUMER_SECRET", ""),
+            client_id=os.getenv("TWITTER_CLIENT_ID", ""),
+            client_secret=os.getenv("TWITTER_CLIENT_SECRET", ""),
+            access_token=os.getenv("TWITTER_ACCESS_TOKEN", ""),
+            access_secret=os.getenv("TWITTER_ACCESS_SECRET", ""),
+        )
+        self.user_id = os.getenv('TWITTER_AUTOMATED_USER_ID')
+        self.whitelisted_authors = os.getenv('TWITTER_WHITELISTED', '').split(',')
+        
+    async def _handle_mention(self, mention) -> None:
+        """Process a single mention and generate response if needed."""
+        tweet_id = mention.id or ""
+        author_id = mention.author_id or ""
+        conversation_id = mention.conversation_id or ""
+        text = mention.text or ""
+        
+        if self.tweet_db.is_tweet_seen(tweet_id):
+            logger.debug(f"Skipping already processed tweet {tweet_id}")
+            return
+            
+        tweet_data = {
+            'tweet_id': tweet_id,
+            'author_id': author_id,
+            'text': text,
+            'conversation_id': conversation_id
+        }
+        
         try:
-            self.client = Api(
-                client_id=self.client_id,
-                client_secret=self.client_secret,
-                consumer_key=self.consumer_key,
-                consumer_secret=self.consumer_secret,
-                access_token=self.access_token,
-                access_secret=self.access_secret,
-                application_only_auth=False
+            if self._is_author_whitelisted(author_id):
+                logger.info(f"Processing whitelisted mention {tweet_id} from user {author_id}")
+                await self._generate_and_post_response(tweet_data)
+            else:
+                logger.debug(f"Skipping non-whitelisted mention {tweet_id} from user {author_id}")
+        finally:
+            # Always mark tweet as seen, even if processing fails
+            self.tweet_db.add_seen_tweet(tweet_data)
+    
+    def _is_author_whitelisted(self, author_id: str) -> bool:
+        """Check if the author is in the whitelist."""
+        logger.debug(f"Checking author {author_id} against whitelist {self.whitelisted_authors}")
+        return str(author_id) in self.whitelisted_authors
+    
+    async def _generate_and_post_response(self, tweet_data: Dict) -> None:
+        """Generate and post a response to a tweet."""
+        history = await self._get_conversation_history(tweet_data)
+        response = await self._generate_response(tweet_data, history)
+        
+        if response:
+            await self._post_response(tweet_data, response)
+    
+    async def _get_conversation_history(self, tweet_data: Dict) -> List[Dict]:
+        """Retrieve and format conversation history."""
+        if not tweet_data['conversation_id']:
+            return []
+            
+        conversation_tweets = self.tweet_db.get_conversation_tweets(tweet_data['conversation_id'])
+        return [
+            {
+                "role": "user" if tweet["author_id"] != self.user_id else "assistant",
+                "content": tweet["text"]
+            }
+            for tweet in conversation_tweets
+            if tweet["text"]
+        ]
+    
+    async def _generate_response(self, tweet_data: Dict, history: List[Dict]) -> Optional[str]:
+        """Generate a response using the AI model."""
+        logger.info(f"Processing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}")
+        logger.debug(f"Tweet text: {tweet_data['text']}")
+        logger.debug(f"Conversation history: {len(history)} messages")
+        
+        response_content = None
+        async for response in execute_twitter_stream(
+            twitter_service=self.twitter_service,
+            account_index="0",
+            history=history,
+            input_str=tweet_data['text']
+        ):
+            if response["type"] == "result":
+                if response.get("content"):
+                    logger.info(f"Final Response: {response['content']}")
+                    response_content = response["content"]
+                elif response.get("reason"):
+                    logger.info(f"No response generated. Reason: {response['reason']}")
+            elif response["type"] == "step":
+                logger.debug(f"Step: {response['content']}")
+                if response["result"]:
+                    logger.debug(f"Result: {response['result']}")
+                    
+        return response_content
+    
+    async def _post_response(self, tweet_data: Dict, response_content: str) -> None:
+        """Post the response to Twitter and store in database."""
+        response_tweet = await self.twitter_service.post_tweet(
+            text=response_content,
+            reply_in_reply_to_tweet_id=tweet_data['tweet_id']
+        )
+        
+        if response_tweet and response_tweet.id:
+            self.tweet_db.add_bot_response(
+                conversation_id=tweet_data['conversation_id'],
+                original_tweet_id=tweet_data['tweet_id'],
+                response_tweet_id=response_tweet.id,
+                response_text=response_content
             )
-            logger.info("Twitter client initialized successfully")
+            logger.info(f"Stored bot response in database. Response tweet ID: {response_tweet.id}")
+    
+    async def process_mentions(self) -> None:
+        """Process all new mentions for the bot user."""
+        try:
+            await self.twitter_service.initialize()
+            mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)
+            if not mentions:
+                logger.debug("No mentions found")
+                return
+
+            for mention in mentions:
+                try:
+                    await self._handle_mention(mention)
+                except Exception as e:
+                    logger.error(f"Error processing mention {mention.id}: {str(e)}")
+                    # Continue processing other mentions even if one fails
+                    continue
+                    
         except Exception as e:
-            logger.error(f"Failed to initialize Twitter client: {str(e)}")
+            logger.error(f"Error processing mentions: {str(e)}")
             raise
 
-    async def post_tweet(self, text: str, reply_in_reply_to_tweet_id: Optional[str] = None) -> Optional[Tweet]:
-        """
-        Post a new tweet or reply to an existing tweet.
-        
-        Args:
-            text: The content of the tweet
-            reply_in_reply_to_tweet_id: Optional ID of tweet to reply to
-            
-        Returns:
-            Tweet data if successful, None if failed
-        """
-        try:
-            if self.client is None:
-                raise Exception("Twitter client is not initialized")
-            response = self.client.create_tweet(
-                text=text,
-                reply_in_reply_to_tweet_id=reply_in_reply_to_tweet_id
-            )
-            logger.info(f"Successfully posted tweet: {text[:20]}...")
-            if type(response) == Tweet:
-                return response
-        except Exception as e:
-            logger.error(f"Failed to post tweet: {str(e)}")
-            return None
+# Global handler instance
+load_dotenv()
+handler = TwitterMentionHandler()
 
-    async def get_user_by_username(self, username: str) -> Optional[User]:
-        """
-        Get user information by username.
-        
-        Args:
-            username: Twitter username without @ symbol
+async def execute_twitter_job() -> None:
+    """Execute the Twitter job to process mentions."""
+    try:
+        if not handler.user_id:
+            logger.error("TWITTER_AUTOMATED_USER_ID not set")
+            return
             
-        Returns:
-            User data if found, None if not found or error
-        """
-        try:
-            if self.client is None:
-                raise Exception("Twitter client is not initialized")
-            response = self.client.get_user(username=username)
-            if type(response) == User:
-                return response
-        except Exception as e:
-            logger.error(f"Failed to get user info for {username}: {str(e)}")
-            return None
-
-
-    async def get_mentions_by_user_id(self, user_id: str, max_results: int = 100) -> List[Tweet]:
-        """
-        Get mentions for a specific user.
-        
-        Args:
-            user_id: Twitter user ID to get mentions for
-            max_results: Maximum number of mentions to return (default 100)
+        logger.info("Starting Twitter mention check")
+        await handler.process_mentions()
+        logger.info("Completed Twitter mention check")
             
-        Returns:
-            List of mention data
-        """
-        try:
-            if self.client is None:
-                raise Exception("Twitter client is not initialized")
-            response = self.client.get_mentions(
-                user_id=user_id,
-                max_results=max_results,
-                tweet_fields=[
-                    "id", "text", "created_at", "author_id", "conversation_id",
-                    "in_reply_to_user_id", "referenced_tweets", "public_metrics",
-                    "entities", "attachments", "context_annotations", "withheld",
-                    "reply_settings", "lang"
-                ],
-                expansions=[
-                    "author_id", "referenced_tweets.id", "referenced_tweets.id.author_id",
-                    "entities.mentions.username", "attachments.media_keys",
-                    "attachments.poll_ids", "in_reply_to_user_id", "geo.place_id"
-                ],
-                user_fields=[
-                    "id", "name", "username", "created_at", "description",
-                    "entities", "location", "pinned_tweet_id", "profile_image_url",
-                    "protected", "public_metrics", "url", "verified", "withheld"
-                ],
-                media_fields=[
-                    "duration_ms", "height", "media_key", "preview_image_url",
-                    "type", "url", "width", "public_metrics", "alt_text"
-                ],
-                place_fields=[
-                    "contained_within", "country", "country_code", "full_name",
-                    "geo", "id", "name", "place_type"
-                ],
-                poll_fields=[
-                    "duration_minutes", "end_datetime", "id", "options",
-                    "voting_status"
-                ]
-            )
-            logger.info(f"Successfully retrieved {len(response.data)} mentions")
-            return response.data
-            
-        except Exception as e:
-            logger.error(f"Failed to get mentions: {str(e)}")
-            return []
+    except Exception as e:
+        logger.error(f"Error in Twitter job: {str(e)}")
+        raise

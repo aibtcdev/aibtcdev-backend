@@ -5,9 +5,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from api import crew
 from api import chat
 from services.cron import execute_cron_job
+from services.twitter import execute_twitter_job
 import os
 from services.bot import start_application, BOT_ENABLED
 import logging
+from lib.twitter import TwitterService
 
 # Load environment variables first
 load_dotenv()
@@ -19,13 +21,27 @@ logger = logging.getLogger('uvicorn.error')
 scheduler = AsyncIOScheduler()
 CRON_ENABLED = os.getenv('CRON_ENABLED', 'true').lower() == 'true'
 CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
+TWITTER_ENABLED = os.getenv('TWITTER_ENABLED', 'true').lower() == 'true'
+TWITTER_INTERVAL_SECONDS = int(os.getenv('TWITTER_INTERVAL_SECONDS', 120))
 
 if CRON_ENABLED:
     scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
-    scheduler.start()
     logger.info(f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds")
 else:
     logger.info("Cron scheduler is disabled")
+
+if TWITTER_ENABLED:
+    scheduler.add_job(execute_twitter_job, "interval", seconds=TWITTER_INTERVAL_SECONDS)
+    logger.info(f"Twitter service started with interval of {TWITTER_INTERVAL_SECONDS} seconds")
+else:
+    logger.info("Twitter service disabled")
+
+if CRON_ENABLED or TWITTER_ENABLED:
+    logger.info("Starting scheduler")
+    scheduler.start()
+    logger.info("Scheduler started")
+else:
+    logger.info("Scheduler is disabled")
 
 app = FastAPI()
 

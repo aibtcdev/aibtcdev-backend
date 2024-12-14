@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from urllib.parse import urlencode
 from db.helpers import (
     get_telegram_user,
     update_telegram_user,
