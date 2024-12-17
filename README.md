@@ -109,11 +109,10 @@ http://localhost:8000/docs
 
 The backend provides several API endpoints:
 
+- `/` - Health check
+- `/bot` - Telegram bot functionality
 - `/crew` - Crew management
-- `/public-crews` - Public crew information
-- `/public-stats` - Statistics
 - `/chat` - Chat functionality
-- `/metrics` - System metrics
 
 For detailed API documentation, visit the `/docs` endpoint when running the server.
 

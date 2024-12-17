@@ -1,10 +1,11 @@
-from typing import Any, Optional, Type
 from crewai_tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Any, Optional, Type
 
 
 class TwitterPostTweetSchema(BaseModel):
     """Input schema for TwitterPostTweetTool."""
+
     text: str = Field(
         ...,
         description="The content of the tweet to be posted",
@@ -40,8 +41,7 @@ class TwitterPostTweetTool(BaseTool):
             if self.twitter_service is None:
                 return "Twitter client is not initialized"
             response = await self.twitter_service.post_tweet(
-                text=text,
-                reply_in_reply_to_tweet_id=reply_to_tweet_id
+                text=text, reply_in_reply_to_tweet_id=reply_to_tweet_id
             )
             if response:
                 return f"Successfully posted tweet: {text[:50]}..."

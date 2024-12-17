@@ -1,37 +1,40 @@
+import logging
+import os
+from api import chat, crew
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from api import crew
-from api import chat
+from services.bot import BOT_ENABLED, start_application
 from services.cron import execute_cron_job
 from services.twitter import execute_twitter_job
-import os
-from services.bot import start_application, BOT_ENABLED
-import logging
 
 # Load environment variables first
 load_dotenv()
 
 # Configure module logger
-logger = logging.getLogger('uvicorn.error')
+logger = logging.getLogger("uvicorn.error")
 
 # Initialize scheduler with environment-controlled cron settings
 scheduler = AsyncIOScheduler()
-CRON_ENABLED = os.getenv('CRON_ENABLED', 'false').lower() == 'true'
-CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
-TWITTER_ENABLED = os.getenv('TWITTER_ENABLED', 'false').lower() == 'true'
-TWITTER_INTERVAL_SECONDS = int(os.getenv('TWITTER_INTERVAL_SECONDS', 120))
+CRON_ENABLED = os.getenv("CRON_ENABLED", "false").lower() == "true"
+CRON_INTERVAL_SECONDS = int(os.getenv("CRON_INTERVAL_SECONDS", 3600))
+TWITTER_ENABLED = os.getenv("TWITTER_ENABLED", "false").lower() == "true"
+TWITTER_INTERVAL_SECONDS = int(os.getenv("TWITTER_INTERVAL_SECONDS", 120))
 
 if CRON_ENABLED:
     scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
-    logger.info(f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds")
+    logger.info(
+        f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds"
+    )
 else:
     logger.info("Cron scheduler is disabled")
 
 if TWITTER_ENABLED:
     scheduler.add_job(execute_twitter_job, "interval", seconds=TWITTER_INTERVAL_SECONDS)
-    logger.info(f"Twitter service started with interval of {TWITTER_INTERVAL_SECONDS} seconds")
+    logger.info(
+        f"Twitter service started with interval of {TWITTER_INTERVAL_SECONDS} seconds"
+    )
 else:
     logger.info("Twitter service disabled")
 
@@ -48,7 +51,7 @@ app = FastAPI()
 cors_origins = [
     "https://sprint.aibtc.dev",
     "https://sprint-faster.aibtc.dev",
-    "https://*.aibtcdev-frontend.pages.dev" # Cloudflare preview deployments
+    "https://*.aibtcdev-frontend.pages.dev"  # Cloudflare preview deployments
     "http://localhost:3000",  # Local development
 ]
 

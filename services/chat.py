@@ -1,12 +1,10 @@
 import asyncio
 import datetime
-import json
-from services.crews import execute_chat_stream
+from concurrent.futures import ThreadPoolExecutor
 from db.helpers import add_job
 from lib.logger import configure_logger
-from lib.websocket_manager import manager
 from lib.models import ProfileInfo
-from concurrent.futures import ThreadPoolExecutor
+from services.crews import execute_chat_stream
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -16,16 +14,17 @@ logger = configure_logger(__name__)
 thread_pool = ThreadPoolExecutor()
 running_jobs = {}
 
+
 async def process_chat_message(
     job_id: str,
     conversation_id: str,
     profile: ProfileInfo,
     input_str: str,
     history: list,
-    output_queue: asyncio.Queue
+    output_queue: asyncio.Queue,
 ):
     """Process a chat message.
-    
+
     Args:
         job_id (str): The ID of the job
         conversation_id (str): The ID of the conversation
@@ -33,22 +32,24 @@ async def process_chat_message(
         input_str (str): The input string for the chat job
         history (list): The conversation history
         output_queue (asyncio.Queue): The output queue for WebSocket streaming
-        
+
     Raises:
         Exception: If the chat message cannot be processed
     """
     try:
         results = []
         logger.debug(f"Starting chat stream for job {job_id}")
-        
+
         # Add initial user message
-        results.append({
-            "role": "user",
-            "type": "user",
-            "content": input_str,
-            "timestamp": datetime.datetime.now().isoformat()
-        })
-        
+        results.append(
+            {
+                "role": "user",
+                "type": "user",
+                "content": input_str,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }
+        )
+
         async for result in execute_chat_stream(
             str(profile.account_index), history, input_str
         ):
@@ -63,7 +64,7 @@ async def process_chat_message(
                 "thought": result.get("thought", None),
                 "timestamp": datetime.datetime.now().isoformat(),
                 "job_started_at": datetime.datetime.now().isoformat(),
-                "role": "assistant"
+                "role": "assistant",
             }
             await output_queue.put(stream_message)
 
@@ -78,7 +79,7 @@ async def process_chat_message(
         # Get the final result from the last message
         final_result = results[-1] if results else None
         final_result_content = final_result.get("content", "") if final_result else ""
-        
+
         add_job(
             profile_id=profile.id,
             conversation_id=conversation_id,
@@ -86,7 +87,7 @@ async def process_chat_message(
             input_data=input_str,
             tokens=final_result.get("tokens", 0) if final_result else 0,
             result=final_result_content,
-            messages=[json.dumps(r) for r in results]
+            messages=results,
         )
         logger.info(f"Chat job {job_id} completed and stored")
 

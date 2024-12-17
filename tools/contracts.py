@@ -1,7 +1,7 @@
-from typing import Dict, Type, Union
-from crewai_tools import BaseTool
 from .bun import BunScriptRunner
+from crewai_tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Dict, Type, Union
 
 
 class ContractSIP10DeployToolSchema(BaseModel):
@@ -51,9 +51,15 @@ class ContractSIP10DeployTool(BaseTool):
 class ContractSIP10SendToolSchema(BaseModel):
     """Input schema for ContractSIP10SendTool."""
 
-    contract_address: str = Field(..., description="Contract address of the token. Format: contract_address.contract_name")
+    contract_address: str = Field(
+        ...,
+        description="Contract address of the token. Format: contract_address.contract_name",
+    )
     recipient: str = Field(..., description="Recipient address to send tokens to.")
-    amount: int = Field(..., description="Amount of tokens to send. Needs to be in microunits based on decimals of token.")
+    amount: int = Field(
+        ...,
+        description="Amount of tokens to send. Needs to be in microunits based on decimals of token.",
+    )
 
 
 class ContractSIP10SendTool(BaseTool):
@@ -85,12 +91,17 @@ class ContractSIP10SendTool(BaseTool):
 class ContractSIP10InfoToolSchema(BaseModel):
     """Input schema for ContractSIP10InfoTool."""
 
-    contract_address: str = Field(..., description="Contract address of the token. Format: contract_address.contract_name")
+    contract_address: str = Field(
+        ...,
+        description="Contract address of the token. Format: contract_address.contract_name",
+    )
 
 
 class ContractSIP10InfoTool(BaseTool):
     name: str = "Get fungible token information."
-    description: str = "Get token information including name, symbol, decimals, and supply."
+    description: str = (
+        "Get token information including name, symbol, decimals, and supply."
+    )
     args_schema: Type[BaseModel] = ContractSIP10InfoToolSchema
     account_index: str = "0"
 

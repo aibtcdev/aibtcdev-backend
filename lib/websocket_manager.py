@@ -1,8 +1,9 @@
-from typing import Dict, Set
 from fastapi import WebSocket
 from lib.logger import configure_logger
+from typing import Dict, Set
 
 logger = configure_logger(__name__)
+
 
 class ConnectionManager:
     def __init__(self):
@@ -47,7 +48,7 @@ class ConnectionManager:
                 except Exception as e:
                     logger.error(f"Error sending message to job WebSocket: {str(e)}")
                     dead_connections.add(connection)
-            
+
             # Clean up dead connections
             for dead in dead_connections:
                 self.job_connections[job_id].discard(dead)
@@ -61,9 +62,11 @@ class ConnectionManager:
                 try:
                     await connection.send_json(message)
                 except Exception as e:
-                    logger.error(f"Error sending message to conversation WebSocket: {str(e)}")
+                    logger.error(
+                        f"Error sending message to conversation WebSocket: {str(e)}"
+                    )
                     dead_connections.add(connection)
-            
+
             # Clean up dead connections
             for dead in dead_connections:
                 self.conversation_connections[conversation_id].discard(dead)
@@ -71,15 +74,14 @@ class ConnectionManager:
                 del self.conversation_connections[conversation_id]
 
     async def broadcast_job_error(self, error_message: str, job_id: str):
-        await self.send_job_message({
-            "type": "error",
-            "message": error_message
-        }, job_id)
+        await self.send_job_message({"type": "error", "message": error_message}, job_id)
 
-    async def broadcast_conversation_error(self, error_message: str, conversation_id: str):
-        await self.send_conversation_message({
-            "type": "error",
-            "message": error_message
-        }, conversation_id)
+    async def broadcast_conversation_error(
+        self, error_message: str, conversation_id: str
+    ):
+        await self.send_conversation_message(
+            {"type": "error", "message": error_message}, conversation_id
+        )
+
 
 manager = ConnectionManager()

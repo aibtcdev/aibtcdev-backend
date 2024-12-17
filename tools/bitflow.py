@@ -1,7 +1,7 @@
-from typing import Dict, Type
-from crewai_tools import BaseTool
 from .bun import BunScriptRunner
+from crewai_tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Dict, Type
 
 
 class BitflowGetAvailableTokens(BaseTool):
@@ -20,6 +20,7 @@ class BitflowGetAvailableTokens(BaseTool):
 
 class BitflowExecuteTradeToolSchema(BaseModel):
     """Input schema for BitflowExecuteTradeTool."""
+
     slippage: str = Field(
         ...,
         description="Slippage amount for the trade. Default to 0.04 which equates to 4%",
@@ -29,8 +30,7 @@ class BitflowExecuteTradeToolSchema(BaseModel):
         description="Amount of whole tokens to trade. Default to 1",
     )
     tokenA: str = Field(
-        ..., 
-        description="Token symbol that you are expecting to give up for the trade"
+        ..., description="Token symbol that you are expecting to give up for the trade"
     )
     tokenB: str = Field(
         ...,
@@ -40,7 +40,9 @@ class BitflowExecuteTradeToolSchema(BaseModel):
 
 class BitflowExecuteTradeTool(BaseTool):
     name: str = "Bitflow: Execute Swap/Trade"
-    description: str = "Execute a market order to buy the specified amount of the token."
+    description: str = (
+        "Execute a market order to buy the specified amount of the token."
+    )
     args_schema: Type[BaseModel] = BitflowExecuteTradeToolSchema
     account_index: str = "0"
 
@@ -48,7 +50,9 @@ class BitflowExecuteTradeTool(BaseTool):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self, slippage: str, amount: str, tokenA: str, tokenB: str) -> Dict[str, str | bool | None]:
+    def _run(
+        self, slippage: str, amount: str, tokenA: str, tokenB: str
+    ) -> Dict[str, str | bool | None]:
         """
         Execute a market order to swap/trade tokens.
 

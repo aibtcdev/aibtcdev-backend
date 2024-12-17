@@ -1,15 +1,18 @@
-import requests
 import os
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables from a .env file
 load_dotenv()
 
+
 class LunarcrushApi:
 
     def __init__(self):
         # Base URL for the Lunarcrush API
-        self.base_url = os.getenv("LUNARCRUSH_BASE_URL", "https://lunarcrush.com/api4/public/")
+        self.base_url = os.getenv(
+            "LUNARCRUSH_BASE_URL", "https://lunarcrush.com/api4/public/"
+        )
         # Retrieve the API key from environment variables
         self.api_key = os.getenv("LUNARCRUSH_API_KEY")
 

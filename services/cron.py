@@ -1,17 +1,17 @@
 import asyncio
-import json
 import datetime
+import json
 import os
 from db.helpers import add_job, get_enabled_crons_expanded
-from services.crews import execute_crew_stream
-from services.bot import send_message_to_user
 from lib.logger import configure_logger
+from services.bot import send_message_to_user
+from services.crews import execute_crew_stream
 
 # Configure logger
 logger = configure_logger(__name__)
 
 # Get the maximum number of concurrent cron tasks from environment variables
-CRON_MAX_CONCURRENT_TASKS = int(os.getenv('CRON_MAX_CONCURRENT_TASKS', 5))
+CRON_MAX_CONCURRENT_TASKS = int(os.getenv("CRON_MAX_CONCURRENT_TASKS", 5))
 
 
 async def execute_cron_job():
@@ -66,27 +66,33 @@ async def execute_single_wrapper(
                 result["crew_id"] = crew_id
                 result["timestamp"] = datetime.datetime.now().isoformat()
                 results_array.append(json.dumps(result))
-                
+
                 # Send message about the result
-                message = f"🤖 Crew Stream Result:\n\nInput: {input_str}\nResult: {result}"
+                message = (
+                    f"🤖 Crew Stream Result:\n\nInput: {input_str}\nResult: {result}"
+                )
                 await send_message_to_user(profile_id, message)
                 logger.debug(f"Crew stream result sent for crew_id={crew_id}")
-                
+
             await output_queue.put(None)  # Signal completion
             logger.info(f"Crew stream completed successfully for crew_id={crew_id}")
         except Exception as e:
             # Log the error
             logger.error(f"Crew stream failed for crew_id={crew_id}: {str(e)}")
             # Send error message
-            error_message = f"❌ Crew Stream Failed:\n\nInput: {input_str}\nError: {str(e)}"
+            error_message = (
+                f"❌ Crew Stream Failed:\n\nInput: {input_str}\nError: {str(e)}"
+            )
             await send_message_to_user(profile_id, error_message)
             raise e
         finally:
             logger.debug(f"Saving chat results for job {job_id}")
 
             final_result = json.loads(results_array[-1]) if results_array else None
-            final_result_content = final_result.get("content", "") if final_result else ""
-            
+            final_result_content = (
+                final_result.get("content", "") if final_result else ""
+            )
+
             add_job(
                 profile_id=profile_id,
                 conversation_id=None,

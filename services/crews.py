@@ -1,16 +1,14 @@
-from textwrap import dedent
-from typing import Any, Dict, List, Tuple, Union
-from crewai import Agent, Task, Crew, Process
-from db.helpers import get_all_crews, get_crew_agents, get_crew_tasks
-from db.client import supabase
-from tools.tools_factory import initialize_tools, get_agent_tools
-from dotenv import load_dotenv
 import asyncio
 import os
+from crewai import Agent, Crew, Process, Task
 from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.tasks.task_output import TaskOutput
-from lib.tokenizer import Trimmer
+from db.helpers import get_crew_agents, get_crew_tasks
+from dotenv import load_dotenv
 from lib.logger import configure_logger
+from textwrap import dedent
+from tools.tools_factory import get_agent_tools, initialize_tools
+from typing import Any, Dict, List, Tuple, Union
 
 logger = configure_logger(__name__)
 
@@ -33,6 +31,7 @@ MANAGER_AGENT_CONFIG = {
 def create_manager_agent() -> Agent:
     """Create a standard manager agent with common configuration."""
     return Agent(**MANAGER_AGENT_CONFIG)
+
 
 def create_agent(agent_data: Dict, tools_map: Dict) -> Agent:
     """Create an agent from agent data and tools map."""
@@ -81,28 +80,6 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
         **kwargs,
     )
 
-def fetch_all_crews() -> Dict:
-    """Fetch all crews and their respective agents and tasks from Supabase."""
-    crews_response = get_all_crews()
-    if not crews_response.data:
-        raise ValueError("No crews found in the database.")
-
-    crews_data = {}
-    for crew in crews_response.data:
-        crew_id = crew["id"]
-        try:
-            agents, tasks = fetch_crew_data(crew_id)
-            crews_data[crew_id] = {
-                "id": crew_id,
-                "name": crew["name"],
-                "description": crew["description"],
-                "agents": agents,
-                "tasks": tasks,
-            }
-        except ValueError as e:
-            print(f"Skipping crew {crew_id}: {e}")
-    return crews_data
-
 
 def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
     """Fetch agents and tasks for the specified crew from Supabase."""
@@ -112,6 +89,7 @@ def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
     if not agents_response or not tasks_response:
         raise ValueError("No agents or tasks found for the specified crew.")
     return agents_response, tasks_response
+
 
 def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[int, Agent]:
     """Build a dictionary of agents from agents data."""
@@ -135,6 +113,7 @@ def build_tasks_list(
         tasks.append(create_task(task_data, agents[agent_id], input_str))
     return tasks
 
+
 def extract_filtered_content(history: List) -> str:
     """Extract and filter content from chat history."""
     filtered_content = []
@@ -157,20 +136,6 @@ def execute_crew(account_index: str, crew_id: int, input_str: str) -> str:
     crew = create_crew(list(agents.values()), tasks)
 
     return crew.kickoff(inputs={"user_input": input_str})
-
-
-def build_all_crews():
-    """Build all crews ready to execute."""
-    crews_data = fetch_all_crews()
-    return [
-        {
-            "id": k,
-            "name": v["name"],
-            "description": v["description"],
-            "crew": build_single_crew(v["agents"], v["tasks"]),
-        }
-        for k, v in crews_data.items()
-    ]
 
 
 def build_single_crew(agents_data: List, tasks_data: List) -> Crew:

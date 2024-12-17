@@ -1,17 +1,22 @@
-from typing import Type
 from crewai_tools import BaseTool
 from lib.alex import AlexApi
 from pydantic import BaseModel, Field
+from typing import Type
 
 
 class AlexPriceHistorySchema(BaseModel):
     """Input schema for AlexGetPriceHistory."""
-    token_address: str = Field(..., description="The address of the token to get price history for.")
+
+    token_address: str = Field(
+        ..., description="The address of the token to get price history for."
+    )
 
 
 class AlexGetPriceHistory(BaseTool):
     name: str = "ALEX: Get Token Price History"
-    description: str = "Retrieve historical price data for a specified cryptocurrency symbol."
+    description: str = (
+        "Retrieve historical price data for a specified cryptocurrency symbol."
+    )
     args_schema: Type[BaseModel] = AlexPriceHistorySchema
 
     def _run(self, token_address: str) -> list:
@@ -50,7 +55,10 @@ class AlexGetSwapInfo(BaseTool):
 
 class AlexTokenPoolVolumeSchema(BaseModel):
     """Input schema for AlexGetTokenPoolVolume."""
-    token_pool_id: str = Field(..., description="The token pool ID to get volume data for.")
+
+    token_pool_id: str = Field(
+        ..., description="The token pool ID to get volume data for."
+    )
 
 
 class AlexGetTokenPoolVolume(BaseTool):

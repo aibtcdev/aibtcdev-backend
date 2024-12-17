@@ -1,21 +1,25 @@
-from typing import Type
 import os
 import requests
 from crewai_tools import BaseTool
 from pydantic import BaseModel
+from typing import Type
 
 
 class GetBitcoinDataSchema(BaseModel):
     """Input schema for GetBitcoinData tool.
     This tool doesn't require any input parameters but we still define the schema for consistency.
     """
+
     pass
 
 
 class GetBitcoinData(BaseTool):
     """Tool for fetching current Bitcoin market data from CoinMarketCap."""
+
     name: str = "GetBitcoinData"
-    description: str = "Fetches Bitcoin data including price, market cap, 24h trading volume, and percentage changes."
+    description: str = (
+        "Fetches Bitcoin data including price, market cap, 24h trading volume, and percentage changes."
+    )
     args_schema: Type[BaseModel] = GetBitcoinDataSchema
 
     def _run(self) -> str:
