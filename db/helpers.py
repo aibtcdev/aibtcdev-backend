@@ -1,4 +1,6 @@
-from .client import supabase
+from lib.models import ProfileResponse, VerificationResponse
+from .client import supabase, services_client
+
 from typing import Dict, List, Optional, Union, Any
 
 # =============================================================================
@@ -7,22 +9,23 @@ from typing import Dict, List, Optional, Union, Any
 
 def get_detailed_conversation(conversation_id: str) -> Dict[str, Any]:
     """Get detailed conversation data with associated jobs."""
-    jobs_response = (
-        supabase.table("jobs")
-        .select("*")
-        .eq("conversation_id", conversation_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
+    jobs_response = services_client.database.get_crew_executions(conversation_id)
+
+    if not jobs_response.executions:
+        return {
+            "conversation": conversation_id,
+            "jobs": []
+        }
 
     return {
         "conversation": conversation_id,
         "jobs": [
             job
-            for job in jobs_response.data
+            for job in jobs_response.executions
             if job["conversation_id"] == conversation_id
         ],
     }
+
 
 # =============================================================================
 # Job Operations
@@ -170,3 +173,25 @@ def get_profile_by_email(email: str) -> Dict:
         .single()
         .execute()
     )
+
+def verify_session_token(token: str) -> VerificationResponse:
+    """Validate if a token is valid and belongs to a user.
+    
+    Args:
+        token (str): Authentication token
+        
+    Returns:
+        dict: Dictionary containing 'valid' and 'message' keys
+    """
+    return services_client.auth.verify_session_token(token)
+
+def get_profile_by_address(address: str) -> ProfileResponse:
+    """Get profile information by address.
+    
+    Args:
+        address (str): User's address
+        
+    Returns:
+        Dict: Profile data including account_index
+    """
+    return services_client.database.get_user_profile(address)

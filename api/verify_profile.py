@@ -1,5 +1,5 @@
 from fastapi import Header, HTTPException, Query
-from db.helpers import get_user_from_token, get_profile_by_email
+from db.helpers import verify_session_token, get_user_from_token, get_profile_by_email, get_profile_by_address
 from lib.logger import configure_logger
 from cachetools import TTLCache
 from lib.models import ProfileInfo
@@ -36,32 +36,27 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         logger.debug("Processing authorization token")
         
         # Get user from token
-        user = get_user_from_token(token)
-        email = user.user.email
+        token = verify_session_token(token)
+        if not token:
+            logger.debug("Token verification failed")
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        address = token["address"]
         
-        # Check cache first
-        if email in cache:
-            logger.debug(f"Cache hit for email: {email}")
-            account_index = cache[email]
-        else:
-            logger.debug(f"Cache miss for email: {email}")
-            # Fetch profile from database
-            profile_response = get_profile_by_email(email)
+        # Fetch profile from database
+        profile_response = get_profile_by_address(address)
+        
+        if profile_response["success"] is False:
+            logger.debug("Profile not found in database")
+            raise HTTPException(status_code=404, detail="Profile not found")
 
-            if not profile_response.data:
-                logger.debug("Profile not found in database")
-                raise HTTPException(status_code=404, detail="Profile not found")
-
-            account_index = profile_response.data.get("account_index")
-            if account_index is None:
-                logger.debug("Account index missing from profile")
-                raise HTTPException(
-                    status_code=400, detail="No account index found for profile"
-                )
-
-            # Update cache
-            cache[email] = account_index
-            logger.debug(f"Cached account_index for email: {email}")
+        account_index = profile_response["profile"]["account_index"]
+        id = profile_response["profile"]["id"]
+        if account_index is None:
+            logger.debug("Account index missing from profile")
+            raise HTTPException(
+                status_code=400, detail="No account index found for profile"
+            )
 
         logger.debug(f"Successfully verified profile with account_index: {account_index}")
         return ProfileInfo(account_index=account_index, id=user.user.id)
