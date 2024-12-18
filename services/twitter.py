@@ -1,6 +1,13 @@
 import os
+from db.helpers import (
+    add_twitter_log,
+    add_twitter_tweet,
+    get_author_tweets,
+    get_thread_tweets,
+    get_twitter_author,
+    get_twitter_tweet,
+)
 from dotenv import load_dotenv
-from lib.db import TweetDB
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from services.flow import execute_twitter_stream
@@ -23,7 +30,6 @@ class TwitterMentionHandler:
 
     def __init__(self):
         """Initialize Twitter components and configuration."""
-        self.tweet_db = TweetDB()
         self.twitter_service = TwitterService(
             consumer_key=os.getenv("TWITTER_CONSUMER_KEY", ""),
             consumer_secret=os.getenv("TWITTER_CONSUMER_SECRET", ""),
@@ -42,7 +48,9 @@ class TwitterMentionHandler:
         conversation_id = mention.conversation_id or ""
         text = mention.text or ""
 
-        if self.tweet_db.is_tweet_seen(tweet_id):
+        # Check if tweet exists in our database
+        existing_tweet = get_twitter_tweet(tweet_id)
+        if existing_tweet:
             logger.debug(f"Skipping already processed tweet {tweet_id}")
             return
 
@@ -64,8 +72,14 @@ class TwitterMentionHandler:
                     f"Skipping non-whitelisted mention {tweet_id} from user {author_id}"
                 )
         finally:
-            # Always mark tweet as seen, even if processing fails
-            self.tweet_db.add_seen_tweet(tweet_data)
+            # Always store the tweet and log its processing
+            add_twitter_tweet(
+                author_id=author_id,
+                tweet_id=tweet_id,
+                tweet_body=text,
+                thread_id=int(conversation_id) if conversation_id else None,
+            )
+            add_twitter_log(tweet_id=tweet_id, status="processed")
 
     def _is_author_whitelisted(self, author_id: str) -> bool:
         """Check if the author is in the whitelist."""
@@ -87,16 +101,15 @@ class TwitterMentionHandler:
         if not tweet_data["conversation_id"]:
             return []
 
-        conversation_tweets = self.tweet_db.get_conversation_tweets(
-            tweet_data["conversation_id"]
-        )
+        # Get all tweets in the conversation thread
+        conversation_tweets = get_thread_tweets(int(tweet_data["conversation_id"]))
         return [
             {
-                "role": "user" if tweet["author_id"] != self.user_id else "assistant",
-                "content": tweet["text"],
+                "role": "user" if tweet.author_id != self.user_id else "assistant",
+                "content": tweet.tweet_body,
             }
             for tweet in conversation_tweets
-            if tweet["text"]
+            if tweet.tweet_body
         ]
 
     async def _generate_response(
@@ -136,11 +149,22 @@ class TwitterMentionHandler:
         )
 
         if response_tweet and response_tweet.id:
-            self.tweet_db.add_bot_response(
-                conversation_id=tweet_data["conversation_id"],
-                original_tweet_id=tweet_data["tweet_id"],
-                response_tweet_id=response_tweet.id,
-                response_text=response_content,
+            # Store the response tweet
+            add_twitter_tweet(
+                author_id=self.user_id,
+                tweet_id=response_tweet.id,
+                tweet_body=response_content,
+                thread_id=(
+                    int(tweet_data["conversation_id"])
+                    if tweet_data["conversation_id"]
+                    else None
+                ),
+            )
+            # Log the response
+            add_twitter_log(
+                tweet_id=response_tweet.id,
+                status="response_posted",
+                message=f"Response to tweet {tweet_data['tweet_id']}",
             )
             logger.info(
                 f"Stored bot response in database. Response tweet ID: {response_tweet.id}"
@@ -160,6 +184,8 @@ class TwitterMentionHandler:
                     await self._handle_mention(mention)
                 except Exception as e:
                     logger.error(f"Error processing mention {mention.id}: {str(e)}")
+                    # Log the error
+                    add_twitter_log(tweet_id=mention.id, status="error", message=str(e))
                     # Continue processing other mentions even if one fails
                     continue
 

@@ -1,7 +1,7 @@
 import json
 from .client import services_client, supabase
-from lib.models import ProfileResponse, VerificationResponse
-from typing import Any, Dict, List
+from lib.models import ProfileResponse, VerificationResponse, XBotAuthor, XBotTweet, XBotLog
+from typing import Any, Dict, List, Optional
 
 # =============================================================================
 # Conversation Operations
@@ -203,3 +203,76 @@ def get_profile_by_address(address: str) -> ProfileResponse:
         Dict: Profile data including account_index
     """
     return services_client.database.get_user_profile(address)
+
+
+# =============================================================================
+# Twitter Operations
+# =============================================================================
+
+
+def get_twitter_author(author_id: str) -> Optional[XBotAuthor]:
+    """Get a Twitter author by their ID."""
+    response = services_client.database.get_author(author_id)
+    return response.author if response.success else None
+
+
+def create_twitter_author(
+    author_id: str, username: Optional[str] = None, realname: Optional[str] = None
+) -> Optional[XBotAuthor]:
+    """Create a new Twitter author."""
+    response = services_client.database.create_author(
+        author_id=author_id, username=username, realname=realname
+    )
+    return response.author if response.success else None
+
+
+def get_twitter_tweet(tweet_id: str) -> Optional[XBotTweet]:
+    """Get a Twitter tweet by its ID."""
+    response = services_client.database.get_tweet(tweet_id)
+    return response.tweet if response.success else None
+
+
+def get_thread_tweets(thread_id: int) -> List[XBotTweet]:
+    """Get all tweets in a thread."""
+    response = services_client.database.get_thread_tweets(thread_id)
+    return response.tweets if response.success else []
+
+
+def get_author_tweets(author_id: str) -> List[XBotTweet]:
+    """Get tweets by a specific author."""
+    response = services_client.database.get_author_tweets(author_id)
+    return response.tweets if response.success else []
+
+
+def add_twitter_tweet(
+    author_id: str,
+    tweet_id: str,
+    tweet_body: str,
+    thread_id: Optional[int] = None
+) -> Optional[XBotTweet]:
+    """Add a new Twitter tweet."""
+    response = services_client.database.add_tweet(
+        author_id=author_id,
+        tweet_id=tweet_id,
+        tweet_body=tweet_body,
+        thread_id=thread_id
+    )
+    return response.tweet if response.success else None
+
+
+def get_twitter_logs(tweet_id: str) -> List[XBotLog]:
+    """Get all logs for a specific tweet."""
+    response = services_client.database.get_tweet_logs(tweet_id)
+    return response.logs if response.success else []
+
+
+def add_twitter_log(
+    tweet_id: str, status: str, message: Optional[str] = None
+) -> Optional[XBotLog]:
+    """Add a new Twitter log entry."""
+    response = services_client.database.add_tweet_log(
+        tweet_id=tweet_id,
+        status=status,
+        message=message
+    )
+    return response.log if response.success else None

@@ -311,8 +311,9 @@ class DatabaseResource(BaseResource):
     # Twitter
     def get_author(self, author_id: str) -> TwitterResponse:
         data = self._request(
-            "GET", "/twitter/authors/get", params={"author_id": author_id}
+            "GET", "/twitter/authors/get", params={"authorId": author_id}
         )
+        print(data)
         return TwitterResponse(**data)
 
     def create_author(
@@ -326,20 +327,18 @@ class DatabaseResource(BaseResource):
         return TwitterResponse(**data)
 
     def get_tweet(self, tweet_id: str) -> TwitterResponse:
-        data = self._request(
-            "GET", "/twitter/tweets/get", params={"tweet_id": tweet_id}
-        )
+        data = self._request("GET", "/twitter/tweets/get", params={"tweetId": tweet_id})
         return TwitterResponse(**data)
 
     def get_thread_tweets(self, thread_id: int) -> TwitterResponse:
         data = self._request(
-            "GET", "/twitter/tweets/thread", params={"thread_id": thread_id}
+            "GET", "/twitter/tweets/thread", params={"threadId": thread_id}
         )
         return TwitterResponse(**data)
 
     def get_author_tweets(self, author_id: str) -> TwitterResponse:
         data = self._request(
-            "GET", "/twitter/tweets/author", params={"author_id": author_id}
+            "GET", "/twitter/tweets/author", params={"authorId": author_id}
         )
         return TwitterResponse(**data)
 
@@ -349,12 +348,16 @@ class DatabaseResource(BaseResource):
         tweet_id: str,
         tweet_body: str,
         thread_id: Optional[int] = None,
+        parent_tweet_id: Optional[str] = None,
+        is_bot_response: bool = False,
     ) -> TwitterResponse:
         json_data = {
             "author_id": author_id,
             "tweet_id": tweet_id,
             "tweet_body": tweet_body,
             "thread_id": thread_id,
+            "parent_tweet_id": parent_tweet_id,
+            "is_bot_response": is_bot_response,
         }
         data = self._request("POST", "/twitter/tweets/add", json=json_data)
         return TwitterResponse(**data)
@@ -444,10 +447,33 @@ class ServicesClient:
         params: Optional[Dict[str, Any]] = None,
         json: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Internal method for making HTTP requests."""
+        """Make an HTTP request to the API.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            endpoint: API endpoint path
+            params: Query parameters
+            json: JSON body data
+
+        Returns:
+            Response data as a dictionary
+        """
         url = f"{self.base_url}{endpoint}"
         response = requests.request(
-            method, url, params=params, json=json, headers=self.headers
+            method,
+            url,
+            params=params,
+            json=json,
+            headers=self.headers,
         )
-        response.raise_for_status()
-        return response.json()
+        try:
+            response.raise_for_status()
+            data = response.json()
+            # Wrap the response data with success field if it's missing
+            if isinstance(data, dict) and "success" not in data:
+                data = {"success": True, **data}
+            return data
+        except requests.exceptions.RequestException as e:
+            # Return error response with success=False
+            print(f"Request error: {e}")
+            return {"success": False, "error": str(e)}
