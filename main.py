@@ -31,7 +31,9 @@ else:
     logger.info("Cron scheduler is disabled")
 
 if AIBTC_TWITTER_ENABLED:
-    scheduler.add_job(execute_twitter_job, "interval", seconds=AIBTC_TWITTER_INTERVAL_SECONDS)
+    scheduler.add_job(
+        execute_twitter_job, "interval", seconds=AIBTC_TWITTER_INTERVAL_SECONDS
+    )
     logger.info(
         f"Twitter service started with interval of {AIBTC_TWITTER_INTERVAL_SECONDS} seconds"
     )

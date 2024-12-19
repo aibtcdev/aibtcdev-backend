@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import json
 import os
-from db.helpers import add_job, get_enabled_crons_expanded
+from db.factory import db
 from lib.logger import configure_logger
 from services.bot import send_message_to_user
 from services.crews import execute_crew_stream
@@ -21,7 +21,7 @@ async def execute_cron_job():
     semaphore = asyncio.Semaphore(AIBTC_CRON_MAX_CONCURRENT_TASKS)
 
     # Get all crons
-    crons = get_enabled_crons_expanded()
+    crons = db.get_enabled_crons_expanded()
 
     # For each cron, execute the task
     tasks = []
@@ -93,7 +93,7 @@ async def execute_single_wrapper(
                 final_result.get("content", "") if final_result else ""
             )
 
-            add_job(
+            db.add_job(
                 profile_id=profile_id,
                 conversation_id=None,
                 crew_id=crew_id,

@@ -2,7 +2,7 @@ import datetime
 import json
 import uuid
 from .verify_profile import ProfileInfo, verify_profile_from_token
-from db.helpers import add_job
+from db.factory import db
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from lib.logger import configure_logger
@@ -125,7 +125,7 @@ async def websocket_endpoint(
                         )
 
                         logger.debug(f"Saving job {job_id} results to database")
-                        add_job(
+                        db.add_job(
                             profile_id=profile.id,
                             conversation_id=None,
                             crew_id=crew_id,

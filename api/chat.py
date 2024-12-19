@@ -3,7 +3,7 @@ import datetime
 import json
 import uuid
 from api.verify_profile import ProfileInfo, verify_profile_from_token
-from db.helpers import get_conversation_history, get_detailed_conversation
+from db.factory import db
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
@@ -87,7 +87,7 @@ async def websocket_endpoint(
     """
     try:
         # Verify conversation belongs to user
-        conversation = get_detailed_conversation(conversation_id)
+        conversation = db.get_detailed_conversation(conversation_id)
 
         if not conversation:
             await websocket.accept()
@@ -160,7 +160,7 @@ async def websocket_endpoint(
                     }
 
                     # Get conversation history
-                    history = get_conversation_history(conversation_id)
+                    history = db.get_conversation_history(conversation_id)
 
                     # Create task
                     task = asyncio.create_task(

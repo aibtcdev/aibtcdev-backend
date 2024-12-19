@@ -1,4 +1,4 @@
-from db.helpers import get_profile_by_address, verify_session_token
+from db.factory import db
 from fastapi import Header, HTTPException, Query
 from lib.logger import configure_logger
 from lib.models import ProfileInfo
@@ -32,23 +32,17 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         token = authorization.split(" ")[1]
         logger.debug("Processing authorization token")
 
+        identifier = db.verify_session_token(token)
         # Get user from token
-        token = verify_session_token(token)
-        if not token:
-            logger.debug("Token verification failed")
-            raise HTTPException(status_code=401, detail="Invalid token")
+        profile_response = db.get_profile(identifier)
 
-        address = token["address"]
-
-        # Fetch profile from database
-        profile_response = get_profile_by_address(address)
-
-        if profile_response["success"] is False:
+        if not profile_response:
             logger.debug("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
-        account_index = profile_response["profile"]["account_index"]
-        stx_address = profile_response["profile"]["stx_address"]
+        account_index = profile_response.get("account_index")
+        id = profile_response.get("id")
+
         if account_index is None:
             logger.debug("Account index missing from profile")
             raise HTTPException(
@@ -58,7 +52,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         logger.debug(
             f"Successfully verified profile with account_index: {account_index}"
         )
-        return ProfileInfo(account_index=account_index, id=stx_address)
+        return ProfileInfo(account_index=account_index, id=id)
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
@@ -87,24 +81,19 @@ async def verify_profile_from_token(
         raise HTTPException(status_code=401, detail="Missing token parameter")
 
     try:
+        # Extract and verify token
+        identifier = db.verify_session_token(token)
+        logger.debug(identifier)
         # Get user from token
-        logger.debug("Processing token from query parameter")
-        token = verify_session_token(token)
-        if not token:
-            logger.debug("Token verification failed")
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        address = token["address"]
-
-        # Fetch profile from database
-        profile_response = get_profile_by_address(address)
-
-        if profile_response["success"] is False:
+        profile_response = db.get_profile(identifier)
+        logger.debug(profile_response)
+        if not profile_response:
             logger.debug("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
-        account_index = profile_response["profile"]["account_index"]
-        stx_address = profile_response["profile"]["stx_address"]
+        account_index = profile_response.get("account_index")
+        id = profile_response.get("id")
+
         if account_index is None:
             logger.debug("Account index missing from profile")
             raise HTTPException(
@@ -114,7 +103,7 @@ async def verify_profile_from_token(
         logger.debug(
             f"Successfully verified profile with account_index: {account_index}"
         )
-        return ProfileInfo(account_index=account_index, id=stx_address)
+        return ProfileInfo(account_index=account_index, id=id)
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is

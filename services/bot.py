@@ -1,11 +1,5 @@
 import os
-from db.helpers import (
-    get_all_registered_telegram_users,
-    get_telegram_user,
-    get_telegram_user_by_profile,
-    get_telegram_user_by_username,
-    update_telegram_user,
-)
+from db.factory import db
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from telegram import Update
@@ -50,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         telegram_user_id = context.args[0]
 
         # Check if user exists with this profile_id
-        result = get_telegram_user(telegram_user_id)
+        result = db.get_telegram_user(telegram_user_id)
 
         if not result.data:
             await update.message.reply_text(
@@ -68,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         }
 
         # Update the user data for the existing profile_id
-        result = update_telegram_user(telegram_user_id, user_data)
+        result = db.update_telegram_user(telegram_user_id, user_data)
 
         is_user_admin = is_admin(user_id)
         admin_status = "You are an admin!" if is_user_admin else "You are not an admin."
@@ -121,7 +115,7 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     try:
         # Query for the user
-        result = get_telegram_user_by_username(username)
+        result = db.get_telegram_user_by_username(username)
 
         if not result.data:
             await update.message.reply_text(
@@ -149,7 +143,7 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     try:
         # Query for all registered users
-        result = get_all_registered_telegram_users()
+        result = db.get_all_registered_telegram_users()
 
         if not result.data:
             await update.message.reply_text("No registered users found.")
@@ -216,7 +210,9 @@ async def get_bot():
 
     global _bot_app
     if _bot_app is None:
-        _bot_app = Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
+        _bot_app = (
+            Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
+        )
         await _bot_app.initialize()
         await _bot_app.start()
     return _bot_app
@@ -232,7 +228,7 @@ async def send_message_to_user(profile_id: str, message: str) -> bool:
 
     try:
         # Query for the user
-        result = get_telegram_user_by_profile(profile_id)
+        result = db.get_telegram_user_by_profile(profile_id)
 
         if not result.data:
             logger.warning(
@@ -262,7 +258,9 @@ async def start_application():
         return _bot_app
 
     # Create the Application and pass it your bot's token
-    _bot_app = Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
+    _bot_app = (
+        Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
+    )
 
     # Add command handlers
     _bot_app.add_handler(CommandHandler("start", start))

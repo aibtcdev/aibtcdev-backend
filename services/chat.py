@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 from concurrent.futures import ThreadPoolExecutor
-from db.helpers import add_job
+from db.factory import db
 from lib.logger import configure_logger
 from lib.models import ProfileInfo
 from services.crews import execute_chat_stream
@@ -80,7 +80,7 @@ async def process_chat_message(
         final_result = results[-1] if results else None
         final_result_content = final_result.get("content", "") if final_result else ""
 
-        add_job(
+        db.add_job(
             profile_id=profile.id,
             conversation_id=conversation_id,
             crew_id=None,  # Default crew ID for chat specialist

@@ -3,7 +3,7 @@ import os
 from crewai import Agent, Crew, Process, Task
 from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.tasks.task_output import TaskOutput
-from db.helpers import get_crew_agents, get_crew_tasks
+from db.factory import db
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from textwrap import dedent
@@ -83,8 +83,11 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
 
 def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
     """Fetch agents and tasks for the specified crew from Supabase."""
-    agents_response = get_crew_agents(crew_id)
-    tasks_response = get_crew_tasks(crew_id)
+
+    agents_response = db.get_crew_agents(crew_id)
+    tasks_response = db.get_crew_tasks(crew_id)
+    print(agents_response)
+    print(tasks_response)
 
     if not agents_response or not tasks_response:
         raise ValueError("No agents or tasks found for the specified crew.")
