@@ -1,5 +1,5 @@
-from typing import Any, Dict, List
 import tiktoken
+from typing import Any, Dict, List
 
 
 class Trimmer:
