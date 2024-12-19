@@ -1,22 +1,25 @@
-from typing import Optional, Type
-import requests
 from crewai_tools import BaseTool
-from textwrap import dedent
 from lib.alex import AlexApi
 from pydantic import BaseModel, Field
+from typing import Type
 
 
 class AlexPriceHistorySchema(BaseModel):
     """Input schema for AlexGetPriceHistory."""
-    token_address: str = Field(..., description="The address of the token to get price history for.")
+
+    token_address: str = Field(
+        ..., description="The address of the token to get price history for."
+    )
 
 
 class AlexGetPriceHistory(BaseTool):
     name: str = "ALEX: Get Token Price History"
-    description: str = "Retrieve historical price data for a specified cryptocurrency symbol."
+    description: str = (
+        "Retrieve historical price data for a specified cryptocurrency symbol."
+    )
     args_schema: Type[BaseModel] = AlexPriceHistorySchema
 
-    def _run(self, token_address: str) -> str:
+    def _run(self, token_address: str) -> list:
         """
         Retrieve historical price data for a specified cryptocurrency symbol.
 
@@ -34,7 +37,7 @@ class AlexGetSwapInfo(BaseTool):
     name: str = "ALEX: Get All Available Token Info"
     description: str = "Retrieve all pair data from the Alex API."
 
-    def _run(self) -> str:
+    def _run(self) -> list:
         """
         Retrieve all pairs from the Alex API and return a formatted string.
 
@@ -44,15 +47,18 @@ class AlexGetSwapInfo(BaseTool):
         obj = AlexApi()
         pairs = obj.get_pairs()
         return [
-            {"token": pair["wrapped_token_y"], "token_pool_id": pair["pool_id"]}
+            {"token": pair.get("wrapped_token_y"), "token_pool_id": pair.get("pool_id")}
             for pair in pairs
-            if pair["wrapped_token_x"] == "STX"
+            if pair.get("wrapped_token_x") == "STX"
         ]
 
 
 class AlexTokenPoolVolumeSchema(BaseModel):
     """Input schema for AlexGetTokenPoolVolume."""
-    token_pool_id: str = Field(..., description="The token pool ID to get volume data for.")
+
+    token_pool_id: str = Field(
+        ..., description="The token pool ID to get volume data for."
+    )
 
 
 class AlexGetTokenPoolVolume(BaseTool):

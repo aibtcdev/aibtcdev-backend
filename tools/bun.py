@@ -1,11 +1,6 @@
-"""
-Bun Script Runner for TypeScript execution.
-Provides a clean interface for running TypeScript scripts using Bun runtime.
-"""
-
-import subprocess
 import os
-from typing import Dict, Union, List, Optional
+import subprocess
+from typing import Dict, List, Union
 
 
 class BunScriptRunner:
@@ -17,10 +12,7 @@ class BunScriptRunner:
 
     @staticmethod
     def bun_run(
-        account_index: str,
-        contract_name: str,
-        script_name: str,
-        *args: str
+        account_index: str, contract_name: str, script_name: str, *args: str
     ) -> Dict[str, Union[str, bool, None]]:
         """
         Run a TypeScript script using Bun with specified parameters.
@@ -58,20 +50,12 @@ class BunScriptRunner:
                 cwd=BunScriptRunner.WORKING_DIR,
                 env=env,
             )
-            return {
-                "output": result.stdout.strip(),
-                "error": None,
-                "success": True
-            }
+            return {"output": result.stdout.strip(), "error": None, "success": True}
         except subprocess.CalledProcessError as e:
             return {
                 "output": e.stdout.strip() if e.stdout else "",
                 "error": e.stderr.strip() if e.stderr else "Unknown error occurred",
-                "success": False
+                "success": False,
             }
         except Exception as e:
-            return {
-                "output": "",
-                "error": str(e),
-                "success": False
-            }
+            return {"output": "", "error": str(e), "success": False}
