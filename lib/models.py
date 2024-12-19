@@ -241,7 +241,7 @@ class UserCron(BaseModel):
     id: int
     profile_id: str
     crew_id: int
-    cron_enabled: bool
+    AIBTC_CRON_ENABLED: bool
     cron_interval: str = "0 * * * *"  # Default to hourly
     cron_input: str = ""
     created_at: datetime

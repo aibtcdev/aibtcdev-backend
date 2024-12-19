@@ -7,8 +7,8 @@ from supabase import Client, create_client
 load_dotenv()
 
 # Initialize Supabase client using environment variables
-url = os.getenv("SUPABASE_URL")
-service_key = os.getenv("SUPABASE_SERVICE_KEY")
+url = os.getenv("AIBTC_SUPABASE_URL")
+service_key = os.getenv("AIBTC_SUPABASE_SERVICE_KEY")
 
 supabase: Client = create_client(url, service_key)
 

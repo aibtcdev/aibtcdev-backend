@@ -17,28 +17,28 @@ logger = logging.getLogger("uvicorn.error")
 
 # Initialize scheduler with environment-controlled cron settings
 scheduler = AsyncIOScheduler()
-CRON_ENABLED = os.getenv("CRON_ENABLED", "false").lower() == "true"
-CRON_INTERVAL_SECONDS = int(os.getenv("CRON_INTERVAL_SECONDS", 3600))
-TWITTER_ENABLED = os.getenv("TWITTER_ENABLED", "false").lower() == "true"
-TWITTER_INTERVAL_SECONDS = int(os.getenv("TWITTER_INTERVAL_SECONDS", 120))
+AIBTC_CRON_ENABLED = os.getenv("AIBTC_CRON_ENABLED", "false").lower() == "true"
+AIBTC_CRON_INTERVAL_SECONDS = int(os.getenv("AIBTC_CRON_INTERVAL_SECONDS", 3600))
+AIBTC_TWITTER_ENABLED = os.getenv("AIBTC_TWITTER_ENABLED", "false").lower() == "true"
+AIBTC_TWITTER_INTERVAL_SECONDS = int(os.getenv("AIBTC_TWITTER_INTERVAL_SECONDS", 120))
 
-if CRON_ENABLED:
-    scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
+if AIBTC_CRON_ENABLED:
+    scheduler.add_job(execute_cron_job, "interval", seconds=AIBTC_CRON_INTERVAL_SECONDS)
     logger.info(
-        f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds"
+        f"Cron scheduler started with interval of {AIBTC_CRON_INTERVAL_SECONDS} seconds"
     )
 else:
     logger.info("Cron scheduler is disabled")
 
-if TWITTER_ENABLED:
-    scheduler.add_job(execute_twitter_job, "interval", seconds=TWITTER_INTERVAL_SECONDS)
+if AIBTC_TWITTER_ENABLED:
+    scheduler.add_job(execute_twitter_job, "interval", seconds=AIBTC_TWITTER_INTERVAL_SECONDS)
     logger.info(
-        f"Twitter service started with interval of {TWITTER_INTERVAL_SECONDS} seconds"
+        f"Twitter service started with interval of {AIBTC_TWITTER_INTERVAL_SECONDS} seconds"
     )
 else:
     logger.info("Twitter service disabled")
 
-if CRON_ENABLED or TWITTER_ENABLED:
+if AIBTC_CRON_ENABLED or AIBTC_TWITTER_ENABLED:
     logger.info("Starting scheduler")
     scheduler.start()
     logger.info("Scheduler started")

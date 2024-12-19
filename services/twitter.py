@@ -31,15 +31,15 @@ class TwitterMentionHandler:
     def __init__(self):
         """Initialize Twitter components and configuration."""
         self.twitter_service = TwitterService(
-            consumer_key=os.getenv("TWITTER_CONSUMER_KEY", ""),
-            consumer_secret=os.getenv("TWITTER_CONSUMER_SECRET", ""),
-            client_id=os.getenv("TWITTER_CLIENT_ID", ""),
-            client_secret=os.getenv("TWITTER_CLIENT_SECRET", ""),
-            access_token=os.getenv("TWITTER_ACCESS_TOKEN", ""),
-            access_secret=os.getenv("TWITTER_ACCESS_SECRET", ""),
+            consumer_key=os.getenv("AIBTC_TWITTER_CONSUMER_KEY", ""),
+            consumer_secret=os.getenv("AIBTC_TWITTER_CONSUMER_SECRET", ""),
+            client_id=os.getenv("AIBTC_TWITTER_CLIENT_ID", ""),
+            client_secret=os.getenv("AIBTC_TWITTER_CLIENT_SECRET", ""),
+            access_token=os.getenv("AIBTC_TWITTER_ACCESS_TOKEN", ""),
+            access_secret=os.getenv("AIBTC_TWITTER_ACCESS_SECRET", ""),
         )
-        self.user_id = os.getenv("TWITTER_AUTOMATED_USER_ID")
-        self.whitelisted_authors = os.getenv("TWITTER_WHITELISTED", "").split(",")
+        self.user_id = os.getenv("AIBTC_TWITTER_AUTOMATED_USER_ID")
+        self.whitelisted_authors = os.getenv("AIBTC_TWITTER_WHITELISTED", "").split(",")
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention and generate response if needed."""
@@ -203,7 +203,7 @@ async def execute_twitter_job() -> None:
     """Execute the Twitter job to process mentions."""
     try:
         if not handler.user_id:
-            logger.error("TWITTER_AUTOMATED_USER_ID not set")
+            logger.error("AIBTC_TWITTER_AUTOMATED_USER_ID not set")
             return
 
         logger.info("Starting Twitter mention check")

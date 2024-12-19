@@ -279,7 +279,7 @@ class DatabaseResource(BaseResource):
         Required fields in cron_data:
         - profile_id: str
         - crew_id: int
-        - cron_enabled: bool
+        - AIBTC_CRON_ENABLED: bool
 
         Optional fields:
         - cron_interval: str (default: "0 * * * *")
@@ -304,7 +304,7 @@ class DatabaseResource(BaseResource):
             "PUT",
             "/crons/toggle",
             params={"id": cron_id},
-            json={"cron_enabled": enabled},
+            json={"AIBTC_CRON_ENABLED": enabled},
         )
         return CronResponse(**data)
 

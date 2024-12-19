@@ -15,14 +15,14 @@ logger = configure_logger(__name__)
 
 load_dotenv()
 
-crewai_verbose = os.getenv("CREWAI_VERBOSE", "false").lower() == "true"
+AIBTC_CREWAI_VERBOSE = os.getenv("AIBTC_CREWAI_VERBOSE", "false").lower() == "true"
 
 # Common configurations
 MANAGER_AGENT_CONFIG = {
     "role": "Task Manager",
     "goal": "Refine and manage tasks for the crew and assign them memory with a key to store their output.",
     "backstory": "You are responsible for optimizing the crew's workflow and ensuring tasks are well-structured.",
-    "verbose": crewai_verbose,
+    "verbose": AIBTC_CREWAI_VERBOSE,
     "memory": True,
     "tools": [],
 }
@@ -40,7 +40,7 @@ def create_agent(agent_data: Dict, tools_map: Dict) -> Agent:
         role=agent_data.get("role"),
         goal=agent_data.get("goal"),
         backstory=agent_data.get("backstory"),
-        verbose=crewai_verbose,
+        verbose=AIBTC_CREWAI_VERBOSE,
         memory=True,
         allow_delegation=False,
         tools=agent_tools,
@@ -76,7 +76,7 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
         manager_agent=create_manager_agent(),
         process=Process.sequential,
         memory=True,
-        verbose=crewai_verbose,
+        verbose=AIBTC_CREWAI_VERBOSE,
         **kwargs,
     )
 
@@ -288,7 +288,7 @@ async def execute_chat_stream(account_index: str, history: List, input_str: str)
         goal="You are responsible for interacting with the user and translating their query into an action.",
         backstory="You are trained to understand the user's query and provide the information they need with your tools, then analyzing the connection between the user's input and the result.",
         tools=tools_map.values(),
-        verbose=crewai_verbose,
+        verbose=AIBTC_CREWAI_VERBOSE,
         memory=False,
         allow_delegation=True,
     )

@@ -206,7 +206,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Global bot instance and settings
 _bot_app = None
-BOT_ENABLED = os.getenv("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
+BOT_ENABLED = os.getenv("AIBTC_TELEGRAM_BOT_ENABLED", "false").lower() == "true"
 
 
 async def get_bot():
@@ -216,7 +216,7 @@ async def get_bot():
 
     global _bot_app
     if _bot_app is None:
-        _bot_app = Application.builder().token(os.getenv("TELEGRAM_BOT_TOKEN")).build()
+        _bot_app = Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
         await _bot_app.initialize()
         await _bot_app.start()
     return _bot_app
@@ -262,7 +262,7 @@ async def start_application():
         return _bot_app
 
     # Create the Application and pass it your bot's token
-    _bot_app = Application.builder().token(os.getenv("TELEGRAM_BOT_TOKEN")).build()
+    _bot_app = Application.builder().token(os.getenv("AIBTC_TELEGRAM_BOT_TOKEN")).build()
 
     # Add command handlers
     _bot_app.add_handler(CommandHandler("start", start))

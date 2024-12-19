@@ -235,7 +235,7 @@ def test_cron_endpoints():
     cron_data = {
         "profile_id": "test_profile",
         "crew_id": test_crew_id,
-        "cron_enabled": True,
+        "AIBTC_CRON_ENABLED": True,
         "cron_interval": "0 * * * *",
         "cron_input": "Test input",
     }

@@ -27,17 +27,17 @@ class GetBitcoinData(BaseTool):
         Fetches Bitcoin data using the CoinMarketCap API.
 
         Required Environment Variables:
-            CMC_API_KEY: CoinMarketCap API key for authentication
+            AIBTC_CMC_API_KEY: CoinMarketCap API key for authentication
 
         Returns:
             str: A formatted string containing Bitcoin price, market cap, trading volume,
                 and percentage changes. Returns an error message if the API call fails.
         """
         # Get the API key from the environment variable
-        api_key = os.getenv("CMC_API_KEY")
+        api_key = os.getenv("AIBTC_CMC_API_KEY")
 
         if not api_key:
-            return "Error: API key not found. Please set the 'CMC_API_KEY' environment variable."
+            return "Error: API key not found. Please set the 'AIBTC_CMC_API_KEY' environment variable."
 
         # CoinMarketCap API URL and parameters
         url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"

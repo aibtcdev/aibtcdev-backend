@@ -11,14 +11,14 @@ from services.crews import execute_crew_stream
 logger = configure_logger(__name__)
 
 # Get the maximum number of concurrent cron tasks from environment variables
-CRON_MAX_CONCURRENT_TASKS = int(os.getenv("CRON_MAX_CONCURRENT_TASKS", 5))
+AIBTC_CRON_MAX_CONCURRENT_TASKS = int(os.getenv("AIBTC_CRON_MAX_CONCURRENT_TASKS", 5))
 
 
 async def execute_cron_job():
     # log the cron
     logger.info("Executing cron job")
     # Create a semaphore with the defined maximum concurrency
-    semaphore = asyncio.Semaphore(CRON_MAX_CONCURRENT_TASKS)
+    semaphore = asyncio.Semaphore(AIBTC_CRON_MAX_CONCURRENT_TASKS)
 
     # Get all crons
     crons = get_enabled_crons_expanded()

@@ -9,7 +9,7 @@ load_dotenv()
 class HiroApi:
 
     def __init__(self):
-        self.base_url = os.getenv("HIRO_API_URL", "https://api.hiro.so")
+        self.base_url = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make a GET request to the Hiro API."""

@@ -9,7 +9,7 @@ load_dotenv()
 class AlexApi:
 
     def __init__(self):
-        self.base_url = os.getenv("ALEX_BASE_URL", "https://api.alexgo.io/")
+        self.base_url = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
         self.limits = 500
 
     def _get(self, endpoint: str, params: dict = {}):
