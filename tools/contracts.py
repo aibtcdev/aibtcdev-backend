@@ -119,3 +119,41 @@ class ContractSIP10InfoTool(BaseTool):
             "get-token-info.ts",
             contract_address,
         )
+
+
+class ContractDAOExecutorDeployToolSchema(BaseModel):
+    """Input schema for ContractDAOExecutorDeployTool."""
+
+    dao_name: str = Field(..., description="Name of the DAO.")
+    contract_id: str = Field(..., description="Contract ID for the DAO.")
+
+
+class ContractDAOExecutorDeployTool(BaseTool):
+    name: str = "Deploy a new DAO executor contract."
+    description: str = (
+        "Deploy a new DAO executor contract with specified name and contract ID."
+    )
+    args_schema: Type[BaseModel] = ContractDAOExecutorDeployToolSchema
+    account_index: str = "0"
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(
+        self,
+        dao_name: str,
+        contract_id: str,
+    ) -> Dict[str, Union[str, bool, None]]:
+        return BunScriptRunner.bun_run(
+            self.account_index,
+            "stacks-dao",
+            "cli.ts",
+            "executor",
+            "deploy",
+            "-n",
+            dao_name,
+            "-c",
+            contract_id,
+            "-d",
+        )

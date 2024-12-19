@@ -1,6 +1,7 @@
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .contracts import (
+    ContractDAOExecutorDeployTool,
     ContractSIP10DeployTool,
     ContractSIP10InfoTool,
     ContractSIP10SendTool,
@@ -53,6 +54,7 @@ def initialize_tools(account_index: str = "0"):
         "get_btc_data": GetBitcoinData(),
         "image_generation": DallETool(),
         "deploy_bonding_curve": STXCityBondingTool(account_index),
+        "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(account_index),
     }
 
 
