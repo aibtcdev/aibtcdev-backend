@@ -1,19 +1,21 @@
-from typing import Type
 import requests
 from crewai_tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Type
 
 
 class FetchContractCodeSchema(BaseModel):
     """Input schema for FetchContractCodeTool."""
+
     user_input: str = Field(
         ...,
-        description="Contract identifier in the format 'contract_address.contract_name'"
+        description="Contract identifier in the format 'contract_address.contract_name'",
     )
 
 
 class FetchContractCodeTool(BaseTool):
     """Tool for fetching contract code directly using user input."""
+
     name: str = "FetchContractCodeTool"
     description: str = "Fetches the contract code from the given user input"
     args_schema: Type[BaseModel] = FetchContractCodeSchema
@@ -32,7 +34,9 @@ class FetchContractCodeTool(BaseTool):
         try:
             contract_address, contract_name = user_input.split(".")
         except ValueError:
-            return "Invalid input format. Use the format 'contract_address.contract_name'."
+            return (
+                "Invalid input format. Use the format 'contract_address.contract_name'."
+            )
 
         source_url = f"https://api.hiro.so/v2/contracts/source/{contract_address}/{contract_name}"
 

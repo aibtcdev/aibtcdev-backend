@@ -1,21 +1,24 @@
-from typing import Type
 from crewai_tools import BaseTool
 from lib.velar import VelarApi
 from pydantic import BaseModel, Field
+from typing import Type
 
 
 class VelarPriceHistorySchema(BaseModel):
     """Input schema for VelarGetPriceHistory."""
+
     token_symbol: str = Field(
-        ...,
-        description="The symbol of the token to get price history for."
+        ..., description="The symbol of the token to get price history for."
     )
 
 
 class VelarGetPriceHistory(BaseTool):
     """Tool for fetching token price history from Velar."""
+
     name: str = "Velar: Get Token Price History"
-    description: str = "Retrieve historical price data for a specified cryptocurrency symbol."
+    description: str = (
+        "Retrieve historical price data for a specified cryptocurrency symbol."
+    )
     args_schema: Type[BaseModel] = VelarPriceHistorySchema
 
     def _run(self, token_symbol: str) -> str:
@@ -37,11 +40,13 @@ class VelarGetTokensSchema(BaseModel):
     """Input schema for VelarGetTokens.
     This tool doesn't require any input parameters but we still define the schema for consistency.
     """
+
     pass
 
 
 class VelarGetTokens(BaseTool):
     """Tool for fetching available tokens from Velar."""
+
     name: str = "Velar: Get All Available Token Info"
     description: str = "Retrieve a list of tokens from the Velar API."
     args_schema: Type[BaseModel] = VelarGetTokensSchema
