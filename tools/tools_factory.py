@@ -16,6 +16,16 @@ from .transactions import (
     StacksTransactionByAddressTool,
 )
 from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
+from .dao_tools import (
+    ExecutorDeployTool,
+    TreasuryDeployTool,
+    TreasuryDepositTool,
+    BankAccountDeployTool,
+    MessagingDeployTool,
+    MessagingSendTool,
+    PaymentsDeployTool,
+    PaymentsAddResourceTool,
+)
 
 
 def initialize_tools(account_index: str = "0"):
@@ -24,6 +34,7 @@ def initialize_tools(account_index: str = "0"):
     """
     # this will be exposed by an endpoint for the frontend to get the available tools
     return {
+        # Existing tools
         "alex_get_price_history": AlexGetPriceHistory(),
         "alex_get_swap_info": AlexGetSwapInfo(),
         "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
@@ -46,6 +57,16 @@ def initialize_tools(account_index: str = "0"):
         "contract_sip10_info": ContractSIP10InfoTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
+        
+        # DAO tools
+        "dao_executor_deploy": ExecutorDeployTool(account_index),
+        "dao_treasury_deploy": TreasuryDeployTool(account_index),
+        "dao_treasury_deposit": TreasuryDepositTool(account_index),
+        "dao_bank_deploy": BankAccountDeployTool(account_index),
+        "dao_messaging_deploy": MessagingDeployTool(account_index),
+        "dao_messaging_send": MessagingSendTool(account_index),
+        "dao_payments_deploy": PaymentsDeployTool(account_index),
+        "dao_payments_add_resource": PaymentsAddResourceTool(account_index),
     }
 
 
