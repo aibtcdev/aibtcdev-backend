@@ -16,15 +16,11 @@ from .transactions import (
     StacksTransactionByAddressTool,
 )
 from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
-from .dao_tools import (
+from .dao import (
     ExecutorDeployTool,
     TreasuryDeployTool,
     TreasuryDepositTool,
-    BankAccountDeployTool,
-    MessagingDeployTool,
-    MessagingSendTool,
-    PaymentsDeployTool,
-    PaymentsAddResourceTool,
+    TreasuryWithdrawTool
 )
 
 
@@ -62,11 +58,7 @@ def initialize_tools(account_index: str = "0"):
         "dao_executor_deploy": ExecutorDeployTool(account_index),
         "dao_treasury_deploy": TreasuryDeployTool(account_index),
         "dao_treasury_deposit": TreasuryDepositTool(account_index),
-        "dao_bank_deploy": BankAccountDeployTool(account_index),
-        "dao_messaging_deploy": MessagingDeployTool(account_index),
-        "dao_messaging_send": MessagingSendTool(account_index),
-        "dao_payments_deploy": PaymentsDeployTool(account_index),
-        "dao_payments_add_resource": PaymentsAddResourceTool(account_index),
+        "dao_treasury_withdraw": TreasuryWithdrawTool(account_index),
     }
 
 

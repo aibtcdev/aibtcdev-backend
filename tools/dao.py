@@ -105,178 +105,32 @@ class TreasuryDepositTool(BaseTool):
             "treasury",
             "deposit-stx",
             "-t", treasury_id,
+            "-a", str(amount),
+        )
+
+
+class TreasuryWithdrawTool(BaseTool):
+    name: str = "Withdraw STX from DAO treasury"
+    description: str = "Withdraw STX tokens from the DAO treasury"
+    args_schema: Type[BaseModel] = TreasuryWithdrawToolSchema
+    account_index: Optional[str] = None
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(
+        self,
+        treasury_id: str,
+        amount: int,
+        recipient: str,
+    ) -> str:
+        return BunScriptRunner.bun_run(
+            self.account_index,
+            "dao",
+            "treasury",
+            "withdraw-stx",
+            "-t", treasury_id,
             "-a", str(amount)
-        )
-
-
-class BankAccountDeployToolSchema(BaseModel):
-    """Input schema for BankAccountDeployTool."""
-    
-    name: str = Field(..., description="Name of the DAO")
-    dao_contract_id: str = Field(..., description="Contract ID of the executor DAO")
-    withdrawal_period: Optional[int] = Field(
-        default=144, description="Default withdrawal period in blocks"
-    )
-    withdrawal_amount: Optional[int] = Field(
-        default=10000000, description="Default withdrawal amount in microSTX"
-    )
-
-
-class BankAccountDeployTool(BaseTool):
-    name: str = "Deploy a new DAO bank account contract"
-    description: str = "Deploy a new bank account contract for managing DAO funds"
-    args_schema: Type[BaseModel] = BankAccountDeployToolSchema
-    account_index: Optional[str] = None
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        name: str,
-        dao_contract_id: str,
-        withdrawal_period: int = 144,
-        withdrawal_amount: int = 10000000,
-    ) -> str:
-        return BunScriptRunner.bun_run(
-            self.account_index,
-            "dao",
-            "bank",
-            "deploy",
-            "-n", name,
-            "-d", dao_contract_id,
-            "-p", str(withdrawal_period),
-            "-a", str(withdrawal_amount)
-        )
-
-
-class MessagingDeployToolSchema(BaseModel):
-    """Input schema for MessagingDeployTool."""
-    
-    name: str = Field(..., description="Name of the DAO")
-
-
-class MessagingDeployTool(BaseTool):
-    name: str = "Deploy a new DAO messaging contract"
-    description: str = "Deploy a new messaging contract for DAO communications"
-    args_schema: Type[BaseModel] = MessagingDeployToolSchema
-    account_index: Optional[str] = None
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        name: str,
-    ) -> str:
-        return BunScriptRunner.bun_run(
-            self.account_index,
-            "dao",
-            "messaging",
-            "deploy",
-            "-n", name
-        )
-
-
-class MessagingSendToolSchema(BaseModel):
-    """Input schema for MessagingSendTool."""
-    
-    contract_id: str = Field(..., description="Contract ID of the messaging contract")
-    message: str = Field(..., description="Message to send")
-
-
-class MessagingSendTool(BaseTool):
-    name: str = "Send message through DAO messaging contract"
-    description: str = "Send a message through the DAO messaging system"
-    args_schema: Type[BaseModel] = MessagingSendToolSchema
-    account_index: Optional[str] = None
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        contract_id: str,
-        message: str,
-    ) -> str:
-        return BunScriptRunner.bun_run(
-            self.account_index,
-            "dao",
-            "messaging",
-            "send",
-            "-c", contract_id,
-            "-m", message
-        )
-
-
-class PaymentsDeployToolSchema(BaseModel):
-    """Input schema for PaymentsDeployTool."""
-    
-    name: str = Field(..., description="Name of the DAO")
-    dao_contract_id: str = Field(..., description="Contract ID of the executor DAO")
-
-
-class PaymentsDeployTool(BaseTool):
-    name: str = "Deploy a new DAO payments contract"
-    description: str = "Deploy a new payments contract for handling DAO payments"
-    args_schema: Type[BaseModel] = PaymentsDeployToolSchema
-    account_index: Optional[str] = None
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        name: str,
-        dao_contract_id: str,
-    ) -> str:
-        return BunScriptRunner.bun_run(
-            self.account_index,
-            "dao",
-            "payments",
-            "deploy",
-            "-n", name,
-            "-d", dao_contract_id
-        )
-
-
-class PaymentsAddResourceToolSchema(BaseModel):
-    """Input schema for PaymentsAddResourceTool."""
-    
-    contract_id: str = Field(..., description="Contract ID of the payments contract")
-    name: str = Field(..., description="Name of the resource")
-    description: str = Field(..., description="Description of the resource")
-    price: int = Field(..., description="Price in microSTX")
-
-
-class PaymentsAddResourceTool(BaseTool):
-    name: str = "Add resource to DAO payments contract"
-    description: str = "Add a new resource to the DAO payments system"
-    args_schema: Type[BaseModel] = PaymentsAddResourceToolSchema
-    account_index: Optional[str] = None
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        contract_id: str,
-        name: str,
-        description: str,
-        price: int,
-    ) -> str:
-        return BunScriptRunner.bun_run(
-            self.account_index,
-            "dao",
-            "payments",
-            "add-resource",
-            "-c", contract_id,
-            "-n", name,
-            "-d", description,
-            "-p", str(price)
+            "-r", recipient
         )
