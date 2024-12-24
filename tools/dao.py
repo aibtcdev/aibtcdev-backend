@@ -36,7 +36,8 @@ class ExecutorDeployTool(BaseTool):
         deployer_flag = "-d" if include_deployer else ""
         return BunScriptRunner.bun_run(
             self.account_index,
-            "dao",
+            "stacks-dao",
+            "cli.ts",
             "executor",
             "deploy",
             "-n", name,
@@ -69,7 +70,8 @@ class TreasuryDeployTool(BaseTool):
     ) -> str:
         return BunScriptRunner.bun_run(
             self.account_index,
-            "dao",
+            "stacks-dao",
+            "cli.ts",
             "treasury",
             "deploy",
             "-n", name,
@@ -101,7 +103,8 @@ class TreasuryDepositTool(BaseTool):
     ) -> str:
         return BunScriptRunner.bun_run(
             self.account_index,
-            "dao",
+            "stacks-dao",
+            "cli.ts",
             "treasury",
             "deposit-stx",
             "-t", treasury_id,
@@ -127,7 +130,8 @@ class TreasuryWithdrawTool(BaseTool):
     ) -> str:
         return BunScriptRunner.bun_run(
             self.account_index,
-            "dao",
+            "stacks-dao",
+            "cli.ts",
             "treasury",
             "withdraw-stx",
             "-t", treasury_id,
