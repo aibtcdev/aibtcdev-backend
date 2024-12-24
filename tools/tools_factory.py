@@ -16,6 +16,12 @@ from .transactions import (
     StacksTransactionByAddressTool,
 )
 from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
+from .dao import (
+    ExecutorDeployTool,
+    TreasuryDeployTool,
+    TreasuryDepositTool,
+    TreasuryWithdrawTool
+)
 
 
 def initialize_tools(account_index: str = "0"):
@@ -24,6 +30,7 @@ def initialize_tools(account_index: str = "0"):
     """
     # this will be exposed by an endpoint for the frontend to get the available tools
     return {
+        # Existing tools
         "alex_get_price_history": AlexGetPriceHistory(),
         "alex_get_swap_info": AlexGetSwapInfo(),
         "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
@@ -46,6 +53,12 @@ def initialize_tools(account_index: str = "0"):
         "contract_sip10_info": ContractSIP10InfoTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
+        
+        # DAO tools
+        "dao_executor_deploy": ExecutorDeployTool(account_index),
+        "dao_treasury_deploy": TreasuryDeployTool(account_index),
+        "dao_treasury_deposit": TreasuryDepositTool(account_index),
+        "dao_treasury_withdraw": TreasuryWithdrawTool(account_index),
     }
 
 
