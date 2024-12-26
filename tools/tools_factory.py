@@ -17,7 +17,10 @@ from .transactions import (
 )
 from .contracts import ContractSIP10DeployTool, ContractSIP10SendTool, ContractSIP10InfoTool
 from .dao import (
+    ExecutorListTool,
     ExecutorDeployTool,
+    ExecutorSetExtensionTool,
+    TreasuryListTool,
     TreasuryDeployTool,
     TreasuryDepositTool,
     TreasuryWithdrawTool
@@ -27,8 +30,13 @@ from .dao import (
 def initialize_tools(account_index: str = "0"):
     """
     Initialize and return a dictionary of available tools.
+    
+    Args:
+        account_index (str): The account index to use for tools that require it.
+        
+    Returns:
+        dict: A dictionary mapping tool names to tool instances.
     """
-    # this will be exposed by an endpoint for the frontend to get the available tools
     return {
         # Existing tools
         "alex_get_price_history": AlexGetPriceHistory(),
@@ -54,8 +62,13 @@ def initialize_tools(account_index: str = "0"):
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
         
-        # DAO tools
+        # DAO Executor tools
+        "dao_executor_list": ExecutorListTool(account_index),
         "dao_executor_deploy": ExecutorDeployTool(account_index),
+        "dao_executor_set_extension": ExecutorSetExtensionTool(account_index),
+        
+        # DAO Treasury tools
+        "dao_treasury_list": TreasuryListTool(account_index),
         "dao_treasury_deploy": TreasuryDeployTool(account_index),
         "dao_treasury_deposit": TreasuryDepositTool(account_index),
         "dao_treasury_withdraw": TreasuryWithdrawTool(account_index),
