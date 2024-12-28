@@ -5,6 +5,7 @@ from .contracts import (
     ContractSIP10DeployTool,
     ContractSIP10InfoTool,
     ContractSIP10SendTool,
+    ContractTokenBondingDeployTool,
 )
 from .fetch_contract_code import FetchContractCodeTool
 from .get_btc_data import GetBitcoinData
@@ -13,14 +14,19 @@ from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
-from .stxcity import STXCityBondingTool
 from .transactions import (
     StacksTransactionByAddressTool,
     StacksTransactionStatusTool,
     StacksTransactionTool,
 )
 from .velar import VelarGetPriceHistory, VelarGetTokens
-from .wallet import WalletGetMyAddress, WalletGetMyBalance, WalletSendSTX
+from .wallet import (
+    WalletFundMyWalletFaucet,
+    WalletGetMyAddress,
+    WalletGetMyBalance,
+    WalletGetMyTransactions,
+    WalletSendSTX,
+)
 from crewai_tools import DallETool, SerperDevTool
 
 
@@ -43,18 +49,20 @@ def initialize_tools(account_index: str = "0"):
         "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(account_index),
         "wallet_get_my_address": WalletGetMyAddress(account_index),
+        "wallet_fund_my_wallet_faucet": WalletFundMyWalletFaucet(account_index),
         "wallet_send_stx": WalletSendSTX(account_index),
+        "wallet_get_my_transactions": WalletGetMyTransactions(account_index),
         "stacks_transaction_status": StacksTransactionStatusTool(),
         "stacks_transaction": StacksTransactionTool(),
         "stacks_transaction_by_address": StacksTransactionByAddressTool(),
-        "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
+        # "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
         "contract_sip10_send": ContractSIP10SendTool(account_index),
         "contract_sip10_info": ContractSIP10InfoTool(account_index),
+        "contract_token_bonding_deploy": ContractTokenBondingDeployTool(account_index),
+        # "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
         "image_generation": DallETool(),
-        "deploy_bonding_curve": STXCityBondingTool(account_index),
-        "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(account_index),
     }
 
 

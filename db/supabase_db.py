@@ -1,4 +1,7 @@
+import os
+import time
 from .database import Database
+from lib.logger import configure_logger
 from lib.models import (
     ProfileResponse,
     VerificationResponse,
@@ -9,12 +12,51 @@ from lib.models import (
 from supabase import Client
 from typing import Any, Dict, List, Optional
 
+logger = configure_logger(__name__)
+
 
 class SupabaseDatabase(Database):
+    # Upload configuration
+    MAX_UPLOAD_RETRIES = 3
+    RETRY_DELAY_SECONDS = 1
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client, **kwargs):
         super().__init__()
         self.client = client
+        self.bucket_name = kwargs.get("bucket_name")
+
+    def add_dao(
+        self,
+        name: str,
+        symbol: str,
+        decimals: int,
+        description: str,
+        token_supply: str,
+    ) -> Dict[str, Any]:
+        """Add a new dao record."""
+        data = {
+            "name": name,
+            "symbol": symbol,
+            "decimals": decimals,
+            "description": description,
+            "token_supply": token_supply,
+        }
+        response = self.client.table("daos").insert(data).execute()
+        if not response.data:
+            raise Exception("Failed to create dao record")
+        return response.data[0]  # Return the first (and should be only) inserted record
+
+    def update_dao(self, dao_id: str, data: dict) -> bool:
+        response = self.client.table("daos").update(data).eq("id", dao_id).execute()
+        return bool(response.data)
+
+    def get_daos(self) -> List[Dict[str, Any]]:
+        response = self.client.table("daos").select("*").execute()
+        return response.data if response.data else []
+
+    def get_dao(self, dao_id: str) -> Dict[str, Any]:
+        response = self.client.table("daos").select("*").eq("id", dao_id).execute()
+        return response.data if response.data else {}
 
     def get_detailed_conversation(self, conversation_id: str) -> Dict[str, Any]:
         """Get detailed conversation data with associated jobs."""
@@ -261,3 +303,68 @@ class SupabaseDatabase(Database):
             username = email.split("@")[0]
             return username.upper()
         return email.upper()
+
+    def upload_file(self, file_path: str, file: bytes) -> str:
+        """Upload a file to Supabase storage.
+
+        Args:
+            file_path: The path where the file will be stored in the bucket
+            file: The file content in bytes
+
+        Returns:
+            str: The public URL of the uploaded file
+
+        Raises:
+            ValueError: If file_path is empty or file is None
+            StorageError: If upload fails or public URL cannot be generated
+            Exception: For other unexpected errors
+        """
+        if not file_path or not file:
+            raise ValueError("File path and file content are required")
+
+        if not self.bucket_name:
+            raise ValueError("Storage bucket name is not configured")
+
+        def attempt_upload(attempt: int) -> Optional[str]:
+            try:
+                logger.debug(
+                    f"Attempting file upload to {file_path} (attempt {attempt})"
+                )
+                upload_response = self.client.storage.from_(self.bucket_name).upload(
+                    file_path, file, {"upsert": "true"}  # Override if file exists
+                )
+
+                if not upload_response:
+                    raise Exception("Upload failed - no response received")
+
+                logger.debug(f"Upload successful: {upload_response}")
+
+                # Get public URL
+                public_url = self.client.storage.from_(self.bucket_name).get_public_url(
+                    file_path
+                )
+                if not public_url:
+                    raise Exception("Failed to generate public URL")
+
+                return public_url
+
+            except Exception as e:
+                logger.error(f"Upload attempt {attempt} failed: {str(e)}")
+                if attempt >= self.MAX_UPLOAD_RETRIES:
+                    raise
+                time.sleep(self.RETRY_DELAY_SECONDS * attempt)  # Exponential backoff
+                return None
+
+        # Attempt upload with retries
+        last_error = None
+        for attempt in range(1, self.MAX_UPLOAD_RETRIES + 1):
+            try:
+                if result := attempt_upload(attempt):
+                    return result
+            except Exception as e:
+                last_error = e
+
+        # If we get here, all retries failed
+        raise Exception(
+            f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
+        )

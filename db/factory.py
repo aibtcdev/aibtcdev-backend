@@ -19,7 +19,9 @@ def get_database() -> Database:
         url = os.getenv("AIBTC_SUPABASE_URL")
         service_key = os.getenv("AIBTC_SUPABASE_SERVICE_KEY")
         supabase: Client = create_client(url, service_key)
-        return SupabaseDatabase(supabase)
+        return SupabaseDatabase(
+            supabase, bucket_name=os.getenv("AIBTC_SUPABASE_BUCKET_NAME")
+        )
     services_url = os.getenv("AIBTC_SERVICES_BASE_URL")
     services_shared_key = os.getenv("AIBTC_SERVICES_SHARED_KEY")
     services_client: ServicesClient = ServicesClient(

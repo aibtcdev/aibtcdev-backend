@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 class CloudflareDatabase(Database):
 
-    def __init__(self, client: ServicesClient):
+    def __init__(self, client: ServicesClient, **kwargs):
         super().__init__()
         self.client = client
 
@@ -135,3 +135,6 @@ class CloudflareDatabase(Database):
     def get_enabled_crons(self) -> List[Dict[str, Any]]:
         """Get all enabled cron jobs."""
         return self.client.database.get_enabled_crons().crons
+
+    def upload_file(self, file_path: str, file: bytes) -> str:
+        pass

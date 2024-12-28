@@ -69,6 +69,30 @@ class WalletGetMyAddress(BaseTool):
         )
 
 
+class WalletFundMyWalletFaucet(BaseTool):
+    """Tool for funding wallet when on testnet."""
+
+    name: str = "Fund my wallet"
+    description: str = "Fund the wallet when on testnet."
+    args_schema: Type[BaseModel] = WalletGetAddressSchema
+    account_index: str = "0"
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(self) -> Dict[str, Union[str, bool, None]]:
+        """
+        Fund the wallet when on testnet.
+
+        Returns:
+            Dict[str, Union[str, bool, None]]: A dictionary containing the funding result.
+        """
+        return BunScriptRunner.bun_run(
+            self.account_index, "stacks-wallet", "testnet-stx-faucet-me.ts"
+        )
+
+
 class WalletSendSTXSchema(BaseModel):
     """Input schema for WalletSendSTX."""
 
@@ -111,4 +135,38 @@ class WalletSendSTX(BaseTool):
             str(amount),
             str(fee),
             memo or "",
+        )
+
+
+class WalletGetTransactionsSchema(BaseModel):
+    """Input schema for WalletGetMyTransactions.
+    This tool doesn't require any input parameters but we still define the schema for consistency.
+    """
+
+    pass
+
+
+class WalletGetMyTransactions(BaseTool):
+    """Tool for fetching wallet transaction history."""
+
+    name: str = "Get my wallet transactions"
+    description: str = (
+        "Get the transaction history for the wallet including STX transfers and contract calls."
+    )
+    args_schema: Type[BaseModel] = WalletGetTransactionsSchema
+    account_index: str = "0"
+
+    def __init__(self, account_index: str, **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _run(self) -> Dict[str, Union[str, bool, None]]:
+        """
+        Get the wallet's transaction history.
+
+        Returns:
+            Dict[str, Union[str, bool, None]]: A dictionary containing the wallet's transaction history.
+        """
+        return BunScriptRunner.bun_run(
+            self.account_index, "stacks-wallet", "get-my-wallet-transactions.ts"
         )

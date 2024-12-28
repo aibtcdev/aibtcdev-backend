@@ -15,6 +15,34 @@ class Database(ABC):
         pass
 
     @abstractmethod
+    def get_daos(
+        self,
+    ) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def get_dao(
+        self,
+        dao_id: str,
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def add_dao(
+        self,
+        name: str,
+        symbol: str,
+        decimals: int,
+        description: str,
+        token_supply: str,
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def update_dao(self, dao_id: str, data: dict) -> bool:
+        pass
+
+    @abstractmethod
     def add_job(
         self,
         profile_id: str,
@@ -119,4 +147,8 @@ class Database(ABC):
     def add_twitter_log(
         self, tweet_id: str, status: str, message: Optional[str] = None
     ) -> XBotLog:
+        pass
+
+    @abstractmethod
+    def upload_file(self, file_path: str, file: bytes) -> str:
         pass

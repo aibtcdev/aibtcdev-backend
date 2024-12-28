@@ -138,3 +138,26 @@ If you encounter rate limit issues with OpenAI:
 - TPM (Tokens Per Minute) limits vary by tier:
   - Tier 1: 200,000 TPM
   - Tier 2: 2,000,000 TPM
+
+
+## Supabase
+
+```sql
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()
+```
+
+
+### NAME
+```sql
+handle_new_user
+```
+
+```sql
+BEGIN
+  INSERT INTO public.profiles (id, username, email)
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'user_name', NEW.email);
+  RETURN NEW;
+END;
+```
+
+Security needs to be definer
