@@ -1,11 +1,11 @@
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .contracts import (
+    ContractCollectiveDeployTool,
     ContractDAOExecutorDeployTool,
     ContractSIP10DeployTool,
     ContractSIP10InfoTool,
     ContractSIP10SendTool,
-    ContractTokenBondingDeployTool,
 )
 from .fetch_contract_code import FetchContractCodeTool
 from .get_btc_data import GetBitcoinData
@@ -58,7 +58,7 @@ def initialize_tools(account_index: str = "0"):
         # "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
         "contract_sip10_send": ContractSIP10SendTool(account_index),
         "contract_sip10_info": ContractSIP10InfoTool(account_index),
-        "contract_token_bonding_deploy": ContractTokenBondingDeployTool(account_index),
+        "contract_collective_deploy": ContractCollectiveDeployTool(account_index),
         # "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),

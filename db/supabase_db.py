@@ -25,39 +25,6 @@ class SupabaseDatabase(Database):
         self.client = client
         self.bucket_name = kwargs.get("bucket_name")
 
-    def add_dao(
-        self,
-        name: str,
-        symbol: str,
-        decimals: int,
-        description: str,
-        token_supply: str,
-    ) -> Dict[str, Any]:
-        """Add a new dao record."""
-        data = {
-            "name": name,
-            "symbol": symbol,
-            "decimals": decimals,
-            "description": description,
-            "token_supply": token_supply,
-        }
-        response = self.client.table("daos").insert(data).execute()
-        if not response.data:
-            raise Exception("Failed to create dao record")
-        return response.data[0]  # Return the first (and should be only) inserted record
-
-    def update_dao(self, dao_id: str, data: dict) -> bool:
-        response = self.client.table("daos").update(data).eq("id", dao_id).execute()
-        return bool(response.data)
-
-    def get_daos(self) -> List[Dict[str, Any]]:
-        response = self.client.table("daos").select("*").execute()
-        return response.data if response.data else []
-
-    def get_dao(self, dao_id: str) -> Dict[str, Any]:
-        response = self.client.table("daos").select("*").eq("id", dao_id).execute()
-        return response.data if response.data else {}
-
     def get_detailed_conversation(self, conversation_id: str) -> Dict[str, Any]:
         """Get detailed conversation data with associated jobs."""
         jobs_response = (
@@ -368,3 +335,134 @@ class SupabaseDatabase(Database):
         raise Exception(
             f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
         )
+
+    def get_collectives(self) -> List[Dict[str, Any]]:
+        """Get all collectives."""
+        response = self.client.table("collectives").select("*").execute()
+        return response.data if response.data else []
+
+    def get_collective(self, collective_id: str) -> Dict[str, Any]:
+        """Get a specific collective by ID."""
+        response = (
+            self.client.table("collectives")
+            .select("*")
+            .eq("id", collective_id)
+            .execute()
+        )
+        if not response.data:
+            raise Exception("Collective not found")
+        return response.data[0]
+
+    def update_collective(self, collective_id: str, data: dict) -> bool:
+        """Update a collective by ID."""
+        response = (
+            self.client.table("collectives")
+            .update(data)
+            .eq("id", collective_id)
+            .execute()
+        )
+        return bool(response.data)
+
+    def add_collective(
+        self, name: str, mission: str, description: str
+    ) -> Dict[str, Any]:
+        """Add a new collective."""
+        data = {
+            "name": name,
+            "mission": mission,
+            "description": description,
+        }
+        response = self.client.table("collectives").insert(data).execute()
+        if not response.data:
+            raise Exception("Failed to create collective record")
+        return response.data[0]
+
+    def get_capabilities(self) -> List[Dict[str, Any]]:
+        """Get all capabilities."""
+        response = self.client.table("capabilities").select("*").execute()
+        return response.data if response.data else []
+
+    def get_capability(self, capability_id: str) -> Dict[str, Any]:
+        """Get a specific capability by ID."""
+        response = (
+            self.client.table("capabilities")
+            .select("*")
+            .eq("id", capability_id)
+            .execute()
+        )
+        if not response.data:
+            raise Exception("capability not found")
+        return response.data[0]
+
+    def add_capability(
+        self,
+        collective_id: str,
+        type: str,
+        contract_principal: str,
+        tx_id: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        """Add a new capabilities."""
+        data = {
+            "collective_id": collective_id,
+            "type": type,
+            "contract_principal": contract_principal,
+            "tx_id": tx_id,
+            "status": status,
+        }
+        response = self.client.table("capabilities").insert(data).execute()
+        if not response.data:
+            raise Exception("Failed to create capabilities record")
+        return response.data[0]
+
+    def update_capability(self, capability_id: str, data: dict) -> bool:
+        """Update a capabilities by ID."""
+        response = (
+            self.client.table("capabilities")
+            .update(data)
+            .eq("id", capability_id)
+            .execute()
+        )
+        return bool(response.data)
+
+    def get_tokens(self) -> List[Dict[str, Any]]:
+        """Get all tokens."""
+        response = self.client.table("tokens").select("*").execute()
+        return response.data if response.data else []
+
+    def get_token(self, token_id: str) -> Dict[str, Any]:
+        """Get a specific token by ID."""
+        response = self.client.table("tokens").select("*").eq("id", token_id).execute()
+        if not response.data:
+            raise Exception("Token not found")
+        return response.data[0]
+
+    def add_token(
+        self,
+        name: str,
+        symbol: str,
+        decimals: int,
+        description: str,
+        max_supply: str,
+        image_url: Optional[str] = None,
+        uri: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add a new token."""
+        data = {
+            "name": name,
+            "symbol": symbol,
+            "decimals": decimals,
+            "description": description,
+            "max_supply": max_supply,
+            "image_url": image_url,
+            "uri": uri,
+        }
+        response = self.client.table("tokens").insert(data).execute()
+        if not response.data:
+            raise Exception("Failed to create token record")
+        return response.data[0]
+
+    def update_token(self, token_id: str, data: dict) -> bool:
+        """Update a token by ID."""
+        response = self.client.table("tokens").update(data).eq("id", token_id).execute()
+        return bool(response.data)

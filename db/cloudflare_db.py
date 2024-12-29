@@ -138,3 +138,171 @@ class CloudflareDatabase(Database):
 
     def upload_file(self, file_path: str, file: bytes) -> str:
         pass
+
+    def get_collectives(self) -> List[Dict[str, Any]]:
+        """Mock implementation to get all collectives."""
+        return [
+            {
+                "id": "mock-collective-1",
+                "name": "Mock Collective 1",
+                "mission": "Mock Mission 1",
+                "description": "Mock Description 1",
+            },
+            {
+                "id": "mock-collective-2",
+                "name": "Mock Collective 2",
+                "mission": "Mock Mission 2",
+                "description": "Mock Description 2",
+            },
+        ]
+
+    def get_collective(self, collective_id: str) -> Dict[str, Any]:
+        """Mock implementation to get a specific collective by ID."""
+        return {
+            "id": collective_id,
+            "name": f"Mock Collective {collective_id}",
+            "mission": f"Mock Mission for {collective_id}",
+            "description": f"Mock Description for {collective_id}",
+        }
+
+    def update_collective(self, collective_id: str, data: dict) -> bool:
+        """Mock implementation to update a collective by ID."""
+        return True
+
+    def add_collective(
+        self, name: str, mission: str, description: str
+    ) -> Dict[str, Any]:
+        """Mock implementation to add a new collective."""
+        return {
+            "id": "new-mock-collective",
+            "name": name,
+            "mission": mission,
+            "description": description,
+        }
+
+    def get_compatabilities(self) -> List[Dict[str, Any]]:
+        """Mock implementation to get all compatabilities."""
+        return [
+            {
+                "id": "mock-compat-1",
+                "collective_id": "mock-collective-1",
+                "type": "mock-type",
+                "contract_principal": "mock-principal-1",
+                "tx_id": "mock-tx-1",
+                "is_deployed": True,
+                "status": "active",
+            },
+            {
+                "id": "mock-compat-2",
+                "collective_id": "mock-collective-2",
+                "type": "mock-type",
+                "contract_principal": "mock-principal-2",
+                "tx_id": "mock-tx-2",
+                "is_deployed": False,
+                "status": "pending",
+            },
+        ]
+
+    def get_compatability(self, compatability_id: str) -> Dict[str, Any]:
+        """Mock implementation to get a specific compatability by ID."""
+        return {
+            "id": compatability_id,
+            "collective_id": "mock-collective-1",
+            "type": "mock-type",
+            "contract_principal": f"mock-principal-{compatability_id}",
+            "tx_id": f"mock-tx-{compatability_id}",
+            "is_deployed": True,
+            "status": "active",
+        }
+
+    def add_compatability(
+        self,
+        collective_id: str,
+        type: str,
+        contract_principal: str,
+        tx_id: str,
+        is_deployed: bool,
+        status: str,
+    ) -> Dict[str, Any]:
+        """Mock implementation to add a new compatability."""
+        return {
+            "id": "new-mock-compat",
+            "collective_id": collective_id,
+            "type": type,
+            "contract_principal": contract_principal,
+            "tx_id": tx_id,
+            "is_deployed": is_deployed,
+            "status": status,
+        }
+
+    def update_compatability(
+        self,
+        compatability_id: str,
+        data: dict,
+    ) -> bool:
+        """Mock implementation to update a compatability by ID."""
+        return True
+
+    def get_tokens(self) -> List[Dict[str, Any]]:
+        """Mock implementation to get all tokens."""
+        return [
+            {
+                "id": "mock-token-1",
+                "name": "Mock Token 1",
+                "symbol": "MTK1",
+                "decimals": 6,
+                "description": "Mock Token Description 1",
+                "max_supply": "1000000",
+                "image_url": "https://mock.url/token1.png",
+                "uri": "https://mock.url/token1",
+            },
+            {
+                "id": "mock-token-2",
+                "name": "Mock Token 2",
+                "symbol": "MTK2",
+                "decimals": 8,
+                "description": "Mock Token Description 2",
+                "max_supply": "2000000",
+                "image_url": "https://mock.url/token2.png",
+                "uri": "https://mock.url/token2",
+            },
+        ]
+
+    def get_token(self, token_id: str) -> Dict[str, Any]:
+        """Mock implementation to get a specific token by ID."""
+        return {
+            "id": token_id,
+            "name": f"Mock Token {token_id}",
+            "symbol": f"MTK{token_id}",
+            "decimals": 6,
+            "description": f"Mock Token Description {token_id}",
+            "max_supply": "1000000",
+            "image_url": f"https://mock.url/token{token_id}.png",
+            "uri": f"https://mock.url/token{token_id}",
+        }
+
+    def add_token(
+        self,
+        name: str,
+        symbol: str,
+        decimals: int,
+        description: str,
+        max_supply: str,
+        image_url: Optional[str] = None,
+        uri: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Mock implementation to add a new token."""
+        return {
+            "id": "new-mock-token",
+            "name": name,
+            "symbol": symbol,
+            "decimals": decimals,
+            "description": description,
+            "max_supply": max_supply,
+            "image_url": image_url,
+            "uri": uri,
+        }
+
+    def update_token(self, token_id: str, data: dict) -> bool:
+        """Mock implementation to update a token by ID."""
+        return True

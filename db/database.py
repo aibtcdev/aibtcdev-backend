@@ -15,31 +15,76 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_daos(
-        self,
-    ) -> List[Dict[str, Any]]:
+    def get_collectives(self) -> List[Dict[str, Any]]:
         pass
 
     @abstractmethod
-    def get_dao(
-        self,
-        dao_id: str,
+    def get_collective(self, collective_id: str) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def update_collective(self, collective_id: str, data: dict) -> bool:
+        pass
+
+    @abstractmethod
+    def add_collective(
+        self, name: str, mission: str, description: str
     ) -> Dict[str, Any]:
         pass
 
     @abstractmethod
-    def add_dao(
+    def get_capabilities(self) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def get_capability(self, capability_id: str) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def add_capability(
+        self,
+        collective_id: str,
+        type: str,
+        contract_principal: str,
+        tx_id: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def update_capability(
+        self,
+        capability_id: str,
+        data: dict,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    def get_tokens(self) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def get_token(
+        self,
+        token_id: str,
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def add_token(
         self,
         name: str,
         symbol: str,
         decimals: int,
         description: str,
-        token_supply: str,
+        max_supply: str,
+        image_url: Optional[str] = None,
+        uri: Optional[str] = None,
     ) -> Dict[str, Any]:
         pass
 
     @abstractmethod
-    def update_dao(self, dao_id: str, data: dict) -> bool:
+    def update_token(self, token_id: str, data: dict) -> bool:
         pass
 
     @abstractmethod

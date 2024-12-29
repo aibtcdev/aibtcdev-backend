@@ -26,6 +26,18 @@ class TokenUpdateError(TokenServiceError):
     pass
 
 
+def generate_collective_dependencies(name: str, mission: str, description: str) -> Dict:
+    """Generate collective dependencies including database record and metadata.
+
+    Args:
+        name: Name of the collective
+        mission: Mission of the collective
+        description: Description of the collective
+    """
+
+    return db.add_collective(name, mission, description)
+
+
 def generate_token_dependencies(
     token_name: str,
     token_symbol: str,
@@ -52,12 +64,12 @@ def generate_token_dependencies(
     """
     try:
         # Create initial token record
-        new_token = db.add_dao(
+        new_token = db.add_token(
             name=token_name,
             symbol=token_symbol,
             description=token_description,
             decimals=token_decimals,
-            token_supply=token_max_supply,
+            max_supply=token_max_supply,
         )
         token_id = new_token["id"]
         logger.debug(f"Created token record with ID: {token_id}")
@@ -75,10 +87,9 @@ def generate_token_dependencies(
         asset_manager = TokenAssetManager(token_id)
         try:
             assets = asset_manager.generate_all_assets(metadata)
-            logger.debug(f"Generated assets: {assets}")
 
             # Update token record with asset URLs
-            if not db.update_dao(
+            if not db.update_token(
                 token_id,
                 {"uri": assets["metadata_url"], "image_url": assets["image_url"]},
             ):
@@ -113,3 +124,7 @@ def generate_token_dependencies(
             f"Unexpected error during token creation: {str(e)}",
             {"original_error": str(e)},
         ) from e
+
+
+def bind_token_to_collective(token_id: str, collective_id: str):
+    return db.update_token(token_id, {"collective_id": collective_id})
