@@ -397,12 +397,14 @@ class SupabaseDatabase(Database):
     def add_schedule(
         self,
         profile_id: str,
+        name: str,
         task: str,
         cron: str,
         enabled: bool,
     ) -> dict:
         data = {
             "profile_id": profile_id,
+            "name": name,
             "task": task,
             "cron": cron,
             "enabled": enabled,
