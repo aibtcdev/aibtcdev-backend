@@ -394,6 +394,22 @@ class SupabaseDatabase(Database):
             raise Exception("capability not found")
         return response.data[0]
 
+    def add_schedule(
+        self,
+        profile_id: str,
+        task: str,
+        cron: str,
+        enabled: bool,
+    ) -> dict:
+        data = {
+            "profile_id": profile_id,
+            "task": task,
+            "cron": cron,
+            "enabled": enabled,
+        }
+        response = self.client.table("schedules").insert(data).execute()
+        return response.data[0]
+
     def add_capability(
         self,
         collective_id: str,

@@ -6,6 +6,7 @@ from crewai.tasks.task_output import TaskOutput
 from db.factory import db
 from dotenv import load_dotenv
 from lib.logger import configure_logger
+from lib.models import ProfileInfo
 from textwrap import dedent
 from tools.tools_factory import get_agent_tools, initialize_tools
 from typing import Any, Dict, List, Tuple, Union
@@ -129,9 +130,9 @@ def extract_filtered_content(history: List) -> str:
     return "\n".join(filtered_content)
 
 
-def execute_crew(account_index: str, crew_id: int, input_str: str) -> str:
+def execute_crew(profile: ProfileInfo, crew_id: int, input_str: str) -> str:
     """Execute a crew synchronously."""
-    tools_map = initialize_tools(account_index)
+    tools_map = initialize_tools(profile)
     agents_data, tasks_data = fetch_crew_data(crew_id)
 
     agents = build_agents_dict(agents_data, tools_map)
@@ -143,16 +144,17 @@ def execute_crew(account_index: str, crew_id: int, input_str: str) -> str:
 
 def build_single_crew(agents_data: List, tasks_data: List) -> Crew:
     """Build a single crew with the given agents and tasks data."""
-    tools_map = initialize_tools("0")
+    profile = ProfileInfo(account_index="", id=0)
+    tools_map = initialize_tools(profile)
     agents = build_agents_dict(agents_data, tools_map)
     tasks = build_tasks_list(tasks_data, agents)
     return create_crew(list(agents.values()), tasks)
 
 
-async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
+async def execute_crew_stream(profile: ProfileInfo, crew_id: int, input_str: str):
     """Execute a crew with streaming output."""
     callback_queue = asyncio.Queue()
-    tools_map = initialize_tools(account_index)
+    tools_map = initialize_tools(profile)
 
     try:
         agents_data, tasks_data = fetch_crew_data(crew_id)
@@ -234,10 +236,10 @@ async def execute_crew_stream(account_index: str, crew_id: int, input_str: str):
     }
 
 
-async def execute_chat_stream(account_index: str, history: List, input_str: str):
+async def execute_chat_stream(profile: ProfileInfo, history: List, input_str: str):
     """Execute a chat stream with history."""
     callback_queue = asyncio.Queue()
-    tools_map = initialize_tools(account_index)
+    tools_map = initialize_tools(profile)
     filtered_content = extract_filtered_content(history)
 
     try:

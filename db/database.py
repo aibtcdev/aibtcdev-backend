@@ -60,6 +60,16 @@ class Database(ABC):
         pass
 
     @abstractmethod
+    def add_schedule(
+        self,
+        profile_id: str,
+        task: str,
+        cron: str,
+        enabled: bool,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     def get_tokens(self) -> List[Dict[str, Any]]:
         pass
 

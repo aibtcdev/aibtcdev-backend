@@ -5,6 +5,7 @@ from .twitter import TwitterService
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
 from enum import Enum
+from lib.models import ProfileInfo
 from pydantic import BaseModel
 from textwrap import dedent
 from tools.tools_factory import initialize_tools
@@ -79,11 +80,11 @@ class TweetAnalysisState(BaseModel):
 
 
 class TweetProcessingFlow(Flow[TweetAnalysisState]):
-    def __init__(self, twitter_service: TwitterService, account_index: str):
+    def __init__(self, twitter_service: TwitterService, profile: ProfileInfo):
         super().__init__()
         self.twitter_service = twitter_service
-        self.account_index = account_index
-        self.tools_map = initialize_tools(account_index)
+        self.profile = profile
+        self.tools_map = initialize_tools(profile)
         logger.info(f"Initialized tools_map with {len(self.tools_map)} tools")
         self.analyzer_agent = self._create_analyzer_agent()
         self.tool_agent = self._create_tool_agent()
@@ -388,14 +389,14 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
 
 async def execute_twitter_stream(
-    twitter_service: Any, account_index: str, history: List, input_str: str
+    twitter_service: Any, profile: ProfileInfo, history: List, input_str: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Execute a chat stream with history using conditional tasks.
 
     Args:
         twitter_service: Twitter service instance
-        account_index: Account index for tool initialization
+        profile: ProfileInfo instance
         history: List of previous conversation messages
         input_str: Current tweet text to process
 
@@ -407,7 +408,7 @@ async def execute_twitter_stream(
         filtered_content = extract_filtered_content(history)
         logger.info(f"Extracted filtered content length: {len(filtered_content)}")
 
-        flow = TweetProcessingFlow(twitter_service, account_index)
+        flow = TweetProcessingFlow(twitter_service, profile)
         flow.state.tweet_text = input_str
         flow.state.filtered_content = filtered_content
 

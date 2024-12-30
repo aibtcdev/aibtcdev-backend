@@ -4,6 +4,7 @@ import json
 import os
 from db.factory import db
 from lib.logger import configure_logger
+from lib.models import ProfileInfo
 from services.bot import send_message_to_user
 from services.crews import execute_crew_stream
 
@@ -27,9 +28,12 @@ async def execute_cron_job():
     tasks = []
     for cron in crons:
         # Generate a unique task ID
+        profile = ProfileInfo(
+            account_index=cron["profiles"]["account_index"],
+            id=cron["profiles"]["id"],
+        )
         task = execute_single_wrapper(
-            cron["profiles"]["id"],
-            str(cron["profiles"]["account_index"]),
+            profile,
             cron["crew_id"],
             cron["input"],
             semaphore,
@@ -42,7 +46,7 @@ async def execute_cron_job():
 
 
 async def execute_single_wrapper(
-    profile_id, account_index, crew_id, input_str, semaphore
+    profile: ProfileInfo, crew_id: str, input_str: str, semaphore: asyncio.Semaphore
 ):
     output_queue = asyncio.Queue()
     results_array = []
@@ -61,7 +65,7 @@ async def execute_single_wrapper(
     async def task_wrapper():
         try:
             # Run the actual crew stream task, yielding output to the queue
-            async for result in execute_crew_stream(account_index, crew_id, input_str):
+            async for result in execute_crew_stream(profile, crew_id, input_str):
                 await output_queue.put(result)
                 result["crew_id"] = crew_id
                 result["timestamp"] = datetime.datetime.now().isoformat()
@@ -71,7 +75,7 @@ async def execute_single_wrapper(
                 message = (
                     f"🤖 Crew Stream Result:\n\nInput: {input_str}\nResult: {result}"
                 )
-                await send_message_to_user(profile_id, message)
+                await send_message_to_user(profile.id, message)
                 logger.debug(f"Crew stream result sent for crew_id={crew_id}")
 
             await output_queue.put(None)  # Signal completion
@@ -83,7 +87,7 @@ async def execute_single_wrapper(
             error_message = (
                 f"❌ Crew Stream Failed:\n\nInput: {input_str}\nError: {str(e)}"
             )
-            await send_message_to_user(profile_id, error_message)
+            await send_message_to_user(profile.id, error_message)
             raise e
         finally:
             logger.debug(f"Saving chat results for job {job_id}")
@@ -94,7 +98,7 @@ async def execute_single_wrapper(
             )
 
             db.add_job(
-                profile_id=profile_id,
+                profile_id=profile.id,
                 conversation_id=None,
                 crew_id=crew_id,
                 input_data=input_str,

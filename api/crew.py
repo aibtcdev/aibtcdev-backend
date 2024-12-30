@@ -105,7 +105,7 @@ async def websocket_endpoint(
                         # Run the crew stream task and stream results
                         logger.debug(f"Executing crew stream for job {job_id}")
                         async for result in execute_crew_stream(
-                            str(profile.account_index), crew_id, input_str
+                            profile, crew_id, input_str
                         ):
                             if not is_connected:
                                 logger.warning(
@@ -192,7 +192,8 @@ async def get_avaliable_tools() -> Dict[str, str]:
     """
     logger.debug("Fetching available tools")
     try:
-        tools_map = initialize_tools("0")
+        profile = ProfileInfo(account_index="", id=0)
+        tools_map = initialize_tools(profile)
         response = {
             tool_name: tool_instance.description
             for tool_name, tool_instance in tools_map.items()

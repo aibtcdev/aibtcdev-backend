@@ -50,9 +50,7 @@ async def process_chat_message(
             }
         )
 
-        async for result in execute_chat_stream(
-            str(profile.account_index), history, input_str
-        ):
+        async for result in execute_chat_stream(profile, history, input_str):
             # Add to the output queue for WebSocket streaming
             stream_message = {
                 "type": "stream",

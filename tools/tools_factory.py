@@ -28,9 +28,11 @@ from .wallet import (
     WalletSendSTX,
 )
 from crewai_tools import DallETool, SerperDevTool
+from lib.models import ProfileInfo
+from tools.db import AddScheduledTaskTool
 
 
-def initialize_tools(account_index: str = "0"):
+def initialize_tools(profile: ProfileInfo):
     """
     Initialize and return a dictionary of available tools.
     """
@@ -40,25 +42,28 @@ def initialize_tools(account_index: str = "0"):
         "alex_get_swap_info": AlexGetSwapInfo(),
         "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
         "bitflow_get_available_tokens": BitflowGetAvailableTokens(),
-        "bitflow_execute_trade": BitflowExecuteTradeTool(account_index),
+        "bitflow_execute_trade": BitflowExecuteTradeTool(profile.account_index),
         "lunarcrush_get_token_data": LunarCrushTokenMetricsTool(),
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
+        "db_add_scheduled_task": AddScheduledTaskTool(profile.id),
         "web_search_experimental": SerperDevTool(),
         "velar_get_token_price_history": VelarGetPriceHistory(),
         "velar_get_tokens": VelarGetTokens(),
-        "wallet_get_my_balance": WalletGetMyBalance(account_index),
-        "wallet_get_my_address": WalletGetMyAddress(account_index),
-        "wallet_fund_my_wallet_faucet": WalletFundMyWalletFaucet(account_index),
-        "wallet_send_stx": WalletSendSTX(account_index),
-        "wallet_get_my_transactions": WalletGetMyTransactions(account_index),
+        "wallet_get_my_balance": WalletGetMyBalance(profile.account_index),
+        "wallet_get_my_address": WalletGetMyAddress(profile.account_index),
+        "wallet_fund_my_wallet_faucet": WalletFundMyWalletFaucet(profile.account_index),
+        "wallet_send_stx": WalletSendSTX(profile.account_index),
+        "wallet_get_my_transactions": WalletGetMyTransactions(profile.account_index),
         "stacks_transaction_status": StacksTransactionStatusTool(),
         "stacks_transaction": StacksTransactionTool(),
         "stacks_transaction_by_address": StacksTransactionByAddressTool(),
         # "contract_sip10_deploy": ContractSIP10DeployTool(account_index),
-        "contract_sip10_send": ContractSIP10SendTool(account_index),
-        "contract_sip10_info": ContractSIP10InfoTool(account_index),
-        "contract_collective_deploy": ContractCollectiveDeployTool(account_index),
+        "contract_sip10_send": ContractSIP10SendTool(profile.account_index),
+        "contract_sip10_info": ContractSIP10InfoTool(profile.account_index),
+        "contract_collective_deploy": ContractCollectiveDeployTool(
+            profile.account_index
+        ),
         # "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(account_index),
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
