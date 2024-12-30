@@ -10,7 +10,7 @@ There are two ways to run the backend locally: using Conda (recommended for deve
 
 ### Prerequisites
 
-- Python 3.10
+- Python 3.12
 - [Bun](https://bun.sh/) (for running TypeScript scripts)
 - Git
 - Conda (if using the Conda approach)
@@ -50,7 +50,7 @@ source ~/.bashrc # for bash
 2. Create and activate a new conda environment:
 
 ```bash
-conda create --name aibackend python=3.10
+conda create --name aibackend python=3.12
 conda activate aibackend
 ```
 
@@ -139,15 +139,14 @@ If you encounter rate limit issues with OpenAI:
   - Tier 1: 200,000 TPM
   - Tier 2: 2,000,000 TPM
 
-
 ## Supabase
 
 ```sql
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()
 ```
 
-
 ### NAME
+
 ```sql
 handle_new_user
 ```
