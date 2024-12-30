@@ -1,14 +1,7 @@
-import os
 import time
 from .database import Database
 from lib.logger import configure_logger
-from lib.models import (
-    ProfileResponse,
-    VerificationResponse,
-    XBotAuthor,
-    XBotLog,
-    XBotTweet,
-)
+from lib.models import XBotAuthor, XBotLog, XBotTweet
 from supabase import Client
 from typing import Any, Dict, List, Optional
 

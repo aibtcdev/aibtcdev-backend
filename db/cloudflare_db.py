@@ -1,12 +1,6 @@
 import json
 from .database import Database
-from lib.models import (
-    ProfileResponse,
-    VerificationResponse,
-    XBotAuthor,
-    XBotLog,
-    XBotTweet,
-)
+from lib.models import XBotAuthor, XBotLog, XBotTweet
 from lib.services import ServicesClient
 from typing import Any, Dict, List, Optional
 
@@ -180,8 +174,19 @@ class CloudflareDatabase(Database):
             "description": description,
         }
 
-    def get_compatabilities(self) -> List[Dict[str, Any]]:
-        """Mock implementation to get all compatabilities."""
+    def add_schedule(
+        self,
+        profile_id: str,
+        name: str,
+        task: str,
+        cron: str,
+        enabled: bool,
+    ) -> bool:
+        """Mock implementation to add a new schedule."""
+        return True
+
+    def get_capabilities(self) -> List[Dict[str, Any]]:
+        """Mock implementation to get all capabilities."""
         return [
             {
                 "id": "mock-compat-1",
@@ -203,19 +208,19 @@ class CloudflareDatabase(Database):
             },
         ]
 
-    def get_compatability(self, compatability_id: str) -> Dict[str, Any]:
-        """Mock implementation to get a specific compatability by ID."""
+    def get_capability(self, capability_id: str) -> Dict[str, Any]:
+        """Mock implementation to get a specific capability by ID."""
         return {
-            "id": compatability_id,
+            "id": capability_id,
             "collective_id": "mock-collective-1",
             "type": "mock-type",
-            "contract_principal": f"mock-principal-{compatability_id}",
-            "tx_id": f"mock-tx-{compatability_id}",
+            "contract_principal": f"mock-principal-{capability_id}",
+            "tx_id": f"mock-tx-{capability_id}",
             "is_deployed": True,
             "status": "active",
         }
 
-    def add_compatability(
+    def add_capability(
         self,
         collective_id: str,
         type: str,
@@ -224,9 +229,9 @@ class CloudflareDatabase(Database):
         is_deployed: bool,
         status: str,
     ) -> Dict[str, Any]:
-        """Mock implementation to add a new compatability."""
+        """Mock implementation to add a new capability."""
         return {
-            "id": "new-mock-compat",
+            "id": "new-mock-capability",
             "collective_id": collective_id,
             "type": type,
             "contract_principal": contract_principal,
@@ -235,12 +240,12 @@ class CloudflareDatabase(Database):
             "status": status,
         }
 
-    def update_compatability(
+    def update_capability(
         self,
-        compatability_id: str,
+        capability_id: str,
         data: dict,
     ) -> bool:
-        """Mock implementation to update a compatability by ID."""
+        """Mock implementation to update a capability by ID."""
         return True
 
     def get_tokens(self) -> List[Dict[str, Any]]:

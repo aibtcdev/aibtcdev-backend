@@ -1,11 +1,5 @@
 from abc import ABC, abstractmethod
-from lib.models import (
-    ProfileResponse,
-    VerificationResponse,
-    XBotAuthor,
-    XBotLog,
-    XBotTweet,
-)
+from lib.models import XBotAuthor, XBotLog, XBotTweet
 from typing import Any, Dict, List, Optional
 
 
