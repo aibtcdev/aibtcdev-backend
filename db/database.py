@@ -63,6 +63,7 @@ class Database(ABC):
     def add_schedule(
         self,
         profile_id: str,
+        name: str,
         task: str,
         cron: str,
         enabled: bool,

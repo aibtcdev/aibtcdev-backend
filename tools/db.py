@@ -7,6 +7,10 @@ from typing import Type
 class AddScheduledTaskToolSchema(BaseModel):
     """Input schema for AddScheduledTaskTool."""
 
+    name: str = Field(
+        ...,
+        description="Name of the scheduled task",
+    )
     task: str = Field(
         ...,
         description="Task to add the schedule to",
@@ -15,9 +19,9 @@ class AddScheduledTaskToolSchema(BaseModel):
         ...,
         description="Cron expression for the schedule, e.g. '0 0 * * *' for every day at midnight",
     )
-    enabled: bool = Field(
+    enabled: str = Field(
         ...,
-        description="Whether the schedule is enabled or not",
+        description="Whether the schedule is enabled or not (true or false)",
     )
 
 
@@ -31,16 +35,21 @@ class AddScheduledTaskTool(BaseTool):
         super().__init__(**kwargs)
         self.profile_id = profile_id
 
-    def _run(self, task: str, cron: str, enabled: bool) -> dict:
+    def _run(self, name: str, task: str, cron: str, enabled: str) -> dict:
         """
         Add a scheduled task to the database.
 
         Args:
+            name (str): Name of the scheduled task
             task (str): Task to add the schedule to
             cron (str): Cron expression for the schedule, e.g. '0 0 * * *' for every day at midnight
-            enabled (bool): Whether the schedule is enabled or not
+            enabled (str): Whether the schedule is enabled or not (true or false)
 
         Returns:
             dict: Response data.
         """
-        return db.add_schedule(self.profile_id, task, cron, enabled)
+        try:
+            response = db.add_schedule(self.profile_id, name, task, cron, bool(enabled))
+            return response
+        except Exception as e:
+            return {"error": str(e)}

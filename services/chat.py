@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from db.factory import db
 from lib.logger import configure_logger
 from lib.models import ProfileInfo
-from services.crews import execute_chat_stream
+from services.crews import execute_chat_stream, execute_chat_stream_langgraph
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -50,7 +50,7 @@ async def process_chat_message(
             }
         )
 
-        async for result in execute_chat_stream(profile, history, input_str):
+        async for result in execute_chat_stream_langgraph(profile, history, input_str):
             # Add to the output queue for WebSocket streaming
             stream_message = {
                 "type": "stream",
