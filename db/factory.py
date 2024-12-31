@@ -15,6 +15,7 @@ def get_database() -> Database:
     based on the AIBTC_BACKEND environment variable.
     """
     backend = os.getenv("AIBTC_BACKEND", "supabase")
+    print(f"Backend: {backend}")
     if backend == "supabase":
         url = os.getenv("AIBTC_SUPABASE_URL")
         service_key = os.getenv("AIBTC_SUPABASE_SERVICE_KEY")

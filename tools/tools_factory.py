@@ -34,6 +34,7 @@ from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
 from lib.models import ProfileInfo
 from tools.db import AddScheduledTaskTool
+from tools.hiro import STXPriceTool
 from typing import Any, Dict, List, Optional
 
 logger = configure_logger(__name__)
@@ -124,6 +125,7 @@ def initialize_tools(profile: ProfileInfo) -> Dict[str, CrewAIBaseTool]:
         "fetch_contract_code": FetchContractCodeTool(),
         "get_btc_data": GetBitcoinData(),
         "image_generation": DallETool(),
+        "get_stx_price": STXPriceTool(),
     }
 
 

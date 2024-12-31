@@ -47,7 +47,7 @@ def generate_token_image(name: str, symbol: str, description: str) -> bytes:
     Raises:
         ImageGenerationError: If image generation fails
     """
-    prompt = f"Generate an image of a {name} token with the symbol {symbol} and description {description}. The image should be in the style of a cryptocurrency."
+    prompt = f"Create a bold, circular icon for the {name} token, featuring the symbol {symbol} clearly. Use a modern crypto style with minimal details—no busy text. Ensure high contrast and a clean design so it is easy to recognize at small sizes (like a Twitter profile pic)."
     try:
         image_url = generate_image(prompt)
         if not image_url:

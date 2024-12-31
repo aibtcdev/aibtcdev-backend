@@ -153,6 +153,17 @@ class HiroApi:
         """Get STX supply."""
         return self._get("/extended/v1/stx_supply")
 
+    def get_stx_price(self) -> float:
+        """Get the current STX price."""
+        try:
+            url = "https://explorer.hiro.so/stxPrice"
+            params = {"blockBurnTime": "current"}
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            return response.json()["price"]
+        except Exception as e:
+            raise Exception(f"Failed to get STX price: {str(e)}")
+
     def search(self, query_id: str) -> dict:
         """Search for blocks, transactions, contracts, or addresses."""
         return self._get(f"/extended/v1/search/{query_id}")
