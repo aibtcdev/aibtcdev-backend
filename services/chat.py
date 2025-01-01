@@ -76,56 +76,113 @@ async def process_chat_message(
                 "thought": None,
             }
 
+            logger.debug("Starting to process stream")
             async for result in stream_func(profile, history, input_str):
-                # Stream tokens to the client
-                if not result.get("content"):
+                logger.debug(
+                    f"Processing stream result - "
+                    f"type: {result.get('type', 'unknown')}, "
+                    f"content: {bool(result.get('content'))}, "
+                    f"tool: {bool(result.get('tool'))}, "
+                    f"input: {bool(result.get('input'))}, "
+                    f"output: {bool(result.get('output'))}, "
+                    f"raw: {result}"
+                )
+
+                # Handle end message first to ensure we capture subsequent tool execution
+                if result.get("type") == "end":
+                    logger.debug("Processing end message")
+                    # Only stream the end message, don't save or reset yet
+                    stream_message = {
+                        "type": "stream",
+                        "stream_type": "end",
+                        "content": "",
+                        "timestamp": datetime.datetime.now().isoformat(),
+                        "job_started_at": datetime.datetime.now().isoformat(),
+                        "role": "assistant",
+                    }
+                    logger.debug("Putting end message in output queue")
+                    await output_queue.put(stream_message)
                     continue
-                stream_message = {
-                    "type": "stream",
-                    "stream_type": result.get("type", "token"),
-                    "content": result.get("content", ""),
-                    "timestamp": datetime.datetime.now().isoformat(),
-                    "job_started_at": datetime.datetime.now().isoformat(),
-                    "role": "assistant",
-                }
-                logger.debug("Putting token in output queue")
-                await output_queue.put(stream_message)
 
-                # Accumulate tokens
-                current_message["content"] += result.get("content", "")
+                # Skip empty content for token messages
+                if result.get("type") == "token" and not result.get("content"):
+                    logger.debug("Skipping empty token message")
+                    continue
 
-                # If this is the end of a complete message (e.g., has thought or tool info)
-                if result.get("thought") or result.get("tool"):
-                    current_message.update(
-                        {
-                            "tool": result.get("tool"),
-                            "tool_input": result.get("tool_input"),
-                            "result": result.get("result"),
-                            "thought": result.get("thought"),
-                        }
+                # Handle tool execution
+                if result.get("type") == "tool_execution":
+                    logger.debug(
+                        f"Tool execution detected - "
+                        f"tool: {result.get('tool')}, "
+                        f"input: {result.get('input')}, "
+                        f"output: {result.get('output')}, "
+                        f"raw: {result}"
                     )
+                    
+                    # Ensure all values are strings
+                    tool_name = str(result.get("tool", ""))
+                    tool_input = str(result.get("input", ""))
+                    tool_output = str(result.get("output", ""))
+                    
+                    logger.debug(f"Processed tool values - name: {tool_name}, input: {tool_input}, output: {tool_output}")
+                    
+                    # Save any accumulated content first
+                    if current_message["content"]:
+                        logger.debug(f"Saving accumulated content: {current_message}")
+                        try:
+                            backend.create_step(
+                                new_step=StepCreate(
+                                    profile_id=profile.id,
+                                    job_id=job_id,
+                                    role="assistant",
+                                    content=current_message["content"],
+                                    tool=None,
+                                    tool_input=None,
+                                    thought=None,
+                                    result=None,
+                                )
+                            )
+                            logger.debug("Successfully saved accumulated content")
+                        except Exception as e:
+                            logger.error(f"Error saving accumulated content: {e}")
+                        
+                        results.append(
+                            {
+                                **current_message,
+                                "timestamp": datetime.datetime.now().isoformat(),
+                            }
+                        )
 
-                    # Save the complete message
-                    logger.debug("Creating step in backend for complete message")
-                    backend.create_step(
-                        new_step=StepCreate(
+                    # Create a new step for the tool execution
+                    logger.debug("Creating tool execution step")
+                    try:
+                        new_step = StepCreate(
                             profile_id=profile.id,
                             job_id=job_id,
                             role="assistant",
-                            content=current_message["content"],
-                            tool=current_message["tool"],
-                            tool_input=current_message["tool_input"],
-                            thought=current_message["thought"],
-                            result=current_message["result"],
+                            content="",  # Content will be in the result
+                            tool=tool_name,
+                            tool_input=tool_input,
+                            thought=None,
+                            result=tool_output
                         )
-                    )
-
-                    # Add to results and reset current message
-                    result_with_timestamp = {
-                        **current_message,
+                        logger.debug(f"Created StepCreate object: {new_step}")
+                        created_step = backend.create_step(new_step=new_step)
+                        logger.debug(f"Successfully created tool execution step: {created_step}")
+                    except Exception as e:
+                        logger.error(f"Error creating tool execution step: {e}")
+                    
+                    # Add to results for streaming
+                    results.append({
+                        "role": "assistant",
+                        "type": "tool",
+                        "tool": tool_name,
+                        "tool_input": tool_input,
+                        "result": tool_output,
                         "timestamp": datetime.datetime.now().isoformat(),
-                    }
-                    results.append(result_with_timestamp)
+                    })
+                    
+                    # Reset current message
                     current_message = {
                         "content": "",
                         "type": "result",
@@ -134,6 +191,53 @@ async def process_chat_message(
                         "result": None,
                         "thought": None,
                     }
+                    continue
+
+                # Handle regular content
+                if result.get("content"):
+                    # Stream message to the client
+                    stream_message = {
+                        "type": "stream",
+                        "stream_type": result.get("type", "token"),
+                        "content": result.get("content", ""),
+                        "timestamp": datetime.datetime.now().isoformat(),
+                        "job_started_at": datetime.datetime.now().isoformat(),
+                        "role": "assistant",
+                    }
+                    logger.debug(
+                        f"Putting message in output queue - type: {stream_message['stream_type']}"
+                    )
+                    await output_queue.put(stream_message)
+
+                    # Accumulate content
+                    current_message["content"] += result.get("content", "")
+                    logger.debug(
+                        f"Accumulated content length: {len(current_message['content'])}"
+                    )
+
+            # After the loop, save any remaining content
+            if current_message["content"]:
+                logger.debug(
+                    f"Saving final content - length: {len(current_message['content'])}"
+                )
+                backend.create_step(
+                    new_step=StepCreate(
+                        profile_id=profile.id,
+                        job_id=job_id,
+                        role="assistant",
+                        content=current_message["content"],
+                        tool=None,
+                        tool_input=None,
+                        thought=None,
+                        result=None,
+                    )
+                )
+                results.append(
+                    {
+                        **current_message,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                    }
+                )
         else:
             # Standard implementation - save each message as it comes
             async for result in stream_func(profile, history, input_str):
@@ -181,9 +285,15 @@ async def process_chat_message(
 
         # Store results in database
         logger.debug("Processing final results")
-        # Get the final result from the last message
-        final_result = results[-1] if results else None
+        # Get the final result from the last non-empty message
+        final_result = None
+        for result in reversed(results):
+            if result.get("content"):
+                final_result = result
+                break
+
         final_result_content = final_result.get("content", "") if final_result else ""
+        logger.debug(f"Final result content length: {len(final_result_content)}")
 
         logger.debug("Updating job in backend")
         backend.update_job(

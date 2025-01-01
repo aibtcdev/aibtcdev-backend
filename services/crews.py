@@ -429,32 +429,48 @@ async def execute_chat_stream_langgraph(
 
                 try:
                     logger.debug("Running agent with tools")
+                    logger.debug(
+                        f"Last message: {state['messages'][-1].content if state['messages'] else ''}"
+                    )
                     # Get the last message content
                     last_message = (
                         state["messages"][-1].content if state["messages"] else ""
                     )
 
                     # Run the agent with proper async handling
+                    logger.debug("Invoking agent with callbacks")
                     agent_result = await agent.ainvoke(
                         {"input": last_message},
-                        config={"callbacks": [callback_handler]},
+                        config={
+                            "callbacks": [callback_handler],
+                            "run_name": "tool_execution",
+                        },
                     )
+                    logger.debug(f"Agent result: {agent_result}")
 
-                    # Stream intermediate steps
-                    if "intermediate_steps" in agent_result:
-                        for step in agent_result["intermediate_steps"]:
-                            if hasattr(step[0], "tool"):
-                                # Stream tool execution
-                                await callback_queue.put(
-                                    {
-                                        "type": "tool_execution",
-                                        "tool": step[0].tool,
-                                        "input": step[0].tool_input,
-                                        "output": (
-                                            step[1] if step[1] is not None else ""
-                                        ),
-                                    }
-                                )
+                    # Process intermediate steps
+                    for step in agent_result.get("intermediate_steps", []):
+                        action, output = step
+                        logger.debug(
+                            f"Processing step - action: {action}, output: {output}"
+                        )
+                        logger.debug(f"Action tool: {action.tool}")
+                        logger.debug(f"Action tool_input: {action.tool_input}")
+
+                        # Convert tool input to string if it's a dict
+                        tool_input = action.tool_input
+                        if isinstance(tool_input, dict):
+                            tool_input = str(tool_input)
+
+                        tool_execution = {
+                            "type": "tool_execution",
+                            "tool": action.tool,
+                            "input": tool_input,
+                            "output": str(output),  # Ensure output is string
+                        }
+                        logger.debug(f"Sending tool execution: {tool_execution}")
+                        await callback_queue.put(tool_execution)
+                        logger.debug(f"Processed intermediate step: {tool_execution}")
 
                     # Get final response
                     response_content = agent_result.get("output", "")
@@ -511,6 +527,7 @@ async def execute_chat_stream_langgraph(
             data = await callback_queue.get()
             logger.debug(f"Received data from queue: {data}")
             if data["type"] == "end":
+                yield data
                 break
             yield data
         except asyncio.CancelledError:
@@ -547,25 +564,75 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         self._on_llm_new_token = on_llm_new_token
         self._on_llm_end = on_llm_end
         self.tokens = []
+        self.current_tool = None
+        self._loop = None
 
-    def on_llm_start(self, *args, **kwargs) -> None:
+    def _ensure_loop(self):
+        """Ensure we have a valid event loop."""
+        try:
+            self._loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        return self._loop
+
+    def _put_to_queue(self, item):
+        """Helper method to put items in queue."""
+        loop = self._ensure_loop()
+        if loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(
+                self.queue.put(item), loop
+            )
+            future.result()  # Wait for it to complete
+        else:
+            loop.run_until_complete(self.queue.put(item))
+
+    def on_llm_start(self, *args, **kwargs):
         """Run when LLM starts running."""
-        self.tokens = []
+        logger.debug("LLM started")
 
-    def on_llm_new_token(self, token: str, **kwargs) -> None:
+    def on_llm_new_token(self, token: str, **kwargs):
         """Run on new token. Only available when streaming is enabled."""
-        self.tokens.append(token)
         if self._on_llm_new_token:
             self._on_llm_new_token(token, **kwargs)
+        self.tokens.append(token)
 
-    def on_llm_end(self, response: LLMResult, **kwargs) -> None:
+    def on_llm_end(self, response: LLMResult, **kwargs):
         """Run when LLM ends running."""
+        logger.debug("LLM ended")
         if self._on_llm_end:
             self._on_llm_end(response, **kwargs)
 
-    def on_llm_error(self, error: Exception, **kwargs) -> None:
+    def on_llm_error(self, error: Exception, **kwargs):
         """Run when LLM errors."""
         logger.error(f"LLM error: {str(error)}")
+
+    def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
+        """Run when tool starts running."""
+        self.current_tool = serialized.get("name")
+        tool_execution = {
+            "type": "tool_execution",
+            "tool": self.current_tool,
+            "input": input_str,
+            "output": None,
+        }
+        self._put_to_queue(tool_execution)
+
+    def on_tool_end(self, output: str, **kwargs):
+        """Run when tool ends running."""
+        if self.current_tool:
+            tool_execution = {
+                "type": "tool_execution",
+                "tool": self.current_tool,
+                "input": None,  # We don't have access to the input here
+                "output": output,
+            }
+            self._put_to_queue(tool_execution)
+            self.current_tool = None
+
+    def on_tool_error(self, error: Exception, **kwargs):
+        """Run when tool errors."""
+        logger.error(f"Tool error: {str(error)}")
 
 
 def should_use_tool(state):
