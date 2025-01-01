@@ -1,8 +1,9 @@
 import datetime
 import json
 import uuid
-from .verify_profile import ProfileInfo, verify_profile_from_token
-from db.factory import db
+from .verify_profile import verify_profile_from_token
+from backend.factory import backend
+from backend.models import Profile
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from lib.logger import configure_logger
@@ -21,8 +22,8 @@ router = APIRouter(prefix="/crew")
 @router.websocket("/{crew_id}/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    crew_id: int,
-    profile: ProfileInfo = Depends(verify_profile_from_token),
+    crew_id: str,
+    profile: Profile = Depends(verify_profile_from_token),
 ) -> None:
     """Handle WebSocket connections for crew interactions.
 
@@ -32,7 +33,7 @@ async def websocket_endpoint(
     Args:
         websocket (WebSocket): The WebSocket connection
         crew_id (int): ID of the crew to interact with
-        profile (ProfileInfo): User profile information from token verification
+        profile (Profile): User profile information from token verification
 
     Note:
         The connection will remain open until explicitly closed or an error occurs.
@@ -43,7 +44,7 @@ async def websocket_endpoint(
     is_connected = False
 
     try:
-        await manager.connect_job(websocket, str(crew_id))
+        await manager.connect_job(websocket, crew_id)
         is_connected = True
         logger.debug(f"WebSocket connected for crew {crew_id}")
 
@@ -65,7 +66,7 @@ async def websocket_endpoint(
                             "type": "error",
                             "message": "Still processing previous request. Please wait for it to complete.",
                         },
-                        str(crew_id),
+                        crew_id,
                     )
                     continue
 
@@ -75,7 +76,7 @@ async def websocket_endpoint(
                     logger.info(f"Processing chat message for crew {crew_id}")
 
                     # Generate a unique job ID
-                    job_id = str(uuid.uuid4())
+                    job_id = uuid.uuid4()
                     results_array = []
 
                     # Add initial user message
@@ -96,10 +97,9 @@ async def websocket_endpoint(
                         await manager.send_job_message(
                             {
                                 "type": "job_started",
-                                "job_id": job_id,
-                                "job_started_at": datetime.datetime.now().isoformat(),
+                                "job_id": str(job_id),
                             },
-                            str(crew_id),
+                            crew_id,
                         )
 
                         # Run the crew stream task and stream results
@@ -125,14 +125,15 @@ async def websocket_endpoint(
                         )
 
                         logger.debug(f"Saving job {job_id} results to database")
-                        db.add_job(
-                            profile_id=profile.id,
-                            conversation_id=None,
-                            crew_id=crew_id,
-                            input_data=input_str,
-                            tokens=final_result.get("tokens", 0) if final_result else 0,
-                            result=final_result_content,
-                            messages=results_array,
+                        backend.update_job(
+                            job_id=job_id,
+                            update_data={
+                                "profile_id": profile.id,
+                                "conversation_id": None,
+                                "crew_id": crew_id,
+                                "input": input_str,
+                                "result": final_result_content,
+                            },
                         )
                         logger.info(
                             f"Successfully completed job {job_id} for crew {crew_id}"
@@ -192,7 +193,7 @@ async def get_avaliable_tools() -> Dict[str, str]:
     """
     logger.debug("Fetching available tools")
     try:
-        profile = ProfileInfo(account_index="", id=0)
+        profile = Profile(account_index="", id=0)
         tools_map = initialize_tools(profile)
         response = {
             tool_name: tool_instance.description

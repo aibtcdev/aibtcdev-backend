@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
 
-class ProfileInfo(BaseModel):
+class Profile(BaseModel):
     account_index: int
     id: str
 

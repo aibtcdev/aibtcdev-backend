@@ -1,4 +1,4 @@
-from db.factory import db
+from backend.factory import backend
 from dotenv import load_dotenv
 from lib.images import generate_token_image
 
@@ -13,7 +13,7 @@ def main():
         description="test description",
     )
     print("Created image bytes")
-    publicImageUrl = db.upload_file(
+    publicImageUrl = backend.upload_file(
         "test.png",
         imageBytes,
     )

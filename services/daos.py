@@ -1,4 +1,5 @@
-from db.factory import db
+from backend.factory import backend
+from backend.models import CollectiveCreate, TokenBase, TokenCreate
 from lib.logger import configure_logger
 from lib.token_assets import TokenAssetError, TokenAssetManager, TokenMetadata
 from typing import Dict, Tuple
@@ -35,7 +36,9 @@ def generate_collective_dependencies(name: str, mission: str, description: str) 
         description: Description of the collective
     """
 
-    return db.add_collective(name, mission, description)
+    return backend.create_collective(
+        CollectiveCreate(name=name, mission=mission, description=description)
+    )
 
 
 def generate_token_dependencies(
@@ -64,12 +67,14 @@ def generate_token_dependencies(
     """
     try:
         # Create initial token record
-        new_token = db.add_token(
-            name=token_name,
-            symbol=token_symbol,
-            description=token_description,
-            decimals=token_decimals,
-            max_supply=token_max_supply,
+        new_token = backend.create_token(
+            TokenCreate(
+                name=token_name,
+                symbol=token_symbol,
+                description=token_description,
+                decimals=token_decimals,
+                max_supply=token_max_supply,
+            )
         )
         token_id = new_token["id"]
         logger.debug(f"Created token record with ID: {token_id}")
@@ -89,9 +94,12 @@ def generate_token_dependencies(
             assets = asset_manager.generate_all_assets(metadata)
 
             # Update token record with asset URLs
-            if not db.update_token(
-                token_id,
-                {"uri": assets["metadata_url"], "image_url": assets["image_url"]},
+            if not backend.update_token(
+                token_id=token_id,
+                update_data=TokenBase(
+                    uri=assets["metadata_url"],
+                    image_url=assets["image_url"],
+                ),
             ):
                 raise TokenUpdateError(
                     "Failed to update token record with asset URLs",
@@ -127,4 +135,6 @@ def generate_token_dependencies(
 
 
 def bind_token_to_collective(token_id: str, collective_id: str):
-    return db.update_token(token_id, {"collective_id": collective_id})
+    return backend.update_token(
+        token_id=token_id, update_data=TokenBase(collective_id=collective_id)
+    )

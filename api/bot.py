@@ -1,4 +1,5 @@
-from api.verify_profile import ProfileInfo, verify_profile
+from api.verify_profile import verify_profile
+from backend.models import Profile
 from fastapi import APIRouter, Body, Depends, HTTPException
 from lib.logger import configure_logger
 from pydantic import BaseModel
@@ -21,13 +22,13 @@ class TestMessageResponse(BaseModel):
 @router.post("/telegram/test", response_model=TestMessageResponse)
 async def test_telegram_message(
     message: str = Body(default="Test message from API", embed=True),
-    profile: ProfileInfo = Depends(verify_profile),
+    profile: Profile = Depends(verify_profile),
 ) -> TestMessageResponse:
     """Send a test message to the logged-in user via Telegram bot.
 
     Args:
         message (str): The message to send
-        profile (ProfileInfo): The user's profile information
+        profile (Profile): The user's profile information
 
     Returns:
         JSONResponse: A JSON response with the result of the operation

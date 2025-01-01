@@ -1,5 +1,6 @@
+from backend.factory import backend
+from backend.models import JobFilter
 from crewai import Agent, Crew, Task
-from db.client import supabase
 from textwrap import dedent
 
 # Create an analyst agent
@@ -18,16 +19,10 @@ analyst_agent = Agent(
 )
 
 # Fetch jobs from database
-jobs_response = (
-    supabase.table("jobs")
-    .select("input")
-    .is_("conversation_id", "null")
-    .order("created_at", desc=False)
-    .execute()
-)
+jobs_response = backend.list_jobs(filters=JobFilter(converation_id=None))
 
 # Prepare inputs for analysis
-inputs = list(set(job["input"] for job in jobs_response.data))
+inputs = list(set(job.input for job in jobs_response))
 inputs_text = "\n".join(f"- {input}" for input in inputs)
 
 # Create analysis task

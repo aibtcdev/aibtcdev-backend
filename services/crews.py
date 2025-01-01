@@ -1,9 +1,10 @@
 import asyncio
 import os
+from backend.factory import backend
+from backend.models import AgentFilter, Profile, TaskFilter
 from crewai import Agent, Crew, Process, Task
 from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.tasks.task_output import TaskOutput
-from db.factory import db
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, initialize_agent
 from langchain.agents.types import AgentType
@@ -13,7 +14,6 @@ from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph
 from lib.logger import configure_logger
-from lib.models import ProfileInfo
 from textwrap import dedent
 from tools.tools_factory import (
     convert_to_langchain_tool,
@@ -22,6 +22,7 @@ from tools.tools_factory import (
     initialize_tools,
 )
 from typing import Any, Dict, List, Tuple, Union
+from uuid import UUID
 
 logger = configure_logger(__name__)
 
@@ -93,20 +94,18 @@ def create_crew(agents: List[Agent], tasks: List[Task], **kwargs) -> Crew:
     )
 
 
-def fetch_crew_data(crew_id: int) -> Tuple[List, List]:
+def fetch_crew_data(crew_id: UUID) -> Tuple[List, List]:
     """Fetch agents and tasks for the specified crew from Supabase."""
 
-    agents_response = db.get_crew_agents(crew_id)
-    tasks_response = db.get_crew_tasks(crew_id)
-    print(agents_response)
-    print(tasks_response)
+    agents_response = backend.list_agents(filters=AgentFilter(crew_id=crew_id))
+    tasks_response = backend.list_tasks(filters=TaskFilter(crew_id=crew_id))
 
     if not agents_response or not tasks_response:
         raise ValueError("No agents or tasks found for the specified crew.")
     return agents_response, tasks_response
 
 
-def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[int, Agent]:
+def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[UUID, Agent]:
     """Build a dictionary of agents from agents data."""
     return {
         agent_data["id"]: create_agent(agent_data, tools_map)
@@ -115,7 +114,7 @@ def build_agents_dict(agents_data: List, tools_map: Dict) -> Dict[int, Agent]:
 
 
 def build_tasks_list(
-    tasks_data: List, agents: Dict[int, Agent], input_str: str = None
+    tasks_data: List, agents: Dict[UUID, Agent], input_str: str = None
 ) -> List[Task]:
     """Build a list of tasks from tasks data."""
     tasks = []
@@ -141,7 +140,7 @@ def extract_filtered_content(history: List) -> str:
     return "\n".join(filtered_content)
 
 
-def execute_crew(profile: ProfileInfo, crew_id: int, input_str: str) -> str:
+def execute_crew(profile: Profile, crew_id: int, input_str: str) -> str:
     """Execute a crew synchronously."""
     tools_map = initialize_tools(profile)
     agents_data, tasks_data = fetch_crew_data(crew_id)
@@ -155,14 +154,14 @@ def execute_crew(profile: ProfileInfo, crew_id: int, input_str: str) -> str:
 
 def build_single_crew(agents_data: List, tasks_data: List) -> Crew:
     """Build a single crew with the given agents and tasks data."""
-    profile = ProfileInfo(account_index="", id=0)
+    profile = Profile(account_index="", id=0)
     tools_map = initialize_tools(profile)
     agents = build_agents_dict(agents_data, tools_map)
     tasks = build_tasks_list(tasks_data, agents)
     return create_crew(list(agents.values()), tasks)
 
 
-async def execute_chat_stream(profile: ProfileInfo, history: List, input_str: str):
+async def execute_chat_stream(profile: Profile, history: List, input_str: str):
     """Execute a chat stream with history."""
     callback_queue = asyncio.Queue()
     tools_map = initialize_tools(profile)
@@ -274,7 +273,7 @@ async def execute_chat_stream(profile: ProfileInfo, history: List, input_str: st
     }
 
 
-async def execute_crew_stream(profile: ProfileInfo, crew_id: int, input_str: str):
+async def execute_crew_stream(profile: Profile, crew_id: UUID, input_str: str):
     """Execute a crew with streaming output."""
     callback_queue = asyncio.Queue()
     tools_map = initialize_tools(profile)
@@ -360,7 +359,7 @@ async def execute_crew_stream(profile: ProfileInfo, crew_id: int, input_str: str
 
 
 async def execute_chat_stream_langgraph(
-    profile: ProfileInfo, history: List, input_str: str
+    profile: Profile, history: List, input_str: str
 ):
     """Execute a chat stream using LangGraph."""
     logger.debug("Starting execute_chat_stream_langgraph")

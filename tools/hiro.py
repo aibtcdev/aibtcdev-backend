@@ -1,7 +1,5 @@
 from crewai_tools import BaseTool
 from lib.hiro import HiroApi
-from pydantic import BaseModel, Field
-from typing import Type
 
 
 class STXPriceTool(BaseTool):

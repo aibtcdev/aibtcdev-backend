@@ -1,5 +1,6 @@
+from backend.factory import backend
+from backend.models import ScheduleCreate
 from crewai_tools import BaseTool
-from db.factory import db
 from pydantic import BaseModel, Field
 from typing import Type
 
@@ -49,7 +50,15 @@ class AddScheduledTaskTool(BaseTool):
             dict: Response data.
         """
         try:
-            response = db.add_schedule(self.profile_id, name, task, cron, bool(enabled))
+            response = backend.create_schedule(
+                ScheduleCreate(
+                    profile_id=self.profile_id,
+                    name=name,
+                    task=task,
+                    cron=cron,
+                    enabled=bool(enabled),
+                )
+            )
             return response
         except Exception as e:
             return {"error": str(e)}

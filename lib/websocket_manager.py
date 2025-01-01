@@ -1,6 +1,7 @@
 from fastapi import WebSocket
 from lib.logger import configure_logger
 from typing import Dict, Set
+from uuid import UUID
 
 logger = configure_logger(__name__)
 

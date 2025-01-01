@@ -2,9 +2,9 @@ import asyncio
 import datetime
 import json
 import os
-from db.factory import db
+from backend.factory import backend
+from backend.models import CronFilter, Profile, StepCreate
 from lib.logger import configure_logger
-from lib.models import ProfileInfo
 from services.bot import send_message_to_user
 from services.crews import execute_crew_stream
 
@@ -22,20 +22,22 @@ async def execute_cron_job():
     semaphore = asyncio.Semaphore(AIBTC_CRON_MAX_CONCURRENT_TASKS)
 
     # Get all crons
-    crons = db.get_enabled_crons_expanded()
+    crons = backend.list_crons(filters=CronFilter(is_enabled=True))
 
     # For each cron, execute the task
     tasks = []
     for cron in crons:
         # Generate a unique task ID
-        profile = ProfileInfo(
-            account_index=cron["profiles"]["account_index"],
-            id=cron["profiles"]["id"],
+        profile = backend.get_profile(cron.profile_id)
+
+        profile = Profile(
+            account_index=profile.account_index,
+            id=cron.profile_id,
         )
         task = execute_single_wrapper(
             profile,
-            cron["crew_id"],
-            cron["input"],
+            cron.crew_id,
+            cron.input,
             semaphore,
         )
         tasks.append(task)
@@ -46,7 +48,7 @@ async def execute_cron_job():
 
 
 async def execute_single_wrapper(
-    profile: ProfileInfo, crew_id: str, input_str: str, semaphore: asyncio.Semaphore
+    profile: Profile, crew_id: str, input_str: str, semaphore: asyncio.Semaphore
 ):
     output_queue = asyncio.Queue()
     results_array = []
@@ -97,15 +99,22 @@ async def execute_single_wrapper(
                 final_result.get("content", "") if final_result else ""
             )
 
-            db.add_job(
+            job_object = backend.create_job(
                 profile_id=profile.id,
-                conversation_id=None,
                 crew_id=crew_id,
-                input_data=input_str,
-                tokens=final_result.get("tokens", 0) if final_result else 0,
+                input=input_str,
                 result=final_result_content,
-                messages=results_array,
             )
+            if job_object:
+                for message in results_array:
+                    backend.create_step(
+                        new_step=StepCreate(
+                            profile_id=profile.id,
+                            job_id=job_object.id,
+                            role="assistant",
+                            content=message,
+                        )
+                    )
             logger.debug(f"Job added to history for crew_id={crew_id}")
 
     async with semaphore:

@@ -1,5 +1,6 @@
 import os
-from db.factory import db
+from backend.factory import backend
+from backend.models import TelegramUserFilter
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from telegram import Update
@@ -44,7 +45,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         telegram_user_id = context.args[0]
 
         # Check if user exists with this profile_id
-        result = db.get_telegram_user(telegram_user_id)
+        result = backend.get_telegram_user(telegram_user_id)
 
         if not result.data:
             await update.message.reply_text(
@@ -62,7 +63,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         }
 
         # Update the user data for the existing profile_id
-        result = db.update_telegram_user(telegram_user_id, user_data)
+        result = backend.update_telegram_user(telegram_user_id, user_data)
 
         is_user_admin = is_admin(user_id)
         admin_status = "You are an admin!" if is_user_admin else "You are not an admin."
@@ -115,15 +116,17 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     try:
         # Query for the user
-        result = db.get_telegram_user_by_username(username)
+        result = backend.list_telegram_users(
+            filters=TelegramUserFilter(username=username)
+        )
 
-        if not result.data:
+        if not result:
             await update.message.reply_text(
                 f"Registered user with username {username} not found."
             )
             return
 
-        chat_id = result.data[0]["telegram_user_id"]
+        chat_id = result[0].telegram_user_id
         bot_app = await get_bot()
         if bot_app:
             await bot_app.bot.send_message(chat_id=chat_id, text=message)
@@ -143,16 +146,16 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     try:
         # Query for all registered users
-        result = db.get_all_registered_telegram_users()
+        result = backend.list_telegram_users()
 
-        if not result.data:
+        if not result:
             await update.message.reply_text("No registered users found.")
             return
 
         user_list = "\n".join(
             [
-                f"{user['username'] or 'No username'}: {user['telegram_user_id']}"
-                for user in result.data
+                f"{user.username or 'No username'}: {user.telegram_user_id}"
+                for user in result
             ]
         )
         await update.message.reply_text(f"Registered users:\n{user_list}")
@@ -228,15 +231,17 @@ async def send_message_to_user(profile_id: str, message: str) -> bool:
 
     try:
         # Query for the user
-        result = db.get_telegram_user_by_profile(profile_id)
+        result = backend.list_telegram_users(
+            filters=TelegramUserFilter(profile_id=profile_id)
+        )
 
-        if not result.data:
+        if not result:
             logger.warning(
                 f"No registered Telegram user found for profile {profile_id}"
             )
             return False
 
-        chat_id = result.data[0]["telegram_user_id"]
+        chat_id = result[0].telegram_user_id
         bot_app = await get_bot()
         if bot_app:
             await bot_app.bot.send_message(chat_id=chat_id, text=message)

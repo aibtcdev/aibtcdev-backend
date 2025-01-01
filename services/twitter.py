@@ -1,5 +1,6 @@
 import os
-from db.factory import db
+from backend.factory import backend
+from backend.models import XTweetCreate, XTweetFilter
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
@@ -42,7 +43,7 @@ class TwitterMentionHandler:
         text = mention.text or ""
 
         # Check if tweet exists in our database
-        existing_tweet = db.get_twitter_tweet(tweet_id)
+        existing_tweet = backend.get_x_tweet(tweet_id)
         if existing_tweet:
             logger.debug(f"Skipping already processed tweet {tweet_id}")
             return
@@ -66,13 +67,14 @@ class TwitterMentionHandler:
                 )
         finally:
             # Always store the tweet and log its processing
-            db.add_twitter_tweet(
-                author_id=author_id,
-                tweet_id=tweet_id,
-                tweet_body=text,
-                thread_id=int(conversation_id) if conversation_id else None,
+            backend.create_x_tweet(
+                XTweetCreate(
+                    author_id=author_id,
+                    tweet_id=tweet_id,
+                    tweet_body=text,
+                    thread_id=int(conversation_id) if conversation_id else None,
+                )
             )
-            db.add_twitter_log(tweet_id=tweet_id, status="processed")
 
     def _is_author_whitelisted(self, author_id: str) -> bool:
         """Check if the author is in the whitelist."""
@@ -95,14 +97,16 @@ class TwitterMentionHandler:
             return []
 
         # Get all tweets in the conversation thread
-        conversation_tweets = db.get_thread_tweets(int(tweet_data["conversation_id"]))
+        conversation_tweets = backend.list_x_tweets(
+            filters=XTweetFilter(conversation_id=tweet_data["conversation_id"])
+        )
         return [
             {
                 "role": "user" if tweet.author_id != self.user_id else "assistant",
-                "content": tweet.tweet_body,
+                "content": tweet.message,
             }
             for tweet in conversation_tweets
-            if tweet.tweet_body
+            if tweet.message
         ]
 
     async def _generate_response(
@@ -143,21 +147,24 @@ class TwitterMentionHandler:
 
         if response_tweet and response_tweet.id:
             # Store the response tweet
-            db.add_twitter_tweet(
-                author_id=self.user_id,
-                tweet_id=response_tweet.id,
-                tweet_body=response_content,
-                thread_id=(
-                    int(tweet_data["conversation_id"])
-                    if tweet_data["conversation_id"]
-                    else None
-                ),
+            backend.create_x_tweet(
+                XTweetCreate(
+                    author_id=self.user_id,
+                    tweet_id=response_tweet.id,
+                    tweet_body=response_content,
+                    thread_id=(
+                        int(tweet_data["conversation_id"])
+                        if tweet_data["conversation_id"]
+                        else None
+                    ),
+                )
             )
             # Log the response
-            db.add_twitter_log(
-                tweet_id=response_tweet.id,
-                status="response_posted",
-                message=f"Response to tweet {tweet_data['tweet_id']}",
+            backend.create_x_tweet(
+                XTweetCreate(
+                    author_id=None,
+                    message=f"Response to tweet {tweet_data['tweet_id']}",
+                )
             )
             logger.info(
                 f"Stored bot response in database. Response tweet ID: {response_tweet.id}"
@@ -178,9 +185,7 @@ class TwitterMentionHandler:
                 except Exception as e:
                     logger.error(f"Error processing mention {mention.id}: {str(e)}")
                     # Log the error
-                    db.add_twitter_log(
-                        tweet_id=mention.id, status="error", message=str(e)
-                    )
+                    backend.create_x_tweet(XTweetCreate(message=str(e)))
                     # Continue processing other mentions even if one fails
                     continue
 

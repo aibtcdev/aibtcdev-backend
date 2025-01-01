@@ -28,11 +28,11 @@ from .wallet import (
     WalletGetMyTransactions,
     WalletSendSTX,
 )
+from backend.models import Profile
 from crewai_tools import BaseTool as CrewAIBaseTool
 from crewai_tools import DallETool, SerperDevTool
 from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
-from lib.models import ProfileInfo
 from tools.db import AddScheduledTaskTool
 from tools.hiro import STXPriceTool
 from typing import Any, Dict, List, Optional
@@ -88,7 +88,7 @@ def convert_to_langchain_tool(crewai_tool: CrewAIBaseTool) -> LangChainBaseTool:
     return tool
 
 
-def initialize_tools(profile: ProfileInfo) -> Dict[str, CrewAIBaseTool]:
+def initialize_tools(profile: Profile) -> Dict[str, CrewAIBaseTool]:
     """Initialize and return a dictionary of available CrewAI tools."""
     # Convert account_index to string
     account_index = (
@@ -136,7 +136,7 @@ def get_agent_tools(
     return [tools_map[name] for name in tool_names if name in tools_map]
 
 
-def initialize_langchain_tools(profile: ProfileInfo) -> Dict[str, LangChainBaseTool]:
+def initialize_langchain_tools(profile: Profile) -> Dict[str, LangChainBaseTool]:
     """Initialize and return a dictionary of available LangChain tools."""
     crewai_tools = initialize_tools(profile)
     langchain_tools = {}

@@ -1,7 +1,8 @@
 import json
 from .bun import BunScriptRunner
+from backend.factory import backend
+from backend.models import CapabilityCreate
 from crewai_tools import BaseTool
-from db.factory import db
 from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
@@ -128,7 +129,7 @@ class ContractCollectiveDeployTool(BaseTool):
                     "tx_id": contracts["token"]["transactionId"],
                 }
 
-                if not db.update_token(token_record["id"], token_updates):
+                if not backend.update_token(token_record["id"], token_updates):
                     return {
                         "output": "",
                         "error": "Failed to update token with contract information",
@@ -137,12 +138,14 @@ class ContractCollectiveDeployTool(BaseTool):
 
                 for contract_name, contract_data in contracts.items():
                     if contract_name != "token":
-                        if not db.add_capability(
-                            collective_record["id"],
-                            contract_name,
-                            contract_data["contractPrincipal"],
-                            contract_data["transactionId"],
-                            "deployed",
+                        if not backend.create_capability(
+                            CapabilityCreate(
+                                collective_record["id"],
+                                contract_name,
+                                contract_data["contractPrincipal"],
+                                contract_data["transactionId"],
+                                "deployed",
+                            )
                         ):
                             return {
                                 "output": "",

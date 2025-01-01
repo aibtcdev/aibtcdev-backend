@@ -1,13 +1,13 @@
-from db.factory import db
+from backend.factory import backend
+from backend.models import Profile, ProfileFilter
 from fastapi import Header, HTTPException, Query
 from lib.logger import configure_logger
-from lib.models import ProfileInfo
 
 # Configure module logger
 logger = configure_logger(__name__)
 
 
-async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
+async def verify_profile(authorization: str = Header(...)) -> Profile:
     """
     Get and verify the account_index from the profile of the requesting user.
 
@@ -15,7 +15,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         authorization (str): Bearer token from request header
 
     Returns:
-        ProfileInfo: Object containing account_index and user ID
+        Profile: Object containing account_index and user ID
 
     Raises:
         HTTPException: For various authentication and profile retrieval failures
@@ -28,20 +28,18 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         )
 
     try:
-        # Extract and verify token
         token = authorization.split(" ")[1]
         logger.debug("Processing authorization token")
 
-        identifier = db.verify_session_token(token)
-        # Get user from token
-        profile_response = db.get_profile(identifier)
-
+        identifier = backend.verify_session_token(token)
+        profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
             logger.debug("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
-        account_index = profile_response.get("account_index")
-        id = profile_response.get("id")
+        profile = profile_response[0]
+        account_index = profile.account_index
+        id = profile.id
 
         if account_index is None:
             logger.debug("Account index missing from profile")
@@ -52,7 +50,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
         logger.debug(
             f"Successfully verified profile with account_index: {account_index}"
         )
-        return ProfileInfo(account_index=account_index, id=id)
+        return profile
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
@@ -63,7 +61,7 @@ async def verify_profile(authorization: str = Header(...)) -> ProfileInfo:
 
 async def verify_profile_from_token(
     token: str = Query(..., description="Bearer token for authentication")
-) -> ProfileInfo:
+) -> Profile:
     """
     Get and verify the account_index from the profile of the requesting user using a token query parameter.
 
@@ -71,7 +69,7 @@ async def verify_profile_from_token(
         token (str): Bearer token from query parameter
 
     Returns:
-        ProfileInfo: Object containing account_index and user ID
+        Profile: Object containing account_index and user ID
 
     Raises:
         HTTPException: For various authentication and profile retrieval failures
@@ -81,18 +79,14 @@ async def verify_profile_from_token(
         raise HTTPException(status_code=401, detail="Missing token parameter")
 
     try:
-        # Extract and verify token
-        identifier = db.verify_session_token(token)
-        logger.debug(identifier)
-        # Get user from token
-        profile_response = db.get_profile(identifier)
-        logger.debug(profile_response)
+        identifier = backend.verify_session_token(token)
+        profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
             logger.debug("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
-        account_index = profile_response.get("account_index")
-        id = profile_response.get("id")
+        profile = profile_response[0]
+        account_index = profile.account_index
 
         if account_index is None:
             logger.debug("Account index missing from profile")
@@ -103,7 +97,7 @@ async def verify_profile_from_token(
         logger.debug(
             f"Successfully verified profile with account_index: {account_index}"
         )
-        return ProfileInfo(account_index=account_index, id=id)
+        return profile
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is

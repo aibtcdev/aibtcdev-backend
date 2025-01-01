@@ -53,7 +53,7 @@ app = FastAPI()
 cors_origins = [
     "https://sprint.aibtc.dev",
     "https://sprint-faster.aibtc.dev",
-    "https://*.aibtcdev-frontend.pages.dev", # Cloudflare preview deployments
+    "https://*.aibtcdev-frontend.pages.dev",  # Cloudflare preview deployments
     "http://localhost:3000",  # Local development
 ]
 

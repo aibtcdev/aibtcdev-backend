@@ -2,10 +2,10 @@ import logging
 import sys
 from .crews import extract_filtered_content
 from .twitter import TwitterService
+from backend.models import Profile
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
 from enum import Enum
-from lib.models import ProfileInfo
 from pydantic import BaseModel
 from textwrap import dedent
 from tools.tools_factory import initialize_tools
@@ -80,7 +80,7 @@ class TweetAnalysisState(BaseModel):
 
 
 class TweetProcessingFlow(Flow[TweetAnalysisState]):
-    def __init__(self, twitter_service: TwitterService, profile: ProfileInfo):
+    def __init__(self, twitter_service: TwitterService, profile: Profile):
         super().__init__()
         self.twitter_service = twitter_service
         self.profile = profile
@@ -389,14 +389,14 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
 
 async def execute_twitter_stream(
-    twitter_service: Any, profile: ProfileInfo, history: List, input_str: str
+    twitter_service: Any, profile: Profile, history: List, input_str: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Execute a chat stream with history using conditional tasks.
 
     Args:
         twitter_service: Twitter service instance
-        profile: ProfileInfo instance
+        profile: Profile instance
         history: List of previous conversation messages
         input_str: Current tweet text to process
 

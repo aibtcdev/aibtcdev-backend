@@ -1,15 +1,15 @@
 import asyncio
 import datetime
-import json
-import uuid
-from api.verify_profile import ProfileInfo, verify_profile_from_token
-from db.factory import db
+from api.verify_profile import verify_profile_from_token
+from backend.factory import backend
+from backend.models import JobCreate, JobFilter, Profile, StepFilter
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
 from pydantic import BaseModel
 from services.chat import process_chat_message, running_jobs
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -73,22 +73,25 @@ class ConversationsResponse(BaseModel):
 async def websocket_endpoint(
     websocket: WebSocket,
     conversation_id: str,
-    profile: ProfileInfo = Depends(verify_profile_from_token),
+    profile: Profile = Depends(verify_profile_from_token),
 ):
     """WebSocket endpoint for real-time chat communication.
 
     Args:
         websocket (WebSocket): The WebSocket connection
         conversation_id (str): The ID of the conversation
-        profile (ProfileInfo): The user's profile information
+        profile (Profile): The user's profile information
 
     Raises:
         WebSocketDisconnect: When client disconnects
     """
     try:
         # Verify conversation belongs to user
-        conversation = db.get_detailed_conversation(conversation_id)
-
+        conversation_id_uuid = UUID(conversation_id)
+        conversation = backend.get_conversation(convo_id=conversation_id_uuid)
+        jobs = backend.list_jobs(
+            filters=JobFilter(conversation_id=conversation_id_uuid)
+        )
         if not conversation:
             await websocket.accept()
             await websocket.send_json(
@@ -101,37 +104,34 @@ async def websocket_endpoint(
         logger.debug(
             f"Starting WebSocket connection for conversation {conversation_id}"
         )
-
+        formatted_history = []
         # Send conversation history using the jobs from detailed conversation
-        if conversation.get("jobs"):
+        if jobs:
             # Format history messages according to frontend expectations
-            formatted_history = []
-            for job in conversation["jobs"]:
-                if job.get("messages"):
-                    for msg in job["messages"]:
-                        if isinstance(msg, str):
-                            msg = json.loads(msg)
+            for job in jobs:
+                # Add user input message
+                formatted_history.append(
+                    {
+                        "role": "user",
+                        "content": job.input,
+                        "timestamp": job.created_at.isoformat(),
+                    }
+                )
 
-                        # Skip step messages with empty thoughts
-                        if msg.get("type") == "step" and (
-                            not msg.get("thought") or msg.get("thought").strip() == ""
-                        ):
-                            continue
-
-                        formatted_msg = {
-                            "role": msg.get("role"),
-                            "type": msg.get("type"),
-                            "content": msg.get("content", ""),
-                            "timestamp": msg.get("timestamp")
-                            or msg.get("created_at")
-                            or msg.get("job_started_at")
-                            or datetime.datetime.now().isoformat(),
-                            "tool": msg.get("tool"),
-                            "tool_input": msg.get("tool_input", None),
-                            "result": msg.get("result", None),
-                            "thought": msg.get("thought", None),
-                        }
-                        formatted_history.append(formatted_msg)
+                steps = backend.list_steps(filters=StepFilter(job_id=job.id))
+                if not steps:
+                    continue
+                for step in steps:
+                    formatted_msg = {
+                        "role": step.role,
+                        "content": step.content,
+                        "timestamp": step.created_at.isoformat(),
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                        "result": step.result,
+                        "thought": step.thought,
+                    }
+                    formatted_history.append(formatted_msg)
 
             # Sort messages by timestamp
             formatted_history.sort(key=lambda x: x["timestamp"])
@@ -149,38 +149,42 @@ async def websocket_endpoint(
 
                 if data.get("type") == "chat_message":
                     # Create a new job for this message
-                    job_id = str(uuid.uuid4())
+                    job = backend.create_job(
+                        JobCreate(
+                            conversation_id=conversation_id_uuid,
+                            profile_id=profile.id,
+                            input=data.get("message", ""),
+                        )
+                    )
+                    job_id = job.id
                     output_queue = asyncio.Queue()
 
                     # Store job info
-                    running_jobs[job_id] = {
+                    running_jobs[str(job_id)] = {
                         "queue": output_queue,
                         "conversation_id": conversation_id,
                         "task": None,
                     }
 
-                    # Get conversation history
-                    history = db.get_conversation_history(conversation_id)
-
                     # Create task
                     task = asyncio.create_task(
                         process_chat_message(
                             job_id=job_id,
-                            conversation_id=conversation_id,
+                            conversation_id=conversation_id_uuid,
                             profile=profile,
                             input_str=data.get("message", ""),
-                            history=history,
+                            history=formatted_history,
                             output_queue=output_queue,
                         )
                     )
-                    running_jobs[job_id]["task"] = task
+                    running_jobs[str(job_id)]["task"] = task
 
                     # Send job started message
                     job_started_at = datetime.datetime.now().isoformat()
                     await manager.send_conversation_message(
                         {
                             "type": "job_started",
-                            "job_id": job_id,
+                            "job_id": str(job_id),
                             "job_started_at": job_started_at,
                         },
                         conversation_id,

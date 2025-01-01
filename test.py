@@ -3,28 +3,7 @@ import os
 from datetime import datetime
 from db.client import services_client
 from dotenv import load_dotenv
-from lib.models import (
-    AgentResponse,
-    AuthResponse,
-    CrewExecution,
-    CrewResponse,
-    CrewStepResponse,
-    CronResponse,
-    ImageGenerationResponse,
-    ImageListResponse,
-    ProfileResponse,
-    RoleResponse,
-    TaskResponse,
-    TwitterResponse,
-    UserCrew,
-    UserCron,
-    UserProfile,
-    UserTask,
-    VerificationResponse,
-    XBotAuthor,
-    XBotLog,
-    XBotTweet,
-)
+from lib.models import TwitterResponse
 from typing import Dict, List, Optional
 
 # Load environment variables

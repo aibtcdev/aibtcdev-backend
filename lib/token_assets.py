@@ -1,5 +1,5 @@
+from backend.factory import backend
 from dataclasses import dataclass
-from db.factory import db
 from lib.images import generate_token_image
 from lib.logger import configure_logger
 from typing import Dict, Optional
@@ -63,7 +63,7 @@ class TokenAssetManager:
                     f"Invalid image data type for token {self.token_id}: got {type(image_bytes)}"
                 )
 
-            return db.upload_file(f"{self.token_id}.png", image_bytes)
+            return backend.upload_file(f"{self.token_id}.png", image_bytes)
 
         except Exception as e:
             if isinstance(e, ImageGenerationError):
@@ -93,7 +93,7 @@ class TokenAssetManager:
         }
 
         try:
-            return db.upload_file(
+            return backend.upload_file(
                 f"{self.token_id}.json", str(json_data).encode("utf-8")
             )
         except Exception as e:
