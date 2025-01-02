@@ -184,3 +184,95 @@ class TwitterService:
         except Exception as e:
             logger.error(f"Failed to get mentions: {str(e)}")
             return []
+
+    async def get_user_tweets(self, user_id: str, max_results: int = 25) -> List[Tweet]:
+        """
+        Get recent tweets from a specific user, including replies and retweets.
+
+        Args:
+            user_id: Twitter user ID to get tweets for
+            max_results: Maximum number of tweets to return (default 25)
+
+        Returns:
+            List of tweet data
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+            response = self.client.get_timelines(
+                user_id=user_id,
+                max_results=max_results,
+                tweet_fields=[
+                    "id", "text", "created_at", "author_id", "conversation_id",
+                    "in_reply_to_user_id", "referenced_tweets", "public_metrics",
+                    "entities", "context_annotations"
+                ],
+                expansions=[
+                    "referenced_tweets.id", "referenced_tweets.id.author_id",
+                    "entities.mentions.username"
+                ]
+            )
+            logger.info(f"Successfully retrieved {len(response.data)} tweets for user {user_id}")
+            return response.data
+        except Exception as e:
+            logger.error(f"Failed to get user tweets: {str(e)}")
+            return []
+
+    async def get_user_profile(self, user_id: str) -> Optional[User]:
+        """
+        Get detailed profile information for a user.
+
+        Args:
+            user_id: Twitter user ID
+
+        Returns:
+            User profile data if found, None if not found or error
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+            response = self.client.get_user(
+                user_id=user_id,
+                user_fields=[
+                    "id", "name", "username", "created_at", "description",
+                    "entities", "pinned_tweet_id", "profile_image_url",
+                    "public_metrics"
+                ]
+            )
+            if type(response) == User:
+                return response
+        except Exception as e:
+            logger.error(f"Failed to get user profile for {user_id}: {str(e)}")
+            return None
+
+    async def get_pinned_tweet(self, user_id: str) -> Optional[Tweet]:
+        """
+        Get the pinned tweet of a user if it exists.
+
+        Args:
+            user_id: Twitter user ID
+
+        Returns:
+            Pinned tweet data if found, None if not found or error
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+            
+            # First get user profile to get pinned tweet ID
+            user_profile = await self.get_user_profile(user_id)
+            if not user_profile or not hasattr(user_profile, "pinned_tweet_id"):
+                return None
+
+            # Get the pinned tweet
+            response = self.client.get_tweet(
+                tweet_id=user_profile.pinned_tweet_id,
+                tweet_fields=[
+                    "id", "text", "created_at", "author_id", "entities",
+                    "context_annotations"
+                ]
+            )
+            return response
+        except Exception as e:
+            logger.error(f"Failed to get pinned tweet for {user_id}: {str(e)}")
+            return None

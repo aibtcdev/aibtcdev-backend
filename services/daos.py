@@ -3,6 +3,7 @@ from backend.models import CollectiveCreate, TokenBase, TokenCreate
 from lib.logger import configure_logger
 from lib.token_assets import TokenAssetError, TokenAssetManager, TokenMetadata
 from typing import Dict, Tuple
+from uuid import UUID
 
 logger = configure_logger(__name__)
 
@@ -34,107 +35,85 @@ def generate_collective_dependencies(name: str, mission: str, description: str) 
         name: Name of the collective
         mission: Mission of the collective
         description: Description of the collective
-    """
 
-    return backend.create_collective(
+    Returns:
+        Dict: Collective record as a dictionary
+    """
+    collective = backend.create_collective(
         CollectiveCreate(name=name, mission=mission, description=description)
     )
+    return collective.model_dump()
 
 
 def generate_token_dependencies(
-    token_name: str,
-    token_symbol: str,
-    token_description: str,
-    token_decimals: int,
-    token_max_supply: str,
+    name: str,
+    symbol: str,
+    description: str,
+    decimals: str,
+    max_supply: str,
 ) -> Tuple[str, Dict]:
-    """Generate token dependencies including database record, image, and metadata.
+    """Generate token dependencies including database record and metadata.
 
     Args:
-        token_name: Name of the token
-        token_symbol: Symbol of the token
-        token_description: Description of the token
-        token_decimals: Number of decimals for the token
-        token_max_supply: Maximum supply of the token
+        name: Name of the token
+        symbol: Symbol of the token
+        description: Description of the token
+        decimals: Number of decimals for the token
+        max_supply: Maximum supply of the token
 
     Returns:
-        Tuple[str, Dict]: Token metadata URL and token details
+        Tuple[str, Dict]: A tuple containing the metadata URL and token record as dict
 
     Raises:
-        TokenCreationError: If token record creation fails
-        TokenAssetError: If asset generation fails
-        TokenUpdateError: If token update fails
+        TokenServiceError: If there is an error creating token dependencies
     """
     try:
-        # Create initial token record
+        # Create token metadata
+        metadata = TokenMetadata(
+            name=name,
+            symbol=symbol,
+            description=description,
+            decimals=decimals,
+            max_supply=max_supply,
+        )
+
+        # Upload token assets
+        assets = TokenAssetManager.upload_token_assets(metadata)
+
+        # Create token record
         new_token = backend.create_token(
             TokenCreate(
-                name=token_name,
-                symbol=token_symbol,
-                description=token_description,
-                decimals=token_decimals,
-                max_supply=token_max_supply,
+                name=name,
+                symbol=symbol,
+                description=description,
+                decimals=decimals,
+                max_supply=max_supply,
             )
         )
-        token_id = new_token["id"]
-        logger.debug(f"Created token record with ID: {token_id}")
 
-        # Create metadata object
-        metadata = TokenMetadata(
-            name=token_name,
-            symbol=token_symbol,
-            description=token_description,
-            decimals=token_decimals,
-            max_supply=token_max_supply,
-        )
+        return assets["metadata_url"], new_token.model_dump()
 
-        # Generate and store assets
-        asset_manager = TokenAssetManager(token_id)
-        try:
-            assets = asset_manager.generate_all_assets(metadata)
-
-            # Update token record with asset URLs
-            if not backend.update_token(
-                token_id=token_id,
-                update_data=TokenBase(
-                    uri=assets["metadata_url"],
-                    image_url=assets["image_url"],
-                ),
-            ):
-                raise TokenUpdateError(
-                    "Failed to update token record with asset URLs",
-                    {"token_id": token_id, "assets": assets},
-                )
-
-            ## there is no update method to the new_token object need to merge dictionary
-            metadata.uri = assets["metadata_url"]
-            metadata.image_url = assets["image_url"]
-            final_token = {
-                **new_token,
-                "uri": assets["metadata_url"],
-                "image_url": assets["image_url"],
-            }
-
-            return assets["metadata_url"], final_token
-
-        except TokenAssetError as e:
-            raise TokenCreationError(
-                f"Failed to generate token assets: {str(e)}",
-                {
-                    "token_id": token_id,
-                    "original_error": str(e),
-                    "token_data": new_token,
-                },
-            ) from e
-
+    except TokenAssetError as e:
+        raise TokenServiceError(
+            f"Failed to upload token assets: {str(e)}",
+            details=e.details if hasattr(e, "details") else None,
+        ) from e
     except Exception as e:
-        raise TokenCreationError(
-            f"Unexpected error during token creation: {str(e)}",
-            {"original_error": str(e)},
+        raise TokenServiceError(
+            f"Failed to create token dependencies: {str(e)}"
         ) from e
 
 
-def bind_token_to_collective(token_id: str, collective_id: str):
+def bind_token_to_collective(token_id: UUID, collective_id: UUID) -> bool:
+    """Bind a token to a collective.
+
+    Args:
+        token_id: UUID of the token
+        collective_id: UUID of the collective
+
+    Returns:
+        bool: True if binding was successful, False otherwise
+    """
     return backend.update_token(
         token_id=token_id, update_data=TokenBase(collective_id=collective_id)
     )

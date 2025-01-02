@@ -1,9 +1,9 @@
 import json
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import CapabilityCreate
+from backend.models import CapabilityCreate, TokenBase
 from crewai_tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from services.daos import (
     TokenServiceError,
     bind_token_to_collective,
@@ -21,28 +21,90 @@ class ContractError(Exception):
         self.details = details or {}
 
 
+class TokenValidationError(ContractError):
+    """Exception for token validation errors"""
+    pass
+
+
+def validate_token_supply(v: str) -> str:
+    """Validate token supply is within acceptable range."""
+    try:
+        supply = int(v)
+        min_supply = 21_000_000
+        max_supply = 1_000_000_000
+        if not min_supply <= supply <= max_supply:
+            raise ValueError(
+                f"Token supply must be between {min_supply:,} and {max_supply:,}"
+            )
+    except ValueError as e:
+        raise TokenValidationError(str(e))
+    return v
+
+
+def validate_token_length(v: str, max_length: int = 280) -> str:
+    """Validate string length for Twitter compatibility."""
+    if len(v) > max_length:
+        raise TokenValidationError(
+            f"Length exceeds {max_length} characters"
+        )
+    return v
+
+
 class ContractCollectiveDeployToolSchema(BaseModel):
     """Input schema for ContractCollectiveDeployToolSchema."""
 
     token_symbol: str = Field(
-        ..., description="The symbol for the token for the collective (e.g., 'HUMAN')"
+        ...,
+        description="The symbol for the token for the collective (e.g., 'HUMAN')",
+        max_length=10
     )
     token_name: str = Field(
-        ..., description="The name of the token for the collective (e.g., 'Human')"
+        ...,
+        description="The name of the token for the collective (e.g., 'Human')",
+        max_length=50
     )
     token_description: str = Field(
         ...,
         description="The description of the token for the collective (e.g., 'The Human Token')",
+        max_length=280
     )
     token_max_supply: str = Field(
         ...,
-        description="Initial supply of the token for the collective. Default is 1000000000",
+        description="Initial supply of the token for the collective (21,000,000 to 1,000,000,000)",
+        validators=[validate_token_supply]
     )
     token_decimals: str = Field(
-        ...,
-        description="Number of decimals for the token for the collective. Default is 6",
+        "6",
+        description="Number of decimals for the token for the collective. Default is 6"
     )
-    mission: str = Field(..., description="The mission statement for the collective")
+    mission: str = Field(
+        ...,
+        description="The mission statement for the collective",
+        max_length=280
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+        validate_assignment = True
+
+    @validator("token_symbol")
+    def validate_symbol(cls, v):
+        """Validate token symbol format."""
+        if not v.isalnum():
+            raise TokenValidationError("Token symbol must be alphanumeric")
+        return validate_token_length(v.upper(), 10)
+
+    @validator("token_name", "token_description", "mission")
+    def validate_text_fields(cls, v):
+        """Validate text field lengths."""
+        return validate_token_length(v)
+
+    @validator("token_decimals")
+    def validate_decimals(cls, v):
+        """Validate token decimals."""
+        if v != "6":
+            raise TokenValidationError("Token decimals must be 6")
+        return v
 
 
 class ContractCollectiveDeployTool(BaseTool):
@@ -50,7 +112,7 @@ class ContractCollectiveDeployTool(BaseTool):
     description: str = """
     Deploy a new collective with a token and a bonding curve for stacks.
     """
-    args_schema: type[BaseModel] = ContractCollectiveDeployToolSchema
+    args_schema: Type[BaseModel] = ContractCollectiveDeployToolSchema
     account_index: str = "0"
 
     def __init__(self, account_index: str, **kwargs):
@@ -67,7 +129,6 @@ class ContractCollectiveDeployTool(BaseTool):
         mission: str,
     ) -> Dict[str, Union[str, bool, None]]:
         try:
-
             # Generate collective dependencies and get collective record
             collective_record = generate_collective_dependencies(
                 token_name, mission, token_description
@@ -75,15 +136,15 @@ class ContractCollectiveDeployTool(BaseTool):
 
             # Generate token dependencies and get token record
             metadata_url, token_record = generate_token_dependencies(
-                token_name,
-                token_symbol,
-                token_description,
-                token_decimals,
-                token_max_supply,
+                name=token_name,
+                symbol=token_symbol,
+                description=token_description,
+                decimals=token_decimals,
+                max_supply=token_max_supply,
             )
 
             if not bind_token_to_collective(
-                token_record["id"], collective_record["id"]
+                token_id=token_record["id"], collective_id=collective_record["id"]
             ):
                 return {
                     "output": "",
@@ -124,10 +185,10 @@ class ContractCollectiveDeployTool(BaseTool):
 
                 # Update token record with contract information
                 contracts = deployment_data["contracts"]
-                token_updates = {
-                    "contract_principal": contracts["token"]["contractPrincipal"],
-                    "tx_id": contracts["token"]["transactionId"],
-                }
+                token_updates = TokenBase(
+                    contract_principal=contracts["token"]["contractPrincipal"],
+                    tx_id=contracts["token"]["transactionId"],
+                )
 
                 if not backend.update_token(token_record["id"], token_updates):
                     return {
@@ -140,11 +201,11 @@ class ContractCollectiveDeployTool(BaseTool):
                     if contract_name != "token":
                         if not backend.create_capability(
                             CapabilityCreate(
-                                collective_record["id"],
-                                contract_name,
-                                contract_data["contractPrincipal"],
-                                contract_data["transactionId"],
-                                "deployed",
+                                collective_id=collective_record["id"],
+                                type=contract_name,
+                                contract_principal=contract_data["contractPrincipal"],
+                                tx_id=contract_data["transactionId"],
+                                status="deployed",
                             )
                         ):
                             return {

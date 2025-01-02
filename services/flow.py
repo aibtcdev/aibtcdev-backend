@@ -1,7 +1,9 @@
 import logging
 import sys
+import re
 from .crews import extract_filtered_content
 from .twitter import TwitterService
+from .dao_analyzer import DAORequestAnalyzer, DAOAnalysisResult
 from backend.models import Profile
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
@@ -31,6 +33,7 @@ logger.propagate = True
 
 # Output schemas for tasks
 class TweetType(str, Enum):
+    DAO_REQUEST = "dao_request"
     TOOL_REQUEST = "tool_request"
     CONVERSATION = "conversation"
     INVALID = "invalid"
@@ -77,6 +80,9 @@ class TweetAnalysisState(BaseModel):
     tool_result: str = None
     response: TweetResponseOutput = None
     tool_success: bool = False
+    dao_analysis: Optional[DAOAnalysisResult] = None
+    user_context: Optional[Dict] = None
+    author_id: Optional[str] = None
 
 
 class TweetProcessingFlow(Flow[TweetAnalysisState]):
@@ -85,6 +91,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         self.twitter_service = twitter_service
         self.profile = profile
         self.tools_map = initialize_tools(profile)
+        self.dao_analyzer = DAORequestAnalyzer()
         logger.info(f"Initialized tools_map with {len(self.tools_map)} tools")
         self.analyzer_agent = self._create_analyzer_agent()
         self.tool_agent = self._create_tool_agent()
@@ -92,9 +99,73 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         self.account_name = "@aibtcdevagent"
         logger.info(f"TweetProcessingFlow initialized with account {self.account_name}")
 
+    async def _gather_user_context(self, user_id: str) -> Dict:
+        """Gather context about the user from their Twitter history."""
+        try:
+            # Get user's recent tweets
+            tweets = await self.twitter_service.get_user_tweets(user_id)
+            
+            # Get user's profile
+            profile = await self.twitter_service.get_user_profile(user_id)
+            
+            # Get pinned tweet if available
+            pinned_tweet = await self.twitter_service.get_pinned_tweet(user_id)
+            
+            return {
+                "tweets": tweets,
+                "profile": profile,
+                "pinned_tweet": pinned_tweet
+            }
+        except Exception as e:
+            logger.error(f"Error gathering user context: {str(e)}")
+            return {"tweets": [], "profile": None, "pinned_tweet": None}
+
     @start()
-    def analyze_tweet(self):
-        logger.info("Starting tweet analysis")
+    async def analyze_tweet(self):
+        """Analyze tweet with priority on DAO creation."""
+        logger.info("🔄 Starting tweet analysis with DAO priority")
+
+        # First gather user context
+        logger.info("👤 Gathering user context...")
+        user_context = await self._gather_user_context(self.state.author_id)
+        self.state.user_context = user_context
+        logger.info(f"📊 User context gathered: {len(user_context.get('tweets', [])) if user_context else 0} tweets")
+
+        # Check for DAO creation request first
+        logger.info("🔍 Analyzing for DAO creation request...")
+        dao_analysis = await self.dao_analyzer.analyze_request(
+            tweet_text=self.state.tweet_text,
+            user_id=self.state.author_id,
+            user_tweets=user_context["tweets"],
+            user_profile=user_context["profile"]
+        )
+        self.state.dao_analysis = dao_analysis
+
+        # If this is a valid DAO request, prioritize it
+        if dao_analysis.is_valid:
+            logger.info("✨ Valid DAO creation request detected!")
+            logger.info(f"  Name: {dao_analysis.parameters.token_name}")
+            logger.info(f"  Symbol: {dao_analysis.parameters.token_symbol}")
+            logger.info(f"  Supply: {dao_analysis.parameters.token_max_supply}")
+            
+            self.state.is_worthy = True
+            self.state.tweet_type = TweetType.DAO_REQUEST
+            self.state.tool_request = ToolRequest(
+                tool_name="contract_collective_deploy",
+                parameters=dao_analysis.parameters.dict(),
+                priority=1
+            )
+            return "execute_tool"
+
+        # If not a DAO request, check for other patterns
+        if re.search(r"@\w+\s+create\s+dao", self.state.tweet_text.lower()):
+            logger.info("⚠️ Invalid DAO request format detected")
+            self.state.is_worthy = True
+            self.state.tweet_type = TweetType.DAO_REQUEST
+            self.state.response_required = True
+            return "generate_response"
+
+        # If not a DAO request, proceed with regular analysis
         analysis_task = Task(
             name="tweet_analysis",
             description=dedent(
@@ -102,9 +173,13 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Your name is {self.account_name} on twitter.
 
                 Analyze this tweet to determine:
-                1. If it's worthy of processing (spam detection, relevance)
-                2. If it's a tool request (token/DAO creation) or conversation
+                1. If it's worthy of processing
+                2. If it's a tool request or conversation
                 3. Required action priority
+                
+                Primary Focus:
+                - Look for DAO creation intent first
+                - Suggest DAO creation if relevant to user's query
                 
                 Tweet History:
                 {self.state.filtered_content}
@@ -115,51 +190,15 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Criteria for worthiness:
                 - Relevance to Stacks/Bitcoin ecosystem
                 - Technical merit and substance
-                - Community value and engagement potential
-                - Authenticity (not spam/troll)
-
-                Criteria for tool request:
-                - Wallet Balance
-                - Wallet Address
-                - Wallet Transaction History
+                - Community value
+                - Authenticity (not spam)
                 
-                Provide confidence score and detailed reasoning.
-            """
-            ),
-            expected_output=dedent(
+                Available Tools:
+                - contract_collective_deploy (Primary: DAO Creation)
+                - wallet_balance
+                - transaction_status
+                - price_history
                 """
-                Structured analysis with:
-                - Worthiness determination (boolean)
-                - Tweet type classification
-                    - "tool_request"
-                    - "conversation"
-                    - "invalid"
-                - Tool request details if applicable. Otherwise None
-                - Confidence score (0-1)
-                - Detailed reasoning
-
-                Output format:
-                {
-                    "worthy": bool,
-                    "reason": str,
-                    "tweet_type": TweetType,
-                    "tool_request": ToolRequest,
-                    "confidence_score": float
-                }
-
-                TweetType enum:
-                - "tool_request"
-                - "conversation"
-                - "invalid"
-
-                ToolRequest:
-                {
-                    "tool_name": str,
-                    "parameters": Dict[str, Any],
-                    "priority": int
-                }
-
-            """
             ),
             agent=self.analyzer_agent,
             output_pydantic=TweetAnalysisOutput,
@@ -174,16 +213,6 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         self.state.tool_request = result.pydantic.tool_request
         self.state.analysis_complete = True
 
-        logger.info(f"Tweet worthiness: {result.pydantic.worthy}")
-        logger.info(f"Tweet type: {result.pydantic.tweet_type}")
-        logger.info(
-            f"Tool request: {result.pydantic.tool_request}"
-            if result.pydantic.tool_request
-            else "Tool request: None"
-        )
-        logger.info(f"Confidence score: {result.pydantic.confidence_score}")
-
-        # if result.pydantic.tweet_type == TweetType.TOOL_REQUEST:
         if result.pydantic.tweet_type == TweetType.TOOL_REQUEST:
             logger.info("Routing to tool execution")
             return "execute_tool"
@@ -200,6 +229,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         )
         if not self.state.is_worthy:
             return "skip"
+        if self.state.tweet_type == TweetType.DAO_REQUEST:
+            return "execute_tool"
         if self.state.tweet_type == TweetType.TOOL_REQUEST:
             return "execute_tool"
         return "generate_response"
@@ -269,14 +300,75 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
     @listen("generate_response")
     def generate_tweet_response(self):
-        logger.info("Starting response generation")
+        """Generate response with DAO creation focus."""
+        logger.info("💭 Starting response generation")
+        
+        # Special handling for DAO creation responses
+        if (self.state.dao_analysis and self.state.dao_analysis.is_valid and 
+            self.state.tool_success):
+            logger.info("🎉 Generating successful DAO creation response")
+            dao_params = self.state.dao_analysis.parameters
+            response = dedent(f"""
+                🎉 Your {dao_params.token_name} DAO is now live!
+                🌐 Visit: https://daos.btc.us/{dao_params.token_symbol.lower()}
+                📜 Contract: {self.state.tool_result.get('contract_address', 'N/A')}
+                💰 ${dao_params.token_symbol} | {int(dao_params.token_max_supply):,} Supply
+
+                {dao_params.mission}
+
+                #StacksBlockchain #Web3 #DAO
+            """).strip()
+
+            logger.info(f"📝 Response generated ({len(response)} chars)")
+            self.state.response = TweetResponseOutput(
+                response=response,
+                tone="enthusiastic",
+                hashtags=["StacksBlockchain", "Web3", "DAO"],
+                mentions=[],
+                urls=[f"https://daos.btc.us/{dao_params.token_symbol.lower()}"]
+            )
+            return "complete"
+
+        # Handle invalid DAO request format
+        if self.state.tweet_type == TweetType.DAO_REQUEST:
+            response = dedent("""
+                🔧 To create a DAO, use one of these formats:
+
+                1️⃣ Simple:
+                @aibtcdevagent create dao MyDAO
+
+                2️⃣ Detailed:
+                @aibtcdevagent create dao
+                name: My DAO
+                symbol: DAO
+                supply: 500M
+                mission: Your mission
+
+                Need help? Check our guide: https://daos.btc.us/guide
+                #StacksBlockchain #DAO
+            """).strip()
+
+            self.state.response = TweetResponseOutput(
+                response=response,
+                tone="helpful",
+                hashtags=["StacksBlockchain", "DAO"],
+                mentions=[],
+                urls=["https://daos.btc.us/guide"]
+            )
+            return "complete"
+
+        # Regular response generation for other cases
         response_task = Task(
             name="response_generation",
             description=dedent(
                 f"""
                 Your name is {self.account_name} on twitter.
 
-                Generate an appropriate response tweet:
+                Generate an appropriate response tweet.
+                
+                Primary Focus:
+                - Suggest DAO creation if relevant
+                - Guide users toward DAO functionality
                 
                 Tweet History:
                 {self.state.filtered_content}
@@ -286,39 +378,24 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 
                 Context:
                 - Tweet Type: {self.state.tweet_type}
-                - Tool Execution: {self.state.tool_request is not None}
                 - Tool Result: {self.state.tool_result if hasattr(self.state, 'tool_result') else 'None'}
                 
                 Requirements:
                 1. Maximum 280 characters
-                2. Maintain professional yet engaging tone thats witty
+                2. Professional yet engaging tone
                 3. Include relevant hashtags
-                4. Reference tool execution results if applicable
+                4. Reference tool results if applicable
                 5. Avoid financial advice
-                6. Use appropriate mentions
-                7. Include relevant URLs if needed
-            """
-            ),
-            expected_output=dedent(
+                6. Include relevant URLs
+                7. Suggest DAO creation if appropriate
                 """
-                A well-crafted tweet response with:
-                - Main message (≤280 chars)
-                - Appropriate tone
-                - Relevant hashtags
-                - Necessary mentions
-                - No URLs
-            """
             ),
             agent=self.response_agent,
             output_pydantic=TweetResponseOutput,
         )
 
-        logger.info("Executing response generation task")
         result = response_task.execute_sync()
-        logger.info(
-            f"Response generation result: {result.pydantic if result else 'None'}"
-        )
-        self.state.response = result.pydantic if result else None
+        self.state.response = result.pydantic
         return "complete"
 
     @listen("skip")
@@ -389,16 +466,17 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
 
 async def execute_twitter_stream(
-    twitter_service: Any, profile: Profile, history: List, input_str: str
+    twitter_service: Any, profile: Profile, history: List, input_str: str, author_id: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Execute a chat stream with history using conditional tasks.
 
     Args:
         twitter_service: Twitter service instance
-        profile: Profile instance
+        profile: Profile instance containing account_index
         history: List of previous conversation messages
         input_str: Current tweet text to process
+        author_id: ID of the tweet author
 
     Yields:
         Dict containing step information or final results
@@ -411,6 +489,7 @@ async def execute_twitter_stream(
         flow = TweetProcessingFlow(twitter_service, profile)
         flow.state.tweet_text = input_str
         flow.state.filtered_content = filtered_content
+        flow.state.author_id = author_id  # Set the author_id in state
 
         logger.info("Starting flow execution")
         result = await flow.kickoff_async()
@@ -425,7 +504,7 @@ async def execute_twitter_stream(
             }
             return
 
-        if flow.state.tweet_type == TweetType.TOOL_REQUEST and flow.state.tool_request:
+        if flow.state.tweet_type == TweetType.DAO_REQUEST and flow.state.tool_request:
             logger.info(
                 f"Yielding tool execution step for tool: {flow.state.tool_request.tool_name}"
             )

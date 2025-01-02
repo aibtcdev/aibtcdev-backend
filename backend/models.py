@@ -319,7 +319,7 @@ class XUserBase(CustomBaseModel):
 
 
 class XUserCreate(XUserBase):
-    pass
+    id: str
 
 
 class XUser(XUserBase):
@@ -337,7 +337,7 @@ class XTweetBase(CustomBaseModel):
 
 
 class XTweetCreate(XTweetBase):
-    pass
+    id: str
 
 
 class XTweet(XTweetBase):

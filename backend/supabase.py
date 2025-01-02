@@ -68,6 +68,7 @@ from .models import (
 )
 from lib.logger import configure_logger
 from supabase import Client
+from postgrest.exceptions import APIError
 from typing import List, Optional
 from uuid import UUID
 
@@ -991,16 +992,21 @@ class SupabaseBackend(AbstractBackend):
         return XUser(**data[0])
 
     def get_x_user(self, x_user_id: str) -> Optional["XUser"]:
-        response = (
-            self.client.table("x_users")
-            .select("*")
-            .eq("id", x_user_id)
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return XUser(**response.data)
+        try:
+            response = (
+                self.client.table("x_users")
+                .select("*")
+                .eq("id", x_user_id)
+                .single()
+                .execute()
+            )
+            if not response.data:
+                return None
+            return XUser(**response.data)
+        except APIError as e:
+            if "PGRST116" in str(e):  # No rows returned
+                return None
+            raise  # Re-raise other API errors
 
     def list_x_users(self, filters: Optional["XUserFilter"] = None) -> List["XUser"]:
         query = self.client.table("x_users").select("*")
@@ -1044,16 +1050,21 @@ class SupabaseBackend(AbstractBackend):
         return XTweet(**data[0])
 
     def get_x_tweet(self, x_tweet_id: str) -> Optional["XTweet"]:
-        response = (
-            self.client.table("x_tweets")
-            .select("*")
-            .eq("id", x_tweet_id)
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return XTweet(**response.data)
+        try:
+            response = (
+                self.client.table("x_tweets")
+                .select("*")
+                .eq("id", x_tweet_id)
+                .single()
+                .execute()
+            )
+            if not response.data:
+                return None
+            return XTweet(**response.data)
+        except APIError as e:
+            if "PGRST116" in str(e):  # No rows returned
+                return None
+            raise  # Re-raise other API errors
 
     def list_x_tweets(self, filters: Optional["XTweetFilter"] = None) -> List["XTweet"]:
         query = self.client.table("x_tweets").select("*")

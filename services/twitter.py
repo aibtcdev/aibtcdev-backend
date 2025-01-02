@@ -1,11 +1,13 @@
 import os
 from backend.factory import backend
-from backend.models import XTweetCreate, XTweetFilter
+from backend.models import XTweetCreate, XTweetFilter, XUserCreate, Profile
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from services.flow import execute_twitter_stream
 from typing import Dict, List, Optional, TypedDict
+from uuid import UUID
+from datetime import datetime
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -34,6 +36,9 @@ class TwitterMentionHandler:
         )
         self.user_id = os.getenv("AIBTC_TWITTER_AUTOMATED_USER_ID")
         self.whitelisted_authors = os.getenv("AIBTC_TWITTER_WHITELISTED", "").split(",")
+        logger.info(
+            f"📋 Initialized with whitelist: {self.whitelisted_authors} (types: {[type(x) for x in self.whitelisted_authors]})"
+        )
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention and generate response if needed."""
@@ -42,11 +47,22 @@ class TwitterMentionHandler:
         conversation_id = mention.conversation_id or ""
         text = mention.text or ""
 
+        logger.info("🎯 New mention detected:")
+        logger.info(f"  Tweet ID: {tweet_id}")
+        logger.info(f"  Author ID: {author_id} (type: {type(author_id)})")
+        logger.info(f"  Text: {text}")
+
         # Check if tweet exists in our database
         existing_tweet = backend.get_x_tweet(tweet_id)
         if existing_tweet:
-            logger.debug(f"Skipping already processed tweet {tweet_id}")
+            logger.debug(f"⏭️  Skipping already processed tweet {tweet_id}")
             return
+
+        # Create or get the X user
+        existing_user = backend.get_x_user(author_id)
+        if not existing_user:
+            logger.info(f"Creating new X user with ID {author_id}")
+            backend.create_x_user(XUserCreate(id=author_id))
 
         tweet_data = {
             "tweet_id": tweet_id,
@@ -69,19 +85,29 @@ class TwitterMentionHandler:
             # Always store the tweet and log its processing
             backend.create_x_tweet(
                 XTweetCreate(
+                    id=tweet_id,
                     author_id=author_id,
-                    tweet_id=tweet_id,
-                    tweet_body=text,
-                    thread_id=int(conversation_id) if conversation_id else None,
+                    message=text
                 )
             )
 
     def _is_author_whitelisted(self, author_id: str) -> bool:
         """Check if the author is in the whitelist."""
-        logger.debug(
-            f"Checking author {author_id} against whitelist {self.whitelisted_authors}"
+        logger.info(
+            f"🔍 Whitelist check details:"
         )
-        return str(author_id) in self.whitelisted_authors
+        logger.info(
+            f"  Author ID: {author_id} (type: {type(author_id)})"
+        )
+        logger.info(
+            f"  Whitelist: {self.whitelisted_authors} (types: {[type(x) for x in self.whitelisted_authors]})"
+        )
+        
+        is_whitelisted = str(author_id) in self.whitelisted_authors
+        logger.info(
+            f"  Result: {'✅ Whitelisted' if is_whitelisted else '❌ Not whitelisted'}"
+        )
+        return is_whitelisted
 
     async def _generate_and_post_response(self, tweet_data: Dict) -> None:
         """Generate and post a response to a tweet."""
@@ -120,11 +146,17 @@ class TwitterMentionHandler:
         logger.debug(f"Conversation history: {len(history)} messages")
 
         response_content = None
+        profile = Profile(
+            id=UUID('00000000-0000-0000-0000-000000000000'),  # Placeholder UUID
+            created_at=datetime.now(),
+            account_index=0
+        )
         async for response in execute_twitter_stream(
             twitter_service=self.twitter_service,
-            account_index="0",
+            profile=profile,
             history=history,
             input_str=tweet_data["text"],
+            author_id=tweet_data["author_id"]
         ):
             if response["type"] == "result":
                 if response.get("content"):
@@ -149,21 +181,17 @@ class TwitterMentionHandler:
             # Store the response tweet
             backend.create_x_tweet(
                 XTweetCreate(
+                    id=response_tweet.id,
                     author_id=self.user_id,
-                    tweet_id=response_tweet.id,
-                    tweet_body=response_content,
-                    thread_id=(
-                        int(tweet_data["conversation_id"])
-                        if tweet_data["conversation_id"]
-                        else None
-                    ),
+                    message=response_content
                 )
             )
             # Log the response
             backend.create_x_tweet(
                 XTweetCreate(
+                    id=None,
                     author_id=None,
-                    message=f"Response to tweet {tweet_data['tweet_id']}",
+                    message=f"Response to tweet {tweet_data['tweet_id']}"
                 )
             )
             logger.info(
@@ -173,24 +201,30 @@ class TwitterMentionHandler:
     async def process_mentions(self) -> None:
         """Process all new mentions for the bot user."""
         try:
+            logger.info("🔍 Checking for new mentions...")
+            
+            # Initialize Twitter service and get mentions
             await self.twitter_service.initialize()
             mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)
+
             if not mentions:
-                logger.debug("No mentions found")
+                logger.info("👻 No new mentions found")
                 return
+
+            logger.info(f"📥 Found {len(mentions)} new mentions to process")
 
             for mention in mentions:
                 try:
+                    logger.info("-----------------------------------")
                     await self._handle_mention(mention)
                 except Exception as e:
-                    logger.error(f"Error processing mention {mention.id}: {str(e)}")
-                    # Log the error
-                    backend.create_x_tweet(XTweetCreate(message=str(e)))
-                    # Continue processing other mentions even if one fails
-                    continue
+                    logger.error(f"❌ Error processing mention {mention.id}: {str(e)}")
+
+            logger.info("✅ Mention processing complete")
+            logger.info("===================================")
 
         except Exception as e:
-            logger.error(f"Error processing mentions: {str(e)}")
+            logger.error(f"❌ Error processing mentions: {str(e)}")
             raise
 
 
