@@ -772,7 +772,7 @@ class SupabaseBackend(AbstractBackend):
         return Step(**response.data)
 
     def list_steps(self, filters: Optional["StepFilter"] = None) -> List["Step"]:
-        query = self.client.table("steps").select("*")
+        query = self.client.table("steps").select("*").order("created_at", desc=True)
         if filters:
             if filters.job_id is not None:
                 query = query.eq("job_id", str(filters.job_id))

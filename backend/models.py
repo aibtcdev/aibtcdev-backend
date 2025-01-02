@@ -224,7 +224,7 @@ class StepBase(CustomBaseModel):
     content: Optional[str] = None
     tool: Optional[str] = None
     tool_input: Optional[str] = None
-    result: Optional[str] = None
+    tool_output: Optional[str] = None
     thought: Optional[str] = None
     profile_id: Optional[UUID] = None
 

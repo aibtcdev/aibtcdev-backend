@@ -118,40 +118,15 @@ async def process_chat_message(
                         f"output: {result.get('output')}, "
                         f"raw: {result}"
                     )
-                    
+
                     # Ensure all values are strings
                     tool_name = str(result.get("tool", ""))
                     tool_input = str(result.get("input", ""))
                     tool_output = str(result.get("output", ""))
-                    
-                    logger.debug(f"Processed tool values - name: {tool_name}, input: {tool_input}, output: {tool_output}")
-                    
-                    # Save any accumulated content first
-                    if current_message["content"]:
-                        logger.debug(f"Saving accumulated content: {current_message}")
-                        try:
-                            backend.create_step(
-                                new_step=StepCreate(
-                                    profile_id=profile.id,
-                                    job_id=job_id,
-                                    role="assistant",
-                                    content=current_message["content"],
-                                    tool=None,
-                                    tool_input=None,
-                                    thought=None,
-                                    result=None,
-                                )
-                            )
-                            logger.debug("Successfully saved accumulated content")
-                        except Exception as e:
-                            logger.error(f"Error saving accumulated content: {e}")
-                        
-                        results.append(
-                            {
-                                **current_message,
-                                "timestamp": datetime.datetime.now().isoformat(),
-                            }
-                        )
+
+                    logger.debug(
+                        f"Processed tool values - name: {tool_name}, input: {tool_input}, output: {tool_output}"
+                    )
 
                     # Create a new step for the tool execution
                     logger.debug("Creating tool execution step")
@@ -164,31 +139,36 @@ async def process_chat_message(
                             tool=tool_name,
                             tool_input=tool_input,
                             thought=None,
-                            result=tool_output
+                            tool_output=tool_output,
                         )
                         logger.debug(f"Created StepCreate object: {new_step}")
                         created_step = backend.create_step(new_step=new_step)
-                        logger.debug(f"Successfully created tool execution step: {created_step}")
+                        logger.debug(
+                            f"Successfully created tool execution step: {created_step}"
+                        )
                     except Exception as e:
                         logger.error(f"Error creating tool execution step: {e}")
-                    
+
                     # Add to results for streaming
-                    results.append({
+                    tool_execution = {
                         "role": "assistant",
-                        "type": "tool",
+                        "type": "stream",
+                        "stream_type": "tool",
                         "tool": tool_name,
                         "tool_input": tool_input,
-                        "result": tool_output,
+                        "tool_output": tool_output,
                         "timestamp": datetime.datetime.now().isoformat(),
-                    })
-                    
+                    }
+                    results.append(tool_execution)
+                    await output_queue.put(tool_execution)
+
                     # Reset current message
                     current_message = {
                         "content": "",
                         "type": "result",
                         "tool": None,
                         "tool_input": None,
-                        "result": None,
+                        "tool_output": None,
                         "thought": None,
                     }
                     continue
@@ -220,6 +200,7 @@ async def process_chat_message(
                 logger.debug(
                     f"Saving final content - length: {len(current_message['content'])}"
                 )
+                logger.debug("Adding current message to results array", current_message)
                 backend.create_step(
                     new_step=StepCreate(
                         profile_id=profile.id,
@@ -229,7 +210,7 @@ async def process_chat_message(
                         tool=None,
                         tool_input=None,
                         thought=None,
-                        result=None,
+                        tool_output=None,
                     )
                 )
                 results.append(

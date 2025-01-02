@@ -521,15 +521,20 @@ async def execute_chat_stream_langgraph(
     task = asyncio.create_task(runnable.ainvoke(config))
 
     # Stream tokens while waiting for completion
-    while True:
+    while not task.done():
         try:
             logger.debug("Waiting for data from callback queue")
-            data = await callback_queue.get()
-            logger.debug(f"Received data from queue: {data}")
-            if data["type"] == "end":
-                yield data
-                break
-            yield data
+            try:
+                # Try to get data with a timeout to avoid getting stuck
+                data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
+                logger.debug(f"Received data from queue: {data}")
+                if data["type"] == "end":
+                    yield data
+                else:
+                    yield data
+            except asyncio.TimeoutError:
+                # No data available, continue checking if task is done
+                continue
         except asyncio.CancelledError:
             logger.error("Task cancelled")
             task.cancel()
@@ -580,9 +585,7 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         """Helper method to put items in queue."""
         loop = self._ensure_loop()
         if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(
-                self.queue.put(item), loop
-            )
+            future = asyncio.run_coroutine_threadsafe(self.queue.put(item), loop)
             future.result()  # Wait for it to complete
         else:
             loop.run_until_complete(self.queue.put(item))
@@ -607,31 +610,40 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         """Run when LLM errors."""
         logger.error(f"LLM error: {str(error)}")
 
-    def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
-        """Run when tool starts running."""
-        self.current_tool = serialized.get("name")
-        tool_execution = {
-            "type": "tool_execution",
-            "tool": self.current_tool,
-            "input": input_str,
-            "output": None,
-        }
-        self._put_to_queue(tool_execution)
+    # def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
+    #     """Run when tool starts running."""
+    #     self.current_tool = serialized.get("name")
+    #     tool_execution = {
+    #         "type": "tool_execution",
+    #         "tool": self.current_tool,
+    #         "input": input_str,
+    #         "output": None,
+    #     }
+    #     self._put_to_queue(tool_execution)
 
-    def on_tool_end(self, output: str, **kwargs):
-        """Run when tool ends running."""
+    # def on_tool_end(self, output: str, **kwargs):
+    #     """Run when tool ends running."""
+    #     if self.current_tool:
+    #         tool_execution = {
+    #             "type": "tool_execution",
+    #             "tool": self.current_tool,
+    #             "input": None,  # We don't have access to the input here
+    #             "output": output,
+    #         }
+    #         self._put_to_queue(tool_execution)
+    #         self.current_tool = None
+
+    def on_tool_error(self, error: Exception, **kwargs):
+        """Run when tool errors."""
         if self.current_tool:
             tool_execution = {
                 "type": "tool_execution",
                 "tool": self.current_tool,
                 "input": None,  # We don't have access to the input here
-                "output": output,
+                "output": f"Error: {str(error)}",
             }
             self._put_to_queue(tool_execution)
             self.current_tool = None
-
-    def on_tool_error(self, error: Exception, **kwargs):
-        """Run when tool errors."""
         logger.error(f"Tool error: {str(error)}")
 
 

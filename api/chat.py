@@ -128,7 +128,7 @@ async def websocket_endpoint(
                         "timestamp": step.created_at.isoformat(),
                         "tool": step.tool,
                         "tool_input": step.tool_input,
-                        "result": step.result,
+                        "tool_output": step.tool_output,
                         "thought": step.thought,
                     }
                     formatted_history.append(formatted_msg)
@@ -197,6 +197,7 @@ async def websocket_endpoint(
                             if result is None:
                                 break
                             # Add job_started_at if it's a stream message
+                            logger.debug(result)
                             if result.get("type") == "stream":
                                 result["job_started_at"] = job_started_at
                             await manager.send_conversation_message(
