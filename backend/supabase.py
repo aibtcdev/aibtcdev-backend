@@ -831,6 +831,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("crew_id", str(filters.crew_id))
             if filters.agent_id is not None:
                 query = query.eq("agent_id", str(filters.agent_id))
+            if filters.is_scheduled is not None:
+                query = query.eq("is_scheduled", filters.is_scheduled)
         response = query.execute()
         data = response.data or []
         return [Task(**row) for row in data]

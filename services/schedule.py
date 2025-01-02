@@ -39,6 +39,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
 
         # Process each schedule from Supabase
         for schedule in schedules:
+            logger.debug(f"Processing schedule: {schedule}")
             schedule_id = str(schedule.id)
             job_id = f"schedule_{schedule_id}"
 
@@ -49,7 +50,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
             is_scheduled = schedule.is_scheduled
 
             if not all([cron_expression, agent_id, task_id]):
-                logger.warning(f"Skipping invalid schedule: {schedule}")
+                logger.debug(f"Skipping invalid schedule: {schedule}")
                 continue
 
             # Skip disabled schedules and remove their jobs if they exist
