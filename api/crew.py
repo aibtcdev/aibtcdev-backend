@@ -4,13 +4,14 @@ import uuid
 from .verify_profile import verify_profile_from_token
 from backend.factory import backend
 from backend.models import Profile
+from crewai.tools import BaseTool
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
 from services.crews import execute_crew_stream
 from tools.tools_factory import initialize_tools
-from typing import Dict
+from typing import Dict, List
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -182,25 +183,50 @@ async def websocket_endpoint(
 
 
 @router.get("/tools")
-async def get_avaliable_tools() -> Dict[str, str]:
+async def get_avaliable_tools() -> List[Dict[str, str]]:
     """Get a list of available tools and their descriptions.
 
     Returns:
-        Dict[str, str]: Dictionary mapping tool names to their descriptions
+        List[Dict[str, str]]: List of dictionaries containing tool information
 
     Raises:
         HTTPException: If there's an error initializing or fetching tools
     """
     logger.debug("Fetching available tools")
     try:
-        profile = Profile(account_index="", id=0)
+        profile = Profile(
+            account_index="0",
+            id="419781f6-c250-4bd6-be9e-fb347d1f77f9",
+            created_at=datetime.datetime.now(),
+            updated_at=datetime.datetime.now(),
+        )
         tools_map = initialize_tools(profile)
-        response = {
-            tool_name: tool_instance.description
-            for tool_name, tool_instance in tools_map.items()
-        }
-        logger.debug(f"Successfully retrieved {len(response)} tools")
-        return JSONResponse(content=response)
+        tools_array = []
+
+        for tool_name, tool_instance in tools_map.items():
+            fields = list(tool_instance.args_schema.model_fields.values())
+            if fields:
+                first_field = fields[0]
+                args_schema = {
+                    name: {
+                        "description": field.description,
+                        "type": BaseTool._get_arg_annotations(field.annotation),
+                    }
+                    for name, field in tool_instance.args_schema.model_fields.items()
+                }
+                # Extract category from tool name (part before first underscore)
+                category = tool_name.split("_")[0].upper()
+
+                tool = {
+                    "id": tool_name,  # Using tool_name as id for now
+                    "name": tool_instance.name,
+                    "description": first_field.description or "",
+                    "category": category,
+                    "parameters": json.dumps(args_schema),
+                }
+                tools_array.append(tool)
+
+        return tools_array
     except Exception as e:
         logger.error(f"Error fetching available tools: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
