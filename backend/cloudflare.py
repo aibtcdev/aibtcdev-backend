@@ -36,10 +36,6 @@ from .models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
-    Schedule,
-    ScheduleBase,
-    ScheduleCreate,
-    ScheduleFilter,
     Step,
     StepBase,
     StepCreate,
@@ -293,30 +289,6 @@ class CloudflareBackend(AbstractBackend):
         return None
 
     def delete_proposal(self, proposal_id: UUID) -> bool:
-        return False
-
-    # ----------------------------------------------------------------
-    # 10. SCHEDULES
-    # ----------------------------------------------------------------
-    def create_schedule(self, new_sched: "ScheduleCreate") -> "Schedule":
-        return Schedule(
-            id=DUMMY_ID, created_at=NOW, **new_sched.dict(exclude_unset=True)
-        )
-
-    def get_schedule(self, sched_id: UUID) -> Optional["Schedule"]:
-        return None
-
-    def list_schedules(
-        self, filters: Optional["ScheduleFilter"] = None
-    ) -> List["Schedule"]:
-        return []
-
-    def update_schedule(
-        self, sched_id: UUID, update_data: "ScheduleBase"
-    ) -> Optional["Schedule"]:
-        return None
-
-    def delete_schedule(self, sched_id: UUID) -> bool:
         return False
 
     # ----------------------------------------------------------------

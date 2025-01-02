@@ -37,10 +37,6 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
-    Schedule,
-    ScheduleBase,
-    ScheduleCreate,
-    ScheduleFilter,
     Step,
     StepBase,
     StepCreate,
@@ -57,6 +53,10 @@ from backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    Wallet,
+    WalletBase,
+    WalletCreate,
+    WalletFilter,
     XTweet,
     XTweetBase,
     XTweetCreate,
@@ -77,6 +77,29 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def upload_file(self, file_path: str, file: bytes) -> str:
+        pass
+
+    # ----------- WALLETS ----------
+    @abstractmethod
+    def create_wallet(self, new_wallet: WalletCreate) -> Wallet:
+        pass
+
+    @abstractmethod
+    def get_wallet(self, wallet_id: UUID) -> Optional[Wallet]:
+        pass
+
+    @abstractmethod
+    def list_wallets(self, filters: Optional[WalletFilter] = None) -> List[Wallet]:
+        pass
+
+    @abstractmethod
+    def update_wallet(
+        self, wallet_id: UUID, update_data: WalletBase
+    ) -> Optional[Wallet]:
+        pass
+
+    @abstractmethod
+    def delete_wallet(self, wallet_id: UUID) -> None:
         pass
 
     # ----------- AGENTS -----------
@@ -284,31 +307,6 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_proposal(self, proposal_id: UUID) -> bool:
-        pass
-
-    # ----------- SCHEDULES -----------
-    @abstractmethod
-    def create_schedule(self, new_sched: ScheduleCreate) -> Schedule:
-        pass
-
-    @abstractmethod
-    def get_schedule(self, sched_id: UUID) -> Optional[Schedule]:
-        pass
-
-    @abstractmethod
-    def list_schedules(
-        self, filters: Optional[ScheduleFilter] = None
-    ) -> List[Schedule]:
-        pass
-
-    @abstractmethod
-    def update_schedule(
-        self, sched_id: UUID, update_data: ScheduleBase
-    ) -> Optional[Schedule]:
-        pass
-
-    @abstractmethod
-    def delete_schedule(self, sched_id: UUID) -> bool:
         pass
 
     # ----------- STEPS -----------

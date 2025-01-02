@@ -11,6 +11,24 @@ class CustomBaseModel(BaseModel):
 
 
 #
+#  WALLETS
+#
+class WalletBase(CustomBaseModel):
+    account_index: Optional[int] = None
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+
+
+class WalletCreate(WalletBase):
+    pass
+
+
+class Wallet(WalletBase):
+    id: UUID
+    created_at: datetime
+
+
+#
 #  AGENTS
 #
 class AgentBase(CustomBaseModel):
@@ -21,6 +39,7 @@ class AgentBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
     agent_tools: Optional[str] = None
     crew_id: Optional[UUID] = None
+    image_url: Optional[str] = None
 
 
 class AgentCreate(AgentBase):
@@ -197,28 +216,6 @@ class Proposal(ProposalBase):
 
 
 #
-# SCHEDULES
-#
-class ScheduleBase(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    prompt: Optional[str] = None
-    cron: Optional[str] = None
-    enabled: bool = False
-    name: Optional[str] = None
-    task: Optional[UUID] = None
-    agent: Optional[UUID] = None
-
-
-class ScheduleCreate(ScheduleBase):
-    pass
-
-
-class Schedule(ScheduleBase):
-    id: UUID
-    created_at: datetime
-
-
-#
 # STEPS
 #
 class StepBase(CustomBaseModel):
@@ -231,8 +228,10 @@ class StepBase(CustomBaseModel):
     thought: Optional[str] = None
     profile_id: Optional[UUID] = None
 
+
 class StepCreate(StepBase):
     pass
+
 
 class Step(StepBase):
     id: UUID
@@ -243,11 +242,13 @@ class Step(StepBase):
 # TASKS
 #
 class TaskBase(CustomBaseModel):
-    description: Optional[str] = None
+    prompt: Optional[str] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
     crew_id: Optional[UUID] = None
-    task_tools: Optional[str] = None
+    name: Optional[str] = None
+    cron: Optional[str] = None
+    is_scheduled: Optional[bool] = False
 
 
 class TaskCreate(TaskBase):
@@ -356,6 +357,11 @@ class XTweet(XTweetBase):
 #
 
 
+class WalletFilter(CustomBaseModel):
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+
+
 class AgentFilter(CustomBaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
@@ -409,12 +415,6 @@ class ProposalFilter(CustomBaseModel):
     is_deployed: Optional[bool] = None
 
 
-class ScheduleFilter(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    agent: Optional[UUID] = None
-    enabled: Optional[bool] = None
-
-
 class StepFilter(CustomBaseModel):
     job_id: Optional[UUID] = None
     role: Optional[str] = None
@@ -424,6 +424,7 @@ class TaskFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
     crew_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
+    is_scheduled: Optional[bool] = None
 
 
 class TelegramUserFilter(CustomBaseModel):

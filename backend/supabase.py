@@ -1,3 +1,4 @@
+import time
 from .abstract import AbstractBackend
 from .models import (
     Agent,
@@ -36,10 +37,6 @@ from .models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
-    Schedule,
-    ScheduleBase,
-    ScheduleCreate,
-    ScheduleFilter,
     Step,
     StepBase,
     StepCreate,
@@ -56,6 +53,10 @@ from .models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    Wallet,
+    WalletBase,
+    WalletCreate,
+    WalletFilter,
     XTweet,
     XTweetBase,
     XTweetCreate,
@@ -157,6 +158,63 @@ class SupabaseBackend(AbstractBackend):
         raise Exception(
             f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
         )
+
+    # ----------------------------------------------------------------
+    # 0. WALLETS
+    # ----------------------------------------------------------------
+
+    def create_wallet(self, new_wallet: "WalletCreate") -> "Wallet":
+        payload = new_wallet.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("wallets").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from Supabase insert for wallet.")
+        return Wallet(**data[0])
+
+    def get_wallet(self, wallet_id: UUID) -> Optional["Wallet"]:
+        response = (
+            self.client.table("wallets")
+            .select("*")
+            .eq("id", str(wallet_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Wallet(**response.data)
+
+    def list_wallets(self, filters: Optional["WalletFilter"] = None) -> List["Wallet"]:
+        query = self.client.table("wallets").select("*")
+        if filters:
+            query = query.eq("user_id", str(filters.profile_id))
+        response = query.execute()
+        data = response.data or []
+        return [Wallet(**row) for row in data]
+
+    def update_wallet(
+        self, wallet_id: UUID, update_data: "WalletBase"
+    ) -> Optional["Wallet"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            # Nothing to update
+            return self.get_wallet(wallet_id)
+        response = (
+            self.client.table("wallets")
+            .update(payload)
+            .eq("id", str(wallet_id))
+            .execute()
+        )
+        updated_rows = response.data or []
+        if not updated_rows:
+            return None
+        return Wallet(**updated_rows[0])
+
+    def delete_wallet(self, wallet_id: UUID) -> bool:
+        response = (
+            self.client.table("wallets").delete().eq("id", str(wallet_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # 1. AGENTS
@@ -686,68 +744,6 @@ class SupabaseBackend(AbstractBackend):
     def delete_proposal(self, proposal_id: UUID) -> bool:
         response = (
             self.client.table("proposals").delete().eq("id", str(proposal_id)).execute()
-        )
-        deleted = response.data or []
-        return len(deleted) > 0
-
-    # ----------------------------------------------------------------
-    # 10. SCHEDULES
-    # ----------------------------------------------------------------
-    def create_schedule(self, new_sched: "ScheduleCreate") -> "Schedule":
-        payload = new_sched.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("schedules").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from schedule insert.")
-        return Schedule(**data[0])
-
-    def get_schedule(self, sched_id: UUID) -> Optional["Schedule"]:
-        response = (
-            self.client.table("schedules")
-            .select("*")
-            .eq("id", str(sched_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Schedule(**response.data)
-
-    def list_schedules(
-        self, filters: Optional["ScheduleFilter"] = None
-    ) -> List["Schedule"]:
-        query = self.client.table("schedules").select("*")
-        if filters:
-            if filters.profile_id is not None:
-                query = query.eq("profile_id", str(filters.profile_id))
-            if filters.agent is not None:
-                query = query.eq("agent", str(filters.agent))
-            if filters.enabled is not None:
-                query = query.eq("enabled", filters.enabled)
-        response = query.execute()
-        data = response.data or []
-        return [Schedule(**row) for row in data]
-
-    def update_schedule(
-        self, sched_id: UUID, update_data: "ScheduleBase"
-    ) -> Optional["Schedule"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_schedule(sched_id)
-        response = (
-            self.client.table("schedules")
-            .update(payload)
-            .eq("id", str(sched_id))
-            .execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Schedule(**updated[0])
-
-    def delete_schedule(self, sched_id: UUID) -> bool:
-        response = (
-            self.client.table("schedules").delete().eq("id", str(sched_id)).execute()
         )
         deleted = response.data or []
         return len(deleted) > 0

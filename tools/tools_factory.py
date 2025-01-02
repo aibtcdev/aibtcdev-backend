@@ -88,7 +88,9 @@ def convert_to_langchain_tool(crewai_tool: CrewAIBaseTool) -> LangChainBaseTool:
     return tool
 
 
-def initialize_tools(profile: Profile) -> Dict[str, CrewAIBaseTool]:
+def initialize_tools(
+    profile: Profile, agent_id: str = "e8325a19-633b-466c-b4c1-19c37a084778"
+) -> Dict[str, CrewAIBaseTool]:
     """Initialize and return a dictionary of available CrewAI tools."""
     # Convert account_index to string
     account_index = (
@@ -105,7 +107,7 @@ def initialize_tools(profile: Profile) -> Dict[str, CrewAIBaseTool]:
         "lunarcrush_get_token_data": LunarCrushTokenMetricsTool(),
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
-        "db_add_scheduled_task": AddScheduledTaskTool(profile.id),
+        "db_add_scheduled_task": AddScheduledTaskTool(profile.id, agent_id),
         "web_search_experimental": SerperDevTool(),
         "velar_get_token_price_history": VelarGetPriceHistory(),
         "velar_get_tokens": VelarGetTokens(),
