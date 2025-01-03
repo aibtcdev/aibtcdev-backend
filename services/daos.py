@@ -68,19 +68,7 @@ def generate_token_dependencies(
         TokenServiceError: If there is an error creating token dependencies
     """
     try:
-        # Create token metadata
-        metadata = TokenMetadata(
-            name=name,
-            symbol=symbol,
-            description=description,
-            decimals=decimals,
-            max_supply=max_supply,
-        )
-
-        # Upload token assets
-        assets = TokenAssetManager.upload_token_assets(metadata)
-
-        # Create token record
+        # Create token record first to get the ID
         new_token = backend.create_token(
             TokenCreate(
                 name=name,
@@ -90,14 +78,52 @@ def generate_token_dependencies(
                 max_supply=max_supply,
             )
         )
+        
+        # Create metadata object
+        metadata = TokenMetadata(
+            name=name,
+            symbol=symbol,
+            description=description,
+            decimals=decimals,
+            max_supply=max_supply,
+        )
 
-        return assets["metadata_url"], new_token.model_dump()
+        # Create asset manager instance with token ID
+        asset_manager = TokenAssetManager(new_token.id)
+        
+        # Generate and upload assets
+        try:
+            assets = asset_manager.generate_all_assets(metadata)
+            
+            # Update token with asset URLs
+            token_updates = TokenBase(
+                uri=assets["metadata_url"],
+                image_url=assets["image_url"]
+            )
+            if not backend.update_token(new_token.id, token_updates):
+                raise TokenServiceError(
+                    "Failed to update token with asset URLs",
+                    {"token_id": new_token.id, "assets": assets}
+                )
 
-    except TokenAssetError as e:
-        raise TokenServiceError(
-            f"Failed to upload token assets: {str(e)}",
-            details=e.details if hasattr(e, "details") else None,
-        ) from e
+            # Return metadata URL and token record as dict
+            token_dict = new_token.model_dump()
+            return assets["metadata_url"], {
+                **token_dict,
+                "uri": assets["metadata_url"],
+                "image_url": assets["image_url"]
+            }
+
+        except TokenAssetError as e:
+            raise TokenServiceError(
+                f"Failed to generate token assets: {str(e)}",
+                {
+                    "token_id": new_token.id,
+                    "original_error": str(e),
+                    "token_data": new_token.model_dump()
+                }
+            ) from e
+
     except Exception as e:
         raise TokenServiceError(
             f"Failed to create token dependencies: {str(e)}"

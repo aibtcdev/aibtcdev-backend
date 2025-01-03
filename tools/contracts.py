@@ -152,7 +152,7 @@ class ContractCollectiveDeployTool(BaseTool):
                     "success": False,
                 }
 
-            # Deploy contracts
+            # Deploy contracts using BunScriptRunner
             result = BunScriptRunner.bun_run(
                 self.account_index,
                 "stacks-contracts",
@@ -167,27 +167,38 @@ class ContractCollectiveDeployTool(BaseTool):
             if not result["success"]:
                 return {
                     "output": result["output"],
-                    "error": result["error"],
+                    "error": result["error"] or "Contract deployment failed",
                     "success": False,
                 }
 
-            # Parse deployment output
             try:
-                deployment_data = json.loads(result["output"])
+                # Parse deployment output
+                deployment_data = json.loads(result["output"] if result["output"] else result["error"])
+                
                 if not deployment_data["success"]:
+                    error_details = deployment_data.get("error", {})
+                    error_msg = error_details.get("message", "Unknown deployment error")
+                    if error_details.get("stage"):
+                        error_msg = f"Failed at {error_details['stage']}: {error_msg}"
                     return {
                         "output": result["output"],
-                        "error": deployment_data.get(
-                            "error", "Unknown deployment error"
-                        ),
+                        "error": error_msg,
                         "success": False,
                     }
 
                 # Update token record with contract information
                 contracts = deployment_data["contracts"]
+                token_contract = contracts.get("token", {})
+                if not token_contract:
+                    return {
+                        "output": "",
+                        "error": "Token contract data missing from deployment result",
+                        "success": False,
+                    }
+
                 token_updates = TokenBase(
-                    contract_principal=contracts["token"]["contractPrincipal"],
-                    tx_id=contracts["token"]["transactionId"],
+                    contract_principal=token_contract["contractPrincipal"],
+                    tx_id=token_contract["transactionId"],
                 )
 
                 if not backend.update_token(token_record["id"], token_updates):
@@ -197,17 +208,18 @@ class ContractCollectiveDeployTool(BaseTool):
                         "success": False,
                     }
 
+                # Create capabilities for each deployed contract
                 for contract_name, contract_data in contracts.items():
                     if contract_name != "token":
-                        if not backend.create_capability(
-                            CapabilityCreate(
-                                collective_id=collective_record["id"],
-                                type=contract_name,
-                                contract_principal=contract_data["contractPrincipal"],
-                                tx_id=contract_data["transactionId"],
-                                status="deployed",
-                            )
-                        ):
+                        capability = CapabilityCreate(
+                            collective_id=collective_record["id"],
+                            type=contract_name,
+                            contract_principal=contract_data["contractPrincipal"],
+                            tx_id=contract_data["transactionId"],
+                            status="deployed",
+                        )
+                        
+                        if not backend.create_capability(capability):
                             return {
                                 "output": "",
                                 "error": f"Failed to add {contract_name} capability",
@@ -215,7 +227,7 @@ class ContractCollectiveDeployTool(BaseTool):
                             }
 
                 return {
-                    "output": result["output"],
+                    "output": json.dumps(deployment_data, indent=2),
                     "error": None,
                     "success": True,
                 }

@@ -337,7 +337,7 @@ class XTweetBase(CustomBaseModel):
 
 
 class XTweetCreate(XTweetBase):
-    id: str
+    id: Optional[str] = None
 
 
 class XTweet(XTweetBase):

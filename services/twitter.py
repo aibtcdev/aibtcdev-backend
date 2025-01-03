@@ -46,17 +46,16 @@ class TwitterMentionHandler:
         author_id = mention.author_id or ""
         conversation_id = mention.conversation_id or ""
         text = mention.text or ""
-
+        
+        # Clean up tweet text - remove extra whitespace and newlines
+        text = ' '.join(text.split())
+        
         logger.info("🎯 New mention detected:")
         logger.info(f"  Tweet ID: {tweet_id}")
         logger.info(f"  Author ID: {author_id} (type: {type(author_id)})")
         logger.info(f"  Text: {text}")
-
-        # Check if tweet exists in our database
-        existing_tweet = backend.get_x_tweet(tweet_id)
-        if existing_tweet:
-            logger.debug(f"⏭️  Skipping already processed tweet {tweet_id}")
-            return
+        logger.debug(f"  Raw text (repr): {repr(mention.text)}")
+        logger.debug(f"  Cleaned text (repr): {repr(text)}")
 
         # Create or get the X user
         existing_user = backend.get_x_user(author_id)
@@ -67,7 +66,7 @@ class TwitterMentionHandler:
         tweet_data = {
             "tweet_id": tweet_id,
             "author_id": author_id,
-            "text": text,
+            "text": text,  # Use the cleaned text
             "conversation_id": conversation_id,
         }
 
@@ -178,7 +177,7 @@ class TwitterMentionHandler:
         )
 
         if response_tweet and response_tweet.id:
-            # Store the response tweet
+            # Store the response tweet in database
             backend.create_x_tweet(
                 XTweetCreate(
                     id=response_tweet.id,
@@ -186,16 +185,8 @@ class TwitterMentionHandler:
                     message=response_content
                 )
             )
-            # Log the response
-            backend.create_x_tweet(
-                XTweetCreate(
-                    id=None,
-                    author_id=None,
-                    message=f"Response to tweet {tweet_data['tweet_id']}"
-                )
-            )
             logger.info(
-                f"Stored bot response in database. Response tweet ID: {response_tweet.id}"
+                f"✅ Successfully stored response tweet in database (ID: {response_tweet.id})"
             )
 
     async def process_mentions(self) -> None:
@@ -203,24 +194,50 @@ class TwitterMentionHandler:
         try:
             logger.info("🔍 Checking for new mentions...")
             
-            # Initialize Twitter service and get mentions
+            # Force re-initialization of Twitter service each time
+            self.twitter_service.client = None
             await self.twitter_service.initialize()
-            mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)
+            
+            # Get the latest tweet ID from our database to use as since_id
+            all_tweets = backend.list_x_tweets()
+            latest_tweet = None
+            if all_tweets:
+                # Sort by ID since Twitter IDs are chronological
+                latest_tweet = max(all_tweets, key=lambda t: t.id)
+                logger.info(f"Latest tweet ID in database: {latest_tweet.id}")
+            
+            # Get mentions with pagination
+            mentions = await self.twitter_service.get_mentions_by_user_id(
+                self.user_id,
+                max_results=100,  # Explicitly set max_results
+                since_id=latest_tweet.id if latest_tweet else None
+            )
 
             if not mentions:
-                logger.info("👻 No new mentions found")
+                logger.info("👻 No mentions found")
                 return
 
-            logger.info(f"📥 Found {len(mentions)} new mentions to process")
+            logger.info(f"📥 Found {len(mentions)} mentions to process")
+            processed_count = 0
 
             for mention in mentions:
                 try:
+                    # Log the mention details
+                    logger.info(f"Processing mention {mention.id} from {mention.created_at}")
+                    
+                    # Check if tweet exists in our database before processing
+                    existing_tweet = backend.get_x_tweet(mention.id)
+                    if existing_tweet:
+                        logger.info(f"⏭️  Skipping already processed tweet {mention.id}")
+                        continue
+                        
                     logger.info("-----------------------------------")
                     await self._handle_mention(mention)
+                    processed_count += 1
                 except Exception as e:
                     logger.error(f"❌ Error processing mention {mention.id}: {str(e)}")
 
-            logger.info("✅ Mention processing complete")
+            logger.info(f"✅ Mention processing complete - Processed {processed_count} new mentions")
             logger.info("===================================")
 
         except Exception as e:
