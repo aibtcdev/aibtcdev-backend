@@ -1,13 +1,13 @@
 from backend.factory import backend
 from backend.models import TaskCreate
-from crewai_tools import BaseTool
+from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from storage3._async.bucket import Response
-from typing import Type
+from typing import Any, Dict, Optional, Type, Union
 
 
-class AddScheduledTaskToolSchema(BaseModel):
-    """Input schema for AddScheduledTaskTool."""
+class AddScheduledTaskInput(BaseModel):
+    """Input schema for AddScheduledTask tool."""
 
     name: str = Field(
         ...,
@@ -28,30 +28,29 @@ class AddScheduledTaskToolSchema(BaseModel):
 
 
 class AddScheduledTaskTool(BaseTool):
-    name: str = "Database: Add Scheduled task"
-    description: str = "Add a scheduled task to the database"
-    args_schema: Type[BaseModel] = AddScheduledTaskToolSchema
+    name: str = "db_add_scheduled_task"
+    description: str = (
+        "Add a scheduled task to the database with specified name, prompt, cron schedule, and enabled status"
+    )
+    args_schema: Type[BaseModel] = AddScheduledTaskInput
+    return_direct: bool = False
     profile_id: str = "0"
     agent_id: str = "0"
 
-    def __init__(self, profile_id: str, agent_id: str, **kwargs):
+    def __init__(self, profile_id: str = "0", agent_id: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.profile_id = profile_id
         self.agent_id = agent_id
 
-    def _run(self, name: str, prompt: str, cron: str, enabled: str) -> dict:
-        """
-        Add a scheduled task to the database.
-
-        Args:
-            name (str): Name of the scheduled task
-            prompt (str): Prompt to schedule
-            cron (str): Cron expression for the schedule, e.g. '0 0 * * *' for every day at midnight
-            enabled (str): Whether the schedule is enabled or not (true or false)
-
-        Returns:
-            dict: Response data.
-        """
+    def _deploy(
+        self,
+        name: str,
+        prompt: str,
+        cron: str,
+        enabled: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to add a scheduled task."""
         try:
             response = backend.create_task(
                 TaskCreate(
@@ -66,3 +65,25 @@ class AddScheduledTaskTool(BaseTool):
             return response
         except Exception as e:
             return {"error": str(e)}
+
+    async def _run(
+        self,
+        name: str,
+        prompt: str,
+        cron: str,
+        enabled: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Sync version of the tool."""
+        return self._deploy(name, prompt, cron, enabled, **kwargs)
+
+    async def _arun(
+        self,
+        name: str,
+        prompt: str,
+        cron: str,
+        enabled: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(name, prompt, cron, enabled, **kwargs)

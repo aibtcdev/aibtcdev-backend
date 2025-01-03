@@ -1,100 +1,111 @@
 from .bun import BunScriptRunner
-from crewai_tools import BaseTool
+from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Type, Union
 
 
-class WalletGetBalanceSchema(BaseModel):
-    """Input schema for WalletGetMyBalance.
-    This tool doesn't require any input parameters but we still define the schema for consistency.
+class WalletGetBalanceInput(BaseModel):
+    """Input schema for getting wallet balance information.
+    No parameters required as it uses the default account.
     """
 
     pass
 
 
 class WalletGetMyBalance(BaseTool):
-    """Tool for fetching wallet balance information."""
-
-    name: str = "Get my wallet balance"
-    description: str = "Get the wallet balance including STX, FT, and NFTs."
-    args_schema: Type[BaseModel] = WalletGetBalanceSchema
+    name: str = "wallet_get_balance"
+    description: str = (
+        "Get the current wallet balance and amount of tokens including STX, fungible tokens (FT), and "
+        "non-fungible tokens (NFTs) associated with the current wallet"
+    )
+    args_schema: Type[BaseModel] = WalletGetBalanceInput
+    return_direct: bool = False
     account_index: str = "0"
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, account_index: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self) -> Dict[str, Union[str, bool, None]]:
-        """
-        Get the current wallet balance.
-
-        Returns:
-            Dict[str, Union[str, bool, None]]: A dictionary containing the wallet balance information,
-                including STX, fungible tokens, and NFTs.
-        """
+    def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get wallet balance."""
         return BunScriptRunner.bun_run(
             self.account_index, "stacks-wallet", "get-my-wallet-balance.ts"
         )
 
+    def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get wallet balance."""
+        return self._deploy(**kwargs)
 
-class WalletGetAddressSchema(BaseModel):
-    """Input schema for WalletGetMyAddress.
-    This tool doesn't require any input parameters but we still define the schema for consistency.
+    async def _arun(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class WalletGetAddressInput(BaseModel):
+    """Input schema for getting wallet address.
+    No parameters required as it uses the default account.
     """
 
     pass
 
 
 class WalletGetMyAddress(BaseTool):
-    """Tool for fetching wallet STX address."""
-
-    name: str = "Get my wallet address"
-    description: str = "Get the STX address of the wallet."
-    args_schema: Type[BaseModel] = WalletGetAddressSchema
+    name: str = "wallet_get_address"
+    description: str = "Get the STX address associated with the current wallet"
+    args_schema: Type[BaseModel] = WalletGetAddressInput
+    return_direct: bool = False
     account_index: str = "0"
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, account_index: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self) -> Dict[str, Union[str, bool, None]]:
-        """
-        Get the wallet's STX address.
-
-        Returns:
-            Dict[str, Union[str, bool, None]]: A dictionary containing the wallet address information.
-        """
+    def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get wallet address."""
         return BunScriptRunner.bun_run(
             self.account_index, "stacks-wallet", "get-my-wallet-address.ts"
         )
 
+    def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get wallet address."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
 
 class WalletFundMyWalletFaucet(BaseTool):
-    """Tool for funding wallet when on testnet."""
-
-    name: str = "Fund my wallet"
-    description: str = "Fund the wallet when on testnet."
-    args_schema: Type[BaseModel] = WalletGetAddressSchema
+    name: str = "wallet_fund_testnet"
+    description: str = (
+        "Fund the current wallet with test STX tokens when running on testnet. This "
+        "operation only works on the Stacks testnet."
+    )
+    args_schema: Type[BaseModel] = WalletGetAddressInput
+    return_direct: bool = False
     account_index: str = "0"
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, account_index: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self) -> Dict[str, Union[str, bool, None]]:
-        """
-        Fund the wallet when on testnet.
-
-        Returns:
-            Dict[str, Union[str, bool, None]]: A dictionary containing the funding result.
-        """
+    def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to fund wallet on testnet."""
         return BunScriptRunner.bun_run(
             self.account_index, "stacks-wallet", "testnet-stx-faucet-me.ts"
         )
 
+    def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to fund wallet on testnet."""
+        return self._deploy(**kwargs)
 
-class WalletSendSTXSchema(BaseModel):
-    """Input schema for WalletSendSTX."""
+    async def _arun(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class WalletSendSTXInput(BaseModel):
+    """Input schema for sending STX tokens."""
 
     recipient: str = Field(..., description="Recipient STX address.")
     amount: int = Field(
@@ -109,24 +120,28 @@ class WalletSendSTXSchema(BaseModel):
 
 
 class WalletSendSTX(BaseTool):
-    """Tool for sending STX tokens."""
-
-    name: str = "Send STX tokens"
-    description: str = "Send STX tokens from your wallet to a recipient address."
-    args_schema: Type[BaseModel] = WalletSendSTXSchema
+    name: str = "wallet_send_stx"
+    description: str = (
+        "Send STX tokens from your wallet to a recipient address. Specify amount in STX "
+        "(not microSTX), optional fee in microSTX (default 200), and optional memo."
+    )
+    args_schema: Type[BaseModel] = WalletSendSTXInput
+    return_direct: bool = False
     account_index: str = "0"
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, account_index: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(
+    def _deploy(
         self,
         recipient: str,
         amount: int,
         fee: Optional[int] = 200,
         memo: Optional[str] = "",
+        **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to send STX tokens."""
         return BunScriptRunner.bun_run(
             self.account_index,
             "stacks-wallet",
@@ -137,36 +152,133 @@ class WalletSendSTX(BaseTool):
             memo or "",
         )
 
+    def _run(
+        self,
+        recipient: str,
+        amount: int,
+        fee: Optional[int] = 200,
+        memo: Optional[str] = "",
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to send STX tokens."""
+        return self._deploy(recipient, amount, fee, memo)
 
-class WalletGetTransactionsSchema(BaseModel):
-    """Input schema for WalletGetMyTransactions.
-    This tool doesn't require any input parameters but we still define the schema for consistency.
+    async def _arun(
+        self,
+        recipient: str,
+        amount: int,
+        fee: Optional[int] = 200,
+        memo: Optional[str] = "",
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(recipient, amount, fee, memo)
+
+
+class WalletGetTransactionsInput(BaseModel):
+    """Input schema for getting wallet transactions.
+    No parameters required as it uses the default account.
     """
 
     pass
 
 
 class WalletGetMyTransactions(BaseTool):
-    """Tool for fetching wallet transaction history."""
-
-    name: str = "Get my wallet transactions"
+    name: str = "wallet_get_transactions"
     description: str = (
-        "Get the transaction history for the wallet including STX transfers and contract calls."
+        "Get transaction history for your wallet including STX transfers and contract "
+        "calls. Returns a list of transactions with their details."
     )
-    args_schema: Type[BaseModel] = WalletGetTransactionsSchema
+    args_schema: Type[BaseModel] = WalletGetTransactionsInput
+    return_direct: bool = False
     account_index: str = "0"
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, account_index: str = "0", **kwargs):
         super().__init__(**kwargs)
         self.account_index = account_index
 
-    def _run(self) -> Dict[str, Union[str, bool, None]]:
-        """
-        Get the wallet's transaction history.
-
-        Returns:
-            Dict[str, Union[str, bool, None]]: A dictionary containing the wallet's transaction history.
-        """
+    def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get transaction history."""
         return BunScriptRunner.bun_run(
             self.account_index, "stacks-wallet", "get-my-wallet-transactions.ts"
         )
+
+    def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get transaction history."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class WalletSIP10SendInput(BaseModel):
+    """Input schema for sending SIP-010 compliant fungible tokens."""
+
+    contract_address: str = Field(
+        ...,
+        description="Contract address of the token. Format: contract_address.contract_name",
+    )
+    recipient: str = Field(..., description="Recipient address to send tokens to.")
+    amount: int = Field(
+        ...,
+        description="Amount of tokens to send. Needs to be in microunits based on decimals of token.",
+    )
+
+
+class WalletSIP10SendTool(BaseTool):
+    name: str = "wallet_send_sip10_token"
+    description: str = (
+        "Send SIP-010 compliant fungible tokens from your wallet to a recipient address. "
+        "Amount must be specified in microunits based on the token's decimals."
+    )
+    args_schema: Type[BaseModel] = WalletSIP10SendInput
+    return_direct: bool = False
+    account_index: str = "0"
+
+    def __init__(self, account_index: str = "0", **kwargs):
+        super().__init__(**kwargs)
+        self.account_index = account_index
+
+    def _deploy(
+        self,
+        contract_address: str,
+        recipient: str,
+        amount: int,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to send SIP-010 tokens."""
+        try:
+            return BunScriptRunner.bun_run(
+                self.account_index,
+                "sip-010-ft",
+                "transfer.ts",
+                contract_address,
+                recipient,
+                str(amount),
+            )
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error during token transfer: {str(e)}",
+            }
+
+    def _run(
+        self,
+        contract_address: str,
+        recipient: str,
+        amount: int,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to send SIP-010 tokens."""
+        return self._deploy(contract_address, recipient, amount)
+
+    async def _arun(
+        self,
+        contract_address: str,
+        recipient: str,
+        amount: int,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(contract_address, recipient, amount)

@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 
@@ -37,7 +37,7 @@ class AgentBase(CustomBaseModel):
     goal: Optional[str] = None
     backstory: Optional[str] = None
     profile_id: Optional[UUID] = None
-    agent_tools: Optional[str] = None
+    agent_tools: Optional[List[str]] = None
     crew_id: Optional[UUID] = None
     image_url: Optional[str] = None
 

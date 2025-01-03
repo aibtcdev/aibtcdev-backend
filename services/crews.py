@@ -15,12 +15,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph
 from lib.logger import configure_logger
 from textwrap import dedent
-from tools.tools_factory import (
-    convert_to_langchain_tool,
-    get_agent_tools,
-    initialize_langchain_tools,
-    initialize_tools,
-)
+from tools.tools_factory import filter_crewai_tools_by_names, initialize_tools
 from typing import Any, Dict, List, Tuple, Union
 from uuid import UUID
 
@@ -48,7 +43,9 @@ def create_manager_agent() -> Agent:
 
 def create_agent(agent_data: Dict, tools_map: Dict) -> Agent:
     """Create an agent from agent data and tools map."""
-    agent_tools = get_agent_tools(agent_data.get("agent_tools", []), tools_map)
+    agent_tools = filter_crewai_tools_by_names(
+        agent_data.get("agent_tools", []), tools_map
+    )
     return Agent(
         role=agent_data.get("role"),
         goal=agent_data.get("goal"),
@@ -364,7 +361,7 @@ async def execute_chat_stream_langgraph(
     """Execute a chat stream using LangGraph."""
     logger.debug("Starting execute_chat_stream_langgraph")
     callback_queue = asyncio.Queue()
-    tools_map = initialize_langchain_tools(profile)  # Use LangChain tools
+    tools_map = initialize_tools(profile, crewai=False)  # Use LangChain tools
     filtered_content = extract_filtered_content(history)
 
     try:

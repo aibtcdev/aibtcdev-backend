@@ -1,18 +1,110 @@
+import uuid
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from backend.factory import backend
-from backend.models import TaskFilter
+from backend.models import JobBase, JobCreate, StepCreate, TaskFilter
 from datetime import datetime
 from lib.logger import configure_logger
+from services.langgraph import execute_langgraph_stream
+from tools.tools_factory import filter_tools_by_names, initialize_tools
 
 logger = configure_logger(__name__)
 
 
-async def execute_scheduled_job(agent_id: str, task_id: str):
+async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
     """Execute a scheduled job with the given agent and task."""
-    logger.info(
-        f"Would have executed job with agent_id={agent_id} and task_id={task_id} at {datetime.now()}"
+
+    task = backend.get_task(task_id=uuid.UUID(task_id))
+    if not task:
+        logger.error(f"Task with ID {task_id} not found")
+        return
+
+    agent = backend.get_agent(agent_id=uuid.UUID(agent_id))
+    if not agent:
+        logger.error(f"Agent with ID {agent_id} not found")
+        return
+
+    profile = backend.get_profile(profile_id=uuid.UUID(profile_id))
+    if not profile:
+        logger.error(f"Profile with ID {profile_id} not found")
+        return
+
+    history = [
+        {
+            "role": "assistant",
+            "content": "Sure, what exactly would you like to know?",
+        },
+    ]
+
+    persona = (
+        "You are a helpful financial assistant with a light-hearted tone. "
+        "You have a positive attitude and a sense of humor. "
+        f"Your name is {agent.name}. "
+        f"Backstory: {agent.backstory}. Role: {agent.role}. Goal: {agent.goal}. "
     )
+
+    tools_map = initialize_tools(profile, crewai=False)
+    ## if the agent.agent_tools is not empty
+    if agent.agent_tools is not None:
+        tools_map_filtered = filter_tools_by_names(agent.agent_tools, tools_map)
+    else:
+        tools_map_filtered = tools_map
+    stream_generator = execute_langgraph_stream(
+        history=history,
+        input_str=task.prompt,
+        persona=persona,
+        tools_map=tools_map_filtered,
+    )
+    history = [
+        {
+            "role": "assistant",
+            "content": "Sure, what exactly would you like to know?",
+        },
+    ]
+
+    job = backend.create_job(
+        new_job=JobCreate(
+            conversation_id=None,
+            input=task.prompt,
+            history=history,
+            agent_id=agent_id,
+            task_id=task_id,
+            profile_id=profile_id,
+        )
+    )
+    async for event in stream_generator:
+        if event["type"] == "tool_execution":
+            # Intermediate step from a tool
+            backend.create_step(
+                new_step=StepCreate(
+                    job_id=job.id,
+                    role="assistant",
+                    tool_name=event["tool"],
+                    tool_input=event["input"],
+                    tool_output=event["output"],
+                    profile_id=profile_id,
+                )
+            )
+        elif event["type"] == "result":
+            # Final result
+            backend.create_step(
+                new_step=StepCreate(
+                    job_id=job.id,
+                    content=event["content"],
+                    role="assistant",
+                    profile_id=profile_id,
+                )
+            )
+            backend.update_job(
+                job_id=job.id,
+                update_data=JobBase(
+                    content=event["content"],
+                    updated_at=datetime.now(),
+                ),
+            )
+            print("\nFinal LLM Response:", event["content"])
+
+    logger.info(f"Executing job with agent_id={agent_id} and task_id={task_id}")
 
 
 async def sync_schedules(scheduler: AsyncIOScheduler):
@@ -48,6 +140,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
             agent_id = str(schedule.agent_id)
             task_id = str(schedule.id)
             is_scheduled = schedule.is_scheduled
+            profile_id = str(schedule.profile_id)
 
             if not all([cron_expression, agent_id, task_id]):
                 logger.debug(f"Skipping invalid schedule: {schedule}")
@@ -72,7 +165,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
                     scheduler.add_job(
                         execute_scheduled_job,
                         CronTrigger.from_crontab(cron_expression),
-                        args=[agent_id, task_id],
+                        args=[agent_id, task_id, profile_id],
                         id=job_id,
                     )
                     logger.info(f"Updated schedule {job_id} with new cron expression")
@@ -81,7 +174,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
                 scheduler.add_job(
                     execute_scheduled_job,
                     CronTrigger.from_crontab(cron_expression),
-                    args=[agent_id, task_id],
+                    args=[agent_id, task_id, profile_id],
                     id=job_id,
                 )
                 logger.info(f"Added new schedule {job_id}")
