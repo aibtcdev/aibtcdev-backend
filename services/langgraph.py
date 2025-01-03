@@ -185,7 +185,7 @@ async def execute_langgraph_stream(
     # Create the chat model with streaming
     chat = ChatOpenAI(
         streaming=True,
-        model="gpt-4",  # Replace with your desired model
+        model="gpt-4o",  # Replace with your desired model
         callbacks=[callback_handler],
         temperature=0.7,
     )
