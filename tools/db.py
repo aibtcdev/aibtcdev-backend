@@ -1,5 +1,5 @@
 from backend.factory import backend
-from backend.models import TaskCreate
+from backend.models import CapabilityFilter, TaskCreate
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from storage3._async.bucket import Response
@@ -87,3 +87,50 @@ class AddScheduledTaskTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(name, prompt, cron, enabled, **kwargs)
+
+
+class CollectiveListSchema(BaseModel):
+    """Input schema for CollectiveList tool."""
+
+
+class CollectiveListTool(BaseTool):
+    name: str = "db_collective_list"
+    description: str = "List all collective tasks in the database"
+    args_schema: Type[BaseModel] = CollectiveListSchema
+    return_direct: bool = False
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _deploy(
+        self,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to list collective tasks."""
+        try:
+            collectives = backend.list_collectives()
+            capabilities = backend.list_capabilities()
+            tokens = backend.list_tokens()
+            response = {
+                "collectives": collectives,
+                "capabilities": capabilities,
+                "tokens": tokens,
+            }
+
+            return response
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _run(
+        self,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Sync version of the tool."""
+        return self._deploy(**kwargs)
+
+    async def _arun(
+        self,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)

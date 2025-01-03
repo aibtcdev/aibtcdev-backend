@@ -30,7 +30,7 @@ from crewai_tools import BaseTool as CrewAIBaseTool
 from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
 from tools.collectives import ContractCollectiveDeployTool
-from tools.db import AddScheduledTaskTool
+from tools.db import AddScheduledTaskTool, CollectiveListTool
 from tools.hiro import STXPriceTool
 from tools.jing import (
     JingCancelAskTool,
@@ -77,6 +77,7 @@ def initialize_tools(
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
         "db_add_scheduled_task": AddScheduledTaskTool(profile.id, agent_id),
+        "db_list_collectives": CollectiveListTool(),
         "jing_get_order_book": JingGetOrderBookTool(account_index),
         "jing_create_bid": JingCreateBidTool(account_index),
         "jing_cancel_ask": JingCancelAskTool(account_index),
