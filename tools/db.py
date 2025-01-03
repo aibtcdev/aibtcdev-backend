@@ -89,14 +89,22 @@ class AddScheduledTaskTool(BaseTool):
         return self._deploy(name, prompt, cron, enabled, **kwargs)
 
 
-class CollectiveListSchema(BaseModel):
+class GetCollectiveListSchema(BaseModel):
     """Input schema for CollectiveList tool."""
 
 
-class CollectiveListTool(BaseTool):
-    name: str = "db_collective_list"
-    description: str = "List all collective tasks in the database"
-    args_schema: Type[BaseModel] = CollectiveListSchema
+class GetCollectiveListTool(BaseTool):
+    name: str = "db_list_collectives_daos"
+    description: str = (
+        "This tool is used to get/list all the collectives and DAOS with their capabilities and tokens. "
+        "It returns a dictionary with three keys: 'collectives', 'capabilities', and 'tokens'. "
+        "'collectives' contains the list of collectives and their details, "
+        "'capabilities' contains the list of capabilities and their details, "
+        "and 'tokens' contains the list of tokens and their details."
+        "Example usage: "
+        "can you show me what collectives are avaliable? "
+    )
+    args_schema: Type[BaseModel] = GetCollectiveListSchema
     return_direct: bool = False
 
     def __init__(self, **kwargs):

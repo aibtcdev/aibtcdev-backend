@@ -417,7 +417,7 @@ async def execute_chat_stream_langgraph(
                 agent = initialize_agent(
                     tools=tools,
                     llm=chat,
-                    agent=AgentType.OPENAI_FUNCTIONS,  # More flexible agent type
+                    agent=AgentType.OPENAI_MULTI_FUNCTIONS,  # More flexible agent type
                     verbose=True,
                     handle_parsing_errors=True,
                     max_iterations=3,  # Limit iterations to prevent infinite loops
@@ -648,17 +648,87 @@ def should_use_tool(state):
     """Determine if a tool should be used based on the current state."""
     messages = state["messages"]
     last_message = messages[-1].content if messages else ""
+    last_message_lower = last_message.lower()
 
-    # Add your conditional logic here
-    # Example conditions:
-    if any(
-        keyword in last_message.lower()
-        for keyword in ["price", "balance", "transaction", "wallet"]
-    ):
+    # Financial and market-related keywords
+    financial_keywords = [
+        "price",
+        "balance",
+        "transaction",
+        "wallet",
+        "market",
+        "trade",
+        "swap",
+        "volume",
+        "history",
+        "bid",
+        "ask",
+        "order",
+        "book",
+        "pending",
+        "buy",
+        "sell",
+        "bonding",
+        "token",
+        "stx",
+        "bitcoin",
+        "btc",
+        "crypto",
+        "price",
+    ]
+
+    # Contract and technical keywords
+    technical_keywords = [
+        "contract",
+        "deploy",
+        "address",
+        "sip10",
+        "collective",
+        "dao",
+        "capability",
+        "schedule",
+        "task",
+        "status",
+        "metadata",
+        "search",
+    ]
+
+    # Action keywords that often indicate tool usage
+    action_verbs = [
+        "get",
+        "check",
+        "list",
+        "show",
+        "find",
+        "create",
+        "cancel",
+        "submit",
+        "execute",
+        "deploy",
+        "schedule",
+    ]
+
+    # Check for financial and market-related queries
+    if any(keyword in last_message_lower for keyword in financial_keywords):
         return True
-    if "get" in last_message.lower() and any(
-        resource in last_message.lower()
-        for resource in ["token", "contract", "address"]
-    ):
+
+    # Check for technical and contract-related queries
+    if any(keyword in last_message_lower for keyword in technical_keywords):
         return True
+
+    # Check for action verbs combined with relevant context
+    if any(verb in last_message_lower for verb in action_verbs):
+        # Additional context checks for action verbs
+        contexts = [
+            "token",
+            "contract",
+            "address",
+            "market",
+            "order",
+            "collective",
+            "dao",
+        ]
+        if any(context in last_message_lower for context in contexts):
+            return True
+
     return False

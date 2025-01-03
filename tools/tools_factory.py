@@ -1,15 +1,37 @@
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
+from .collectives import ContractCollectiveDeployTool
 from .contracts import (
     ContractSIP10DeployTool,
     ContractSIP10InfoTool,
     FetchContractSourceTool,
 )
+from .db import AddScheduledTaskTool, GetCollectiveListTool
 from .get_btc_data import GetBitcoinData
+from .hiro import STXPriceTool
+from .jing import (
+    JingCancelAskTool,
+    JingCancelBidTool,
+    JingCreateBidTool,
+    JingGetAskTool,
+    JingGetBidTool,
+    JingGetMarketsTool,
+    JingGetOrderBookTool,
+    JingGetPendingOrdersTool,
+    JingSubmitAskTool,
+    JingSubmitBidTool,
+)
 from .lunarcrush import (
     LunarCrushTokenMetadataTool,
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
+)
+from .stxcity import (
+    StxCityCheckValidBondingTool,
+    StxCityExecuteBuyTool,
+    StxCityExecuteSellTool,
+    StxCityListBondingTokensTool,
+    StxCitySearchTool,
 )
 from .transactions import (
     StacksTransactionByAddressTool,
@@ -29,28 +51,6 @@ from backend.models import Profile
 from crewai_tools import BaseTool as CrewAIBaseTool
 from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
-from tools.collectives import ContractCollectiveDeployTool
-from tools.db import AddScheduledTaskTool, CollectiveListTool
-from tools.hiro import STXPriceTool
-from tools.jing import (
-    JingCancelAskTool,
-    JingCancelBidTool,
-    JingCreateBidTool,
-    JingGetAskTool,
-    JingGetBidTool,
-    JingGetMarketsTool,
-    JingGetOrderBookTool,
-    JingGetPendingOrdersTool,
-    JingSubmitAskTool,
-    JingSubmitBidTool,
-)
-from tools.stxcity import (
-    StxCityCheckValidBondingTool,
-    StxCityExecuteBuyTool,
-    StxCityExecuteSellTool,
-    StxCityListBondingTokensTool,
-    StxCitySearchTool,
-)
 from typing import Any, Dict, List, Optional
 
 logger = configure_logger(__name__)
@@ -77,7 +77,7 @@ def initialize_tools(
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
         "db_add_scheduled_task": AddScheduledTaskTool(profile.id, agent_id),
-        "db_list_collectives": CollectiveListTool(),
+        "db_list_collectives_daos": GetCollectiveListTool(),
         "jing_get_order_book": JingGetOrderBookTool(account_index),
         "jing_create_bid": JingCreateBidTool(account_index),
         "jing_cancel_ask": JingCancelAskTool(account_index),
