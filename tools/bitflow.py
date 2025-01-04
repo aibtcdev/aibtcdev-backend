@@ -2,6 +2,7 @@ from .bun import BunScriptRunner
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional, Type, Union
+from uuid import UUID
 
 
 class BitflowBaseInput(BaseModel):
@@ -36,10 +37,18 @@ class BitflowGetAvailableTokens(BaseTool):
     description: str = "Get the list of available tokens for trading on Bitflow"
     args_schema: Type[BaseModel] = BitflowBaseInput
     return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        if wallet_id:
+            self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get available tokens."""
-        return BunScriptRunner.bun_run("0", "stacks-bitflow", "get-tokens.ts")
+        return BunScriptRunner.bun_run(
+            self.wallet_id, "stacks-bitflow", "get-tokens.ts"
+        )
 
     def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get available tokens."""
@@ -57,34 +66,34 @@ class BitflowExecuteTradeTool(BaseTool):
     )
     args_schema: Type[BaseModel] = BitflowExecuteTradeInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self, slippage: str, amount: str, tokenA: str, tokenB: str, **kwargs
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to perform a token swap."""
         return BunScriptRunner.bun_run(
-            self.account_index,
+            self.wallet_id,
             "stacks-bitflow",
-            "exec-swap.ts",
+            "execute-trade.ts",
             slippage,
             amount,
-            f"token-{tokenA.lower()}",
-            f"token-{tokenB.lower()}",
+            tokenA,
+            tokenB,
         )
 
     def _run(
         self, slippage: str, amount: str, tokenA: str, tokenB: str, **kwargs
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to perform a token swap."""
-        return self._deploy(slippage, amount, tokenA, tokenB)
+        return self._deploy(slippage, amount, tokenA, tokenB, **kwargs)
 
     async def _arun(
         self, slippage: str, amount: str, tokenA: str, tokenB: str, **kwargs
     ) -> Dict[str, Union[str, bool, None]]:
         """Async version of the tool."""
-        return self._deploy(slippage, amount, tokenA, tokenB)
+        return self._deploy(slippage, amount, tokenA, tokenB, **kwargs)

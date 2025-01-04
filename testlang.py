@@ -14,7 +14,6 @@ if __name__ == "__main__":
     async def main():
         # Example profile
         profile = Profile(
-            account_index="0",
             id="419781f6-c250-4bd6-be9e-fb347d1f77f9",
             created_at=datetime.datetime.now(),
             updated_at=datetime.datetime.now(),

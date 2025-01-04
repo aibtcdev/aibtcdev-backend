@@ -11,12 +11,36 @@ class CustomBaseModel(BaseModel):
 
 
 #
+#  SECRETS
+#
+class SecretBase(CustomBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    secret: Optional[str] = None
+    decrypted_secret: Optional[str] = None
+    key_id: Optional[str] = None
+    nonce: Optional[str] = None
+
+
+class SecretCreate(SecretBase):
+    pass
+
+
+class Secret(SecretBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+#
 #  WALLETS
 #
 class WalletBase(CustomBaseModel):
-    account_index: Optional[int] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
+    secret_id: Optional[UUID] = None
 
 
 class WalletCreate(WalletBase):
@@ -187,7 +211,6 @@ class Profile(ProfileBase):
     id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
-    account_index: int
 
 
 #
@@ -425,6 +448,11 @@ class TaskFilter(CustomBaseModel):
     crew_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     is_scheduled: Optional[bool] = None
+
+
+class SecretFilter(CustomBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class TelegramUserFilter(CustomBaseModel):

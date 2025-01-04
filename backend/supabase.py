@@ -1,4 +1,5 @@
 import time
+import uuid
 from .abstract import AbstractBackend
 from .models import (
     Agent,
@@ -37,6 +38,10 @@ from .models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    Secret,
+    SecretBase,
+    SecretCreate,
+    SecretFilter,
     Step,
     StepBase,
     StepCreate,
@@ -67,6 +72,10 @@ from .models import (
     XUserFilter,
 )
 from lib.logger import configure_logger
+from sqlalchemy import Column, DateTime, Engine, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from supabase import Client
 from typing import List, Optional
 from uuid import UUID
@@ -74,17 +83,68 @@ from uuid import UUID
 logger = configure_logger(__name__)
 
 
+Base = declarative_base()
+
+
+class SecretSQL(Base):
+    __tablename__ = "decrypted_secrets"
+    __table_args__ = {"schema": "vault"}  # Specifies the vault schema
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    secret = Column(Text, nullable=False)
+    decrypted_secret = Column(Text)
+    key_id = Column(String)
+    nonce = Column(String)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+def sqlalchemy_to_pydantic(secret_sql: SecretSQL) -> Secret:
+    """Convert a SecretSQL model to a Secret pydantic model."""
+    return Secret(
+        id=str(secret_sql.id),
+        name=secret_sql.name,
+        description=secret_sql.description,
+        secret=secret_sql.secret,
+        decrypted_secret=secret_sql.decrypted_secret,
+        key_id=str(secret_sql.key_id) if secret_sql.key_id else None,
+        nonce=bytes(secret_sql.nonce).hex() if secret_sql.nonce else None,
+        created_at=secret_sql.created_at,
+        updated_at=secret_sql.updated_at,
+    )
+
+
+def pydantic_to_sqlalchemy(secret_pydantic: SecretCreate) -> SecretSQL:
+    return SecretSQL(
+        name=secret_pydantic.name,
+        description=secret_pydantic.description,
+        secret=secret_pydantic.secret,
+        key_id=secret_pydantic.key_id,
+        nonce=secret_pydantic.nonce,
+    )
+
+
 class SupabaseBackend(AbstractBackend):
     # Upload configuration
     MAX_UPLOAD_RETRIES = 3
     RETRY_DELAY_SECONDS = 1
 
-    def __init__(self, client: Client, **kwargs):
+    def __init__(self, client: Client, sqlalchemy_engine: Engine, **kwargs):
         # super().__init__()  # If your AbstractDatabase has an __init__ to call
         self.client = client
+        self.sqlalchemy_engine = sqlalchemy_engine
         self.bucket_name = kwargs.get("bucket_name")
+        self.Session = sessionmaker(bind=self.sqlalchemy_engine)
 
-    # ----------------------------------------------------------------
+        try:
+            with self.sqlalchemy_engine.connect() as connection:
+                logger.info("SQLAlchemy connection successful!")
+        except Exception as e:
+            logger.error(f"Failed to connect to database: {e}")
+
+    # ---------------------------------------------------------------
     # HELPER FUNCTIONS
     # ----------------------------------------------------------------
     def verify_session_token(self, token: str) -> Optional[str]:
@@ -186,7 +246,10 @@ class SupabaseBackend(AbstractBackend):
     def list_wallets(self, filters: Optional["WalletFilter"] = None) -> List["Wallet"]:
         query = self.client.table("wallets").select("*")
         if filters:
-            query = query.eq("user_id", str(filters.profile_id))
+            if filters.profile_id:
+                query = query.eq("profile_id", str(filters.profile_id))
+            if filters.agent_id:
+                query = query.eq("agent_id", str(filters.agent_id))
         response = query.execute()
         data = response.data or []
         return [Wallet(**row) for row in data]
@@ -1082,3 +1145,45 @@ class SupabaseBackend(AbstractBackend):
         response = self.client.table("x_tweets").delete().eq("id", x_tweet_id).execute()
         deleted = response.data or []
         return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 17. SECRETS
+    # ----------------------------------------------------------------
+    def get_secret(self, secret_id: UUID) -> Optional["Secret"]:
+        """Get a secret by its ID."""
+        logger.debug(f"Getting secret with ID: {secret_id}")
+        try:
+            with self.Session() as session:
+                secret_sql = (
+                    session.query(SecretSQL)
+                    .filter(SecretSQL.id == secret_id)
+                    .one_or_none()
+                )
+                if not secret_sql:
+                    logger.warning(f"No secret found with ID: {secret_id}")
+                    return None
+                return sqlalchemy_to_pydantic(secret_sql)
+        except Exception as e:
+            logger.error(f"Error getting secret: {e}")
+            raise
+
+    def list_secrets(self, filters: Optional["SecretFilter"] = None) -> List["Secret"]:
+        """List secrets with optional filters."""
+        logger.debug(f"Listing secrets with filters: {filters}")
+        try:
+            with self.Session() as session:
+                query = session.query(SecretSQL)
+                if filters:
+                    if filters.name is not None:
+                        query = query.filter(SecretSQL.name == filters.name)
+                    if filters.description is not None:
+                        query = query.filter(
+                            SecretSQL.description == filters.description
+                        )
+                secret_sql_list = query.all()
+                return [
+                    sqlalchemy_to_pydantic(secret_sql) for secret_sql in secret_sql_list
+                ]
+        except Exception as e:
+            logger.error(f"Error listing secrets: {e}")
+            raise

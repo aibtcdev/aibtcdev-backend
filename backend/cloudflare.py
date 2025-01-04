@@ -245,10 +245,7 @@ class CloudflareBackend(AbstractBackend):
     # ----------------------------------------------------------------
     def create_profile(self, new_profile: "ProfileCreate") -> "Profile":
         return Profile(
-            id=DUMMY_ID,
-            created_at=NOW,
-            account_index=0,  # or any placeholder integer
-            **new_profile.dict(exclude_unset=True)
+            id=DUMMY_ID, created_at=NOW, **new_profile.dict(exclude_unset=True)
         )
 
     def get_profile(self, profile_id: UUID) -> Optional["Profile"]:

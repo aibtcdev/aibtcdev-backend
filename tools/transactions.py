@@ -2,6 +2,7 @@ from .bun import BunScriptRunner
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional, Type, Union
+from uuid import UUID
 
 
 class StacksTransactionStatusInput(BaseModel):
@@ -20,12 +21,20 @@ class StacksTransactionStatusTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionStatusInput
     return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
 
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to check transaction status."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transaction-status.ts", transaction_id
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transaction-status.ts",
+                transaction_id,
             )
             return result
         except Exception as e:
@@ -57,12 +66,20 @@ class StacksTransactionTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionInput
     return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
 
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transaction details."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transaction.ts", transaction_id
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transaction.ts",
+                transaction_id,
             )
             return result
         except Exception as e:
@@ -91,12 +108,20 @@ class StacksTransactionByAddressTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionByAddressInput
     return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
 
     def _deploy(self, address: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transactions by address."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transactions-by-address.ts", address
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transactions-by-address.ts",
+                address,
             )
             return result
         except Exception as e:

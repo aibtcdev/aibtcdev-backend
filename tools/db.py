@@ -4,6 +4,7 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from storage3._async.bucket import Response
 from typing import Any, Dict, Optional, Type, Union
+from uuid import UUID
 
 
 class AddScheduledTaskInput(BaseModel):
@@ -34,10 +35,15 @@ class AddScheduledTaskTool(BaseTool):
     )
     args_schema: Type[BaseModel] = AddScheduledTaskInput
     return_direct: bool = False
-    profile_id: str = "0"
-    agent_id: str = "0"
+    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
 
-    def __init__(self, profile_id: str = "0", agent_id: str = "0", **kwargs):
+    def __init__(
+        self,
+        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.profile_id = profile_id
         self.agent_id = agent_id

@@ -4,6 +4,7 @@ from lib.hiro import HiroApi
 from pydantic import BaseModel, Field
 from services.daos import TokenServiceError, generate_token_dependencies
 from typing import Any, Dict, Optional, Type, Union
+from uuid import UUID
 
 
 class ContractSIP10DeployInput(BaseModel):
@@ -27,11 +28,11 @@ class ContractSIP10DeployTool(BaseTool):
     description: str = "Deploy a new token contract following the SIP-10 standard"
     args_schema: Type[BaseModel] = ContractSIP10DeployInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self,
@@ -53,7 +54,7 @@ class ContractSIP10DeployTool(BaseTool):
             )
 
             return BunScriptRunner.bun_run(
-                self.account_index,
+                self.wallet_id,
                 "sip-010-ft",
                 "deploy.ts",
                 token_name,
@@ -127,11 +128,11 @@ class ContractSIP10InfoTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ContractSIP10InfoInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self,
@@ -140,7 +141,7 @@ class ContractSIP10InfoTool(BaseTool):
         """Execute the tool to get SIP-10 token information."""
         try:
             return BunScriptRunner.bun_run(
-                self.account_index,
+                self.wallet_id,
                 "sip-010-ft",
                 "get-token-info.ts",
                 contract_address,
@@ -182,11 +183,11 @@ class FetchContractSourceTool(BaseTool):
     description: str = "Fetch the source code of a contract using the Hiro API"
     args_schema: Type[BaseModel] = FetchContractSourceInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self,

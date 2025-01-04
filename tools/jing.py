@@ -2,6 +2,7 @@ from .bun import BunScriptRunner
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Type, Union
+from uuid import UUID
 
 
 # Schema definitions
@@ -76,11 +77,11 @@ class JingGetMarketsInput(BaseModel):
 
 # Base Tool with common initialization
 class JingBaseTool(BaseTool):
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
 
 # Tool implementations
@@ -92,9 +93,7 @@ class JingGetOrderBookTool(JingBaseTool):
 
     def _deploy(self, pair: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get order book data."""
-        return BunScriptRunner.bun_run(
-            self.account_index, "jing", "get-orderbook.ts", pair
-        )
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "get-orderbook.ts", pair)
 
     def _run(self, pair: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get order book data."""
@@ -126,9 +125,9 @@ class JingCreateBidTool(JingBaseTool):
             args.append(recipient)
         if expiry:
             args.append(str(expiry))
-        args.append(self.account_index)
+        args.append(str(self.wallet_id))
 
-        return BunScriptRunner.bun_run(self.account_index, "jing", "bid.ts", *args)
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "bid.ts", *args)
 
     def _run(
         self,
@@ -166,7 +165,7 @@ class JingSubmitBidTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to submit a bid."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "submit-bid.ts", str(swap_id)
+            self.wallet_id, "jing", "submit-bid.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -199,9 +198,9 @@ class JingCreateAskTool(JingBaseTool):
             args.append(recipient)
         if expiry:
             args.append(str(expiry))
-        args.append(self.account_index)
+        args.append(str(self.wallet_id))
 
-        return BunScriptRunner.bun_run(self.account_index, "jing", "ask.ts", *args)
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "ask.ts", *args)
 
     def _run(
         self,
@@ -237,7 +236,7 @@ class JingSubmitAskTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to submit an ask."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "submit-ask.ts", str(swap_id)
+            self.wallet_id, "jing", "submit-ask.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -258,7 +257,7 @@ class JingGetPrivateOffersTool(JingBaseTool):
     def _deploy(self, pair: str, user_address: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get private offers."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "get-private-offers.ts", pair, user_address
+            self.wallet_id, "jing", "get-private-offers.ts", pair, user_address
         )
 
     def _run(self, pair: str, user_address: str, **kwargs) -> Dict[str, Any]:
@@ -278,9 +277,7 @@ class JingGetPendingOrdersTool(JingBaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get pending orders."""
-        return BunScriptRunner.bun_run(
-            self.account_index, "jing", "get-pending-orders.ts"
-        )
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "get-pending-orders.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get pending orders."""
@@ -312,11 +309,9 @@ class JingRepriceBidTool(JingBaseTool):
             args.append(recipient)
         if expiry:
             args.append(str(expiry))
-        args.append(self.account_index)
+        args.append(str(self.wallet_id))
 
-        return BunScriptRunner.bun_run(
-            self.account_index, "jing", "reprice-bid.ts", *args
-        )
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "reprice-bid.ts", *args)
 
     def _run(
         self,
@@ -364,11 +359,9 @@ class JingRepriceAskTool(JingBaseTool):
             args.append(recipient)
         if expiry:
             args.append(str(expiry))
-        args.append(self.account_index)
+        args.append(str(self.wallet_id))
 
-        return BunScriptRunner.bun_run(
-            self.account_index, "jing", "reprice-ask.ts", *args
-        )
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "reprice-ask.ts", *args)
 
     def _run(
         self,
@@ -404,7 +397,7 @@ class JingCancelBidTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to cancel a bid."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "cancel-bid.ts", str(swap_id)
+            self.wallet_id, "jing", "cancel-bid.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -425,7 +418,7 @@ class JingCancelAskTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to cancel an ask."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "cancel-ask.ts", str(swap_id)
+            self.wallet_id, "jing", "cancel-ask.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -446,7 +439,7 @@ class JingGetBidTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get bid details."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "get-bid.ts", str(swap_id)
+            self.wallet_id, "jing", "get-bid.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -467,7 +460,7 @@ class JingGetAskTool(JingBaseTool):
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get ask details."""
         return BunScriptRunner.bun_run(
-            self.account_index, "jing", "get-ask.ts", str(swap_id)
+            self.wallet_id, "jing", "get-ask.ts", str(swap_id)
         )
 
     def _run(self, swap_id: int, **kwargs) -> Dict[str, Any]:
@@ -489,7 +482,7 @@ class JingGetMarketsTool(JingBaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get available markets."""
-        return BunScriptRunner.bun_run(self.account_index, "jing", "list-markets.ts")
+        return BunScriptRunner.bun_run(self.wallet_id, "jing", "list-markets.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get available markets."""

@@ -148,12 +148,16 @@ async def websocket_endpoint(
                 data = await websocket.receive_json()
 
                 if data.get("type") == "chat_message":
+
+                    agent_id = UUID(data.get("agent_id", None))
+                    message = data.get("message", "")
                     # Create a new job for this message
                     job = backend.create_job(
                         JobCreate(
                             conversation_id=conversation_id_uuid,
                             profile_id=profile.id,
-                            input=data.get("message", ""),
+                            agent_id=agent_id,
+                            input=message,
                         )
                     )
                     job_id = job.id
@@ -172,7 +176,8 @@ async def websocket_endpoint(
                             job_id=job_id,
                             conversation_id=conversation_id_uuid,
                             profile=profile,
-                            input_str=data.get("message", ""),
+                            agent_id=agent_id,
+                            input_str=message,
                             history=formatted_history,
                             output_queue=output_queue,
                         )

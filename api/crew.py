@@ -8,7 +8,6 @@ from crewai.tools import BaseTool
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
-from services.crews import execute_crew_stream
 from tools.tools_factory import initialize_tools
 from typing import Dict, List
 
@@ -33,12 +32,13 @@ def get_avaliable_tools() -> List[Dict[str, str]]:
     logger.debug("Fetching available tools")
     try:
         mock_profile = Profile(
-            account_index="0",
             id="419781f6-c250-4bd6-be9e-fb347d1f77f9",
             created_at=datetime.datetime.now(),
             updated_at=datetime.datetime.now(),
         )
-        tools_map = initialize_tools(mock_profile, crewai=False)
+        tools_map = initialize_tools(
+            mock_profile, "419781f6-c250-4bd6-be9e-fb347d1f77f9", crewai=False
+        )
 
         tools_array = []
         for tool_name, tool_instance in tools_map.items():

@@ -155,6 +155,7 @@ postgrest==0.19.1
 posthog==3.7.4
 proto-plus==1.25.0
 protobuf==5.29.2
+psycopg2==2.9.10
 ptyprocess==0.7.0
 pulsar-client==3.5.0
 py==1.11.0

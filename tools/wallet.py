@@ -2,11 +2,12 @@ from .bun import BunScriptRunner
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Type, Union
+from uuid import UUID
 
 
 class WalletGetBalanceInput(BaseModel):
     """Input schema for getting wallet balance information.
-    No parameters required as it uses the default account.
+    No parameters required as it uses the wallet_id from initialization.
     """
 
     pass
@@ -20,16 +21,16 @@ class WalletGetMyBalance(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetBalanceInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet balance."""
         return BunScriptRunner.bun_run(
-            self.account_index, "stacks-wallet", "get-my-wallet-balance.ts"
+            self.wallet_id, "stacks-wallet", "get-my-wallet-balance.ts"
         )
 
     def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
@@ -43,7 +44,7 @@ class WalletGetMyBalance(BaseTool):
 
 class WalletGetAddressInput(BaseModel):
     """Input schema for getting wallet address.
-    No parameters required as it uses the default account.
+    No parameters required as it uses the wallet_id from initialization.
     """
 
     pass
@@ -54,16 +55,16 @@ class WalletGetMyAddress(BaseTool):
     description: str = "Get the STX address associated with the current wallet"
     args_schema: Type[BaseModel] = WalletGetAddressInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet address."""
         return BunScriptRunner.bun_run(
-            self.account_index, "stacks-wallet", "get-my-wallet-address.ts"
+            self.wallet_id, "stacks-wallet", "get-my-wallet-address.ts"
         )
 
     def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
@@ -83,16 +84,16 @@ class WalletFundMyWalletFaucet(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetAddressInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to fund wallet on testnet."""
         return BunScriptRunner.bun_run(
-            self.account_index, "stacks-wallet", "testnet-stx-faucet-me.ts"
+            self.wallet_id, "stacks-wallet", "testnet-stx-faucet-me.ts"
         )
 
     def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
@@ -127,11 +128,11 @@ class WalletSendSTX(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletSendSTXInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self,
@@ -143,7 +144,7 @@ class WalletSendSTX(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to send STX tokens."""
         return BunScriptRunner.bun_run(
-            self.account_index,
+            self.wallet_id,
             "stacks-wallet",
             "transfer-my-stx.ts",
             recipient,
@@ -177,7 +178,7 @@ class WalletSendSTX(BaseTool):
 
 class WalletGetTransactionsInput(BaseModel):
     """Input schema for getting wallet transactions.
-    No parameters required as it uses the default account.
+    No parameters required as it uses the wallet_id from initialization.
     """
 
     pass
@@ -191,16 +192,16 @@ class WalletGetMyTransactions(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetTransactionsInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get transaction history."""
         return BunScriptRunner.bun_run(
-            self.account_index, "stacks-wallet", "get-my-wallet-transactions.ts"
+            self.wallet_id, "stacks-wallet", "get-my-wallet-transactions.ts"
         )
 
     def _run(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
@@ -234,11 +235,11 @@ class WalletSIP10SendTool(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletSIP10SendInput
     return_direct: bool = False
-    account_index: str = "0"
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str = "0", **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
     def _deploy(
         self,
@@ -250,7 +251,7 @@ class WalletSIP10SendTool(BaseTool):
         """Execute the tool to send SIP-010 tokens."""
         try:
             return BunScriptRunner.bun_run(
-                self.account_index,
+                self.wallet_id,
                 "sip-010-ft",
                 "transfer.ts",
                 contract_address,

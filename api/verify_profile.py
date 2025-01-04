@@ -9,13 +9,13 @@ logger = configure_logger(__name__)
 
 async def verify_profile(authorization: str = Header(...)) -> Profile:
     """
-    Get and verify the account_index from the profile of the requesting user.
+    Get profile of the requesting user.
 
     Args:
         authorization (str): Bearer token from request header
 
     Returns:
-        Profile: Object containing account_index and user ID
+        Profile: Object
 
     Raises:
         HTTPException: For various authentication and profile retrieval failures
@@ -38,18 +38,8 @@ async def verify_profile(authorization: str = Header(...)) -> Profile:
             raise HTTPException(status_code=404, detail="Profile not found")
 
         profile = profile_response[0]
-        account_index = profile.account_index
-        id = profile.id
 
-        if account_index is None:
-            logger.debug("Account index missing from profile")
-            raise HTTPException(
-                status_code=400, detail="No account index found for profile"
-            )
-
-        logger.debug(
-            f"Successfully verified profile with account_index: {account_index}"
-        )
+        logger.debug(f"Successfully verified profile with id: {profile.id}")
         return profile
 
     except HTTPException:
@@ -63,13 +53,13 @@ async def verify_profile_from_token(
     token: str = Query(..., description="Bearer token for authentication")
 ) -> Profile:
     """
-    Get and verify the account_index from the profile of the requesting user using a token query parameter.
+    Get and verify the profile of the requesting user using a token query parameter.
 
     Args:
         token (str): Bearer token from query parameter
 
     Returns:
-        Profile: Object containing account_index and user ID
+        Profile: Object
 
     Raises:
         HTTPException: For various authentication and profile retrieval failures
@@ -86,17 +76,8 @@ async def verify_profile_from_token(
             raise HTTPException(status_code=404, detail="Profile not found")
 
         profile = profile_response[0]
-        account_index = profile.account_index
 
-        if account_index is None:
-            logger.debug("Account index missing from profile")
-            raise HTTPException(
-                status_code=400, detail="No account index found for profile"
-            )
-
-        logger.debug(
-            f"Successfully verified profile with account_index: {account_index}"
-        )
+        logger.debug(f"Successfully verified profile with id: {profile.id}")
         return profile
 
     except HTTPException:

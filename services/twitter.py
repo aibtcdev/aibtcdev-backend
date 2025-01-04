@@ -122,7 +122,6 @@ class TwitterMentionHandler:
         response_content = None
         async for response in execute_twitter_stream(
             twitter_service=self.twitter_service,
-            account_index="0",
             history=history,
             input_str=tweet_data["text"],
         ):

@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from services.bot import BOT_ENABLED, start_application
-from services.cron import execute_cron_job
 from services.schedule import sync_schedules
 from services.twitter import execute_twitter_job
 
@@ -18,8 +17,6 @@ logger = logging.getLogger("uvicorn.error")
 
 # Initialize scheduler with environment-controlled settings
 scheduler = AsyncIOScheduler()
-AIBTC_CRON_ENABLED = os.getenv("AIBTC_CRON_ENABLED", "false").lower() == "true"
-AIBTC_CRON_INTERVAL_SECONDS = int(os.getenv("AIBTC_CRON_INTERVAL_SECONDS", 3600))
 AIBTC_TWITTER_ENABLED = os.getenv("AIBTC_TWITTER_ENABLED", "false").lower() == "true"
 AIBTC_TWITTER_INTERVAL_SECONDS = int(os.getenv("AIBTC_TWITTER_INTERVAL_SECONDS", 120))
 AIBTC_SCHEDULE_SYNC_ENABLED = (
@@ -28,14 +25,6 @@ AIBTC_SCHEDULE_SYNC_ENABLED = (
 AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS = int(
     os.getenv("AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS", 60)
 )
-
-if AIBTC_CRON_ENABLED:
-    scheduler.add_job(execute_cron_job, "interval", seconds=AIBTC_CRON_INTERVAL_SECONDS)
-    logger.info(
-        f"Cron scheduler started with interval of {AIBTC_CRON_INTERVAL_SECONDS} seconds"
-    )
-else:
-    logger.info("Cron scheduler is disabled")
 
 if AIBTC_TWITTER_ENABLED:
     scheduler.add_job(
@@ -60,7 +49,7 @@ if AIBTC_SCHEDULE_SYNC_ENABLED:
 else:
     logger.info("Schedule sync service is disabled")
 
-if AIBTC_CRON_ENABLED or AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED:
+if AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED:
     logger.info("Starting scheduler")
     scheduler.start()
     logger.info("Scheduler started")
