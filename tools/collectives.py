@@ -2,7 +2,7 @@ import json
 import logging
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import CapabilityCreate
+from backend.models import CapabilityCreate, TokenBase
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from services.daos import (
@@ -98,29 +98,15 @@ class ContractCollectiveDeployTool(BaseTool):
             logger.debug(f"Generated token record content: {token_record}")
             logger.debug(f"Generated metadata_url: {metadata_url}")
 
-            # Verify record IDs before binding
-            logger.debug("Step 3: Verifying record IDs before binding...")
-            try:
-                token_id = token_record["id"]
-                collective_id = collective_record["id"]
-                logger.debug(f"Token ID: {token_id}, Collective ID: {collective_id}")
-            except (KeyError, TypeError) as e:
-                logger.error(f"Failed to extract IDs from records: {str(e)}")
-                logger.error(
-                    f"Token record keys: {token_record.keys() if isinstance(token_record, dict) else 'Not a dict'}"
-                )
-                logger.error(
-                    f"Collective record keys: {collective_record.keys() if isinstance(collective_record, dict) else 'Not a dict'}"
-                )
-                raise ValueError(f"Invalid record format: {str(e)}")
-
             # Bind token to collective
             logger.debug("Step 4: Binding token to collective...")
-            bind_result = bind_token_to_collective(token_id, collective_id)
+            bind_result = bind_token_to_collective(
+                token_record.id, collective_record.id
+            )
             if not bind_result:
                 logger.error("Failed to bind token to collective")
-                logger.error(f"Token ID: {token_id}")
-                logger.error(f"Collective ID: {collective_id}")
+                logger.error(f"Token ID: {token_record.id}")
+                logger.error(f"Collective ID: {collective_record.id}")
                 return {
                     "output": "",
                     "error": "Failed to bind token to collective",
@@ -178,13 +164,12 @@ class ContractCollectiveDeployTool(BaseTool):
                 # Update token record with contract information
                 logger.debug("Step 7: Updating token with contract information...")
                 contracts = deployment_data["contracts"]
-                token_updates = {
-                    "contract_principal": contracts["token"]["contractPrincipal"],
-                    "tx_id": contracts["token"]["transactionId"],
-                }
+                token_updates = TokenBase(
+                    contract_principal=contracts["token"]["contractPrincipal"],
+                    tx_id=contracts["token"]["transactionId"],
+                )
                 logger.debug(f"Token updates: {token_updates}")
-
-                if not backend.update_token(token_id, token_updates):
+                if not backend.update_token(token_record.id, token_updates):
                     logger.error("Failed to update token with contract information")
                     return {
                         "output": "",
@@ -199,7 +184,7 @@ class ContractCollectiveDeployTool(BaseTool):
                         logger.debug(f"Creating capability for {contract_name}")
                         capability_result = backend.create_capability(
                             CapabilityCreate(
-                                collective_id=collective_id,
+                                collective_id=collective_record.id,
                                 type=contract_name,
                                 contract_principal=contract_data["contractPrincipal"],
                                 tx_id=contract_data["transactionId"],

@@ -89,9 +89,12 @@ async def websocket_endpoint(
         # Verify conversation belongs to user
         conversation_id_uuid = UUID(conversation_id)
         conversation = backend.get_conversation(convo_id=conversation_id_uuid)
+        logger.info(f"Received WebSocket connection for conversation {conversation}")
         jobs = backend.list_jobs(
             filters=JobFilter(conversation_id=conversation_id_uuid)
         )
+        logger.info(f"Jobs for conversation {conversation}: {jobs}")
+
         if not conversation:
             await websocket.accept()
             await websocket.send_json(
@@ -109,6 +112,7 @@ async def websocket_endpoint(
         if jobs:
             # Format history messages according to frontend expectations
             for job in jobs:
+                logger.info(f"Processing job {job}")
                 # Add user input message
                 formatted_history.append(
                     {
@@ -153,7 +157,7 @@ async def websocket_endpoint(
                     message = data.get("message", "")
                     # Create a new job for this message
                     job = backend.create_job(
-                        JobCreate(
+                        new_job=JobCreate(
                             conversation_id=conversation_id_uuid,
                             profile_id=profile.id,
                             agent_id=agent_id,

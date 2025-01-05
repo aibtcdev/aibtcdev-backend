@@ -39,7 +39,6 @@ class BunScriptRunner:
         secret = backend.get_secret(wallet.secret_id)
         mnemonic = secret.decrypted_secret
 
-        logger.info(f"Running script {wallet_id} with mnemonic: {secret}")
         env = os.environ.copy()
         env["ACCOUNT_INDEX"] = "0"
         env["MNEMONIC"] = mnemonic

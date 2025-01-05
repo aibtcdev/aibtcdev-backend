@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, initialize_agent
 from langchain.agents.types import AgentType
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph
@@ -23,16 +23,18 @@ def extract_filtered_content(history: List) -> str:
     """Extract and filter content from chat history."""
     filtered_content = []
     for message in history:
+        logger.info(f"Processing message: {message}")
         if isinstance(message, str):
             filtered_content.append(message)
         elif isinstance(message, dict):
+
             if message.get("role") == "assistant" and message.get("type") == "result":
                 filtered_content.append(message.get("content", ""))
     return "\n".join(filtered_content)
 
 
 async def execute_chat_stream_langgraph(
-    profile: Profile, agent_id: UUID, history: List, input_str: str
+    profile: Profile, agent_id: UUID, history: List, input_str: str, persona: str = None
 ):
     """Execute a chat stream using LangGraph."""
     logger.debug("Starting execute_chat_stream_langgraph")
@@ -55,6 +57,10 @@ async def execute_chat_stream_langgraph(
             messages.append(HumanMessage(content=msg["content"]))
         else:
             messages.append(AIMessage(content=msg["content"]))
+
+    if persona:
+        logger.debug("Adding persona as a SystemMessage")
+        messages.append(SystemMessage(content=persona))
 
     # Add the current input
     messages.append(HumanMessage(content=input_str))
