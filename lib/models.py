@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 
 
 class Profile(BaseModel):
-    account_index: int
     id: str
 
 
@@ -54,7 +53,6 @@ class UserProfile(BaseModel):
     id: int
     stx_address: str
     user_role: str
-    account_index: Optional[int] = None
     bns_address: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -3,7 +3,6 @@ from abc import ABC
 from lib.models import (
     AgentResponse,
     AuthResponse,
-    CrewExecution,
     CrewResponse,
     CrewStepResponse,
     CronResponse,
@@ -13,16 +12,9 @@ from lib.models import (
     RoleResponse,
     TaskResponse,
     TwitterResponse,
-    UserCrew,
-    UserCron,
-    UserProfile,
-    UserTask,
     VerificationResponse,
-    XBotAuthor,
-    XBotLog,
-    XBotTweet,
 )
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 
 class BaseResource(ABC):

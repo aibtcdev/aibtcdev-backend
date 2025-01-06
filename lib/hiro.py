@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+from typing import Any, Dict
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -130,6 +131,21 @@ class HiroApi:
     def get_contract_events(self, contract_id: str) -> dict:
         """Get contract events."""
         return self._get(f"/extended/v1/contract/{contract_id}/events")
+
+    def get_contract_source(
+        self, contract_address: str, contract_name: str
+    ) -> Dict[str, Any]:
+        """Get the source code of a contract.
+
+        Args:
+            contract_address: The contract's address
+            contract_name: The name of the contract
+
+        Returns:
+            Dict containing the contract source code and metadata
+        """
+        response = self._get(f"/v2/contracts/source/{contract_address}/{contract_name}")
+        return response.json()
 
     # Burnchain related endpoints
     def get_burnchain_rewards(self) -> dict:

@@ -1,17 +1,37 @@
-from crewai_tools import BaseTool
-from lib.hiro import HiroApi
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+from typing import Optional, Type
+
+
+class STXPriceInput(BaseModel):
+    """Input for STXPriceTool."""
+
+    pass
 
 
 class STXPriceTool(BaseTool):
-    name: str = "STX: Get Current Price"
-    description: str = "Retrieve the current price of STX."
+    """Tool for getting the current STX price."""
 
-    def _run(self) -> str:
-        """
-        Retrieve the current price of STX.
+    name: str = "stacks_stx_price"
+    description: str = "A tool that can be used to get the current STX price"
+    args_schema: Type[BaseModel] = STXPriceInput
+    return_direct: bool = False
+
+    def _deploy(self, *args, **kwargs) -> float:
+        """Get the current STX price.
 
         Returns:
-            str: The current price of STX.
+            float: The current STX price
         """
-        obj = HiroApi()
-        return str(obj.get_stx_price())
+        from lib.hiro import HiroApi
+
+        api = HiroApi()
+        return str(api.get_stx_price())
+
+    def _run(self, *args, **kwargs) -> str:
+        """Get the current STX price."""
+        return self._deploy(*args, **kwargs)
+
+    async def _arun(self, *args, **kwargs) -> str:
+        """Async implementation of getting STX price."""
+        return self._deploy(*args, **kwargs)

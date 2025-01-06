@@ -152,7 +152,6 @@ class TwitterMentionHandler:
         )
         async for response in execute_twitter_stream(
             twitter_service=self.twitter_service,
-            profile=profile,
             history=history,
             input_str=tweet_data["text"],
             author_id=tweet_data["author_id"]

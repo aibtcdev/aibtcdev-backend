@@ -5,13 +5,10 @@ from backend.factory import backend
 from backend.models import UUID, JobBase, Profile, StepCreate
 from concurrent.futures import ThreadPoolExecutor
 from lib.logger import configure_logger
-from services.crews import execute_chat_stream, execute_chat_stream_langgraph
+from services.crews import execute_chat_stream_langgraph
 
 # Configure logger
 logger = configure_logger(__name__)
-
-# Configure chat settings
-USE_LANGGRAPH = os.getenv("AIBTC_USE_LANGGRAPH", "false").lower() == "true"
 
 # Create a thread pool executor for running sync functions
 thread_pool = ThreadPoolExecutor()
@@ -22,6 +19,7 @@ async def process_chat_message(
     job_id: UUID,
     conversation_id: UUID,
     profile: Profile,
+    agent_id: UUID,
     input_str: str,
     history: list,
     output_queue: asyncio.Queue,
@@ -45,9 +43,6 @@ async def process_chat_message(
         logger.debug(
             f"Input parameters - job_id: {job_id}, conversation_id: {conversation_id}, profile_id: {profile.id}"
         )
-        logger.debug(
-            f"Using {'langgraph' if USE_LANGGRAPH else 'standard'} implementation"
-        )
 
         # Add initial user message
         logger.debug("Adding initial user message to results")
@@ -61,227 +56,207 @@ async def process_chat_message(
         )
 
         logger.debug("Starting chat stream execution")
-        stream_func = (
-            execute_chat_stream_langgraph if USE_LANGGRAPH else execute_chat_stream
-        )
 
-        if USE_LANGGRAPH:
-            # For langgraph, accumulate tokens and only save complete messages
-            current_message = {
-                "content": "",
-                "type": "result",
-                "tool": None,
-                "tool_input": None,
-                "result": None,
-                "thought": None,
-            }
+        # For langgraph, accumulate tokens and only save complete messages
+        current_message = {
+            "content": "",
+            "type": "result",
+            "tool": None,
+            "tool_input": None,
+            "result": None,
+            "thought": None,
+        }
 
-            logger.debug("Starting to process stream")
-            async for result in stream_func(profile, history, input_str):
-                logger.debug(
-                    f"Processing stream result - "
-                    f"type: {result.get('type', 'unknown')}, "
-                    f"content: {bool(result.get('content'))}, "
-                    f"tool: {bool(result.get('tool'))}, "
-                    f"input: {bool(result.get('input'))}, "
-                    f"output: {bool(result.get('output'))}, "
-                    f"raw: {result}"
-                )
+        agent = backend.get_agent(agent_id=agent_id)
+        if not agent:
+            logger.error(f"Agent with ID {agent_id} not found")
+            return
 
-                # Handle end message first to ensure we capture subsequent tool execution
-                if result.get("type") == "end":
-                    logger.debug("Processing end message")
-                    # Only stream the end message, don't save or reset yet
-                    stream_message = {
-                        "type": "stream",
-                        "stream_type": "end",
-                        "content": "",
-                        "timestamp": datetime.datetime.now().isoformat(),
-                        "job_started_at": datetime.datetime.now().isoformat(),
-                        "role": "assistant",
-                    }
-                    logger.debug("Putting end message in output queue")
-                    await output_queue.put(stream_message)
-                    continue
+        persona = f"""
+        You are a helpful financial assistant with a light-hearted tone and a positive attitude.
+        You appreciate humor and enjoy making friendly jokes, especially related to finance and technology.
 
-                # Skip empty content for token messages
-                if result.get("type") == "token" and not result.get("content"):
-                    logger.debug("Skipping empty token message")
-                    continue
+        Your name is {agent.name}.
 
-                # Handle tool execution
-                if result.get("type") == "tool_execution":
-                    logger.debug(
-                        f"Tool execution detected - "
-                        f"tool: {result.get('tool')}, "
-                        f"input: {result.get('input')}, "
-                        f"output: {result.get('output')}, "
-                        f"raw: {result}"
-                    )
-                    
-                    # Ensure all values are strings
-                    tool_name = str(result.get("tool", ""))
-                    tool_input = str(result.get("input", ""))
-                    tool_output = str(result.get("output", ""))
-                    
-                    logger.debug(f"Processed tool values - name: {tool_name}, input: {tool_input}, output: {tool_output}")
-                    
-                    # Save any accumulated content first
-                    if current_message["content"]:
-                        logger.debug(f"Saving accumulated content: {current_message}")
-                        try:
-                            backend.create_step(
-                                new_step=StepCreate(
-                                    profile_id=profile.id,
-                                    job_id=job_id,
-                                    role="assistant",
-                                    content=current_message["content"],
-                                    tool=None,
-                                    tool_input=None,
-                                    thought=None,
-                                    result=None,
-                                )
-                            )
-                            logger.debug("Successfully saved accumulated content")
-                        except Exception as e:
-                            logger.error(f"Error saving accumulated content: {e}")
-                        
-                        results.append(
-                            {
-                                **current_message,
-                                "timestamp": datetime.datetime.now().isoformat(),
-                            }
-                        )
+        Backstory:
+        {agent.backstory}
 
-                    # Create a new step for the tool execution
-                    logger.debug("Creating tool execution step")
-                    try:
-                        new_step = StepCreate(
-                            profile_id=profile.id,
-                            job_id=job_id,
-                            role="assistant",
-                            content="",  # Content will be in the result
-                            tool=tool_name,
-                            tool_input=tool_input,
-                            thought=None,
-                            result=tool_output
-                        )
-                        logger.debug(f"Created StepCreate object: {new_step}")
-                        created_step = backend.create_step(new_step=new_step)
-                        logger.debug(f"Successfully created tool execution step: {created_step}")
-                    except Exception as e:
-                        logger.error(f"Error creating tool execution step: {e}")
-                    
-                    # Add to results for streaming
-                    results.append({
-                        "role": "assistant",
-                        "type": "tool",
-                        "tool": tool_name,
-                        "tool_input": tool_input,
-                        "result": tool_output,
-                        "timestamp": datetime.datetime.now().isoformat(),
-                    })
-                    
-                    # Reset current message
-                    current_message = {
-                        "content": "",
-                        "type": "result",
-                        "tool": None,
-                        "tool_input": None,
-                        "result": None,
-                        "thought": None,
-                    }
-                    continue
+        Role:
+        {agent.role}
 
-                # Handle regular content
-                if result.get("content"):
-                    # Stream message to the client
-                    stream_message = {
-                        "type": "stream",
-                        "stream_type": result.get("type", "token"),
-                        "content": result.get("content", ""),
-                        "timestamp": datetime.datetime.now().isoformat(),
-                        "job_started_at": datetime.datetime.now().isoformat(),
-                        "role": "assistant",
-                    }
-                    logger.debug(
-                        f"Putting message in output queue - type: {stream_message['stream_type']}"
-                    )
-                    await output_queue.put(stream_message)
+        Goal:
+        {agent.goal}
 
-                    # Accumulate content
-                    current_message["content"] += result.get("content", "")
-                    logger.debug(
-                        f"Accumulated content length: {len(current_message['content'])}"
-                    )
+        Knowledge:
+        - Specialize in Stacks blockchain wallet management
+        - Proficient in STX transactions, Clarity smart contracts, and NFT minting
+        - Familiar with blockchain security best practices
+        - Capable of providing market insights and usage tips for Stacks-based dApps
 
-            # After the loop, save any remaining content
-            if current_message["content"]:
-                logger.debug(
-                    f"Saving final content - length: {len(current_message['content'])}"
-                )
-                backend.create_step(
-                    new_step=StepCreate(
-                        profile_id=profile.id,
-                        job_id=job_id,
-                        role="assistant",
-                        content=current_message["content"],
-                        tool=None,
-                        tool_input=None,
-                        thought=None,
-                        result=None,
-                    )
-                )
-                results.append(
-                    {
-                        **current_message,
-                        "timestamp": datetime.datetime.now().isoformat(),
-                    }
-                )
-        else:
-            # Standard implementation - save each message as it comes
-            async for result in stream_func(profile, history, input_str):
-                # Add to the output queue for WebSocket streaming
-                logger.debug(
-                    f"Processing stream result of type: {result.get('type', 'unknown')}"
-                )
+        Capabilities:
+        - Provide step-by-step instructions for sending/receiving STX
+        - Track and display real-time wallet balances and transaction history
+        - Offer high-level overviews of market conditions and relevant news
+        - Share best practices to enhance security
+
+        Disclaimer:
+        - You are not a licensed financial advisor
+        - Always remind users to do their own research and keep private keys secure
+
+        Style:
+        - Use a friendly, enthusiastic tone
+        - Offer concise, step-by-step guidance where applicable
+        - Confirm user intent before giving advice on or executing any critical actions
+
+        Boundaries:
+        - You do not support or endorse illicit activities
+        - If a user asks for high-risk actions, disclaim the potential risks and encourage caution
+        """
+        logger.debug("Starting to process stream")
+        async for result in execute_chat_stream_langgraph(
+            profile, agent_id, history, input_str, persona
+        ):
+            logger.debug(
+                f"Processing stream result - "
+                f"type: {result.get('type', 'unknown')}, "
+                f"content: {bool(result.get('content'))}, "
+                f"tool: {bool(result.get('tool'))}, "
+                f"input: {bool(result.get('input'))}, "
+                f"output: {bool(result.get('output'))}, "
+                f"raw: {result}"
+            )
+
+            # Handle end message first to ensure we capture subsequent tool execution
+            if result.get("type") == "end":
+                logger.debug("Processing end message")
+                # Only stream the end message, don't save or reset yet
                 stream_message = {
                     "type": "stream",
-                    "stream_type": result.get(
-                        "type", "result"
-                    ),  # step, task, or result
-                    "content": result.get("content", ""),
-                    "tool": result.get("tool", None),
-                    "tool_input": result.get("tool_input", None),
-                    "result": result.get("result", None),
-                    "thought": result.get("thought", None),
+                    "stream_type": "end",
+                    "content": "",
                     "timestamp": datetime.datetime.now().isoformat(),
                     "job_started_at": datetime.datetime.now().isoformat(),
                     "role": "assistant",
                 }
-                logger.debug("Putting message in output queue")
+                logger.debug("Putting end message in output queue")
                 await output_queue.put(stream_message)
+                continue
 
-                logger.debug("Creating step in backend")
-                backend.create_step(
-                    new_step=StepCreate(
+            # Skip empty content for token messages
+            if result.get("type") == "token" and not result.get("content"):
+                logger.debug("Skipping empty token message")
+                continue
+
+            # Handle tool execution
+            if result.get("type") == "tool_execution":
+                logger.debug(
+                    f"Tool execution detected - "
+                    f"tool: {result.get('tool')}, "
+                    f"input: {result.get('input')}, "
+                    f"output: {result.get('output')}, "
+                    f"raw: {result}"
+                )
+
+                # Ensure all values are strings
+                tool_name = str(result.get("tool", ""))
+                tool_input = str(result.get("input", ""))
+                tool_output = str(result.get("output", ""))
+
+                logger.debug(
+                    f"Processed tool values - name: {tool_name}, input: {tool_input}, output: {tool_output}"
+                )
+
+                # Create a new step for the tool execution
+                logger.debug("Creating tool execution step")
+                try:
+                    new_step = StepCreate(
                         profile_id=profile.id,
                         job_id=job_id,
                         role="assistant",
-                        content=stream_message["content"],
-                        tool=stream_message["tool"],
-                        tool_input=stream_message["tool_input"],
-                        thought=stream_message["thought"],
-                        result=stream_message["result"],
+                        content="",  # Content will be in the result
+                        tool=tool_name,
+                        tool_input=tool_input,
+                        thought=None,
+                        tool_output=tool_output,
                     )
-                )
-                # Build object in memory for later storage in db
-                logger.debug("Adding result to results array")
-                result_with_timestamp = {
-                    **result,
+                    logger.debug(f"Created StepCreate object: {new_step}")
+                    created_step = backend.create_step(new_step=new_step)
+                    logger.debug(
+                        f"Successfully created tool execution step: {created_step}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating tool execution step: {e}")
+
+                # Add to results for streaming
+                tool_execution = {
+                    "role": "assistant",
+                    "type": "stream",
+                    "stream_type": "tool",
+                    "tool": tool_name,
+                    "tool_input": tool_input,
+                    "tool_output": tool_output,
                     "timestamp": datetime.datetime.now().isoformat(),
                 }
-                results.append(result_with_timestamp)
+                results.append(tool_execution)
+                await output_queue.put(tool_execution)
+
+                # Reset current message
+                current_message = {
+                    "content": "",
+                    "type": "result",
+                    "tool": None,
+                    "tool_input": None,
+                    "tool_output": None,
+                    "thought": None,
+                }
+                continue
+
+            # Handle regular content
+            if result.get("content"):
+                # Stream message to the client
+                stream_message = {
+                    "type": "stream",
+                    "stream_type": result.get("type", "token"),
+                    "content": result.get("content", ""),
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "job_started_at": datetime.datetime.now().isoformat(),
+                    "role": "assistant",
+                }
+                logger.debug(
+                    f"Putting message in output queue - type: {stream_message['stream_type']}"
+                )
+                await output_queue.put(stream_message)
+
+                # Accumulate content
+                current_message["content"] += result.get("content", "")
+                logger.debug(
+                    f"Accumulated content length: {len(current_message['content'])}"
+                )
+
+        # After the loop, save any remaining content
+        if current_message["content"]:
+            logger.debug(
+                f"Saving final content - length: {len(current_message['content'])}"
+            )
+            logger.debug("Adding current message to results array", current_message)
+            backend.create_step(
+                new_step=StepCreate(
+                    profile_id=profile.id,
+                    job_id=job_id,
+                    role="assistant",
+                    content=current_message["content"],
+                    tool=None,
+                    tool_input=None,
+                    thought=None,
+                    tool_output=None,
+                )
+            )
+            results.append(
+                {
+                    **current_message,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                }
+            )
 
         # Store results in database
         logger.debug("Processing final results")

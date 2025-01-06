@@ -37,6 +37,9 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    Secret,
+    SecretBase,
+    SecretFilter,
     Step,
     StepBase,
     StepCreate,
@@ -79,6 +82,29 @@ class AbstractBackend(ABC):
     def upload_file(self, file_path: str, file: bytes) -> str:
         pass
 
+    # ----------- SECRETS -----------
+    # @abstractmethod
+    # def create_secret(self, new_secret: SecretBase) -> Secret:
+    #     pass
+
+    @abstractmethod
+    def get_secret(self, secret_id: UUID) -> Optional[Secret]:
+        pass
+
+    @abstractmethod
+    def list_secrets(self, filters: Optional[SecretFilter] = None) -> List[Secret]:
+        pass
+
+    # @abstractmethod
+    # def update_secret(
+    #     self, secret_id: UUID, update_data: SecretBase
+    # ) -> Optional[Secret]:
+    #     pass
+
+    # @abstractmethod
+    # def delete_secret(self, secret_id: UUID) -> bool:
+    #     pass
+
     # ----------- WALLETS ----------
     @abstractmethod
     def create_wallet(self, new_wallet: WalletCreate) -> Wallet:
@@ -99,7 +125,7 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def delete_wallet(self, wallet_id: UUID) -> None:
+    def delete_wallet(self, wallet_id: UUID) -> bool:
         pass
 
     # ----------- AGENTS -----------

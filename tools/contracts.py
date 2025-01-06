@@ -1,262 +1,14 @@
-import json
 from .bun import BunScriptRunner
-from backend.factory import backend
-from backend.models import CapabilityCreate, TokenBase
-from crewai_tools import BaseTool
-from pydantic import BaseModel, Field, validator
-from services.daos import (
-    TokenServiceError,
-    bind_token_to_collective,
-    generate_collective_dependencies,
-    generate_token_dependencies,
-)
-from typing import Dict, Type, Union
+from langchain.tools import BaseTool
+from lib.hiro import HiroApi
+from pydantic import BaseModel, Field
+from services.daos import TokenServiceError, generate_token_dependencies
+from typing import Any, Dict, Optional, Type, Union
+from uuid import UUID
 
 
-class ContractError(Exception):
-    """Base exception for contract-related errors"""
-
-    def __init__(self, message: str, details: Dict = None):
-        super().__init__(message)
-        self.details = details or {}
-
-
-class TokenValidationError(ContractError):
-    """Exception for token validation errors"""
-    pass
-
-
-def validate_token_supply(v: str) -> str:
-    """Validate token supply is within acceptable range."""
-    try:
-        supply = int(v)
-        min_supply = 21_000_000
-        max_supply = 1_000_000_000
-        if not min_supply <= supply <= max_supply:
-            raise ValueError(
-                f"Token supply must be between {min_supply:,} and {max_supply:,}"
-            )
-    except ValueError as e:
-        raise TokenValidationError(str(e))
-    return v
-
-
-def validate_token_length(v: str, max_length: int = 280) -> str:
-    """Validate string length for Twitter compatibility."""
-    if len(v) > max_length:
-        raise TokenValidationError(
-            f"Length exceeds {max_length} characters"
-        )
-    return v
-
-
-class ContractCollectiveDeployToolSchema(BaseModel):
-    """Input schema for ContractCollectiveDeployToolSchema."""
-
-    token_symbol: str = Field(
-        ...,
-        description="The symbol for the token for the collective (e.g., 'HUMAN')",
-        max_length=10
-    )
-    token_name: str = Field(
-        ...,
-        description="The name of the token for the collective (e.g., 'Human')",
-        max_length=50
-    )
-    token_description: str = Field(
-        ...,
-        description="The description of the token for the collective (e.g., 'The Human Token')",
-        max_length=280
-    )
-    token_max_supply: str = Field(
-        ...,
-        description="Initial supply of the token for the collective (21,000,000 to 1,000,000,000)",
-        validators=[validate_token_supply]
-    )
-    token_decimals: str = Field(
-        "6",
-        description="Number of decimals for the token for the collective. Default is 6"
-    )
-    mission: str = Field(
-        ...,
-        description="The mission statement for the collective",
-        max_length=280
-    )
-
-    class Config:
-        """Pydantic model configuration."""
-        validate_assignment = True
-
-    @validator("token_symbol")
-    def validate_symbol(cls, v):
-        """Validate token symbol format."""
-        if not v.isalnum():
-            raise TokenValidationError("Token symbol must be alphanumeric")
-        return validate_token_length(v.upper(), 10)
-
-    @validator("token_name", "token_description", "mission")
-    def validate_text_fields(cls, v):
-        """Validate text field lengths."""
-        return validate_token_length(v)
-
-    @validator("token_decimals")
-    def validate_decimals(cls, v):
-        """Validate token decimals."""
-        if v != "6":
-            raise TokenValidationError("Token decimals must be 6")
-        return v
-
-
-class ContractCollectiveDeployTool(BaseTool):
-    name: str = "Collective Deploy Tool"
-    description: str = """
-    Deploy a new collective with a token and a bonding curve for stacks.
-    """
-    args_schema: Type[BaseModel] = ContractCollectiveDeployToolSchema
-    account_index: str = "0"
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
-    def _run(
-        self,
-        token_symbol: str,
-        token_name: str,
-        token_description: str,
-        token_max_supply: str,
-        token_decimals: str,
-        mission: str,
-    ) -> Dict[str, Union[str, bool, None]]:
-        try:
-            # Generate collective dependencies and get collective record
-            collective_record = generate_collective_dependencies(
-                token_name, mission, token_description
-            )
-
-            # Generate token dependencies and get token record
-            metadata_url, token_record = generate_token_dependencies(
-                name=token_name,
-                symbol=token_symbol,
-                description=token_description,
-                decimals=token_decimals,
-                max_supply=token_max_supply,
-            )
-
-            if not bind_token_to_collective(
-                token_id=token_record["id"], collective_id=collective_record["id"]
-            ):
-                return {
-                    "output": "",
-                    "error": "Failed to bind token to collective",
-                    "success": False,
-                }
-
-            # Deploy contracts using BunScriptRunner
-            result = BunScriptRunner.bun_run(
-                self.account_index,
-                "stacks-contracts",
-                "deploy-dao.ts",
-                token_symbol,
-                token_name,
-                token_max_supply,
-                token_decimals,
-                metadata_url,
-            )
-
-            if not result["success"]:
-                return {
-                    "output": result["output"],
-                    "error": result["error"] or "Contract deployment failed",
-                    "success": False,
-                }
-
-            try:
-                # Parse deployment output
-                deployment_data = json.loads(result["output"] if result["output"] else result["error"])
-                
-                if not deployment_data["success"]:
-                    error_details = deployment_data.get("error", {})
-                    error_msg = error_details.get("message", "Unknown deployment error")
-                    if error_details.get("stage"):
-                        error_msg = f"Failed at {error_details['stage']}: {error_msg}"
-                    return {
-                        "output": result["output"],
-                        "error": error_msg,
-                        "success": False,
-                    }
-
-                # Update token record with contract information
-                contracts = deployment_data["contracts"]
-                token_contract = contracts.get("token", {})
-                if not token_contract:
-                    return {
-                        "output": "",
-                        "error": "Token contract data missing from deployment result",
-                        "success": False,
-                    }
-
-                token_updates = TokenBase(
-                    contract_principal=token_contract["contractPrincipal"],
-                    tx_id=token_contract["transactionId"],
-                )
-
-                if not backend.update_token(token_record["id"], token_updates):
-                    return {
-                        "output": "",
-                        "error": "Failed to update token with contract information",
-                        "success": False,
-                    }
-
-                # Create capabilities for each deployed contract
-                for contract_name, contract_data in contracts.items():
-                    if contract_name != "token":
-                        capability = CapabilityCreate(
-                            collective_id=collective_record["id"],
-                            type=contract_name,
-                            contract_principal=contract_data["contractPrincipal"],
-                            tx_id=contract_data["transactionId"],
-                            status="deployed",
-                        )
-                        
-                        if not backend.create_capability(capability):
-                            return {
-                                "output": "",
-                                "error": f"Failed to add {contract_name} capability",
-                                "success": False,
-                            }
-
-                return {
-                    "output": json.dumps(deployment_data, indent=2),
-                    "error": None,
-                    "success": True,
-                }
-
-            except json.JSONDecodeError as e:
-                return {
-                    "output": result["output"],
-                    "error": f"Failed to parse deployment output: {str(e)}",
-                    "success": False,
-                }
-
-        except TokenServiceError as e:
-            error_msg = f"Failed to create token dependencies: {str(e)}"
-            details = e.details if hasattr(e, "details") else None
-            return {
-                "output": details if details else "",
-                "error": error_msg,
-                "success": False,
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Unexpected error during token deployment: {str(e)}",
-                "output": "",
-            }
-
-
-class ContractSIP10DeployToolSchema(BaseModel):
-    """Input schema for ContractSIP10DeployTool."""
+class ContractSIP10DeployInput(BaseModel):
+    """Input schema for ContractSIP10Deploy tool."""
 
     token_symbol: str = Field(..., description="Symbol of the token.")
     token_name: str = Field(..., description="Name of the token.")
@@ -272,23 +24,26 @@ class ContractSIP10DeployToolSchema(BaseModel):
 
 
 class ContractSIP10DeployTool(BaseTool):
-    name: str = "Deploy a new token with its contract."
-    description: str = "Deploy a new token with its contract."
-    args_schema: Type[BaseModel] = ContractSIP10DeployToolSchema
-    account_index: str = "0"
+    name: str = "contract_sip10_deploy"
+    description: str = "Deploy a new token contract following the SIP-10 standard"
+    args_schema: Type[BaseModel] = ContractSIP10DeployInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
-    def _run(
+    def _deploy(
         self,
         token_symbol: str,
         token_name: str,
         token_decimals: int,
         token_description: str,
         token_max_supply: str,
+        **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to deploy a SIP-10 token contract."""
         try:
             token_url, token_data = generate_token_dependencies(
                 token_name,
@@ -299,7 +54,7 @@ class ContractSIP10DeployTool(BaseTool):
             )
 
             return BunScriptRunner.bun_run(
-                self.account_index,
+                self.wallet_id,
                 "sip-010-ft",
                 "deploy.ts",
                 token_name,
@@ -320,55 +75,45 @@ class ContractSIP10DeployTool(BaseTool):
                 "error": f"Unexpected error during token deployment: {str(e)}",
             }
 
-
-class ContractSIP10SendToolSchema(BaseModel):
-    """Input schema for ContractSIP10SendTool."""
-
-    contract_address: str = Field(
-        ...,
-        description="Contract address of the token. Format: contract_address.contract_name",
-    )
-    recipient: str = Field(..., description="Recipient address to send tokens to.")
-    amount: int = Field(
-        ...,
-        description="Amount of tokens to send. Needs to be in microunits based on decimals of token.",
-    )
-
-
-class ContractSIP10SendTool(BaseTool):
-    name: str = "Send fungible tokens to a recipient."
-    description: str = "Send fungible tokens from your wallet to a recipient address."
-    args_schema: Type[BaseModel] = ContractSIP10SendToolSchema
-    account_index: str = "0"
-
-    def __init__(self, account_index: str, **kwargs):
-        super().__init__(**kwargs)
-        self.account_index = account_index
-
     def _run(
         self,
-        contract_address: str,
-        recipient: str,
-        amount: int,
+        token_symbol: str,
+        token_name: str,
+        token_decimals: int,
+        token_description: str,
+        token_max_supply: str,
+        **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
-        try:
-            return BunScriptRunner.bun_run(
-                self.account_index,
-                "sip-010-ft",
-                "transfer.ts",
-                contract_address,
-                recipient,
-                str(amount),
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Unexpected error during token transfer: {str(e)}",
-            }
+        """Execute the tool to deploy a SIP-10 token contract."""
+        return self._deploy(
+            token_symbol,
+            token_name,
+            token_decimals,
+            token_description,
+            token_max_supply,
+        )
+
+    async def _arun(
+        self,
+        token_symbol: str,
+        token_name: str,
+        token_decimals: int,
+        token_description: str,
+        token_max_supply: str,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(
+            token_symbol,
+            token_name,
+            token_decimals,
+            token_description,
+            token_max_supply,
+        )
 
 
-class ContractSIP10InfoToolSchema(BaseModel):
-    """Input schema for ContractSIP10InfoTool."""
+class ContractSIP10InfoInput(BaseModel):
+    """Input schema for ContractSIP10Info tool."""
 
     contract_address: str = Field(
         ...,
@@ -377,24 +122,26 @@ class ContractSIP10InfoToolSchema(BaseModel):
 
 
 class ContractSIP10InfoTool(BaseTool):
-    name: str = "Get fungible token information."
+    name: str = "contract_sip10_info"
     description: str = (
-        "Get token information including name, symbol, decimals, and supply."
+        "Get token information including name, symbol, decimals, and supply for a SIP-10 token"
     )
-    args_schema: Type[BaseModel] = ContractSIP10InfoToolSchema
-    account_index: str = "0"
+    args_schema: Type[BaseModel] = ContractSIP10InfoInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def __init__(self, account_index: str, **kwargs):
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
 
-    def _run(
+    def _deploy(
         self,
         contract_address: str,
     ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get SIP-10 token information."""
         try:
             return BunScriptRunner.bun_run(
-                self.account_index,
+                self.wallet_id,
                 "sip-010-ft",
                 "get-token-info.ts",
                 contract_address,
@@ -405,46 +152,74 @@ class ContractSIP10InfoTool(BaseTool):
                 "error": f"Unexpected error during token info retrieval: {str(e)}",
             }
 
+    def _run(
+        self,
+        contract_address: str,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Execute the tool to get SIP-10 token information."""
+        return self._deploy(contract_address)
 
-class ContractDAOExecutorDeployToolSchema(BaseModel):
-    """Input schema for ContractDAOExecutorDeployTool."""
+    async def _arun(
+        self,
+        contract_address: str,
+        **kwargs,
+    ) -> Dict[str, Union[str, bool, None]]:
+        """Async version of the tool."""
+        return self._deploy(contract_address)
 
-    dao_name: str = Field(..., description="Name of the DAO.")
-    contract_id: str = Field(..., description="Contract ID for the DAO.")
 
+class FetchContractSourceInput(BaseModel):
+    """Input schema for FetchContractSource tool."""
 
-class ContractDAOExecutorDeployTool(BaseTool):
-    name: str = "Deploy a new DAO executor contract."
-    description: str = (
-        "Deploy a new DAO executor contract with specified name and contract ID."
+    contract_address: str = Field(
+        ..., description="The contract's address (e.g., SP000...)"
     )
-    args_schema: Type[BaseModel] = ContractDAOExecutorDeployToolSchema
-    account_index: str = "0"
+    contract_name: str = Field(..., description="The name of the contract")
 
-    def __init__(self, account_index: str, **kwargs):
+
+class FetchContractSourceTool(BaseTool):
+    name: str = "contract_fetch_source"
+    description: str = "Fetch the source code of a contract using the Hiro API"
+    args_schema: Type[BaseModel] = FetchContractSourceInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        self.account_index = account_index
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        contract_address: str,
+        contract_name: str,
+    ):
+        """Execute the tool to fetch contract source code."""
+        try:
+            api = HiroApi()
+            result = api.get_contract_source(contract_address, contract_name)
+
+            if "source" in result:
+                return result["source"]
+            else:
+                return f"Error: Could not find source code. API response: {result}"
+        except Exception as e:
+            return f"Error fetching contract source: {str(e)}"
 
     def _run(
         self,
-        dao_name: str,
-        contract_id: str,
-    ) -> Dict[str, Union[str, bool, None]]:
-        try:
-            return BunScriptRunner.bun_run(
-                self.account_index,
-                "stacks-dao",
-                "cli.ts",
-                "executor",
-                "deploy",
-                "-n",
-                dao_name,
-                "-c",
-                contract_id,
-                "-d",
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Unexpected error during DAO executor deployment: {str(e)}",
-            }
+        contract_address: str,
+        contract_name: str,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to fetch contract source code."""
+        return self._deploy(contract_address, contract_name)
+
+    async def _arun(
+        self,
+        contract_address: str,
+        contract_name: str,
+        **kwargs,
+    ) -> str:
+        """Async version of the tool."""
+        return self._deploy(contract_address, contract_name)

@@ -89,9 +89,12 @@ async def websocket_endpoint(
         # Verify conversation belongs to user
         conversation_id_uuid = UUID(conversation_id)
         conversation = backend.get_conversation(convo_id=conversation_id_uuid)
+        logger.info(f"Received WebSocket connection for conversation {conversation}")
         jobs = backend.list_jobs(
             filters=JobFilter(conversation_id=conversation_id_uuid)
         )
+        logger.info(f"Jobs for conversation {conversation}: {jobs}")
+
         if not conversation:
             await websocket.accept()
             await websocket.send_json(
@@ -109,6 +112,7 @@ async def websocket_endpoint(
         if jobs:
             # Format history messages according to frontend expectations
             for job in jobs:
+                logger.info(f"Processing job {job}")
                 # Add user input message
                 formatted_history.append(
                     {
@@ -128,7 +132,7 @@ async def websocket_endpoint(
                         "timestamp": step.created_at.isoformat(),
                         "tool": step.tool,
                         "tool_input": step.tool_input,
-                        "result": step.result,
+                        "tool_output": step.tool_output,
                         "thought": step.thought,
                     }
                     formatted_history.append(formatted_msg)
@@ -148,12 +152,16 @@ async def websocket_endpoint(
                 data = await websocket.receive_json()
 
                 if data.get("type") == "chat_message":
+
+                    agent_id = UUID(data.get("agent_id", None))
+                    message = data.get("message", "")
                     # Create a new job for this message
                     job = backend.create_job(
-                        JobCreate(
+                        new_job=JobCreate(
                             conversation_id=conversation_id_uuid,
                             profile_id=profile.id,
-                            input=data.get("message", ""),
+                            agent_id=agent_id,
+                            input=message,
                         )
                     )
                     job_id = job.id
@@ -172,7 +180,8 @@ async def websocket_endpoint(
                             job_id=job_id,
                             conversation_id=conversation_id_uuid,
                             profile=profile,
-                            input_str=data.get("message", ""),
+                            agent_id=agent_id,
+                            input_str=message,
                             history=formatted_history,
                             output_queue=output_queue,
                         )
@@ -197,6 +206,7 @@ async def websocket_endpoint(
                             if result is None:
                                 break
                             # Add job_started_at if it's a stream message
+                            logger.debug(result)
                             if result.get("type") == "stream":
                                 result["job_started_at"] = job_started_at
                             await manager.send_conversation_message(

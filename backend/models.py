@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 
@@ -11,12 +11,36 @@ class CustomBaseModel(BaseModel):
 
 
 #
+#  SECRETS
+#
+class SecretBase(CustomBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    secret: Optional[str] = None
+    decrypted_secret: Optional[str] = None
+    key_id: Optional[str] = None
+    nonce: Optional[str] = None
+
+
+class SecretCreate(SecretBase):
+    pass
+
+
+class Secret(SecretBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+#
 #  WALLETS
 #
 class WalletBase(CustomBaseModel):
-    account_index: Optional[int] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
+    secret_id: Optional[UUID] = None
 
 
 class WalletCreate(WalletBase):
@@ -37,7 +61,7 @@ class AgentBase(CustomBaseModel):
     goal: Optional[str] = None
     backstory: Optional[str] = None
     profile_id: Optional[UUID] = None
-    agent_tools: Optional[str] = None
+    agent_tools: Optional[List[str]] = None
     crew_id: Optional[UUID] = None
     image_url: Optional[str] = None
 
@@ -187,7 +211,6 @@ class Profile(ProfileBase):
     id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
-    account_index: int
 
 
 #
@@ -224,7 +247,7 @@ class StepBase(CustomBaseModel):
     content: Optional[str] = None
     tool: Optional[str] = None
     tool_input: Optional[str] = None
-    result: Optional[str] = None
+    tool_output: Optional[str] = None
     thought: Optional[str] = None
     profile_id: Optional[UUID] = None
 
@@ -425,6 +448,11 @@ class TaskFilter(CustomBaseModel):
     crew_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     is_scheduled: Optional[bool] = None
+
+
+class SecretFilter(CustomBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class TelegramUserFilter(CustomBaseModel):
