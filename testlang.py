@@ -56,7 +56,7 @@ if __name__ == "__main__":
                 print(event["content"], end="", flush=True)
             elif event["type"] == "end":
                 print("\n--- LLM finished sending tokens ---")
-            elif event["type"] == "tool_execution":
+            elif event["type"] == "tool":
                 # Intermediate step from a tool
                 print(f"\n[TOOL] {event}")
             elif event["type"] == "result":

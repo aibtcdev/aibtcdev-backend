@@ -17,28 +17,24 @@ class ConnectionManager:
         if job_id not in self.job_connections:
             self.job_connections[job_id] = set()
         self.job_connections[job_id].add(websocket)
-        logger.debug(f"New WebSocket connection for job {job_id}")
 
     async def connect_conversation(self, websocket: WebSocket, conversation_id: str):
         await websocket.accept()
         if conversation_id not in self.conversation_connections:
             self.conversation_connections[conversation_id] = set()
         self.conversation_connections[conversation_id].add(websocket)
-        logger.debug(f"New WebSocket connection for conversation {conversation_id}")
 
     async def disconnect_job(self, websocket: WebSocket, job_id: str):
         if job_id in self.job_connections:
             self.job_connections[job_id].discard(websocket)
             if not self.job_connections[job_id]:
                 del self.job_connections[job_id]
-        logger.debug(f"Closed WebSocket connection for job {job_id}")
 
     async def disconnect_conversation(self, websocket: WebSocket, conversation_id: str):
         if conversation_id in self.conversation_connections:
             self.conversation_connections[conversation_id].discard(websocket)
             if not self.conversation_connections[conversation_id]:
                 del self.conversation_connections[conversation_id]
-        logger.debug(f"Closed WebSocket connection for conversation {conversation_id}")
 
     async def send_job_message(self, message: dict, job_id: str):
         if job_id in self.job_connections:

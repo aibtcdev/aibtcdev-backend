@@ -243,6 +243,7 @@ class Proposal(ProposalBase):
 #
 class StepBase(CustomBaseModel):
     job_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
     role: Optional[str] = None
     content: Optional[str] = None
     tool: Optional[str] = None

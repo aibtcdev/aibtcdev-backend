@@ -8,42 +8,27 @@ logger = configure_logger(__name__)
 
 
 async def verify_profile(authorization: str = Header(...)) -> Profile:
-    """
-    Get profile of the requesting user.
-
-    Args:
-        authorization (str): Bearer token from request header
-
-    Returns:
-        Profile: Object
-
-    Raises:
-        HTTPException: For various authentication and profile retrieval failures
-    """
-    # Validate authorization header
     if not authorization or not authorization.startswith("Bearer "):
-        logger.debug("Authorization header is missing or invalid")
+        logger.error("Authorization header is missing or invalid")
         raise HTTPException(
             status_code=401, detail="Missing or invalid authorization header"
         )
 
     try:
         token = authorization.split(" ")[1]
-        logger.debug("Processing authorization token")
 
         identifier = backend.verify_session_token(token)
         profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
-            logger.debug("Profile not found in database")
+            logger.error("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
         profile = profile_response[0]
 
-        logger.debug(f"Successfully verified profile with id: {profile.id}")
         return profile
 
     except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=401, detail="Authorization failed")
@@ -65,19 +50,18 @@ async def verify_profile_from_token(
         HTTPException: For various authentication and profile retrieval failures
     """
     if not token:
-        logger.debug("Token query parameter is missing")
+        logger.error("Token query parameter is missing")
         raise HTTPException(status_code=401, detail="Missing token parameter")
 
     try:
         identifier = backend.verify_session_token(token)
         profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
-            logger.debug("Profile not found in database")
+            logger.error("Profile not found in database")
             raise HTTPException(status_code=404, detail="Profile not found")
 
         profile = profile_response[0]
 
-        logger.debug(f"Successfully verified profile with id: {profile.id}")
         return profile
 
     except HTTPException:

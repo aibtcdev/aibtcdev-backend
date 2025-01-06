@@ -11,7 +11,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph
 from lib.logger import configure_logger
 from tools.tools_factory import initialize_tools
-from typing import List
+from typing import Dict, List
 from uuid import UUID
 
 logger = configure_logger(__name__)
@@ -37,9 +37,7 @@ async def execute_chat_stream_langgraph(
     profile: Profile, agent_id: UUID, history: List, input_str: str, persona: str = None
 ):
     """Execute a chat stream using LangGraph."""
-    logger.debug("Starting execute_chat_stream_langgraph")
     callback_queue = asyncio.Queue()
-    logger.info(f"initializing tools for profile {agent_id}")
     tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
     filtered_content = extract_filtered_content(history)
 
@@ -49,8 +47,6 @@ async def execute_chat_stream_langgraph(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    logger.debug(f"Converting history to messages, history length: {len(history)}")
-    # Convert history to LangChain message format
     messages = []
     for msg in filtered_content:
         if msg["role"] == "user":
@@ -59,14 +55,10 @@ async def execute_chat_stream_langgraph(
             messages.append(AIMessage(content=msg["content"]))
 
     if persona:
-        logger.debug("Adding persona as a SystemMessage")
         messages.append(SystemMessage(content=persona))
 
-    # Add the current input
     messages.append(HumanMessage(content=input_str))
-    logger.debug(f"Final messages length: {len(messages)}")
 
-    # Create the chat model with streaming
     callback_handler = StreamingCallbackHandler(
         queue=callback_queue,
         on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
@@ -81,44 +73,29 @@ async def execute_chat_stream_langgraph(
         streaming=True,
         model="gpt-4o",
         callbacks=[callback_handler],
-        temperature=0.7,  # Add some temperature for more natural responses
+        temperature=0.7,
     )
 
-    # Define the tool selection node
     async def tool_selection_node(state):
-        logger.debug("Entering tool_selection_node")
-        logger.debug(f"Current state messages: {len(state['messages'])}")
-
         try:
             if should_use_tool(state):
                 logger.debug("Tool usage detected, initializing agent")
-                # Convert tools list to LangChain format
                 tools = list(tools_map.values())
-                logger.debug(f"Using {len(tools)} tools")
 
-                # Configure the agent with tools
                 agent = initialize_agent(
                     tools=tools,
                     llm=chat,
-                    agent=AgentType.OPENAI_MULTI_FUNCTIONS,  # More flexible agent type
+                    agent=AgentType.OPENAI_MULTI_FUNCTIONS,
                     verbose=True,
                     handle_parsing_errors=True,
-                    max_iterations=3,  # Limit iterations to prevent infinite loops
-                    return_intermediate_steps=True,  # Get intermediate steps for streaming
+                    max_iterations=3,
+                    return_intermediate_steps=True,
                 )
 
                 try:
-                    logger.debug("Running agent with tools")
-                    logger.debug(
-                        f"Last message: {state['messages'][-1].content if state['messages'] else ''}"
-                    )
-                    # Get the last message content
                     last_message = (
                         state["messages"][-1].content if state["messages"] else ""
                     )
-
-                    # Run the agent with proper async handling
-                    logger.debug("Invoking agent with callbacks")
                     agent_result = await agent.ainvoke(
                         {"input": last_message},
                         config={
@@ -126,37 +103,23 @@ async def execute_chat_stream_langgraph(
                             "run_name": "tool_execution",
                         },
                     )
-                    logger.debug(f"Agent result: {agent_result}")
-
-                    # Process intermediate steps
                     for step in agent_result.get("intermediate_steps", []):
                         action, output = step
-                        logger.debug(
-                            f"Processing step - action: {action}, output: {output}"
-                        )
-                        logger.debug(f"Action tool: {action.tool}")
-                        logger.debug(f"Action tool_input: {action.tool_input}")
-
-                        # Convert tool input to string if it's a dict
                         tool_input = action.tool_input
                         if isinstance(tool_input, dict):
                             tool_input = str(tool_input)
 
                         tool_execution = {
-                            "type": "tool_execution",
+                            "type": "tool",
                             "tool": action.tool,
                             "input": tool_input,
                             "output": str(output),  # Ensure output is string
+                            "status": "end",
                         }
-                        logger.debug(f"Sending tool execution: {tool_execution}")
                         await callback_queue.put(tool_execution)
-                        logger.debug(f"Processed intermediate step: {tool_execution}")
 
                     # Get final response
                     response_content = agent_result.get("output", "")
-                    logger.debug(
-                        f"Agent response received: {response_content[:100]}..."
-                    )
 
                     return {
                         "messages": state["messages"]
@@ -165,17 +128,12 @@ async def execute_chat_stream_langgraph(
                     }
                 except Exception as e:
                     logger.error(f"Error in tool execution: {str(e)}")
-                    # Fallback to regular chat if tool execution fails
-                    logger.debug("Falling back to regular chat after tool error")
 
-            # Use regular chat without tools (either by choice or after tool failure)
-            logger.debug("Using regular chat without tools")
             messages = state["messages"]
             response = await chat.ainvoke(messages)
             response_content = (
                 response.content if hasattr(response, "content") else str(response)
             )
-            logger.debug(f"Chat response received: {response_content[:100]}...")
             return {
                 "messages": messages + [AIMessage(content=response_content)],
                 "response": response_content,
@@ -290,16 +248,16 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         """Run when LLM errors."""
         logger.error(f"LLM error: {str(error)}")
 
-    # def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
-    #     """Run when tool starts running."""
-    #     self.current_tool = serialized.get("name")
-    #     tool_execution = {
-    #         "type": "tool_execution",
-    #         "tool": self.current_tool,
-    #         "input": input_str,
-    #         "output": None,
-    #     }
-    #     self._put_to_queue(tool_execution)
+    def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
+        """Run when tool starts running."""
+        self.current_tool = serialized.get("name")
+        tool_execution = {
+            "type": "tool",
+            "tool": self.current_tool,
+            "input": input_str,
+            "status": "start",
+        }
+        self._put_to_queue(tool_execution)
 
     # def on_tool_end(self, output: str, **kwargs):
     #     """Run when tool ends running."""
@@ -317,7 +275,7 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         """Run when tool errors."""
         if self.current_tool:
             tool_execution = {
-                "type": "tool_execution",
+                "type": "tool",
                 "tool": self.current_tool,
                 "input": None,  # We don't have access to the input here
                 "output": f"Error: {str(error)}",
