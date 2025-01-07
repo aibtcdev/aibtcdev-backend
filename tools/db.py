@@ -1,5 +1,5 @@
 from backend.factory import backend
-from backend.models import CapabilityFilter, TaskCreate
+from backend.models import ExtensionFilter, TaskCreate
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from storage3._async.bucket import Response
@@ -95,22 +95,22 @@ class AddScheduledTaskTool(BaseTool):
         return self._deploy(name, prompt, cron, enabled, **kwargs)
 
 
-class GetCollectiveListSchema(BaseModel):
-    """Input schema for CollectiveList tool."""
+class GetDAOListSchema(BaseModel):
+    """Input schema for DAOList tool."""
 
 
-class GetCollectiveListTool(BaseTool):
-    name: str = "db_list_collectives_daos"
+class GetDAOListTool(BaseTool):
+    name: str = "db_list_daos_daos"
     description: str = (
-        "This tool is used to get/list all the collectives and DAOS with their capabilities and tokens. "
-        "It returns a dictionary with three keys: 'collectives', 'capabilities', and 'tokens'. "
-        "'collectives' contains the list of collectives and their details, "
-        "'capabilities' contains the list of capabilities and their details, "
+        "This tool is used to get/list all the daos and DAOS with their extensions and tokens. "
+        "It returns a dictionary with three keys: 'daos', 'extensions', and 'tokens'. "
+        "'daos' contains the list of daos and their details, "
+        "'extensions' contains the list of extensions and their details, "
         "and 'tokens' contains the list of tokens and their details."
         "Example usage: "
-        "can you show me what collectives are avaliable? "
+        "can you show me what daos are avaliable? "
     )
-    args_schema: Type[BaseModel] = GetCollectiveListSchema
+    args_schema: Type[BaseModel] = GetDAOListSchema
     return_direct: bool = False
 
     def __init__(self, **kwargs):
@@ -120,14 +120,14 @@ class GetCollectiveListTool(BaseTool):
         self,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to list collective tasks."""
+        """Execute the tool to list dao tasks."""
         try:
-            collectives = backend.list_collectives()
-            capabilities = backend.list_capabilities()
+            daos = backend.list_daos()
+            extensions = backend.list_extensions()
             tokens = backend.list_tokens()
             response = {
-                "collectives": collectives,
-                "capabilities": capabilities,
+                "daos": daos,
+                "extensions": extensions,
                 "tokens": tokens,
             }
 

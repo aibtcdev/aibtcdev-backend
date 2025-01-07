@@ -324,9 +324,9 @@ def should_use_tool(state):
         "deploy",
         "address",
         "sip10",
-        "collective",
         "dao",
-        "capability",
+        "dao",
+        "extension",
         "schedule",
         "task",
         "status",
@@ -366,7 +366,7 @@ def should_use_tool(state):
             "address",
             "market",
             "order",
-            "collective",
+            "dao",
             "dao",
         ]
         if any(context in last_message_lower for context in contexts):

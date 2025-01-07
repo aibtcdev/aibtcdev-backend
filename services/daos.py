@@ -1,5 +1,5 @@
 from backend.factory import backend
-from backend.models import Collective, CollectiveCreate, Token, TokenBase, TokenCreate
+from backend.models import DAO, DAOCreate, Token, TokenBase, TokenCreate
 from lib.logger import configure_logger
 from lib.token_assets import TokenAssetError, TokenAssetManager, TokenMetadata
 from typing import Dict, Tuple
@@ -28,29 +28,27 @@ class TokenUpdateError(TokenServiceError):
     pass
 
 
-def generate_collective_dependencies(
-    name: str, mission: str, description: str
-) -> Collective:
-    """Generate collective dependencies including database record and metadata.
+def generate_dao_dependencies(name: str, mission: str, description: str) -> DAO:
+    """Generate dao dependencies including database record and metadata.
 
     Args:
-        name: Name of the collective
-        mission: Mission of the collective
-        description: Description of the collective
+        name: Name of the dao
+        mission: Mission of the dao
+        description: Description of the dao
     """
     logger.debug(
-        f"Creating collective with name={name}, mission={mission}, description={description}"
+        f"Creating dao with name={name}, mission={mission}, description={description}"
     )
     try:
-        collective = backend.create_collective(
-            CollectiveCreate(name=name, mission=mission, description=description)
+        dao = backend.create_dao(
+            DAOCreate(name=name, mission=mission, description=description)
         )
-        logger.debug(f"Created collective type: {type(collective)}")
-        logger.debug(f"Created collective content: {collective}")
+        logger.debug(f"Created dao type: {type(dao)}")
+        logger.debug(f"Created dao content: {dao}")
 
-        return collective
+        return dao
     except Exception as e:
-        logger.error(f"Failed to create collective: {str(e)}", exc_info=True)
+        logger.error(f"Failed to create dao: {str(e)}", exc_info=True)
         raise
 
 
@@ -154,24 +152,24 @@ def generate_token_dependencies(
         ) from e
 
 
-def bind_token_to_collective(token_id: UUID, collective_id: UUID):
-    """Bind a token to a collective.
+def bind_token_to_dao(token_id: UUID, dao_id: UUID):
+    """Bind a token to a DAO.
 
     Args:
         token_id: ID of the token to bind
-        collective_id: ID of the collective to bind to
+        dao_id: ID of the DAO to bind to
 
     Returns:
         bool: True if binding was successful, False otherwise
     """
-    logger.debug(f"Binding token {token_id} to collective {collective_id}")
+    logger.debug(f"Binding token {token_id} to DAO {dao_id}")
     try:
-        token_update = TokenBase(collective_id=collective_id)
+        token_update = TokenBase(dao_id=dao_id)
         logger.debug(f"Token update data: {token_update}")
 
         result = backend.update_token(token_id=token_id, update_data=token_update)
         logger.debug(f"Bind result: {result}")
         return result
     except Exception as e:
-        logger.error(f"Failed to bind token to collective: {str(e)}", exc_info=True)
+        logger.error(f"Failed to bind token to DAO: {str(e)}", exc_info=True)
         return False

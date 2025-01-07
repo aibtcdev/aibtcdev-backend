@@ -24,7 +24,7 @@ def generate_persona(agent: Agent):
         - Familiar with blockchain security best practices
         - Capable of providing market insights and usage tips for Stacks-based dApps
 
-        Capabilities:
+        Extensions:
         - Provide step-by-step instructions for sending/receiving STX
         - Track and display real-time wallet balances and transaction history
         - Offer high-level overviews of market conditions and relevant news

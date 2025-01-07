@@ -2,13 +2,13 @@ import json
 import logging
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import CapabilityCreate, TokenBase
+from backend.models import ExtensionCreate, TokenBase
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
-    bind_token_to_collective,
-    generate_collective_dependencies,
+    bind_token_to_dao,
+    generate_dao_dependencies,
     generate_token_dependencies,
 )
 from typing import Any, Dict, Optional, Type, Union
@@ -17,36 +17,34 @@ from uuid import UUID
 logger = logging.getLogger(__name__)
 
 
-class ContractCollectiveDeployInput(BaseModel):
-    """Input schema for ContractCollectiveDeploy tool."""
+class ContractDAODeployInput(BaseModel):
+    """Input schema for ContractDAODeploy tool."""
 
     token_symbol: str = Field(
-        ..., description="The symbol for the token for the collective (e.g., 'HUMAN')"
+        ..., description="The symbol for the token for the DAO (e.g., 'HUMAN')"
     )
     token_name: str = Field(
-        ..., description="The name of the token for the collective (e.g., 'Human')"
+        ..., description="The name of the token for the DAO (e.g., 'Human')"
     )
     token_description: str = Field(
         ...,
-        description="The description of the token for the collective (e.g., 'The Human Token')",
+        description="The description of the token for the DAO (e.g., 'The Human Token')",
     )
     token_max_supply: str = Field(
         ...,
-        description="Initial supply of the token for the collective. Default is 1000000000",
+        description="Initial supply of the token for the DAO. Default is 1000000000",
     )
     token_decimals: str = Field(
         ...,
-        description="Number of decimals for the token for the collective. Default is 6",
+        description="Number of decimals for the token for the DAO. Default is 6",
     )
-    mission: str = Field(..., description="The mission statement for the collective")
+    mission: str = Field(..., description="The mission statement for the DAO")
 
 
-class ContractCollectiveDeployTool(BaseTool):
-    name: str = "contract_collective_deploy"
-    description: str = (
-        "Deploy a new collective with a token and a bonding curve for stacks"
-    )
-    args_schema: Type[BaseModel] = ContractCollectiveDeployInput
+class ContractDAODeployTool(BaseTool):
+    name: str = "contract_dao_deploy"
+    description: str = "Deploy a new DAO with a token and a bonding curve for stacks"
+    args_schema: Type[BaseModel] = ContractDAODeployInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
@@ -73,13 +71,13 @@ class ContractCollectiveDeployTool(BaseTool):
                 f"mission={mission}"
             )
 
-            # Generate collective dependencies and get collective record
-            logger.debug("Step 1: Generating collective dependencies...")
-            collective_record = generate_collective_dependencies(
+            # Generate dao dependencies and get dao record
+            logger.debug("Step 1: Generating dao dependencies...")
+            dao_record = generate_dao_dependencies(
                 token_name, mission, token_description
             )
-            logger.debug(f"Generated collective record type: {type(collective_record)}")
-            logger.debug(f"Generated collective record content: {collective_record}")
+            logger.debug(f"Generated dao record type: {type(dao_record)}")
+            logger.debug(f"Generated dao record content: {dao_record}")
 
             # Generate token dependencies and get token record
             logger.debug("Step 2: Generating token dependencies...")
@@ -98,21 +96,19 @@ class ContractCollectiveDeployTool(BaseTool):
             logger.debug(f"Generated token record content: {token_record}")
             logger.debug(f"Generated metadata_url: {metadata_url}")
 
-            # Bind token to collective
-            logger.debug("Step 4: Binding token to collective...")
-            bind_result = bind_token_to_collective(
-                token_record.id, collective_record.id
-            )
+            # Bind token to dao
+            logger.debug("Step 4: Binding token to dao...")
+            bind_result = bind_token_to_dao(token_record.id, dao_record.id)
             if not bind_result:
-                logger.error("Failed to bind token to collective")
+                logger.error("Failed to bind token to dao")
                 logger.error(f"Token ID: {token_record.id}")
-                logger.error(f"Collective ID: {collective_record.id}")
+                logger.error(f"DAO ID: {dao_record.id}")
                 return {
                     "output": "",
-                    "error": "Failed to bind token to collective",
+                    "error": "Failed to bind token to dao",
                     "success": False,
                 }
-            logger.debug("Successfully bound token to collective")
+            logger.debug("Successfully bound token to dao")
 
             # Deploy contracts
             logger.debug("Step 5: Deploying contracts...")
@@ -177,29 +173,29 @@ class ContractCollectiveDeployTool(BaseTool):
                         "success": False,
                     }
 
-                # Create capabilities
-                logger.debug("Step 8: Creating capabilities...")
+                # Create extensions
+                logger.debug("Step 8: Creating extensions...")
                 for contract_name, contract_data in contracts.items():
                     if contract_name != "token":
-                        logger.debug(f"Creating capability for {contract_name}")
-                        capability_result = backend.create_capability(
-                            CapabilityCreate(
-                                collective_id=collective_record.id,
+                        logger.debug(f"Creating extension for {contract_name}")
+                        extension_result = backend.create_extension(
+                            ExtensionCreate(
+                                dao_id=dao_record.id,
                                 type=contract_name,
                                 contract_principal=contract_data["contractPrincipal"],
                                 tx_id=contract_data["transactionId"],
                                 status="deployed",
                             )
                         )
-                        if not capability_result:
-                            logger.error(f"Failed to add {contract_name} capability")
+                        if not extension_result:
+                            logger.error(f"Failed to add {contract_name} extension")
                             return {
                                 "output": "",
-                                "error": f"Failed to add {contract_name} capability",
+                                "error": f"Failed to add {contract_name} extension",
                                 "success": False,
                             }
                         logger.debug(
-                            f"Successfully created capability for {contract_name}"
+                            f"Successfully created extension for {contract_name}"
                         )
 
                 logger.debug("Deployment completed successfully")
@@ -247,7 +243,7 @@ class ContractCollectiveDeployTool(BaseTool):
         mission: str,
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
-        """Execute the tool to deploy a new collective."""
+        """Execute the tool to deploy a new dao."""
         return self._deploy(
             token_symbol,
             token_name,

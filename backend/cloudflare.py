@@ -1,17 +1,10 @@
 from .abstract import AbstractBackend
 from .models import (
+    DAO,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Capability,
-    CapabilityBase,
-    CapabilityCreate,
-    CapabilityFilter,
-    Collective,
-    CollectiveBase,
-    CollectiveCreate,
-    CollectiveFilter,
     Conversation,
     ConversationBase,
     ConversationCreate,
@@ -24,6 +17,13 @@ from .models import (
     CronBase,
     CronCreate,
     CronFilter,
+    DAOBase,
+    DAOCreate,
+    DAOFilter,
+    Extension,
+    ExtensionBase,
+    ExtensionCreate,
+    ExtensionFilter,
     Job,
     JobBase,
     JobCreate,
@@ -117,49 +117,43 @@ class CloudflareBackend(AbstractBackend):
     # ----------------------------------------------------------------
     # 2. CAPABILITIES
     # ----------------------------------------------------------------
-    def create_capability(self, new_cap: "CapabilityCreate") -> "Capability":
-        return Capability(
+    def create_extension(self, new_cap: "ExtensionCreate") -> "Extension":
+        return Extension(
             id=DUMMY_ID, created_at=NOW, **new_cap.dict(exclude_unset=True)
         )
 
-    def get_capability(self, cap_id: UUID) -> Optional["Capability"]:
+    def get_extension(self, cap_id: UUID) -> Optional["Extension"]:
         return None
 
-    def list_capabilities(
-        self, filters: Optional["CapabilityFilter"] = None
-    ) -> List["Capability"]:
+    def list_extensions(
+        self, filters: Optional["ExtensionFilter"] = None
+    ) -> List["Extension"]:
         return []
 
-    def update_capability(
-        self, cap_id: UUID, update_data: "CapabilityBase"
-    ) -> Optional["Capability"]:
+    def update_extension(
+        self, cap_id: UUID, update_data: "ExtensionBase"
+    ) -> Optional["Extension"]:
         return None
 
-    def delete_capability(self, cap_id: UUID) -> bool:
+    def delete_extension(self, cap_id: UUID) -> bool:
         return False
 
     # ----------------------------------------------------------------
-    # 3. COLLECTIVES
+    # 3. DAOS
     # ----------------------------------------------------------------
-    def create_collective(self, new_col: "CollectiveCreate") -> "Collective":
-        return Collective(
-            id=DUMMY_ID, created_at=NOW, **new_col.dict(exclude_unset=True)
-        )
+    def create_dao(self, new_col: "DAOCreate") -> "DAO":
+        return DAO(id=DUMMY_ID, created_at=NOW, **new_col.dict(exclude_unset=True))
 
-    def get_collective(self, col_id: UUID) -> Optional["Collective"]:
+    def get_dao(self, col_id: UUID) -> Optional["DAO"]:
         return None
 
-    def list_collectives(
-        self, filters: Optional["CollectiveFilter"] = None
-    ) -> List["Collective"]:
+    def list_daos(self, filters: Optional["DAOFilter"] = None) -> List["DAO"]:
         return []
 
-    def update_collective(
-        self, col_id: UUID, update_data: "CollectiveBase"
-    ) -> Optional["Collective"]:
+    def update_dao(self, col_id: UUID, update_data: "DAOBase") -> Optional["DAO"]:
         return None
 
-    def delete_collective(self, col_id: UUID) -> bool:
+    def delete_dao(self, col_id: UUID) -> bool:
         return False
 
     # ----------------------------------------------------------------

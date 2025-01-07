@@ -2,18 +2,11 @@ import time
 import uuid
 from .abstract import AbstractBackend
 from .models import (
+    DAO,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Capability,
-    CapabilityBase,
-    CapabilityCreate,
-    CapabilityFilter,
-    Collective,
-    CollectiveBase,
-    CollectiveCreate,
-    CollectiveFilter,
     Conversation,
     ConversationBase,
     ConversationCreate,
@@ -26,6 +19,13 @@ from .models import (
     CronBase,
     CronCreate,
     CronFilter,
+    DAOBase,
+    DAOCreate,
+    DAOFilter,
+    Extension,
+    ExtensionBase,
+    ExtensionCreate,
+    ExtensionFilter,
     Job,
     JobBase,
     JobCreate,
@@ -348,17 +348,17 @@ class SupabaseBackend(AbstractBackend):
     # ----------------------------------------------------------------
     # 2. CAPABILITIES
     # ----------------------------------------------------------------
-    def create_capability(self, new_cap: "CapabilityCreate") -> "Capability":
+    def create_extension(self, new_cap: "ExtensionCreate") -> "Extension":
         payload = new_cap.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("capabilities").insert(payload).execute()
+        response = self.client.table("extensions").insert(payload).execute()
         data = response.data or []
         if not data:
-            raise ValueError("No data returned from insert for capability.")
-        return Capability(**data[0])
+            raise ValueError("No data returned from insert for extension.")
+        return Extension(**data[0])
 
-    def get_capability(self, cap_id: UUID) -> Optional["Capability"]:
+    def get_extension(self, cap_id: UUID) -> Optional["Extension"]:
         response = (
-            self.client.table("capabilities")
+            self.client.table("extensions")
             .select("*")
             .eq("id", str(cap_id))
             .single()
@@ -366,31 +366,31 @@ class SupabaseBackend(AbstractBackend):
         )
         if not response.data:
             return None
-        return Capability(**response.data)
+        return Extension(**response.data)
 
-    def list_capabilities(
-        self, filters: Optional["CapabilityFilter"] = None
-    ) -> List["Capability"]:
-        query = self.client.table("capabilities").select("*")
+    def list_extensions(
+        self, filters: Optional["ExtensionFilter"] = None
+    ) -> List["Extension"]:
+        query = self.client.table("extensions").select("*")
         if filters:
-            if filters.collective_id is not None:
-                query = query.eq("collective_id", str(filters.collective_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
             if filters.type is not None:
                 query = query.eq("type", filters.type)
             if filters.status is not None:
                 query = query.eq("status", filters.status)
         response = query.execute()
         data = response.data or []
-        return [Capability(**row) for row in data]
+        return [Extension(**row) for row in data]
 
-    def update_capability(
-        self, cap_id: UUID, update_data: "CapabilityBase"
-    ) -> Optional["Capability"]:
+    def update_extension(
+        self, cap_id: UUID, update_data: "ExtensionBase"
+    ) -> Optional["Extension"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_capability(cap_id)
+            return self.get_extension(cap_id)
         response = (
-            self.client.table("capabilities")
+            self.client.table("extensions")
             .update(payload)
             .eq("id", str(cap_id))
             .execute()
@@ -398,29 +398,29 @@ class SupabaseBackend(AbstractBackend):
         updated = response.data or []
         if not updated:
             return None
-        return Capability(**updated[0])
+        return Extension(**updated[0])
 
-    def delete_capability(self, cap_id: UUID) -> bool:
+    def delete_extension(self, cap_id: UUID) -> bool:
         response = (
-            self.client.table("capabilities").delete().eq("id", str(cap_id)).execute()
+            self.client.table("extensions").delete().eq("id", str(cap_id)).execute()
         )
         deleted = response.data or []
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
-    # 3. COLLECTIVES
+    # 3. DAOS
     # ----------------------------------------------------------------
-    def create_collective(self, new_col: "CollectiveCreate") -> "Collective":
+    def create_dao(self, new_col: "DAOCreate") -> "DAO":
         payload = new_col.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("collectives").insert(payload).execute()
+        response = self.client.table("daos").insert(payload).execute()
         data = response.data or []
         if not data:
-            raise ValueError("No data returned for collective insert.")
-        return Collective(**data[0])
+            raise ValueError("No data returned for dao insert.")
+        return DAO(**data[0])
 
-    def get_collective(self, col_id: UUID) -> Optional["Collective"]:
+    def get_dao(self, col_id: UUID) -> Optional["DAO"]:
         response = (
-            self.client.table("collectives")
+            self.client.table("daos")
             .select("*")
             .eq("id", str(col_id))
             .single()
@@ -428,40 +428,31 @@ class SupabaseBackend(AbstractBackend):
         )
         if not response.data:
             return None
-        return Collective(**response.data)
+        return DAO(**response.data)
 
-    def list_collectives(
-        self, filters: Optional["CollectiveFilter"] = None
-    ) -> List["Collective"]:
-        query = self.client.table("collectives").select("*")
+    def list_daos(self, filters: Optional["DAOFilter"] = None) -> List["DAO"]:
+        query = self.client.table("daos").select("*")
         if filters:
             if filters.name is not None:
                 query = query.eq("name", filters.name)
         response = query.execute()
         data = response.data or []
-        return [Collective(**row) for row in data]
+        return [DAO(**row) for row in data]
 
-    def update_collective(
-        self, col_id: UUID, update_data: "CollectiveBase"
-    ) -> Optional["Collective"]:
+    def update_dao(self, col_id: UUID, update_data: "DAOBase") -> Optional["DAO"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_collective(col_id)
+            return self.get_dao(col_id)
         response = (
-            self.client.table("collectives")
-            .update(payload)
-            .eq("id", str(col_id))
-            .execute()
+            self.client.table("daos").update(payload).eq("id", str(col_id)).execute()
         )
         updated = response.data or []
         if not updated:
             return None
-        return Collective(**updated[0])
+        return DAO(**updated[0])
 
-    def delete_collective(self, col_id: UUID) -> bool:
-        response = (
-            self.client.table("collectives").delete().eq("id", str(col_id)).execute()
-        )
+    def delete_dao(self, col_id: UUID) -> bool:
+        response = self.client.table("daos").delete().eq("id", str(col_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 
@@ -777,8 +768,8 @@ class SupabaseBackend(AbstractBackend):
     ) -> List["Proposal"]:
         query = self.client.table("proposals").select("*")
         if filters:
-            if filters.collective_id is not None:
-                query = query.eq("collective_id", str(filters.collective_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
                 query = query.eq("status", filters.status)
             if filters.is_deployed is not None:
@@ -1008,8 +999,8 @@ class SupabaseBackend(AbstractBackend):
     def list_tokens(self, filters: Optional["TokenFilter"] = None) -> List["Token"]:
         query = self.client.table("tokens").select("*")
         if filters:
-            if filters.collective_id is not None:
-                query = query.eq("collective_id", str(filters.collective_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
             if filters.name is not None:
                 query = query.eq("name", filters.name)
             if filters.symbol is not None:
@@ -1072,12 +1063,14 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("username", filters.username)
             if filters.realname is not None:
                 query = query.eq("realname", filters.realname)
+            if filters.user_id is not None:
+                query = query.eq("user_id", filters.user_id)
         response = query.execute()
         data = response.data or []
         return [XUser(**row) for row in data]
 
     def update_x_user(
-        self, x_user_id: str, update_data: "XUserBase"
+        self, x_user_id: UUID, update_data: "XUserBase"
     ) -> Optional["XUser"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
@@ -1090,7 +1083,7 @@ class SupabaseBackend(AbstractBackend):
             return None
         return XUser(**updated[0])
 
-    def delete_x_user(self, x_user_id: str) -> bool:
+    def delete_x_user(self, x_user_id: UUID) -> bool:
         response = self.client.table("x_users").delete().eq("id", x_user_id).execute()
         deleted = response.data or []
         return len(deleted) > 0
@@ -1106,7 +1099,7 @@ class SupabaseBackend(AbstractBackend):
             raise ValueError("No data returned from x_tweets insert.")
         return XTweet(**data[0])
 
-    def get_x_tweet(self, x_tweet_id: str) -> Optional["XTweet"]:
+    def get_x_tweet(self, x_tweet_id: UUID) -> Optional["XTweet"]:
         response = (
             self.client.table("x_tweets")
             .select("*")
@@ -1123,12 +1116,16 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.author_id is not None:
                 query = query.eq("author_id", filters.author_id)
+            if filters.conversation_id is not None:
+                query = query.eq("conversation_id", filters.conversation_id)
+            if filters.tweet_id is not None:
+                query = query.eq("tweet_id", filters.tweet_id)
         response = query.execute()
         data = response.data or []
         return [XTweet(**row) for row in data]
 
     def update_x_tweet(
-        self, x_tweet_id: str, update_data: "XTweetBase"
+        self, x_tweet_id: UUID, update_data: "XTweetBase"
     ) -> Optional["XTweet"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
@@ -1141,7 +1138,7 @@ class SupabaseBackend(AbstractBackend):
             return None
         return XTweet(**updated[0])
 
-    def delete_x_tweet(self, x_tweet_id: str) -> bool:
+    def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
         response = self.client.table("x_tweets").delete().eq("id", x_tweet_id).execute()
         deleted = response.data or []
         return len(deleted) > 0

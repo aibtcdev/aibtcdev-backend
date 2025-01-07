@@ -1,18 +1,11 @@
 from abc import ABC, abstractmethod
 from backend.models import (
+    DAO,
     UUID,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Capability,
-    CapabilityBase,
-    CapabilityCreate,
-    CapabilityFilter,
-    Collective,
-    CollectiveBase,
-    CollectiveCreate,
-    CollectiveFilter,
     Conversation,
     ConversationBase,
     ConversationCreate,
@@ -25,6 +18,13 @@ from backend.models import (
     CronBase,
     CronCreate,
     CronFilter,
+    DAOBase,
+    DAOCreate,
+    DAOFilter,
+    Extension,
+    ExtensionBase,
+    ExtensionCreate,
+    ExtensionFilter,
     Job,
     JobBase,
     JobCreate,
@@ -151,52 +151,48 @@ class AbstractBackend(ABC):
 
     # ----------- CAPABILITIES -----------
     @abstractmethod
-    def create_capability(self, new_cap: CapabilityCreate) -> Capability:
+    def create_extension(self, new_cap: ExtensionCreate) -> Extension:
         pass
 
     @abstractmethod
-    def get_capability(self, cap_id: UUID) -> Optional[Capability]:
+    def get_extension(self, cap_id: UUID) -> Optional[Extension]:
         pass
 
     @abstractmethod
-    def list_capabilities(
-        self, filters: Optional[CapabilityFilter] = None
-    ) -> List[Capability]:
+    def list_extensions(
+        self, filters: Optional[ExtensionFilter] = None
+    ) -> List[Extension]:
         pass
 
     @abstractmethod
-    def update_capability(
-        self, cap_id: UUID, update_data: CapabilityBase
-    ) -> Optional[Capability]:
+    def update_extension(
+        self, cap_id: UUID, update_data: ExtensionBase
+    ) -> Optional[Extension]:
         pass
 
     @abstractmethod
-    def delete_capability(self, cap_id: UUID) -> bool:
+    def delete_extension(self, cap_id: UUID) -> bool:
         pass
 
-    # ----------- COLLECTIVES -----------
+    # ----------- DAOS -----------
     @abstractmethod
-    def create_collective(self, new_col: CollectiveCreate) -> Collective:
-        pass
-
-    @abstractmethod
-    def get_collective(self, col_id: UUID) -> Optional[Collective]:
+    def create_dao(self, new_col: DAOCreate) -> DAO:
         pass
 
     @abstractmethod
-    def list_collectives(
-        self, filters: Optional[CollectiveFilter] = None
-    ) -> List[Collective]:
+    def get_dao(self, col_id: UUID) -> Optional[DAO]:
         pass
 
     @abstractmethod
-    def update_collective(
-        self, col_id: UUID, update_data: CollectiveBase
-    ) -> Optional[Collective]:
+    def list_daos(self, filters: Optional[DAOFilter] = None) -> List[DAO]:
         pass
 
     @abstractmethod
-    def delete_collective(self, col_id: UUID) -> bool:
+    def update_dao(self, col_id: UUID, update_data: DAOBase) -> Optional[DAO]:
+        pass
+
+    @abstractmethod
+    def delete_dao(self, col_id: UUID) -> bool:
         pass
 
     # ----------- CONVERSATIONS -----------
@@ -429,7 +425,7 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def get_x_user(self, x_user_id: str) -> Optional[XUser]:
+    def get_x_user(self, x_user_id: UUID) -> Optional[XUser]:
         pass
 
     @abstractmethod
@@ -437,11 +433,11 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def update_x_user(self, x_user_id: str, update_data: XUserBase) -> Optional[XUser]:
+    def update_x_user(self, x_user_id: UUID, update_data: XUserBase) -> Optional[XUser]:
         pass
 
     @abstractmethod
-    def delete_x_user(self, x_user_id: str) -> bool:
+    def delete_x_user(self, x_user_id: UUID) -> bool:
         pass
 
     # ----------- X_TWEETS -----------
@@ -450,7 +446,7 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def get_x_tweet(self, x_tweet_id: str) -> Optional[XTweet]:
+    def get_x_tweet(self, x_tweet_id: UUID) -> Optional[XTweet]:
         pass
 
     @abstractmethod
@@ -459,10 +455,10 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def update_x_tweet(
-        self, x_tweet_id: str, update_data: XTweetBase
+        self, x_tweet_id: UUID, update_data: XTweetBase
     ) -> Optional[XTweet]:
         pass
 
     @abstractmethod
-    def delete_x_tweet(self, x_tweet_id: str) -> bool:
+    def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
         pass

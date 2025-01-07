@@ -79,37 +79,37 @@ class Agent(AgentBase):
 #
 # CAPABILITIES
 #
-class CapabilityBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+class ExtensionBase(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     type: str
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     status: Optional[str] = "DRAFT"
 
 
-class CapabilityCreate(CapabilityBase):
+class ExtensionCreate(ExtensionBase):
     pass
 
 
-class Capability(CapabilityBase):
+class Extension(ExtensionBase):
     id: UUID
     created_at: datetime
 
 
 #
-# COLLECTIVES
+# DAOS
 #
-class CollectiveBase(CustomBaseModel):
+class DAOBase(CustomBaseModel):
     name: str
     mission: Optional[str] = None
     description: Optional[str] = None
 
 
-class CollectiveCreate(CollectiveBase):
+class DAOCreate(DAOBase):
     pass
 
 
-class Collective(CollectiveBase):
+class DAO(DAOBase):
     id: UUID
     created_at: datetime
 
@@ -217,7 +217,7 @@ class Profile(ProfileBase):
 # PROPOSALS
 #
 class ProposalBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     title: Optional[str] = None
     description: Optional[str] = None
     code: Optional[str] = None
@@ -310,7 +310,7 @@ class TelegramUser(TelegramUserBase):
 # TOKENS
 #
 class TokenBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     name: Optional[str] = None
@@ -340,6 +340,7 @@ class Token(TokenBase):
 class XUserBase(CustomBaseModel):
     realname: Optional[str] = None
     username: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class XUserCreate(XUserBase):
@@ -347,7 +348,7 @@ class XUserCreate(XUserBase):
 
 
 class XUser(XUserBase):
-    id: str
+    id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -357,7 +358,9 @@ class XUser(XUserBase):
 #
 class XTweetBase(CustomBaseModel):
     message: Optional[str] = None
-    author_id: Optional[str] = None
+    author_id: Optional[UUID] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class XTweetCreate(XTweetBase):
@@ -365,7 +368,7 @@ class XTweetCreate(XTweetBase):
 
 
 class XTweet(XTweetBase):
-    id: str
+    id: UUID
     created_at: datetime
 
 
@@ -394,13 +397,13 @@ class AgentFilter(CustomBaseModel):
     crew_id: Optional[UUID] = None
 
 
-class CapabilityFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+class ExtensionFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     type: Optional[str] = None
     status: Optional[str] = None
 
 
-class CollectiveFilter(CustomBaseModel):
+class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
 
 
@@ -434,7 +437,7 @@ class ProfileFilter(CustomBaseModel):
 
 
 class ProposalFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     status: Optional[str] = None
     is_deployed: Optional[bool] = None
 
@@ -463,15 +466,18 @@ class TelegramUserFilter(CustomBaseModel):
 
 
 class TokenFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
 
 
 class XUserFilter(CustomBaseModel):
+    user_id: Optional[str] = None
     username: Optional[str] = None
     realname: Optional[str] = None
 
 
 class XTweetFilter(CustomBaseModel):
-    author_id: Optional[str] = None
+    author_id: Optional[UUID] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
