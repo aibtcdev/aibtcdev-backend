@@ -112,7 +112,7 @@ class TwitterService:
                     "text",
                     "created_at",
                     "author_id",
-                    "thread_id",
+                    "conversation_id",
                     "in_reply_to_user_id",
                     "referenced_tweets",
                     "public_metrics",

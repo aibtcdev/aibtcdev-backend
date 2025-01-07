@@ -317,7 +317,7 @@ class XTweetBase(CustomBaseModel):
     message: Optional[str] = None
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
-    thread_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class XTweetCreate(XTweetBase):
@@ -419,4 +419,4 @@ class XUserFilter(CustomBaseModel):
 class XTweetFilter(CustomBaseModel):
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
-    thread_id: Optional[str] = None
+    conversation_id: Optional[str] = None

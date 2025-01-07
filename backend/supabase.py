@@ -990,8 +990,8 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.author_id is not None:
                 query = query.eq("author_id", filters.author_id)
-            if filters.thread_id is not None:
-                query = query.eq("thread_id", filters.thread_id)
+            if filters.conversation_id is not None:
+                query = query.eq("conversation_id", filters.conversation_id)
             if filters.tweet_id is not None:
                 query = query.eq("tweet_id", filters.tweet_id)
         response = query.execute()
