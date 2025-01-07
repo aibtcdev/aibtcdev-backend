@@ -205,7 +205,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         if not self.state.is_worthy:
             return "skip"
         if self.state.tweet_type == TweetType.TOOL_REQUEST:
-            return "execute_tool"
+            return "generate_response"
         return "generate_response"
 
     @listen("execute_tool")
