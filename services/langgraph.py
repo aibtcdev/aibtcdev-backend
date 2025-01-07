@@ -19,7 +19,7 @@ logger = configure_logger(__name__)
 
 def extract_filtered_content(history: List[Dict]) -> List[Dict]:
     """
-    Stub for filtering conversation history. Replace or remove as needed.
+    Stub for filtering thread history. Replace or remove as needed.
     For now, just returns the original history.
     """
     return history
@@ -150,7 +150,7 @@ async def execute_langgraph_stream(
         f"Converting history to messages, history length: {len(filtered_content)}"
     )
 
-    # Convert conversation history to LangChain message format
+    # Convert thread history to LangChain message format
     messages = []
 
     # 1. Optionally add the persona as a SystemMessage
@@ -158,7 +158,7 @@ async def execute_langgraph_stream(
         logger.debug("Adding persona as a SystemMessage")
         messages.append(SystemMessage(content=persona))
 
-    # 2. Convert existing conversation
+    # 2. Convert existing thread
     for msg in filtered_content:
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))

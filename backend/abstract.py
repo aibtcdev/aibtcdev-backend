@@ -6,18 +6,6 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Conversation,
-    ConversationBase,
-    ConversationCreate,
-    ConversationFilter,
-    Crew,
-    CrewBase,
-    CrewCreate,
-    CrewFilter,
-    Cron,
-    CronBase,
-    CronCreate,
-    CronFilter,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -52,6 +40,10 @@ from backend.models import (
     TelegramUserBase,
     TelegramUserCreate,
     TelegramUserFilter,
+    Thread,
+    ThreadBase,
+    ThreadCreate,
+    ThreadFilter,
     Token,
     TokenBase,
     TokenCreate,
@@ -149,13 +141,13 @@ class AbstractBackend(ABC):
     def delete_agent(self, agent_id: UUID) -> bool:
         pass
 
-    # ----------- CAPABILITIES -----------
+    # ----------- EXTENSIONS -----------
     @abstractmethod
-    def create_extension(self, new_cap: ExtensionCreate) -> Extension:
+    def create_extension(self, new_ext: ExtensionCreate) -> Extension:
         pass
 
     @abstractmethod
-    def get_extension(self, cap_id: UUID) -> Optional[Extension]:
+    def get_extension(self, ext_id: UUID) -> Optional[Extension]:
         pass
 
     @abstractmethod
@@ -166,21 +158,21 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def update_extension(
-        self, cap_id: UUID, update_data: ExtensionBase
+        self, ext_id: UUID, update_data: ExtensionBase
     ) -> Optional[Extension]:
         pass
 
     @abstractmethod
-    def delete_extension(self, cap_id: UUID) -> bool:
+    def delete_extension(self, ext_id: UUID) -> bool:
         pass
 
     # ----------- DAOS -----------
     @abstractmethod
-    def create_dao(self, new_col: DAOCreate) -> DAO:
+    def create_dao(self, new_dao: DAOCreate) -> DAO:
         pass
 
     @abstractmethod
-    def get_dao(self, col_id: UUID) -> Optional[DAO]:
+    def get_dao(self, dao_id: UUID) -> Optional[DAO]:
         pass
 
     @abstractmethod
@@ -188,78 +180,34 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def update_dao(self, col_id: UUID, update_data: DAOBase) -> Optional[DAO]:
+    def update_dao(self, dao_id: UUID, update_data: DAOBase) -> Optional[DAO]:
         pass
 
     @abstractmethod
-    def delete_dao(self, col_id: UUID) -> bool:
+    def delete_dao(self, dao_id: UUID) -> bool:
         pass
 
-    # ----------- CONVERSATIONS -----------
+    # ----------- THREADS -----------
     @abstractmethod
-    def create_conversation(self, new_convo: ConversationCreate) -> Conversation:
-        pass
-
-    @abstractmethod
-    def get_conversation(self, convo_id: UUID) -> Optional[Conversation]:
+    def create_thread(self, new_thread: ThreadCreate) -> Thread:
         pass
 
     @abstractmethod
-    def list_conversations(
-        self, filters: Optional[ConversationFilter] = None
-    ) -> List[Conversation]:
+    def get_thread(self, thread_id: UUID) -> Optional[Thread]:
         pass
 
     @abstractmethod
-    def update_conversation(
-        self, convo_id: UUID, update_data: ConversationBase
-    ) -> Optional[Conversation]:
+    def list_threads(self, filters: Optional[ThreadFilter] = None) -> List[Thread]:
         pass
 
     @abstractmethod
-    def delete_conversation(self, convo_id: UUID) -> bool:
-        pass
-
-    # ----------- CREWS -----------
-    @abstractmethod
-    def create_crew(self, new_crew: CrewCreate) -> Crew:
+    def update_thread(
+        self, thread_id: UUID, update_data: ThreadBase
+    ) -> Optional[Thread]:
         pass
 
     @abstractmethod
-    def get_crew(self, crew_id: UUID) -> Optional[Crew]:
-        pass
-
-    @abstractmethod
-    def list_crews(self, filters: Optional[CrewFilter] = None) -> List[Crew]:
-        pass
-
-    @abstractmethod
-    def update_crew(self, crew_id: UUID, update_data: CrewBase) -> Optional[Crew]:
-        pass
-
-    @abstractmethod
-    def delete_crew(self, crew_id: UUID) -> bool:
-        pass
-
-    # ----------- CRONS -----------
-    @abstractmethod
-    def create_cron(self, new_cron: CronCreate) -> Cron:
-        pass
-
-    @abstractmethod
-    def get_cron(self, cron_id: UUID) -> Optional[Cron]:
-        pass
-
-    @abstractmethod
-    def list_crons(self, filters: Optional[CronFilter] = None) -> List[Cron]:
-        pass
-
-    @abstractmethod
-    def update_cron(self, cron_id: UUID, update_data: CronBase) -> Optional[Cron]:
-        pass
-
-    @abstractmethod
-    def delete_cron(self, cron_id: UUID) -> bool:
+    def delete_thread(self, thread_id: UUID) -> bool:
         pass
 
     # ----------- JOBS -----------

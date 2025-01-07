@@ -62,7 +62,6 @@ class AgentBase(CustomBaseModel):
     backstory: Optional[str] = None
     profile_id: Optional[UUID] = None
     agent_tools: Optional[List[str]] = None
-    crew_id: Optional[UUID] = None
     image_url: Optional[str] = None
 
 
@@ -117,56 +116,16 @@ class DAO(DAOBase):
 #
 # CONVERSATIONS
 #
-class ConversationBase(CustomBaseModel):
+class ThreadBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
-    name: Optional[str] = "New Conversation"
+    name: Optional[str] = "New Thread"
 
 
-class ConversationCreate(ConversationBase):
+class ThreadCreate(ThreadBase):
     pass
 
 
-class Conversation(ConversationBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# CREWS
-#
-class CrewBase(CustomBaseModel):
-    name: Optional[str] = None
-    profile_id: Optional[UUID] = None
-    description: Optional[str] = None
-    executions: Optional[float] = None
-    is_public: bool = False
-
-
-class CrewCreate(CrewBase):
-    pass
-
-
-class Crew(CrewBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# CRONS
-#
-class CronBase(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
-    is_enabled: Optional[bool] = False
-    interval: Optional[str] = None
-    input: Optional[str] = None
-
-
-class CronCreate(CronBase):
-    pass
-
-
-class Cron(CronBase):
+class Thread(ThreadBase):
     id: UUID
     created_at: datetime
 
@@ -175,8 +134,7 @@ class Cron(CronBase):
 # JOBS
 #
 class JobBase(CustomBaseModel):
-    conversation_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
+    thread_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
     input: Optional[str] = None
     result: Optional[str] = None
@@ -269,7 +227,6 @@ class TaskBase(CustomBaseModel):
     prompt: Optional[str] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
     name: Optional[str] = None
     cron: Optional[str] = None
     is_scheduled: Optional[bool] = False
@@ -360,7 +317,7 @@ class XTweetBase(CustomBaseModel):
     message: Optional[str] = None
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
-    conversation_id: Optional[str] = None
+    thread_id: Optional[str] = None
 
 
 class XTweetCreate(XTweetBase):
@@ -379,9 +336,6 @@ class XTweet(XTweetBase):
 # Each table gets its own Filter class with optional fields
 # you might want to filter on in the "list" methods.
 #
-# Example: AgentFilter can filter by name, role, or crew_id
-# etc. Extend to any fields you need to filter by.
-#
 
 
 class WalletFilter(CustomBaseModel):
@@ -394,7 +348,6 @@ class AgentFilter(CustomBaseModel):
     role: Optional[str] = None
     goal: Optional[str] = None
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
 
 
 class ExtensionFilter(CustomBaseModel):
@@ -407,26 +360,13 @@ class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
 
 
-class ConversationFilter(CustomBaseModel):
+class ThreadFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
     name: Optional[str] = None
-
-
-class CrewFilter(CustomBaseModel):
-    name: Optional[str] = None
-    profile_id: Optional[UUID] = None
-    is_public: Optional[bool] = None
-
-
-class CronFilter(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
-    is_enabled: Optional[bool] = None
 
 
 class JobFilter(CustomBaseModel):
-    conversation_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
+    thread_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
 
 
@@ -449,7 +389,6 @@ class StepFilter(CustomBaseModel):
 
 class TaskFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     is_scheduled: Optional[bool] = None
 
@@ -480,4 +419,4 @@ class XUserFilter(CustomBaseModel):
 class XTweetFilter(CustomBaseModel):
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
-    conversation_id: Optional[str] = None
+    thread_id: Optional[str] = None

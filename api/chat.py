@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 from api.verify_profile import verify_profile_from_token
 from backend.factory import backend
 from backend.models import JobCreate, JobFilter, Profile, StepFilter
@@ -20,41 +19,35 @@ router = APIRouter(prefix="/chat")
 @router.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    conversation_id: str = Query(..., description="Conversation ID"),
+    thread_id: str = Query(..., description="Thread ID"),
     profile: Profile = Depends(verify_profile_from_token),
 ):
     """WebSocket endpoint for real-time chat communication.
 
     Args:
         websocket (WebSocket): The WebSocket connection
-        conversation_id (str): The ID of the conversation
+        thread_id (str): The ID of the thread
         profile (Profile): The user's profile information
 
     Raises:
         WebSocketDisconnect: When client disconnects
     """
     try:
-        # Verify conversation belongs to user
-        conversation_id_uuid = UUID(conversation_id)
-        conversation = backend.get_conversation(convo_id=conversation_id_uuid)
-        logger.info(f"Received WebSocket connection for conversation {conversation}")
-        jobs = backend.list_jobs(
-            filters=JobFilter(conversation_id=conversation_id_uuid)
-        )
-        logger.info(f"Jobs for conversation {conversation}: {jobs}")
+        # Verify thread belongs to user
+        thread_id_uuid = UUID(thread_id)
+        thread = backend.get_thread(thread_id=thread_id_uuid)
+        logger.info(f"Received WebSocket connection for thread {thread}")
+        jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id_uuid))
+        logger.info(f"Jobs for thread {thread}: {jobs}")
 
-        if not conversation:
+        if not thread:
             await websocket.accept()
-            await websocket.send_json(
-                {"type": "error", "message": "Conversation not found"}
-            )
+            await websocket.send_json({"type": "error", "message": "Thread not found"})
             await websocket.close()
             return
 
-        await manager.connect_conversation(websocket, conversation_id)
-        logger.debug(
-            f"Starting WebSocket connection for conversation {conversation_id}"
-        )
+        await manager.connect_thread(websocket, thread_id)
+        logger.debug(f"Starting WebSocket connection for thread {thread_id}")
         formatted_history = []
         if jobs:
             for job in jobs:
@@ -100,7 +93,7 @@ async def websocket_endpoint(
                     # Create a new job for this message
                     job = backend.create_job(
                         new_job=JobCreate(
-                            conversation_id=conversation_id_uuid,
+                            thread_id=thread_id_uuid,
                             profile_id=profile.id,
                             agent_id=agent_id,
                             input=content,
@@ -112,7 +105,7 @@ async def websocket_endpoint(
                     # Store job info
                     running_jobs[str(job_id)] = {
                         "queue": output_queue,
-                        "conversation_id": conversation_id,
+                        "thread_id": thread_id,
                         "task": None,
                     }
 
@@ -120,7 +113,7 @@ async def websocket_endpoint(
                     task = asyncio.create_task(
                         process_chat_message(
                             job_id=job_id,
-                            conversation_id=conversation_id_uuid,
+                            thread_id=thread_id_uuid,
                             profile=profile,
                             agent_id=agent_id,
                             input_str=content,
@@ -140,31 +133,23 @@ async def websocket_endpoint(
                             logger.debug(result)
                             if result.get("type") == "stream":
                                 result["job_started_at"] = job_started_at
-                            await manager.send_conversation_message(
-                                result, conversation_id
-                            )
+                            await manager.send_thread_message(result, thread_id)
                     except Exception as e:
                         logger.error(f"Error processing chat message: {str(e)}")
-                        await manager.broadcast_conversation_error(
-                            str(e), conversation_id
-                        )
+                        await manager.broadcast_thread_error(str(e), thread_id)
 
         except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected for conversation {conversation_id}")
+            logger.info(f"WebSocket disconnected for thread {thread_id}")
         except Exception as e:
             logger.error(
-                f"Error in WebSocket connection for conversation {conversation_id}: {str(e)}"
+                f"Error in WebSocket connection for thread {thread_id}: {str(e)}"
             )
-            await manager.broadcast_conversation_error(str(e), conversation_id)
+            await manager.broadcast_thread_error(str(e), thread_id)
         finally:
-            await manager.disconnect_conversation(websocket, conversation_id)
-            logger.debug(
-                f"Cleaned up WebSocket connection for conversation {conversation_id}"
-            )
+            await manager.disconnect_thread(websocket, thread_id)
+            logger.debug(f"Cleaned up WebSocket connection for thread {thread_id}")
 
     except Exception as e:
-        logger.error(
-            f"Error setting up WebSocket for conversation {conversation_id}: {str(e)}"
-        )
+        logger.error(f"Error setting up WebSocket for thread {thread_id}: {str(e)}")
         if not websocket.client_state.disconnected:
             await websocket.close()

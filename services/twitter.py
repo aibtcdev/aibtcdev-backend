@@ -1,5 +1,4 @@
 import os
-import uuid
 from backend.factory import backend
 from backend.models import XTweetCreate, XTweetFilter, XUserCreate, XUserFilter
 from dotenv import load_dotenv
@@ -40,7 +39,7 @@ class TwitterMentionHandler:
         """Process a single mention and generate response if needed."""
         tweet_id = mention.id or ""
         author_id = mention.author_id or ""
-        conversation_id = mention.conversation_id or ""
+        thread_id = mention.thread_id or ""
         text = mention.text or ""
 
         # Check if tweet exists in our database
@@ -58,7 +57,7 @@ class TwitterMentionHandler:
             "tweet_id": tweet_id,
             "author_id": author_id,
             "text": text,
-            "conversation_id": conversation_id,
+            "thread_id": thread_id,
         }
 
         try:
@@ -80,7 +79,7 @@ class TwitterMentionHandler:
                         author_id=author.id,
                         tweet_id=tweet_id,
                         message=text,
-                        conversation_id=conversation_id,
+                        thread_id=thread_id,
                     )
                 )
             else:
@@ -94,7 +93,7 @@ class TwitterMentionHandler:
                         author_id=author.id,
                         tweet_id=tweet_id,
                         message=text,
-                        conversation_id=conversation_id,
+                        thread_id=thread_id,
                     )
                 )
 
@@ -107,27 +106,27 @@ class TwitterMentionHandler:
 
     async def _generate_and_post_response(self, tweet_data: Dict) -> None:
         """Generate and post a response to a tweet."""
-        history = await self._get_conversation_history(tweet_data)
+        history = await self._get_thread_history(tweet_data)
         response = await self._generate_response(tweet_data, history)
 
         if response:
             await self._post_response(tweet_data, response)
 
-    async def _get_conversation_history(self, tweet_data: Dict) -> List[Dict]:
-        """Retrieve and format conversation history."""
-        if not tweet_data["conversation_id"]:
+    async def _get_thread_history(self, tweet_data: Dict) -> List[Dict]:
+        """Retrieve and format thread history."""
+        if not tweet_data["thread_id"]:
             return []
 
-        # Get all tweets in the conversation thread
-        conversation_tweets = backend.list_x_tweets(
-            filters=XTweetFilter(conversation_id=tweet_data["conversation_id"])
+        # Get all tweets in the thread thread
+        thread_tweets = backend.list_x_tweets(
+            filters=XTweetFilter(thread_id=tweet_data["thread_id"])
         )
         return [
             {
                 "role": "user" if tweet.author_id != self.user_id else "assistant",
                 "content": tweet.message,
             }
-            for tweet in conversation_tweets
+            for tweet in thread_tweets
             if tweet.message
         ]
 
@@ -139,7 +138,7 @@ class TwitterMentionHandler:
             f"Processing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}"
         )
         logger.debug(f"Tweet text: {tweet_data['text']}")
-        logger.debug(f"Conversation history: {len(history)} messages")
+        logger.debug(f"Thread history: {len(history)} messages")
 
         response_content = None
         async for response in execute_twitter_stream(
@@ -172,7 +171,7 @@ class TwitterMentionHandler:
                 XTweetCreate(
                     tweet_id=response_tweet.id,
                     message=response_content,
-                    conversation_id=tweet_data["conversation_id"],
+                    thread_id=tweet_data["thread_id"],
                 )
             )
             logger.info(

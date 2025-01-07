@@ -1,6 +1,6 @@
 import logging
 import sys
-from .crews import extract_filtered_content
+from .chat_stream_langgraph import extract_filtered_content
 from .twitter import TwitterService
 from backend.models import Profile
 from crewai import Agent, Task
@@ -34,7 +34,7 @@ logger.propagate = True
 # Output schemas for tasks
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
-    CONVERSATION = "conversation"
+    CONVERSATION = "thread"
     INVALID = "invalid"
 
 
@@ -136,7 +136,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 - Worthiness determination (boolean)
                 - Tweet type classification
                     - "tool_request"
-                    - "conversation"
+                    - "thread"
                     - "invalid"
                 - Tool request details if applicable. Otherwise None
                 - Confidence score (0-1)
@@ -153,7 +153,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
                 TweetType enum:
                 - "tool_request"
-                - "conversation"
+                - "thread"
                 - "invalid"
 
                 ToolRequest:
@@ -403,7 +403,7 @@ async def execute_twitter_stream(
     Args:
         twitter_service: Twitter service instance
         profile: Profile instance
-        history: List of previous conversation messages
+        history: List of previous thread messages
         input_str: Current tweet text to process
 
     Yields:

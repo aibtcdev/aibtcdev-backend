@@ -59,7 +59,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
 
     job = backend.create_job(
         new_job=JobCreate(
-            conversation_id=None,
+            thread_id=None,
             input=task.prompt,
             history=history,
             agent_id=agent_id,

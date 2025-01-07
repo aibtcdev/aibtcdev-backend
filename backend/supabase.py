@@ -7,18 +7,6 @@ from .models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Conversation,
-    ConversationBase,
-    ConversationCreate,
-    ConversationFilter,
-    Crew,
-    CrewBase,
-    CrewCreate,
-    CrewFilter,
-    Cron,
-    CronBase,
-    CronCreate,
-    CronFilter,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -54,6 +42,10 @@ from .models import (
     TelegramUserBase,
     TelegramUserCreate,
     TelegramUserFilter,
+    Thread,
+    ThreadBase,
+    ThreadCreate,
+    ThreadFilter,
     Token,
     TokenBase,
     TokenCreate,
@@ -313,9 +305,6 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("goal", filters.goal)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
-            if filters.crew_id is not None:
-                query = query.eq("crew_id", str(filters.crew_id))
-
         response = query.execute()
         data = response.data or []
         return [Agent(**row) for row in data]
@@ -348,19 +337,19 @@ class SupabaseBackend(AbstractBackend):
     # ----------------------------------------------------------------
     # 2. CAPABILITIES
     # ----------------------------------------------------------------
-    def create_extension(self, new_cap: "ExtensionCreate") -> "Extension":
-        payload = new_cap.model_dump(exclude_unset=True, mode="json")
+    def create_extension(self, new_ext: "ExtensionCreate") -> "Extension":
+        payload = new_ext.model_dump(exclude_unset=True, mode="json")
         response = self.client.table("extensions").insert(payload).execute()
         data = response.data or []
         if not data:
             raise ValueError("No data returned from insert for extension.")
         return Extension(**data[0])
 
-    def get_extension(self, cap_id: UUID) -> Optional["Extension"]:
+    def get_extension(self, ext_id: UUID) -> Optional["Extension"]:
         response = (
             self.client.table("extensions")
             .select("*")
-            .eq("id", str(cap_id))
+            .eq("id", str(ext_id))
             .single()
             .execute()
         )
@@ -384,15 +373,15 @@ class SupabaseBackend(AbstractBackend):
         return [Extension(**row) for row in data]
 
     def update_extension(
-        self, cap_id: UUID, update_data: "ExtensionBase"
+        self, ext_id: UUID, update_data: "ExtensionBase"
     ) -> Optional["Extension"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_extension(cap_id)
+            return self.get_extension(ext_id)
         response = (
             self.client.table("extensions")
             .update(payload)
-            .eq("id", str(cap_id))
+            .eq("id", str(ext_id))
             .execute()
         )
         updated = response.data or []
@@ -400,9 +389,9 @@ class SupabaseBackend(AbstractBackend):
             return None
         return Extension(**updated[0])
 
-    def delete_extension(self, cap_id: UUID) -> bool:
+    def delete_extension(self, ext_id: UUID) -> bool:
         response = (
-            self.client.table("extensions").delete().eq("id", str(cap_id)).execute()
+            self.client.table("extensions").delete().eq("id", str(ext_id)).execute()
         )
         deleted = response.data or []
         return len(deleted) > 0
@@ -410,19 +399,19 @@ class SupabaseBackend(AbstractBackend):
     # ----------------------------------------------------------------
     # 3. DAOS
     # ----------------------------------------------------------------
-    def create_dao(self, new_col: "DAOCreate") -> "DAO":
-        payload = new_col.model_dump(exclude_unset=True, mode="json")
+    def create_dao(self, new_dao: "DAOCreate") -> "DAO":
+        payload = new_dao.model_dump(exclude_unset=True, mode="json")
         response = self.client.table("daos").insert(payload).execute()
         data = response.data or []
         if not data:
             raise ValueError("No data returned for dao insert.")
         return DAO(**data[0])
 
-    def get_dao(self, col_id: UUID) -> Optional["DAO"]:
+    def get_dao(self, dao_id: UUID) -> Optional["DAO"]:
         response = (
             self.client.table("daos")
             .select("*")
-            .eq("id", str(col_id))
+            .eq("id", str(dao_id))
             .single()
             .execute()
         )
@@ -439,50 +428,48 @@ class SupabaseBackend(AbstractBackend):
         data = response.data or []
         return [DAO(**row) for row in data]
 
-    def update_dao(self, col_id: UUID, update_data: "DAOBase") -> Optional["DAO"]:
+    def update_dao(self, dao_id: UUID, update_data: "DAOBase") -> Optional["DAO"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_dao(col_id)
+            return self.get_dao(dao_id)
         response = (
-            self.client.table("daos").update(payload).eq("id", str(col_id)).execute()
+            self.client.table("daos").update(payload).eq("id", str(dao_id)).execute()
         )
         updated = response.data or []
         if not updated:
             return None
         return DAO(**updated[0])
 
-    def delete_dao(self, col_id: UUID) -> bool:
-        response = self.client.table("daos").delete().eq("id", str(col_id)).execute()
+    def delete_dao(self, dao_id: UUID) -> bool:
+        response = self.client.table("daos").delete().eq("id", str(dao_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # 4. CONVERSATIONS
     # ----------------------------------------------------------------
-    def create_conversation(self, new_convo: "ConversationCreate") -> "Conversation":
-        payload = new_convo.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("conversations").insert(payload).execute()
+    def create_thread(self, new_thread: "ThreadCreate") -> "Thread":
+        payload = new_thread.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("threads").insert(payload).execute()
         data = response.data or []
         if not data:
-            raise ValueError("No data returned from conversation insert.")
-        return Conversation(**data[0])
+            raise ValueError("No data returned from thread insert.")
+        return Thread(**data[0])
 
-    def get_conversation(self, convo_id: UUID) -> Optional["Conversation"]:
+    def get_thread(self, thread_id: UUID) -> Optional["Thread"]:
         response = (
-            self.client.table("conversations")
+            self.client.table("threads")
             .select("*")
-            .eq("id", str(convo_id))
+            .eq("id", str(thread_id))
             .single()
             .execute()
         )
         if not response.data:
             return None
-        return Conversation(**response.data)
+        return Thread(**response.data)
 
-    def list_conversations(
-        self, filters: Optional["ConversationFilter"] = None
-    ) -> List["Conversation"]:
-        query = self.client.table("conversations").select("*")
+    def list_threads(self, filters: Optional["ThreadFilter"] = None) -> List["Thread"]:
+        query = self.client.table("threads").select("*")
         if filters:
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
@@ -490,138 +477,29 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("name", filters.name)
         response = query.execute()
         data = response.data or []
-        return [Conversation(**row) for row in data]
+        return [Thread(**row) for row in data]
 
-    def update_conversation(
-        self, convo_id: UUID, update_data: "ConversationBase"
-    ) -> Optional["Conversation"]:
+    def update_thread(
+        self, thread_id: UUID, update_data: "ThreadBase"
+    ) -> Optional["Thread"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_conversation(convo_id)
+            return self.get_thread(thread_id)
         response = (
-            self.client.table("conversations")
+            self.client.table("threads")
             .update(payload)
-            .eq("id", str(convo_id))
+            .eq("id", str(thread_id))
             .execute()
         )
         updated = response.data or []
         if not updated:
             return None
-        return Conversation(**updated[0])
+        return Thread(**updated[0])
 
-    def delete_conversation(self, convo_id: UUID) -> bool:
+    def delete_thread(self, thread_id: UUID) -> bool:
         response = (
-            self.client.table("conversations")
-            .delete()
-            .eq("id", str(convo_id))
-            .execute()
+            self.client.table("threads").delete().eq("id", str(thread_id)).execute()
         )
-        deleted = response.data or []
-        return len(deleted) > 0
-
-    # ----------------------------------------------------------------
-    # 5. CREWS
-    # ----------------------------------------------------------------
-    def create_crew(self, new_crew: "CrewCreate") -> "Crew":
-        payload = new_crew.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("crews").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from crew insert.")
-        return Crew(**data[0])
-
-    def get_crew(self, crew_id: UUID) -> Optional["Crew"]:
-        response = (
-            self.client.table("crews")
-            .select("*")
-            .eq("id", str(crew_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Crew(**response.data)
-
-    def list_crews(self, filters: Optional["CrewFilter"] = None) -> List["Crew"]:
-        query = self.client.table("crews").select("*")
-        if filters:
-            if filters.name is not None:
-                query = query.eq("name", filters.name)
-            if filters.profile_id is not None:
-                query = query.eq("profile_id", str(filters.profile_id))
-            if filters.is_public is not None:
-                query = query.eq("is_public", filters.is_public)
-        response = query.execute()
-        data = response.data or []
-        return [Crew(**row) for row in data]
-
-    def update_crew(self, crew_id: UUID, update_data: "CrewBase") -> Optional["Crew"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_crew(crew_id)
-        response = (
-            self.client.table("crews").update(payload).eq("id", str(crew_id)).execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Crew(**updated[0])
-
-    def delete_crew(self, crew_id: UUID) -> bool:
-        response = self.client.table("crews").delete().eq("id", str(crew_id)).execute()
-        deleted = response.data or []
-        return len(deleted) > 0
-
-    # ----------------------------------------------------------------
-    # 6. CRONS
-    # ----------------------------------------------------------------
-    def create_cron(self, new_cron: "CronCreate") -> "Cron":
-        payload = new_cron.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("crons").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from cron insert.")
-        return Cron(**data[0])
-
-    def get_cron(self, cron_id: UUID) -> Optional["Cron"]:
-        response = (
-            self.client.table("crons")
-            .select("*")
-            .eq("id", str(cron_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Cron(**response.data)
-
-    def list_crons(self, filters: Optional["CronFilter"] = None) -> List["Cron"]:
-        query = self.client.table("crons").select("*")
-        if filters:
-            if filters.profile_id is not None:
-                query = query.eq("profile_id", str(filters.profile_id))
-            if filters.crew_id is not None:
-                query = query.eq("crew_id", str(filters.crew_id))
-            if filters.is_enabled is not None:
-                query = query.eq("is_enabled", filters.is_enabled)
-        response = query.execute()
-        data = response.data or []
-        return [Cron(**row) for row in data]
-
-    def update_cron(self, cron_id: UUID, update_data: "CronBase") -> Optional["Cron"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_cron(cron_id)
-        response = (
-            self.client.table("crons").update(payload).eq("id", str(cron_id)).execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Cron(**updated[0])
-
-    def delete_cron(self, cron_id: UUID) -> bool:
-        response = self.client.table("crons").delete().eq("id", str(cron_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 
@@ -651,10 +529,8 @@ class SupabaseBackend(AbstractBackend):
     def list_jobs(self, filters: Optional["JobFilter"] = None) -> List["Job"]:
         query = self.client.table("jobs").select("*")
         if filters:
-            if filters.conversation_id is not None:
-                query = query.eq("conversation_id", str(filters.conversation_id))
-            if filters.crew_id is not None:
-                query = query.eq("crew_id", str(filters.crew_id))
+            if filters.thread_id is not None:
+                query = query.eq("thread_id", str(filters.thread_id))
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
         response = query.execute()
@@ -881,8 +757,6 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
-            if filters.crew_id is not None:
-                query = query.eq("crew_id", str(filters.crew_id))
             if filters.agent_id is not None:
                 query = query.eq("agent_id", str(filters.agent_id))
             if filters.is_scheduled is not None:
@@ -1116,8 +990,8 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.author_id is not None:
                 query = query.eq("author_id", filters.author_id)
-            if filters.conversation_id is not None:
-                query = query.eq("conversation_id", filters.conversation_id)
+            if filters.thread_id is not None:
+                query = query.eq("thread_id", filters.thread_id)
             if filters.tweet_id is not None:
                 query = query.eq("tweet_id", filters.tweet_id)
         response = query.execute()

@@ -79,14 +79,14 @@ test_chat.sh:
  1. Create tests for all endpoints:                                                                                                                                                                                  
     - POST / (chat trigger)                                                                                                                                                                                          
     - GET /{job_id}/stream                                                                                                                                                                                           
-    - POST /conversations                                                                                                                                                                                            
-    - GET /conversations                                                                                                                                                                                             
-    - GET /conversations/latest                                                                                                                                                                                      
-    - GET /conversations/{conversation_id}                                                                                                                                                                           
-    - DELETE /conversations/{conversation_id}                                                                                                                                                                        
+    - POST /threads                                                                                                                                                                                            
+    - GET /threads                                                                                                                                                                                             
+    - GET /threads/latest                                                                                                                                                                                      
+    - GET /threads/{thread_id}                                                                                                                                                                           
+    - DELETE /threads/{thread_id}                                                                                                                                                                        
  2. Test authentication requirements                                                                                                                                                                                 
  3. Test SSE streaming functionality                                                                                                                                                                                 
- 4. Test conversation management                                                                                                                                                                                     
+ 4. Test thread management                                                                                                                                                                                     
                                                                                                                                                                                                                      
 
 test_crew.sh:                                                                                                                                                                                                        

@@ -5,7 +5,7 @@ from backend.models import UUID, JobBase, Profile, StepCreate
 from concurrent.futures import ThreadPoolExecutor
 from lib.logger import configure_logger
 from lib.persona import generate_persona
-from services.crews import execute_chat_stream_langgraph
+from services.chat_stream_langgraph import execute_chat_stream_langgraph
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -17,7 +17,7 @@ running_jobs = {}
 
 async def process_chat_message(
     job_id: UUID,
-    conversation_id: UUID,
+    thread_id: UUID,
     profile: Profile,
     agent_id: UUID,
     input_str: str,
@@ -28,10 +28,10 @@ async def process_chat_message(
 
     Args:
         job_id (UUID): The ID of the job
-        conversation_id (UUID): The ID of the conversation
+        thread_id (UUID): The ID of the thread
         profile (Profile): The user's profile information
         input_str (str): The input string for the chat job
-        history (list): The conversation history
+        history (list): The thread history
         output_queue (asyncio.Queue): The output queue for WebSocket streaming
 
     Raises:
@@ -55,7 +55,7 @@ async def process_chat_message(
         current_message = {
             "content": "",
             "type": "result",
-            "conversation_id": str(conversation_id),
+            "thread_id": str(thread_id),
             "tool": None,
             "tool_input": None,
             "tool_output": None,
@@ -82,7 +82,7 @@ async def process_chat_message(
                 # Only stream the end message, don't save or reset yet
                 stream_message = {
                     "type": "token",
-                    "conversation_id": str(conversation_id),
+                    "thread_id": str(thread_id),
                     "status": "end",
                     "content": "",
                     "created_at": datetime.datetime.now().isoformat(),
@@ -130,7 +130,7 @@ async def process_chat_message(
                         "tool_input": tool_input,
                         "tool_output": tool_output,
                         "created_at": datetime.datetime.now().isoformat(),
-                        "conversation_id": str(conversation_id),
+                        "thread_id": str(thread_id),
                         "agent_id": str(agent_id),
                     }
                     results.append(tool_execution)
@@ -143,7 +143,7 @@ async def process_chat_message(
                     "tool": None,
                     "tool_input": None,
                     "tool_output": None,
-                    "conversation_id": str(conversation_id),
+                    "thread_id": str(thread_id),
                     "agent_id": str(agent_id),
                 }
                 continue
@@ -157,7 +157,7 @@ async def process_chat_message(
                         "status": "processing",
                         "content": result.get("content", ""),
                         "created_at": datetime.datetime.now().isoformat(),
-                        "conversation_id": str(conversation_id),
+                        "thread_id": str(thread_id),
                     }
                     await output_queue.put(stream_message)
                 elif result.get("type") == "result":
@@ -194,7 +194,7 @@ async def process_chat_message(
             job_id=job_id,
             update_data=JobBase(
                 profile_id=profile.id,
-                conversation_id=conversation_id,
+                thread_id=thread_id,
                 input=input_str,
                 result=final_result_content,
             ),
