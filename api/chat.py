@@ -18,6 +18,30 @@ logger = configure_logger(__name__)
 router = APIRouter(prefix="/chat")
 
 
+def get_job_history(thread_id: UUID, profile_id: UUID) -> List:
+    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id))
+    formatted_history = []
+    for job in jobs:
+        if job.profile_id == profile_id:
+            formatted_history.append(
+                {
+                    "role": "user",
+                    "content": job.input,
+                    "created_at": job.created_at.isoformat(),
+                    "thread_id": str(thread_id),
+                }
+            )
+            formatted_history.append(
+                {
+                    "role": "assistant",
+                    "content": job.result,
+                    "created_at": job.created_at.isoformat(),
+                    "thread_id": str(thread_id),
+                }
+            )
+    return formatted_history
+
+
 def get_thread_history(thread_id: UUID, profile_id: UUID) -> List:
     thread = backend.get_thread(thread_id=thread_id)
     if thread.profile_id != profile_id:
@@ -54,6 +78,7 @@ def get_thread_history(thread_id: UUID, profile_id: UUID) -> List:
                     "thread_id": str(thread.id),
                     "type": type,
                 }
+                print(formatted_msg)
                 formatted_history.append(formatted_msg)
 
         # Sort messages by timestamp
@@ -103,7 +128,7 @@ async def websocket_endpoint(
                         )
                         await websocket.close()
                         return
-                    formatted_history = get_thread_history(thread_id, profile.id)
+                    formatted_history = get_job_history(thread_id, profile.id)
                     content = data.get("content", "")
                     # Create a new job for this message
                     job = backend.create_job(

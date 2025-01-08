@@ -19,18 +19,26 @@ logger = configure_logger(__name__)
 load_dotenv()
 
 
-def extract_filtered_content(history: List) -> str:
+def extract_filtered_content(history: List) -> List[Dict]:
     """Extract and filter content from chat history."""
     filtered_content = []
     for message in history:
         logger.info(f"Processing message: {message}")
-        if isinstance(message, str):
-            filtered_content.append(message)
-        elif isinstance(message, dict):
-
-            if message.get("role") == "assistant" and message.get("type") == "result":
-                filtered_content.append(message.get("content", ""))
-    return "\n".join(filtered_content)
+        if message.get("role") == "user":
+            filtered_content.append(
+                {
+                    "role": "user",
+                    "content": message.get("content", ""),
+                }
+            )
+        elif message.get("role") == "assistant":
+            filtered_content.append(
+                {
+                    "role": "assistant",
+                    "content": message.get("content", ""),
+                }
+            )
+    return filtered_content
 
 
 async def execute_chat_stream_langgraph(
