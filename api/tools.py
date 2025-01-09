@@ -74,7 +74,7 @@ def get_avaliable_tools() -> List[Dict[str, str]]:
 avaliable_tools = get_avaliable_tools()
 
 
-@router.get("/")
+@router.get("/available")
 async def get_tools() -> List[Dict[str, str]]:
     """Get a list of available tools and their descriptions.
 

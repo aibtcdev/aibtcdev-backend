@@ -40,10 +40,10 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
     persona = generate_persona(agent)
 
     tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
-    if agent.agent_tools is not None:
-        tools_map_filtered = filter_tools_by_names(agent.agent_tools, tools_map)
-    else:
-        tools_map_filtered = tools_map
+    # if agent.agent_tools is not None:
+    #     tools_map_filtered = filter_tools_by_names(agent.agent_tools, tools_map)
+    # else:
+    tools_map_filtered = tools_map
     stream_generator = execute_langgraph_stream(
         history=history,
         input_str=task.prompt,
