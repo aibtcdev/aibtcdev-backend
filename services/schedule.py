@@ -3,11 +3,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from backend.factory import backend
 from backend.models import JobBase, JobCreate, StepCreate, TaskFilter
-from datetime import datetime
 from lib.logger import configure_logger
 from lib.persona import generate_persona
 from services.langgraph import execute_langgraph_stream
-from tools.tools_factory import filter_tools_by_names, initialize_tools
+from tools.tools_factory import initialize_tools
 
 logger = configure_logger(__name__)
 
@@ -61,7 +60,6 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
         new_job=JobCreate(
             thread_id=None,
             input=task.prompt,
-            history=history,
             agent_id=agent_id,
             task_id=task_id,
             profile_id=profile_id,
@@ -74,7 +72,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
                     job_id=job.id,
                     agent_id=agent_id,
                     role="assistant",
-                    tool_name=event["tool"],
+                    tool=event["tool"],
                     tool_input=event["input"],
                     tool_output=event["output"],
                     profile_id=profile_id,
@@ -93,8 +91,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
             backend.update_job(
                 job_id=job.id,
                 update_data=JobBase(
-                    content=event["content"],
-                    updated_at=datetime.now(),
+                    result=event["content"],
                 ),
             )
 

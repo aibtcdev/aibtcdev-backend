@@ -139,6 +139,8 @@ class JobBase(CustomBaseModel):
     input: Optional[str] = None
     result: Optional[str] = None
     tokens: Optional[float] = None
+    task_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
 
 class JobCreate(JobBase):
