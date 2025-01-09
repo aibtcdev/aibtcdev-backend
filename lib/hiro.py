@@ -30,7 +30,7 @@ class HiroApi:
         except Exception as e:
             raise Exception(f"Hiro API GET request error: {str(e)}")
 
-    def get_wallet_balance(self, addr: str) -> str:
+    def get_address_balance(self, addr: str) -> str:
         """Retrieve wallet balance for an address."""
         try:
             return self._get(f"extended/v1/address/{addr}/balances")

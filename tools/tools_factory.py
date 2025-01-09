@@ -1,5 +1,4 @@
 import inspect
-import textwrap
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .contracts import (
@@ -8,9 +7,20 @@ from .contracts import (
     FetchContractSourceTool,
 )
 from .daos import ContractDAODeployTool
-from .db import AddScheduledTaskTool, GetDAOListTool
+from .db import (
+    AddScheduledTaskTool,
+    DeleteScheduledTaskTool,
+    GetDAOListTool,
+    ListScheduledTasksTool,
+    UpdateScheduledTaskTool,
+    GetDAOByNameTool,
+)
 from .get_btc_data import GetBitcoinData
-from .hiro import STXPriceTool
+from .hiro import (
+    STXPriceTool,
+    STXGetContractInfoTool,
+    STXGetPrincipalAddressBalanceTool,
+)
 from .jing import (
     JingCancelAskTool,
     JingCancelBidTool,
@@ -102,6 +112,10 @@ def initialize_tools(
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
         "db_add_scheduled_task": AddScheduledTaskTool(profile.id, agent_id),
         "db_list_daos_daos": GetDAOListTool(),
+        "db_get_dao_by_name": GetDAOByNameTool(),
+        "db_list_scheduled_tasks": ListScheduledTasksTool(profile.id, agent_id),
+        "db_update_scheduled_task": UpdateScheduledTaskTool(profile.id, agent_id),
+        "db_delete_scheduled_task": DeleteScheduledTaskTool(profile.id, agent_id),
         "jing_get_order_book": JingGetOrderBookTool(wallet_id),
         "jing_create_bid": JingCreateBidTool(wallet_id),
         "jing_cancel_ask": JingCancelAskTool(wallet_id),
@@ -124,6 +138,8 @@ def initialize_tools(
         "stacks_transaction": StacksTransactionTool(wallet_id),
         "stacks_transaction_by_address": StacksTransactionByAddressTool(wallet_id),
         "stacks_stx_price": STXPriceTool(),
+        "stacks_get_contract_info": STXGetContractInfoTool(),
+        "stacks_get_principal_address_balance": STXGetPrincipalAddressBalanceTool(),
         # "contract_sip10_deploy": ContractSIP10DeployTool(wallet_id),
         # "contract_dao_executor_deploy": ContractDAOExecutorDeployTool(wallet_id),
         "contract_sip10_info": ContractSIP10InfoTool(wallet_id),
