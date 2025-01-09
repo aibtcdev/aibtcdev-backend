@@ -28,10 +28,6 @@ class AddScheduledTaskInput(BaseModel):
         ...,
         description="Cron expression for the schedule, e.g. '0 0 * * *' for every day at midnight",
     )
-    enabled: str = Field(
-        ...,
-        description="Whether the schedule is enabled or not (true or false) (default: true)",
-    )
 
 
 class AddScheduledTaskTool(BaseTool):
@@ -60,7 +56,6 @@ class AddScheduledTaskTool(BaseTool):
         name: str,
         prompt: str,
         cron: str,
-        enabled: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to add a scheduled task."""
@@ -71,7 +66,7 @@ class AddScheduledTaskTool(BaseTool):
                     agent_id=self.agent_id,
                     profile_id=self.profile_id,
                     name=name,
-                    is_scheduled=bool(enabled),
+                    is_scheduled=True,
                     cron=cron,
                 )
             )
@@ -84,22 +79,20 @@ class AddScheduledTaskTool(BaseTool):
         name: str,
         prompt: str,
         cron: str,
-        enabled: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Sync version of the tool."""
-        return self._deploy(name, prompt, cron, enabled, **kwargs)
+        return self._deploy(name, prompt, cron, **kwargs)
 
     async def _arun(
         self,
         name: str,
         prompt: str,
         cron: str,
-        enabled: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(name, prompt, cron, enabled, **kwargs)
+        return self._deploy(name, prompt, cron, **kwargs)
 
 
 class GetDAOListSchema(BaseModel):
@@ -333,7 +326,6 @@ class ListScheduledTasksTool(BaseTool):
     description: str = (
         "List all scheduled tasks for the current agent. Returns a list of tasks with their details "
         "including ID, name, prompt, cron schedule, and enabled status."
-        "Example usage: 'show me all the scheduled tasks' or 'list all the scheduled tasks' or 'get all the scheduled tasks'"
     )
     args_schema: Type[BaseModel] = ListScheduledTasksSchema
     return_direct: bool = False

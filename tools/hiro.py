@@ -47,25 +47,26 @@ class STXGetPrincipalAddressBalanceInput(BaseModel):
 
 
 class STXGetPrincipalAddressBalanceTool(BaseTool):
-    """Tool for getting the STX balance of a principal address."""
+    """Tool for getting the balance of a principal address."""
 
     name: str = "stacks_get_principal_address_balance"
     description: str = (
-        "A tool that can be used to get the STX balance of a principal address"
+        "A tool that can be used to get the balance and holdings of a principal address"
+        "This could be used to get the balance of a DAO treasury or a specific wallet"
         "Example usage: 'get the balance of the address SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2'"
-        "Example usage 2: 'get the balance of the address SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm'"
+        "Example usage 2: 'get the balance of the address SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.ST1RF2TSGRFBBSE9F0AEZ8YKQ2N2TVQ5V8ESZYKF9.hors-ext006-treasury'"
     )
     args_schema: Type[BaseModel] = STXGetPrincipalAddressBalanceInput
     return_direct: bool = False
 
     def _deploy(self, address: str) -> str:
-        """Get the STX balance for a principal address.
+        """Get the balance and holdings for a principal address.
 
         Args:
             address: The principal address to get the balance for
 
         Returns:
-            str: The STX balance of the address
+            str: The balance and holdings of the address
         """
         from lib.hiro import HiroApi
 
@@ -73,11 +74,11 @@ class STXGetPrincipalAddressBalanceTool(BaseTool):
         return str(api.get_address_balance(address))
 
     def _run(self, address: str) -> str:
-        """Get the STX balance for a principal address."""
+        """Get the balance and holdings for a principal address."""
         return self._deploy(address=address)
 
     async def _arun(self, address: str) -> str:
-        """Async implementation of getting STX balance."""
+        """Async implementation of getting balance and holdings."""
         return self._deploy(address=address)
 
 
