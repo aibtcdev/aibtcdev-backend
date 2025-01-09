@@ -43,7 +43,10 @@ class ContractDAODeployInput(BaseModel):
 
 class ContractDAODeployTool(BaseTool):
     name: str = "contract_dao_deploy"
-    description: str = "Deploy a new DAO with a token and a bonding curve for stacks"
+    description: str = (
+        "Deploy a new DAO with a token and a bonding curve for stacks. "
+        "Example usage: 'deploy a dao named 'Human' with a token named 'Human' and a mission statement 'The Human Token'"
+    )
     args_schema: Type[BaseModel] = ContractDAODeployInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")

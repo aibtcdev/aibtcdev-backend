@@ -1,6 +1,6 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Optional, Type
+from typing import Type
 
 
 class STXPriceInput(BaseModel):
@@ -12,7 +12,7 @@ class STXPriceInput(BaseModel):
 class STXPriceTool(BaseTool):
     """Tool for getting the current STX price."""
 
-    name: str = "stacks_stx_price"
+    name: str = "stacks_get_stx_price"
     description: str = "A tool that can be used to get the current STX price"
     args_schema: Type[BaseModel] = STXPriceInput
     return_direct: bool = False
@@ -52,6 +52,8 @@ class STXGetPrincipalAddressBalanceTool(BaseTool):
     name: str = "stacks_get_principal_address_balance"
     description: str = (
         "A tool that can be used to get the STX balance of a principal address"
+        "Example usage: 'get the balance of the address SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2'"
+        "Example usage 2: 'get the balance of the address SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm'"
     )
     args_schema: Type[BaseModel] = STXGetPrincipalAddressBalanceInput
     return_direct: bool = False
@@ -94,6 +96,7 @@ class STXGetContractInfoTool(BaseTool):
     name: str = "stacks_get_contract_info"
     description: str = (
         "A tool that can be used to get information about a Stacks smart contract"
+        "Example usage: 'get info about the contract named 'SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm'"
     )
     args_schema: Type[BaseModel] = STXGetContractInfoInput
     return_direct: bool = False

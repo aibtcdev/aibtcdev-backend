@@ -38,6 +38,7 @@ class AddScheduledTaskTool(BaseTool):
     name: str = "db_add_scheduled_task"
     description: str = (
         "Add a scheduled task to the database with specified name, prompt, cron schedule, and enabled status"
+        "Example usage: 'add a task named 'bitcoin price' to run every hour' or 'enable the task named 'bitcoin price'"
     )
     args_schema: Type[BaseModel] = AddScheduledTaskInput
     return_direct: bool = False
@@ -106,15 +107,14 @@ class GetDAOListSchema(BaseModel):
 
 
 class GetDAOListTool(BaseTool):
-    name: str = "db_list_daos_daos"
+    name: str = "db_list_daos"
     description: str = (
         "This tool is used to get/list all the daos and DAOS with their extensions and tokens. "
         "It returns a dictionary with three keys: 'daos', 'extensions', and 'tokens'. "
         "'daos' contains the list of daos and their details, "
         "'extensions' contains the list of extensions and their details, "
         "and 'tokens' contains the list of tokens and their details."
-        "Example usage: "
-        "can you show me what daos are avaliable? "
+        "Example usage: 'show me all the daos' or 'list all the daos' or 'get all the daos'"
     )
     args_schema: Type[BaseModel] = GetDAOListSchema
     return_direct: bool = False
@@ -333,6 +333,7 @@ class ListScheduledTasksTool(BaseTool):
     description: str = (
         "List all scheduled tasks for the current agent. Returns a list of tasks with their details "
         "including ID, name, prompt, cron schedule, and enabled status."
+        "Example usage: 'show me all the scheduled tasks' or 'list all the scheduled tasks' or 'get all the scheduled tasks'"
     )
     args_schema: Type[BaseModel] = ListScheduledTasksSchema
     return_direct: bool = False

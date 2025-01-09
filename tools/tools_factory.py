@@ -146,11 +146,11 @@ def initialize_tools(
         "contract_dao_deploy": ContractDAODeployTool(wallet_id),
         "contract_source_fetch": FetchContractSourceTool(wallet_id),
         "btc_price": GetBitcoinData(),
-        "stxcity_search": StxCitySearchTool(wallet_id),
+        # "stxcity_search": StxCitySearchTool(wallet_id),
         "stxcity_execute_sell": StxCityExecuteSellTool(wallet_id),
         "stxcity_execute_buy": StxCityExecuteBuyTool(wallet_id),
-        "stxcity_check_valid_bonding": StxCityCheckValidBondingTool(wallet_id),
-        "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
+        # "stxcity_check_valid_bonding": StxCityCheckValidBondingTool(wallet_id),
+        # "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
     }
 
     if crewai:
