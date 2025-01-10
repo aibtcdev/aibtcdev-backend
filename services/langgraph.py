@@ -189,7 +189,7 @@ async def execute_langgraph_stream(
     tool_node = ToolNode(list(tools_map.values()))
 
     # Define the function that determines whether to continue or not
-    def should_continue(state: State) -> Literal["tools", "END"]:
+    def should_continue(state: State) -> str:
         messages = state["messages"]
         last_message = messages[-1]
         if last_message.tool_calls:
