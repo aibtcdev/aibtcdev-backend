@@ -2,11 +2,13 @@ import uuid
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from backend.factory import backend
-from backend.models import JobBase, JobCreate, StepCreate, TaskFilter
+from backend.models import JobBase, JobCreate, StepCreate, TaskFilter, JobFilter
 from lib.logger import configure_logger
 from lib.persona import generate_persona
 from services.langgraph import execute_langgraph_stream
 from tools.tools_factory import initialize_tools
+from uuid import UUID
+from typing import List
 
 logger = configure_logger(__name__)
 

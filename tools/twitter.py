@@ -17,15 +17,15 @@ class TwitterPostTweetInput(BaseModel):
 
     content: str = Field(
         ...,
-        description="The content of the tweet to be posted",
+        description="The content of the tweet to be posted. Required to be less than 280 characters.",
     )
 
 
 class TwitterPostTweetTool(BaseTool):
     name: str = "twitter_post_tweet"
     description: str = (
-        "Post a new tweet or reply to an existing tweet on Twitter. Returns a success "
-        "message with the first 50 characters of the tweet if successful."
+        "Post a new tweet or reply to an existing tweet on Twitter."
+        "Required to be less than 280 characters."
     )
     args_schema: Type[BaseModel] = TwitterPostTweetInput
     return_direct: bool = False
