@@ -70,6 +70,36 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         else:
             loop.run_until_complete(self.queue.put(item))
 
+    def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
+        """Run when tool starts running."""
+        self.current_tool = serialized.get("name")
+        tool_execution = {
+            "type": "tool",
+            "tool": self.current_tool,
+            "input": input_str,
+            "status": "start",
+        }
+        self._put_to_queue(tool_execution)
+        logger.debug(f"Tool started: {self.current_tool}")
+
+    def on_tool_end(self, output: str, **kwargs):
+        """Run when tool ends running."""
+        if self.current_tool:
+            # Extract just the content if it's a ToolMessage
+            if hasattr(output, "content"):
+                output = output.content
+
+            tool_execution = {
+                "type": "tool",
+                "tool": self.current_tool,
+                "input": None,  # We don't have access to the input here
+                "output": str(output),
+                "status": "end",
+            }
+            self._put_to_queue(tool_execution)
+            self.current_tool = None
+            logger.debug(f"Tool ended with output: {output}")
+
     def on_llm_start(self, *args, **kwargs):
         """Run when LLM starts running."""
         logger.debug("LLM started")
@@ -95,10 +125,11 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         """Run when tool errors."""
         if self.current_tool:
             tool_execution = {
-                "type": "tool_execution",
+                "type": "tool",
                 "tool": self.current_tool,
-                "input": None,
+                "input": None,  # We don't have access to the input here
                 "output": f"Error: {str(error)}",
+                "status": "error",
             }
             self._put_to_queue(tool_execution)
             self.current_tool = None
@@ -159,7 +190,14 @@ async def execute_langgraph_stream(
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))
         else:
-            messages.append(AIMessage(content=msg["content"]))
+            # Handle assistant messages, ensuring content is not None
+            content = msg.get("content") or ""  # Default to empty string if None
+            if "tool_calls" in msg:
+                messages.append(
+                    AIMessage(content=content, tool_calls=msg["tool_calls"])
+                )
+            else:
+                messages.append(AIMessage(content=content))
 
     # 3. Add the current user input
     messages.append(HumanMessage(content=input_str))
@@ -184,8 +222,9 @@ async def execute_langgraph_stream(
         temperature=0.7,
     ).bind_tools(list(tools_map.values()))
 
-    # Create the tool node
+    # Create the tool node and config with callbacks
     tool_node = ToolNode(list(tools_map.values()))
+    config = {"callbacks": [callback_handler]}
 
     # Define the function that determines whether to continue or not
     def should_continue(state: State) -> str:
@@ -223,9 +262,8 @@ async def execute_langgraph_stream(
     # Compile the graph
     runnable = workflow.compile()
 
-    # Run the graph
-    config = {"messages": messages}
-    task = asyncio.create_task(runnable.ainvoke(config))
+    # Run the graph with config including callbacks
+    task = asyncio.create_task(runnable.ainvoke({"messages": messages}, config=config))
 
     # Stream tokens while waiting for completion
     while not task.done():
