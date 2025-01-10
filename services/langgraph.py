@@ -9,6 +9,16 @@ from langgraph.graph import END, Graph
 from lib.logger import configure_logger
 from tools.tools_factory import initialize_tools
 from typing import Dict, List, Optional
+from typing import Annotated, Literal, TypedDict
+from langchain_core.tools import BaseTool
+from langgraph.prebuilt import ToolNode
+from langgraph.graph.message import add_messages
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from lib.logger import configure_logger
+from tools.tools_factory import initialize_tools
+from typing import Dict, List, Optional
 
 # -----------------------------------------------------
 # Example placeholders - adapt these to your environment
@@ -23,25 +33,6 @@ def extract_filtered_content(history: List[Dict]) -> List[Dict]:
     For now, just returns the original history.
     """
     return history
-
-
-def should_use_tool(state: Dict) -> bool:
-    """
-    Simple logic to decide if a tool is needed. Customize as you like.
-    """
-    messages = state["messages"]
-    last_message = messages[-1].content if messages else ""
-
-    if any(
-        keyword in last_message.lower()
-        for keyword in ["price", "balance", "transaction", "wallet"]
-    ):
-        return True
-    if "get" in last_message.lower() and any(
-        res in last_message.lower() for res in ["token", "contract", "address"]
-    ):
-        return True
-    return False
 
 
 # -----------------------------------------------------
@@ -120,6 +111,12 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 # -----------------------------------------------------
 
 
+class State(TypedDict):
+    """State for the agent."""
+
+    messages: Annotated[list, add_messages]
+
+
 async def execute_langgraph_stream(
     history: List[Dict],
     input_str: str,
@@ -163,8 +160,6 @@ async def execute_langgraph_stream(
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))
         else:
-            # For roles other than 'user' (like 'assistant', 'system', etc.), treat them as AI messages
-            # Adjust if you want to handle system messages separately.
             messages.append(AIMessage(content=msg["content"]))
 
     # 3. Add the current user input
@@ -188,95 +183,45 @@ async def execute_langgraph_stream(
         model="gpt-4o",  # Replace with your desired model
         callbacks=[callback_handler],
         temperature=0.7,
+    ).bind_tools(list(tools_map.values()))
+
+    # Create the tool node
+    tool_node = ToolNode(list(tools_map.values()))
+
+    # Define the function that determines whether to continue or not
+    def should_continue(state: State) -> Literal["tools", "END"]:
+        messages = state["messages"]
+        last_message = messages[-1]
+        if last_message.tool_calls:
+            return "tools"
+        return END
+
+    # Define the function that calls the model
+    def call_model(state: State):
+        messages = state["messages"]
+        response = chat.invoke(messages)
+        return {"messages": [response]}
+
+    # Define the graph
+    workflow = StateGraph(State)
+
+    # Define the nodes we will cycle between
+    workflow.add_node("agent", call_model)
+    workflow.add_node("tools", tool_node)
+
+    # Set the entrypoint as 'agent'
+    workflow.add_edge(START, "agent")
+
+    # Add conditional edges
+    workflow.add_conditional_edges(
+        "agent",
+        should_continue,
     )
 
-    # The node (function) that decides whether to call tools or do a direct chat
-    async def tool_selection_node(state: Dict):
-        logger.debug("Entering tool_selection_node")
-        logger.debug(f"Current state messages: {len(state['messages'])}")
+    # Add edge from tools to agent
+    workflow.add_edge("tools", "agent")
 
-        try:
-            if should_use_tool(state):
-                logger.debug("Tool usage detected, initializing agent")
-                tools = list(tools_map.values())
-                logger.debug(f"Using {len(tools)} tools")
-
-                agent = initialize_agent(
-                    tools=tools,
-                    llm=chat,
-                    agent=AgentType.OPENAI_FUNCTIONS,
-                    verbose=True,
-                    handle_parsing_errors=True,
-                    max_iterations=3,
-                    return_intermediate_steps=True,
-                )
-
-                try:
-                    last_message = (
-                        state["messages"][-1].content if state["messages"] else ""
-                    )
-                    logger.debug(
-                        f"Invoking agent with last user message: {last_message[:100]}"
-                    )
-
-                    agent_result = await agent.ainvoke(
-                        {"input": last_message},
-                        config={
-                            "callbacks": [callback_handler],
-                            "run_name": "tool_execution",
-                        },
-                    )
-
-                    # Process intermediate steps
-                    for step in agent_result.get("intermediate_steps", []):
-                        action, output = step
-                        tool_input = action.tool_input
-                        if isinstance(tool_input, dict):
-                            tool_input = str(tool_input)
-
-                        tool_execution = {
-                            "type": "tool_execution",
-                            "tool": action.tool,
-                            "input": tool_input,
-                            "output": str(output),
-                        }
-                        await callback_queue.put(tool_execution)
-
-                    response_content = agent_result.get("output", "")
-                    logger.debug(f"Agent response content: {response_content[:100]}")
-
-                    return {
-                        "messages": state["messages"]
-                        + [AIMessage(content=response_content)],
-                        "response": response_content,
-                    }
-                except Exception as e:
-                    logger.error(f"Error in tool execution: {str(e)}")
-                    logger.debug("Falling back to regular chat after tool error")
-
-            logger.debug("Using regular chat without tools")
-            messages_ = state["messages"]
-            response = await chat.ainvoke(messages_)
-            response_content = (
-                response.content if hasattr(response, "content") else str(response)
-            )
-            logger.debug(f"Chat response received: {response_content[:100]}")
-
-            return {
-                "messages": messages_ + [AIMessage(content=response_content)],
-                "response": response_content,
-            }
-        except Exception as e:
-            logger.error(f"Error in tool_selection_node: {str(e)}")
-            raise
-
-    # Create the graph
-    workflow = Graph()
-    workflow.add_node("chat", tool_selection_node)
-    workflow.set_entry_point("chat")
-    workflow.add_edge("chat", END)
-
-    # Compile the graph into a runnable
+    # Compile the graph
     runnable = workflow.compile()
 
     # Run the graph
@@ -311,6 +256,6 @@ async def execute_langgraph_stream(
 
     yield {
         "type": "result",
-        "content": result["response"],
-        "tokens": None,  # or any other metadata you'd like to add
+        "content": result["messages"][-1].content,
+        "tokens": None,
     }

@@ -161,7 +161,7 @@ class TwitterMentionHandler:
 
     async def _post_response(self, tweet_data: Dict, response_content: str) -> None:
         """Post the response to Twitter and store in database."""
-        response_tweet = await self.twitter_service.post_tweet(
+        response_tweet = await self.twitter_service._apost_tweet(
             text=response_content, reply_in_reply_to_tweet_id=tweet_data["tweet_id"]
         )
 
@@ -181,7 +181,7 @@ class TwitterMentionHandler:
     async def process_mentions(self) -> None:
         """Process all new mentions for the bot user."""
         try:
-            await self.twitter_service.initialize()
+            await self.twitter_service._ainitialize()
             mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)
             if not mentions:
                 logger.debug("No mentions found")

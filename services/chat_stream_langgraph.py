@@ -2,21 +2,27 @@ import asyncio
 from backend.factory import backend
 from backend.models import Profile
 from dotenv import load_dotenv
-from langchain.agents import AgentExecutor, initialize_agent
-from langchain.agents.types import AgentType
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
-from langgraph.graph import END, Graph
+from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import ToolNode
+from langgraph.graph.message import add_messages
 from lib.logger import configure_logger
 from tools.tools_factory import initialize_tools
-from typing import Dict, List
+from typing import Dict, List, Annotated, Literal, TypedDict
 from uuid import UUID
 
 logger = configure_logger(__name__)
 
 load_dotenv()
+
+
+class State(TypedDict):
+    """State for the agent."""
+
+    messages: Annotated[list, add_messages]
 
 
 def extract_filtered_content(history: List) -> List[Dict]:
@@ -82,82 +88,46 @@ async def execute_chat_stream_langgraph(
         model="gpt-4o",
         callbacks=[callback_handler],
         temperature=0.7,
-    )
+    ).bind_tools(list(tools_map.values()))
 
-    async def tool_selection_node(state):
-        try:
-            if should_use_tool(state):
-                logger.debug("Tool usage detected, initializing agent")
-                tools = list(tools_map.values())
+    # Create the tool node
+    tool_node = ToolNode(list(tools_map.values()))
 
-                agent = initialize_agent(
-                    tools=tools,
-                    llm=chat,
-                    agent=AgentType.OPENAI_MULTI_FUNCTIONS,
-                    verbose=True,
-                    handle_parsing_errors=True,
-                    max_iterations=3,
-                    return_intermediate_steps=True,
-                )
+    # Define the function that determines whether to continue or not
+    def should_continue(state: State) -> str:
+        messages = state["messages"]
+        last_message = messages[-1]
+        if last_message.tool_calls:
+            return "tools"
+        return END
 
-                try:
-                    last_message = (
-                        state["messages"][-1].content if state["messages"] else ""
-                    )
-                    agent_result = await agent.ainvoke(
-                        {"input": last_message},
-                        config={
-                            "callbacks": [callback_handler],
-                            "run_name": "tool_execution",
-                        },
-                    )
-                    for step in agent_result.get("intermediate_steps", []):
-                        action, output = step
-                        tool_input = action.tool_input
-                        if isinstance(tool_input, dict):
-                            tool_input = str(tool_input)
-
-                        tool_execution = {
-                            "type": "tool",
-                            "tool": action.tool,
-                            "input": tool_input,
-                            "output": str(output),  # Ensure output is string
-                            "status": "end",
-                        }
-                        await callback_queue.put(tool_execution)
-
-                    # Get final response
-                    response_content = agent_result.get("output", "")
-
-                    return {
-                        "messages": state["messages"]
-                        + [AIMessage(content=response_content)],
-                        "response": response_content,
-                    }
-                except Exception as e:
-                    logger.error(f"Error in tool execution: {str(e)}")
-
-            messages = state["messages"]
-            response = await chat.ainvoke(messages)
-            response_content = (
-                response.content if hasattr(response, "content") else str(response)
-            )
-            return {
-                "messages": messages + [AIMessage(content=response_content)],
-                "response": response_content,
-            }
-        except Exception as e:
-            logger.error(f"Error in tool_selection_node: {str(e)}")
-            raise
+    # Define the function that calls the model
+    def call_model(state: State):
+        messages = state["messages"]
+        response = chat.invoke(messages)
+        return {"messages": [response]}
 
     # Create the graph
     logger.debug("Creating workflow graph")
-    workflow = Graph()
-    workflow.add_node("chat", tool_selection_node)
-    workflow.set_entry_point("chat")
-    workflow.add_edge("chat", END)
+    workflow = StateGraph(State)
 
-    # Compile the graph into a runnable
+    # Define the nodes we will cycle between
+    workflow.add_node("agent", call_model)
+    workflow.add_node("tools", tool_node)
+
+    # Set the entrypoint as 'agent'
+    workflow.add_edge(START, "agent")
+
+    # Add conditional edges
+    workflow.add_conditional_edges(
+        "agent",
+        should_continue,
+    )
+
+    # Add edge from tools to agent
+    workflow.add_edge("tools", "agent")
+
+    # Compile the graph
     logger.debug("Compiling workflow")
     runnable = workflow.compile()
 
@@ -200,8 +170,8 @@ async def execute_chat_stream_langgraph(
 
     yield {
         "type": "result",
-        "content": result["response"],
-        "tokens": None,  # LangGraph doesn't provide token count directly
+        "content": result["messages"][-1].content,
+        "tokens": None,
     }
 
 
@@ -291,93 +261,3 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             self._put_to_queue(tool_execution)
             self.current_tool = None
         logger.error(f"Tool error: {str(error)}")
-
-
-def should_use_tool(state):
-    """Determine if a tool should be used based on the current state."""
-    messages = state["messages"]
-    last_message = messages[-1].content if messages else ""
-    last_message_lower = last_message.lower()
-
-    # Financial and market-related keywords
-    financial_keywords = [
-        "price",
-        "balance",
-        "transaction",
-        "wallet",
-        "market",
-        "trade",
-        "swap",
-        "volume",
-        "history",
-        "bid",
-        "ask",
-        "order",
-        "book",
-        "pending",
-        "buy",
-        "sell",
-        "bonding",
-        "token",
-        "stx",
-        "bitcoin",
-        "btc",
-        "crypto",
-        "price",
-    ]
-
-    # Contract and technical keywords
-    technical_keywords = [
-        "contract",
-        "deploy",
-        "address",
-        "sip10",
-        "dao",
-        "dao",
-        "extension",
-        "schedule",
-        "task",
-        "status",
-        "metadata",
-        "search",
-    ]
-
-    # Action keywords that often indicate tool usage
-    action_verbs = [
-        "get",
-        "check",
-        "list",
-        "show",
-        "find",
-        "create",
-        "cancel",
-        "submit",
-        "execute",
-        "deploy",
-        "schedule",
-    ]
-
-    # Check for financial and market-related queries
-    if any(keyword in last_message_lower for keyword in financial_keywords):
-        return True
-
-    # Check for technical and contract-related queries
-    if any(keyword in last_message_lower for keyword in technical_keywords):
-        return True
-
-    # Check for action verbs combined with relevant context
-    if any(verb in last_message_lower for verb in action_verbs):
-        # Additional context checks for action verbs
-        contexts = [
-            "token",
-            "contract",
-            "address",
-            "market",
-            "order",
-            "dao",
-            "dao",
-        ]
-        if any(context in last_message_lower for context in contexts):
-            return True
-
-    return False

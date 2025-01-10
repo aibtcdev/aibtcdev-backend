@@ -121,16 +121,7 @@ class GetDAOListTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to list dao tasks."""
         try:
-            daos = backend.list_daos()
-            extensions = backend.list_extensions()
-            tokens = backend.list_tokens()
-            response = {
-                "daos": daos,
-                "extensions": extensions,
-                "tokens": tokens,
-            }
-
-            return response
+            return backend.list_daos()
         except Exception as e:
             return {"error": str(e)}
 

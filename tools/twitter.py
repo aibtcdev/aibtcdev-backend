@@ -59,7 +59,9 @@ class TwitterPostTweetTool(BaseTool):
                 client_id=x_creds.client_id,
                 client_secret=x_creds.client_secret,
             )
-            response = asyncio.run(twitter_service.post_tweet(text=content))
+            twitter_service.initialize()
+            response = twitter_service.post_tweet(text=content)
+
             logger.info(f"Response: {response}")
             if response:
                 return f"https://x.com/i/web/status/{response.id}"
@@ -68,7 +70,7 @@ class TwitterPostTweetTool(BaseTool):
             logger.error(f"Error posting tweet: {str(e)}")
             return f"Error posting tweet: {str(e)}"
 
-    async def _run(self, content: str, **kwargs) -> str:
+    def _run(self, content: str, **kwargs) -> str:
         return self._deploy(content, **kwargs)
 
     async def _arun(self, content: str, **kwargs) -> str:
