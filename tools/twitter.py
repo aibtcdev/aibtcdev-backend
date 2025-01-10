@@ -4,7 +4,12 @@ from typing import Type
 from uuid import UUID
 from backend.factory import backend
 from backend.models import XCredsFilter
+from lib.logger import configure_logger
 from lib.twitter import TwitterService
+import asyncio
+
+
+logger = configure_logger(__name__)
 
 
 class TwitterPostTweetInput(BaseModel):
@@ -54,11 +59,13 @@ class TwitterPostTweetTool(BaseTool):
                 client_id=x_creds.client_id,
                 client_secret=x_creds.client_secret,
             )
-            response = twitter_service.post_tweet(text=content)
+            response = asyncio.run(twitter_service.post_tweet(text=content))
+            logger.info(f"Response: {response}")
             if response:
-                return f"Successfully posted tweet: {content[:50]}..."
+                return f"https://x.com/i/web/status/{response.id}"
             return "Failed to post tweet"
         except Exception as e:
+            logger.error(f"Error posting tweet: {str(e)}")
             return f"Error posting tweet: {str(e)}"
 
     async def _run(self, content: str, **kwargs) -> str:
