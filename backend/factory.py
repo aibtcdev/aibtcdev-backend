@@ -1,9 +1,7 @@
 import os
 from .abstract import AbstractBackend
-from .cloudflare import CloudflareBackend
 from .supabase import SupabaseBackend
 from dotenv import load_dotenv
-from lib.services import ServicesClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 from supabase import Client, create_client
@@ -36,12 +34,6 @@ def get_backend() -> AbstractBackend:
             sqlalchemy_engine=engine,
             bucket_name=os.getenv("AIBTC_SUPABASE_BUCKET_NAME"),
         )
-    services_url = os.getenv("AIBTC_SERVICES_BASE_URL")
-    services_shared_key = os.getenv("AIBTC_SERVICES_SHARED_KEY")
-    services_client: ServicesClient = ServicesClient(
-        base_url=services_url, shared_key=services_shared_key
-    )
-    return CloudflareBackend(services_client)
 
 
 # Create an instance

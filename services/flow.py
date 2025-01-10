@@ -1,15 +1,17 @@
 import logging
 import sys
-from .crews import extract_filtered_content
+from .chat_stream_langgraph import extract_filtered_content
 from .twitter import TwitterService
 from backend.models import Profile
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
+from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel
 from textwrap import dedent
-from tools.tools_factory import initialize_tools
+from tools.tools_factory import filter_crewai_tools_by_names, initialize_tools
 from typing import Any, AsyncGenerator, Dict, List, Optional
+from uuid import UUID
 
 # Configure logging with console handler
 logger = logging.getLogger(__name__)
@@ -32,7 +34,7 @@ logger.propagate = True
 # Output schemas for tasks
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
-    CONVERSATION = "conversation"
+    CONVERSATION = "thread"
     INVALID = "invalid"
 
 
@@ -80,11 +82,20 @@ class TweetAnalysisState(BaseModel):
 
 
 class TweetProcessingFlow(Flow[TweetAnalysisState]):
-    def __init__(self, twitter_service: TwitterService, profile: Profile):
+    def __init__(self, twitter_service: TwitterService):
         super().__init__()
         self.twitter_service = twitter_service
-        self.profile = profile
-        self.tools_map = initialize_tools(profile)
+        self.tools_map_all = initialize_tools(
+            Profile(
+                id=UUID("ff163ed8-b084-4fb3-899c-c7d5e483afaf"),
+                created_at=datetime.now(),
+            ),
+            agent_id=UUID("01ee34a3-a38c-44df-97be-b857a1bd9843"),
+            crewai=True,
+        )
+        self.tools_map = filter_crewai_tools_by_names(
+            ["contract_dao_deploy"], self.tools_map_all
+        )
         logger.info(f"Initialized tools_map with {len(self.tools_map)} tools")
         self.analyzer_agent = self._create_analyzer_agent()
         self.tool_agent = self._create_tool_agent()
@@ -102,9 +113,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Your name is {self.account_name} on twitter.
 
                 Analyze this tweet to determine:
-                1. If it's worthy of processing (spam detection, relevance)
-                2. If it's a tool request (token/DAO creation) or conversation
-                3. Required action priority
+                1. Generate appropriate response for the tooling
+                2. Use the DAO deployment tool
                 
                 Tweet History:
                 {self.state.filtered_content}
@@ -112,16 +122,10 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Current Tweet:
                 {self.state.tweet_text}
                 
-                Criteria for worthiness:
-                - Relevance to Stacks/Bitcoin ecosystem
-                - Technical merit and substance
-                - Community value and engagement potential
-                - Authenticity (not spam/troll)
-
-                Criteria for tool request:
-                - Wallet Balance
-                - Wallet Address
-                - Wallet Transaction History
+                You will use the tool contract_dao_deploy to deploy a new DAO with a token and a bonding curve for stacks.
+                
+                Requirements:
+                1. expand upon any missing details in the request for a dao to be deployed to meet the needs of the tool parameterss 
                 
                 Provide confidence score and detailed reasoning.
             """
@@ -132,7 +136,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 - Worthiness determination (boolean)
                 - Tweet type classification
                     - "tool_request"
-                    - "conversation"
+                    - "thread"
                     - "invalid"
                 - Tool request details if applicable. Otherwise None
                 - Confidence score (0-1)
@@ -149,7 +153,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
                 TweetType enum:
                 - "tool_request"
-                - "conversation"
+                - "thread"
                 - "invalid"
 
                 ToolRequest:
@@ -201,7 +205,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         if not self.state.is_worthy:
             return "skip"
         if self.state.tweet_type == TweetType.TOOL_REQUEST:
-            return "execute_tool"
+            return "generate_response"
         return "generate_response"
 
     @listen("execute_tool")
@@ -288,6 +292,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 - Tweet Type: {self.state.tweet_type}
                 - Tool Execution: {self.state.tool_request is not None}
                 - Tool Result: {self.state.tool_result if hasattr(self.state, 'tool_result') else 'None'}
+                
+                Make a post like congrats to the user for the dao deployment.
                 
                 Requirements:
                 1. Maximum 280 characters
@@ -389,7 +395,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
 
 
 async def execute_twitter_stream(
-    twitter_service: Any, profile: Profile, history: List, input_str: str
+    twitter_service: Any, history: List, input_str: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Execute a chat stream with history using conditional tasks.
@@ -397,7 +403,7 @@ async def execute_twitter_stream(
     Args:
         twitter_service: Twitter service instance
         profile: Profile instance
-        history: List of previous conversation messages
+        history: List of previous thread messages
         input_str: Current tweet text to process
 
     Yields:
@@ -408,7 +414,7 @@ async def execute_twitter_stream(
         filtered_content = extract_filtered_content(history)
         logger.info(f"Extracted filtered content length: {len(filtered_content)}")
 
-        flow = TweetProcessingFlow(twitter_service, profile)
+        flow = TweetProcessingFlow(twitter_service)
         flow.state.tweet_text = input_str
         flow.state.filtered_content = filtered_content
 

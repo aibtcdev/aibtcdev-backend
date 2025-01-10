@@ -8,10 +8,8 @@ from uuid import UUID
 class BitflowBaseInput(BaseModel):
     """Base input schema for Bitflow tools."""
 
-    pass
 
-
-class BitflowExecuteTradeInput(BaseModel):
+class BitflowExecuteTradeInput(BitflowBaseInput):
     """Input schema for BitflowExecuteTradeTool."""
 
     slippage: str = Field(

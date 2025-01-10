@@ -1,6 +1,6 @@
 import logging
 import os
-from api import chat, crew
+from api import chat, tools
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -109,5 +109,5 @@ async def health():
     return {"status": "healthy"}
 
 
-app.include_router(crew.router)
+app.include_router(tools.router)
 app.include_router(chat.router)

@@ -14,10 +14,10 @@ class WalletGetBalanceInput(BaseModel):
 
 
 class WalletGetMyBalance(BaseTool):
-    name: str = "wallet_get_balance"
+    name: str = "wallet_get_my_balance"
     description: str = (
-        "Get the current wallet balance and amount of tokens including STX, fungible tokens (FT), and "
-        "non-fungible tokens (NFTs) associated with the current wallet"
+        "Get my wallet balance and amount of tokens including STX, fungible tokens (FT), and "
+        "non-fungible tokens (NFTs) associated with my wallet"
     )
     args_schema: Type[BaseModel] = WalletGetBalanceInput
     return_direct: bool = False
@@ -51,8 +51,8 @@ class WalletGetAddressInput(BaseModel):
 
 
 class WalletGetMyAddress(BaseTool):
-    name: str = "wallet_get_address"
-    description: str = "Get the STX address associated with the current wallet"
+    name: str = "wallet_get_my_address"
+    description: str = "Get my Stacks STX address"
     args_schema: Type[BaseModel] = WalletGetAddressInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
@@ -77,9 +77,9 @@ class WalletGetMyAddress(BaseTool):
 
 
 class WalletFundMyWalletFaucet(BaseTool):
-    name: str = "wallet_fund_testnet"
+    name: str = "wallet_fund_my_wallet_faucet"
     description: str = (
-        "Fund the current wallet with test STX tokens when running on testnet. This "
+        "Fund my wallet with test STX tokens when running on testnet. This "
         "operation only works on the Stacks testnet."
     )
     args_schema: Type[BaseModel] = WalletGetAddressInput
@@ -185,9 +185,9 @@ class WalletGetTransactionsInput(BaseModel):
 
 
 class WalletGetMyTransactions(BaseTool):
-    name: str = "wallet_get_transactions"
+    name: str = "wallet_get_my_transactions"
     description: str = (
-        "Get transaction history for your wallet including STX transfers and contract "
+        "Get transaction history for my wallet including STX transfers and contract "
         "calls. Returns a list of transactions with their details."
     )
     args_schema: Type[BaseModel] = WalletGetTransactionsInput

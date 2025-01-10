@@ -22,7 +22,7 @@ sequenceDiagram
     ChatRouter->>SessionManager: Add user message
     ChatRouter->>SessionManager: trim_messages()
     
-    ChatRouter->>CrewManager: kickoff_conversation(messages, session_id)
+    ChatRouter->>CrewManager: kickoff_thread(messages, session_id)
     
     CrewManager->>UserChatSpecialistCrew: Initialize Crew
     UserChatSpecialistCrew->>UserChatSpecialistCrew: setup_agents()
@@ -42,7 +42,7 @@ sequenceDiagram
     end
 
     UserChatSpecialistCrew-->>CrewManager: Return final response
-    CrewManager-->>ChatRouter: Return conversation response
+    CrewManager-->>ChatRouter: Return thread response
     ChatRouter-->>FastAPI: Return response object
     FastAPI-->>Client: Return JSON response
 

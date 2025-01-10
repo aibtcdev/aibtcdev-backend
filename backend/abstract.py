@@ -1,30 +1,18 @@
 from abc import ABC, abstractmethod
 from backend.models import (
+    DAO,
     UUID,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
-    Capability,
-    CapabilityBase,
-    CapabilityCreate,
-    CapabilityFilter,
-    Collective,
-    CollectiveBase,
-    CollectiveCreate,
-    CollectiveFilter,
-    Conversation,
-    ConversationBase,
-    ConversationCreate,
-    ConversationFilter,
-    Crew,
-    CrewBase,
-    CrewCreate,
-    CrewFilter,
-    Cron,
-    CronBase,
-    CronCreate,
-    CronFilter,
+    DAOBase,
+    DAOCreate,
+    DAOFilter,
+    Extension,
+    ExtensionBase,
+    ExtensionCreate,
+    ExtensionFilter,
     Job,
     JobBase,
     JobCreate,
@@ -52,6 +40,10 @@ from backend.models import (
     TelegramUserBase,
     TelegramUserCreate,
     TelegramUserFilter,
+    Thread,
+    ThreadBase,
+    ThreadCreate,
+    ThreadFilter,
     Token,
     TokenBase,
     TokenCreate,
@@ -60,6 +52,10 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    XCreds,
+    XCredsBase,
+    XCredsCreate,
+    XCredsFilter,
     XTweet,
     XTweetBase,
     XTweetCreate,
@@ -149,121 +145,73 @@ class AbstractBackend(ABC):
     def delete_agent(self, agent_id: UUID) -> bool:
         pass
 
-    # ----------- CAPABILITIES -----------
+    # ----------- EXTENSIONS -----------
     @abstractmethod
-    def create_capability(self, new_cap: CapabilityCreate) -> Capability:
+    def create_extension(self, new_ext: ExtensionCreate) -> Extension:
         pass
 
     @abstractmethod
-    def get_capability(self, cap_id: UUID) -> Optional[Capability]:
+    def get_extension(self, ext_id: UUID) -> Optional[Extension]:
         pass
 
     @abstractmethod
-    def list_capabilities(
-        self, filters: Optional[CapabilityFilter] = None
-    ) -> List[Capability]:
+    def list_extensions(
+        self, filters: Optional[ExtensionFilter] = None
+    ) -> List[Extension]:
         pass
 
     @abstractmethod
-    def update_capability(
-        self, cap_id: UUID, update_data: CapabilityBase
-    ) -> Optional[Capability]:
+    def update_extension(
+        self, ext_id: UUID, update_data: ExtensionBase
+    ) -> Optional[Extension]:
         pass
 
     @abstractmethod
-    def delete_capability(self, cap_id: UUID) -> bool:
+    def delete_extension(self, ext_id: UUID) -> bool:
         pass
 
-    # ----------- COLLECTIVES -----------
+    # ----------- DAOS -----------
     @abstractmethod
-    def create_collective(self, new_col: CollectiveCreate) -> Collective:
-        pass
-
-    @abstractmethod
-    def get_collective(self, col_id: UUID) -> Optional[Collective]:
+    def create_dao(self, new_dao: DAOCreate) -> DAO:
         pass
 
     @abstractmethod
-    def list_collectives(
-        self, filters: Optional[CollectiveFilter] = None
-    ) -> List[Collective]:
+    def get_dao(self, dao_id: UUID) -> Optional[DAO]:
         pass
 
     @abstractmethod
-    def update_collective(
-        self, col_id: UUID, update_data: CollectiveBase
-    ) -> Optional[Collective]:
+    def list_daos(self, filters: Optional[DAOFilter] = None) -> List[DAO]:
         pass
 
     @abstractmethod
-    def delete_collective(self, col_id: UUID) -> bool:
-        pass
-
-    # ----------- CONVERSATIONS -----------
-    @abstractmethod
-    def create_conversation(self, new_convo: ConversationCreate) -> Conversation:
+    def update_dao(self, dao_id: UUID, update_data: DAOBase) -> Optional[DAO]:
         pass
 
     @abstractmethod
-    def get_conversation(self, convo_id: UUID) -> Optional[Conversation]:
+    def delete_dao(self, dao_id: UUID) -> bool:
+        pass
+
+    # ----------- THREADS -----------
+    @abstractmethod
+    def create_thread(self, new_thread: ThreadCreate) -> Thread:
         pass
 
     @abstractmethod
-    def list_conversations(
-        self, filters: Optional[ConversationFilter] = None
-    ) -> List[Conversation]:
+    def get_thread(self, thread_id: UUID) -> Optional[Thread]:
         pass
 
     @abstractmethod
-    def update_conversation(
-        self, convo_id: UUID, update_data: ConversationBase
-    ) -> Optional[Conversation]:
+    def list_threads(self, filters: Optional[ThreadFilter] = None) -> List[Thread]:
         pass
 
     @abstractmethod
-    def delete_conversation(self, convo_id: UUID) -> bool:
-        pass
-
-    # ----------- CREWS -----------
-    @abstractmethod
-    def create_crew(self, new_crew: CrewCreate) -> Crew:
+    def update_thread(
+        self, thread_id: UUID, update_data: ThreadBase
+    ) -> Optional[Thread]:
         pass
 
     @abstractmethod
-    def get_crew(self, crew_id: UUID) -> Optional[Crew]:
-        pass
-
-    @abstractmethod
-    def list_crews(self, filters: Optional[CrewFilter] = None) -> List[Crew]:
-        pass
-
-    @abstractmethod
-    def update_crew(self, crew_id: UUID, update_data: CrewBase) -> Optional[Crew]:
-        pass
-
-    @abstractmethod
-    def delete_crew(self, crew_id: UUID) -> bool:
-        pass
-
-    # ----------- CRONS -----------
-    @abstractmethod
-    def create_cron(self, new_cron: CronCreate) -> Cron:
-        pass
-
-    @abstractmethod
-    def get_cron(self, cron_id: UUID) -> Optional[Cron]:
-        pass
-
-    @abstractmethod
-    def list_crons(self, filters: Optional[CronFilter] = None) -> List[Cron]:
-        pass
-
-    @abstractmethod
-    def update_cron(self, cron_id: UUID, update_data: CronBase) -> Optional[Cron]:
-        pass
-
-    @abstractmethod
-    def delete_cron(self, cron_id: UUID) -> bool:
+    def delete_thread(self, thread_id: UUID) -> bool:
         pass
 
     # ----------- JOBS -----------
@@ -423,13 +371,36 @@ class AbstractBackend(ABC):
     def delete_token(self, token_id: UUID) -> bool:
         pass
 
+    # ----------- X_CREDS -----------
+    @abstractmethod
+    def create_x_creds(self, new_xc: XCredsCreate) -> XCreds:
+        pass
+
+    @abstractmethod
+    def get_x_creds(self, x_creds_id: UUID) -> Optional[XCreds]:
+        pass
+
+    @abstractmethod
+    def list_x_creds(self, filters: Optional[XCredsFilter] = None) -> List[XCreds]:
+        pass
+
+    @abstractmethod
+    def update_x_creds(
+        self, x_creds_id: UUID, update_data: XCredsBase
+    ) -> Optional[XCreds]:
+        pass
+
+    @abstractmethod
+    def delete_x_creds(self, x_creds_id: UUID) -> bool:
+        pass
+
     # ----------- X_USERS -----------
     @abstractmethod
     def create_x_user(self, new_xu: XUserCreate) -> XUser:
         pass
 
     @abstractmethod
-    def get_x_user(self, x_user_id: str) -> Optional[XUser]:
+    def get_x_user(self, x_user_id: UUID) -> Optional[XUser]:
         pass
 
     @abstractmethod
@@ -437,11 +408,11 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def update_x_user(self, x_user_id: str, update_data: XUserBase) -> Optional[XUser]:
+    def update_x_user(self, x_user_id: UUID, update_data: XUserBase) -> Optional[XUser]:
         pass
 
     @abstractmethod
-    def delete_x_user(self, x_user_id: str) -> bool:
+    def delete_x_user(self, x_user_id: UUID) -> bool:
         pass
 
     # ----------- X_TWEETS -----------
@@ -450,7 +421,7 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
-    def get_x_tweet(self, x_tweet_id: str) -> Optional[XTweet]:
+    def get_x_tweet(self, x_tweet_id: UUID) -> Optional[XTweet]:
         pass
 
     @abstractmethod
@@ -459,10 +430,10 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def update_x_tweet(
-        self, x_tweet_id: str, update_data: XTweetBase
+        self, x_tweet_id: UUID, update_data: XTweetBase
     ) -> Optional[XTweet]:
         pass
 
     @abstractmethod
-    def delete_x_tweet(self, x_tweet_id: str) -> bool:
+    def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
         pass

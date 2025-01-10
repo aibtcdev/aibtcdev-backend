@@ -53,6 +53,30 @@ class Wallet(WalletBase):
 
 
 #
+#  X_CREDS
+#
+class XCredsBase(CustomBaseModel):
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    secret_id: Optional[UUID] = None
+    consumer_key: Optional[str] = None
+    consumer_secret: Optional[str] = None
+    access_token: Optional[str] = None
+    access_secret: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+
+
+class XCredsCreate(XCredsBase):
+    pass
+
+
+class XCreds(XCredsBase):
+    id: UUID
+    created_at: datetime
+
+
+#
 #  AGENTS
 #
 class AgentBase(CustomBaseModel):
@@ -62,7 +86,6 @@ class AgentBase(CustomBaseModel):
     backstory: Optional[str] = None
     profile_id: Optional[UUID] = None
     agent_tools: Optional[List[str]] = None
-    crew_id: Optional[UUID] = None
     image_url: Optional[str] = None
 
 
@@ -79,37 +102,37 @@ class Agent(AgentBase):
 #
 # CAPABILITIES
 #
-class CapabilityBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+class ExtensionBase(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     type: str
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     status: Optional[str] = "DRAFT"
 
 
-class CapabilityCreate(CapabilityBase):
+class ExtensionCreate(ExtensionBase):
     pass
 
 
-class Capability(CapabilityBase):
+class Extension(ExtensionBase):
     id: UUID
     created_at: datetime
 
 
 #
-# COLLECTIVES
+# DAOS
 #
-class CollectiveBase(CustomBaseModel):
+class DAOBase(CustomBaseModel):
     name: str
     mission: Optional[str] = None
     description: Optional[str] = None
 
 
-class CollectiveCreate(CollectiveBase):
+class DAOCreate(DAOBase):
     pass
 
 
-class Collective(CollectiveBase):
+class DAO(DAOBase):
     id: UUID
     created_at: datetime
 
@@ -117,56 +140,16 @@ class Collective(CollectiveBase):
 #
 # CONVERSATIONS
 #
-class ConversationBase(CustomBaseModel):
+class ThreadBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
-    name: Optional[str] = "New Conversation"
+    name: Optional[str] = "New Thread"
 
 
-class ConversationCreate(ConversationBase):
+class ThreadCreate(ThreadBase):
     pass
 
 
-class Conversation(ConversationBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# CREWS
-#
-class CrewBase(CustomBaseModel):
-    name: Optional[str] = None
-    profile_id: Optional[UUID] = None
-    description: Optional[str] = None
-    executions: Optional[float] = None
-    is_public: bool = False
-
-
-class CrewCreate(CrewBase):
-    pass
-
-
-class Crew(CrewBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# CRONS
-#
-class CronBase(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
-    is_enabled: Optional[bool] = False
-    interval: Optional[str] = None
-    input: Optional[str] = None
-
-
-class CronCreate(CronBase):
-    pass
-
-
-class Cron(CronBase):
+class Thread(ThreadBase):
     id: UUID
     created_at: datetime
 
@@ -175,12 +158,13 @@ class Cron(CronBase):
 # JOBS
 #
 class JobBase(CustomBaseModel):
-    conversation_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
+    thread_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
     input: Optional[str] = None
     result: Optional[str] = None
     tokens: Optional[float] = None
+    task_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
 
 class JobCreate(JobBase):
@@ -217,7 +201,7 @@ class Profile(ProfileBase):
 # PROPOSALS
 #
 class ProposalBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     title: Optional[str] = None
     description: Optional[str] = None
     code: Optional[str] = None
@@ -243,6 +227,7 @@ class Proposal(ProposalBase):
 #
 class StepBase(CustomBaseModel):
     job_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
     role: Optional[str] = None
     content: Optional[str] = None
     tool: Optional[str] = None
@@ -268,7 +253,6 @@ class TaskBase(CustomBaseModel):
     prompt: Optional[str] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
     name: Optional[str] = None
     cron: Optional[str] = None
     is_scheduled: Optional[bool] = False
@@ -309,7 +293,7 @@ class TelegramUser(TelegramUserBase):
 # TOKENS
 #
 class TokenBase(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     name: Optional[str] = None
@@ -339,6 +323,7 @@ class Token(TokenBase):
 class XUserBase(CustomBaseModel):
     realname: Optional[str] = None
     username: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class XUserCreate(XUserBase):
@@ -346,7 +331,7 @@ class XUserCreate(XUserBase):
 
 
 class XUser(XUserBase):
-    id: str
+    id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -356,7 +341,9 @@ class XUser(XUserBase):
 #
 class XTweetBase(CustomBaseModel):
     message: Optional[str] = None
-    author_id: Optional[str] = None
+    author_id: Optional[UUID] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class XTweetCreate(XTweetBase):
@@ -364,7 +351,7 @@ class XTweetCreate(XTweetBase):
 
 
 class XTweet(XTweetBase):
-    id: str
+    id: UUID
     created_at: datetime
 
 
@@ -374,9 +361,6 @@ class XTweet(XTweetBase):
 #
 # Each table gets its own Filter class with optional fields
 # you might want to filter on in the "list" methods.
-#
-# Example: AgentFilter can filter by name, role, or crew_id
-# etc. Extend to any fields you need to filter by.
 #
 
 
@@ -390,39 +374,25 @@ class AgentFilter(CustomBaseModel):
     role: Optional[str] = None
     goal: Optional[str] = None
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
 
 
-class CapabilityFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+class ExtensionFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     type: Optional[str] = None
     status: Optional[str] = None
 
 
-class CollectiveFilter(CustomBaseModel):
+class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
 
 
-class ConversationFilter(CustomBaseModel):
+class ThreadFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
     name: Optional[str] = None
-
-
-class CrewFilter(CustomBaseModel):
-    name: Optional[str] = None
-    profile_id: Optional[UUID] = None
-    is_public: Optional[bool] = None
-
-
-class CronFilter(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
-    is_enabled: Optional[bool] = None
 
 
 class JobFilter(CustomBaseModel):
-    conversation_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
+    thread_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
 
 
@@ -433,7 +403,7 @@ class ProfileFilter(CustomBaseModel):
 
 
 class ProposalFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     status: Optional[str] = None
     is_deployed: Optional[bool] = None
 
@@ -445,7 +415,6 @@ class StepFilter(CustomBaseModel):
 
 class TaskFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
-    crew_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     is_scheduled: Optional[bool] = None
 
@@ -462,15 +431,23 @@ class TelegramUserFilter(CustomBaseModel):
 
 
 class TokenFilter(CustomBaseModel):
-    collective_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
 
 
+class XCredsFilter(CustomBaseModel):
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+
+
 class XUserFilter(CustomBaseModel):
+    user_id: Optional[str] = None
     username: Optional[str] = None
     realname: Optional[str] = None
 
 
 class XTweetFilter(CustomBaseModel):
-    author_id: Optional[str] = None
+    author_id: Optional[UUID] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None

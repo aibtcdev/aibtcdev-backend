@@ -9,45 +9,45 @@ VALID_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY2
 test_chat() {
     echo "Testing chat endpoints..."
 
-    # Test create conversation endpoint
+    # Test create thread endpoint
     response=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Authorization: Bearer $VALID_TOKEN" \
-        "${API_URL}/chat/conversations")
+        "${API_URL}/chat/threads")
     status=$(echo "$response" | tail -n1)
     body=$(echo "$response" | head -n1)
     
     if [ "$status" -eq 500 ]; then
-        echo -e "${GREEN}✓${NC} Create conversation returns 500 for error case"
+        echo -e "${GREEN}✓${NC} Create thread returns 500 for error case"
     else
-        echo -e "${RED}✗${NC} Create conversation should return 500 for error case, got $status"
+        echo -e "${RED}✗${NC} Create thread should return 500 for error case, got $status"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-    # Test get conversations endpoint
+    # Test get threads endpoint
     response=$(curl -s -w "\n%{http_code}" -X GET \
         -H "Authorization: Bearer $VALID_TOKEN" \
-        "${API_URL}/chat/conversations")
+        "${API_URL}/chat/threads")
     status=$(echo "$response" | tail -n1)
     
     if [ "$status" -eq 500 ]; then
-        echo -e "${GREEN}✓${NC} Get conversations returns 500 for error case"
+        echo -e "${GREEN}✓${NC} Get threads returns 500 for error case"
     else
-        echo -e "${RED}✗${NC} Get conversations should return 500 for error case, got $status"
+        echo -e "${RED}✗${NC} Get threads should return 500 for error case, got $status"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-    # Test get latest conversation endpoint
+    # Test get latest thread endpoint
     response=$(curl -s -w "\n%{http_code}" -X GET \
         -H "Authorization: Bearer $VALID_TOKEN" \
-        "${API_URL}/chat/conversations/latest")
+        "${API_URL}/chat/threads/latest")
     status=$(echo "$response" | tail -n1)
     
     if [ "$status" -eq 500 ]; then
-        echo -e "${GREEN}✓${NC} Get latest conversation returns 500 for error case"
+        echo -e "${GREEN}✓${NC} Get latest thread returns 500 for error case"
     else
-        echo -e "${RED}✗${NC} Get latest conversation should return 500 for error case, got $status"
+        echo -e "${RED}✗${NC} Get latest thread should return 500 for error case, got $status"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -57,7 +57,7 @@ test_chat() {
         -H "Authorization: Bearer $VALID_TOKEN" \
         -H "Content-Type: application/json" \
         -d '{"input_str":"test message"}' \
-        "${API_URL}/chat/?conversation_id=123")
+        "${API_URL}/chat/?thread_id=123")
     status=$(echo "$response" | tail -n1)
     
     if [ "$status" -eq 500 ]; then
@@ -82,22 +82,22 @@ test_chat() {
     fi
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-    # Test delete conversation endpoint
+    # Test delete thread endpoint
     response=$(curl -s -w "\n%{http_code}" -X DELETE \
         -H "Authorization: Bearer $VALID_TOKEN" \
-        "${API_URL}/chat/conversations/123")
+        "${API_URL}/chat/threads/123")
     status=$(echo "$response" | tail -n1)
     
     if [ "$status" -eq 500 ]; then
-        echo -e "${GREEN}✓${NC} Delete conversation returns 500 for error case"
+        echo -e "${GREEN}✓${NC} Delete thread returns 500 for error case"
     else
-        echo -e "${RED}✗${NC} Delete conversation should return 500 for error case, got $status"
+        echo -e "${RED}✗${NC} Delete thread should return 500 for error case, got $status"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
     # Test CORS headers for all endpoints
-    test_cors "/chat/conversations" "Chat conversations CORS"
-    test_cors "/chat/conversations/latest" "Chat latest conversation CORS"
+    test_cors "/chat/threads" "Chat threads CORS"
+    test_cors "/chat/threads/latest" "Chat latest thread CORS"
     test_cors "/chat/" "Chat trigger CORS"
 }

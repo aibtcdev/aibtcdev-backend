@@ -15,16 +15,14 @@ class StxCityBaseInput(BaseModel):
 class StxCityExecuteBuyInput(BaseModel):
     """Input schema for STXCity buy order execution."""
 
-    stx_amount: Decimal = Field(
-        ..., description="Amount of STX to spend on the purchase"
-    )
+    stx_amount: str = Field(..., description="Amount of STX to spend on the purchase")
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     token_contract_id: str = Field(
         ..., description="Contract ID of the token to purchase"
     )
     token_symbol: str = Field(..., description="Symbol of the token to purchase")
-    slippage: Optional[int] = Field(
-        default=50,
+    slippage: Optional[str] = Field(
+        default="50",
         description="Slippage tolerance in basis points (default: 50, which is 0.5%)",
     )
 
@@ -44,11 +42,11 @@ class StxCityExecuteBuyTool(BaseTool):
 
     def _deploy(
         self,
-        stx_amount: Decimal,
+        stx_amount: str,
         dex_contract_id: str,
         token_contract_id: str,
         token_symbol: str,
-        slippage: Optional[int] = 50,
+        slippage: Optional[str] = "50",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
@@ -65,11 +63,11 @@ class StxCityExecuteBuyTool(BaseTool):
 
     def _run(
         self,
-        stx_amount: Decimal,
+        stx_amount: str,
         dex_contract_id: str,
         token_contract_id: str,
         token_symbol: str,
-        slippage: Optional[int] = 50,
+        slippage: Optional[str] = "50",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
@@ -79,11 +77,11 @@ class StxCityExecuteBuyTool(BaseTool):
 
     async def _arun(
         self,
-        stx_amount: Decimal,
+        stx_amount: str,
         dex_contract_id: str,
         token_contract_id: str,
         token_symbol: str,
-        slippage: Optional[int] = 50,
+        slippage: Optional[str] = "50",
         **kwargs,
     ) -> str:
         """Async version of the tool."""

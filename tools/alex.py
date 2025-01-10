@@ -4,7 +4,11 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Type
 
 
-class AlexPriceHistoryInput(BaseModel):
+class AlexBaseInput(BaseModel):
+    """Base input schema for Alex tools."""
+
+
+class AlexPriceHistoryInput(AlexBaseInput):
     """Input schema for AlexGetPriceHistory."""
 
     token_address: str = Field(
@@ -12,7 +16,7 @@ class AlexPriceHistoryInput(BaseModel):
     )
 
 
-class AlexTokenPoolVolumeInput(BaseModel):
+class AlexTokenPoolVolumeInput(AlexBaseInput):
     """Input schema for AlexGetTokenPoolVolume."""
 
     token_pool_id: str = Field(
@@ -46,6 +50,7 @@ class AlexGetSwapInfo(BaseTool):
     name: str = "alex_get_swap_info"
     description: str = "Retrieve all available token pair data from the Alex DEX"
     return_direct: bool = False
+    args_schema: Type[BaseModel] = AlexBaseInput
 
     def _deploy(self, **kwargs) -> List[Dict[str, str]]:
         """Execute the tool to get swap info."""

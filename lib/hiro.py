@@ -26,14 +26,14 @@ class HiroApi:
     def get_token_holders(self, token: str) -> str:
         """Retrieve a list of token holders."""
         try:
-            return self._get(f"extended/v1/tokens/ft/{token}/holders")
+            return self._get(f"/extended/v1/tokens/ft/{token}/holders")
         except Exception as e:
             raise Exception(f"Hiro API GET request error: {str(e)}")
 
-    def get_wallet_balance(self, addr: str) -> str:
+    def get_address_balance(self, addr: str) -> str:
         """Retrieve wallet balance for an address."""
         try:
-            return self._get(f"extended/v1/address/{addr}/balances")
+            return self._get(f"/extended/v1/address/{addr}/balances")
         except Exception as e:
             raise Exception(f"Hiro API GET request error: {str(e)}")
 

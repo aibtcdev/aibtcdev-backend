@@ -25,7 +25,10 @@ class TwitterService:
         self.client_secret = client_secret
         self.client = None
 
-    async def initialize(self) -> None:
+    async def _ainitialize(self) -> None:
+        self.initialize()
+
+    def initialize(self) -> None:
         """Initialize the Twitter client."""
         try:
             self.client = Api(
@@ -42,7 +45,22 @@ class TwitterService:
             logger.error(f"Failed to initialize Twitter client: {str(e)}")
             raise
 
-    async def post_tweet(
+    async def _apost_tweet(
+        self, text: str, reply_in_reply_to_tweet_id: Optional[str] = None
+    ) -> Optional[Tweet]:
+        """
+        Post a new tweet or reply to an existing tweet.
+
+        Args:
+            text: The content of the tweet
+            reply_in_reply_to_tweet_id: Optional ID of tweet to reply to
+
+        Returns:
+            Tweet data if successful, None if failed
+        """
+        return self.post_tweet(text, reply_in_reply_to_tweet_id)
+
+    def post_tweet(
         self, text: str, reply_in_reply_to_tweet_id: Optional[str] = None
     ) -> Optional[Tweet]:
         """

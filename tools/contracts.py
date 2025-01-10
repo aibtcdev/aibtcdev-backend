@@ -25,7 +25,10 @@ class ContractSIP10DeployInput(BaseModel):
 
 class ContractSIP10DeployTool(BaseTool):
     name: str = "contract_sip10_deploy"
-    description: str = "Deploy a new token contract following the SIP-10 standard"
+    description: str = (
+        "Deploy a new token contract following the SIP-10 standard. "
+        "Example usage: 'deploy a token named 'Human' with a symbol 'HUMAN' and a description 'The Human Token'"
+    )
     args_schema: Type[BaseModel] = ContractSIP10DeployInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
@@ -124,7 +127,8 @@ class ContractSIP10InfoInput(BaseModel):
 class ContractSIP10InfoTool(BaseTool):
     name: str = "contract_sip10_info"
     description: str = (
-        "Get token information including name, symbol, decimals, and supply for a SIP-10 token"
+        "Get token information including name, symbol, decimals, and supply for a SIP-10 token. "
+        "Example usage: 'get info about the token named 'SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm'"
     )
     args_schema: Type[BaseModel] = ContractSIP10InfoInput
     return_direct: bool = False
@@ -173,14 +177,18 @@ class FetchContractSourceInput(BaseModel):
     """Input schema for FetchContractSource tool."""
 
     contract_address: str = Field(
-        ..., description="The contract's address (e.g., SP000...)"
+        ...,
+        description="The contract's address (e.g., SP000... or SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm)",
     )
     contract_name: str = Field(..., description="The name of the contract")
 
 
 class FetchContractSourceTool(BaseTool):
     name: str = "contract_fetch_source"
-    description: str = "Fetch the source code of a contract using the Hiro API"
+    description: str = (
+        "Fetch the source code of a contract using the Hiro API. "
+        "Example usage: 'fetch the source code of the contract named 'SP295MNE41DC74QYCPRS8N37YYMC06N6Q3T5P1YC2.foundry-6s-FSwIm'"
+    )
     args_schema: Type[BaseModel] = FetchContractSourceInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")

@@ -1,57 +1,80 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Any, Optional, Type
+from typing import Type
+from uuid import UUID
+from backend.factory import backend
+from backend.models import XCredsFilter
+from lib.logger import configure_logger
+from lib.twitter import TwitterService
+
+
+logger = configure_logger(__name__)
 
 
 class TwitterPostTweetInput(BaseModel):
     """Input schema for posting tweets or replying to existing tweets."""
 
-    text: str = Field(
+    content: str = Field(
         ...,
-        description="The content of the tweet to be posted",
-    )
-    reply_to_tweet_id: Optional[str] = Field(
-        None,
-        description="Optional ID of the tweet to reply to",
+        description="The content of the tweet to be posted. Required to be less than 280 characters.",
     )
 
 
 class TwitterPostTweetTool(BaseTool):
-    name = "twitter_post_tweet"
-    description = (
-        "Post a new tweet or reply to an existing tweet on Twitter. Returns a success "
-        "message with the first 50 characters of the tweet if successful."
+    name: str = "twitter_post_tweet"
+    description: str = (
+        "Post a new tweet or reply to an existing tweet on Twitter."
+        "Required to be less than 280 characters."
     )
     args_schema: Type[BaseModel] = TwitterPostTweetInput
     return_direct: bool = False
+    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
 
-    def __init__(self, twitter_service: Any, **kwargs):
+    def __init__(
+        self,
+        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        **kwargs,
+    ):
         super().__init__(**kwargs)
-        self.twitter_service = twitter_service
+        self.profile_id = profile_id
+        self.agent_id = agent_id
 
-    def _deploy(
-        self, text: str, reply_to_tweet_id: Optional[str] = None, **kwargs
-    ) -> str:
+    def _deploy(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet synchronously."""
+        if len(content) > 280:
+            return "Error: Tweet content exceeds 280 characters limit. Please shorten your message."
+
         try:
-            if self.twitter_service is None:
-                return "Twitter client is not initialized"
-            response = self.twitter_service.post_tweet(
-                text=text, reply_in_reply_to_tweet_id=reply_to_tweet_id
+            x_creds = backend.list_x_creds(
+                filters=XCredsFilter(agent_id=self.agent_id),
             )
+            if not x_creds:
+                return "No X creds found for this agent"
+            x_creds = x_creds[0]
+            twitter_service = TwitterService(
+                consumer_key=x_creds.consumer_key,
+                consumer_secret=x_creds.consumer_secret,
+                access_token=x_creds.access_token,
+                access_secret=x_creds.access_secret,
+                client_id=x_creds.client_id,
+                client_secret=x_creds.client_secret,
+            )
+            twitter_service.initialize()
+            response = twitter_service.post_tweet(text=content)
+
+            logger.info(f"Response: {response}")
             if response:
-                return f"Successfully posted tweet: {text[:50]}..."
+                return f"https://x.com/i/web/status/{response.id}"
             return "Failed to post tweet"
         except Exception as e:
+            logger.error(f"Error posting tweet: {str(e)}")
             return f"Error posting tweet: {str(e)}"
 
-    async def _run(
-        self, text: str, reply_to_tweet_id: Optional[str] = None, **kwargs
-    ) -> str:
-        return self._deploy(text, reply_to_tweet_id, **kwargs)
+    def _run(self, content: str, **kwargs) -> str:
+        return self._deploy(content, **kwargs)
 
-    async def _arun(
-        self, text: str, reply_to_tweet_id: Optional[str] = None, **kwargs
-    ) -> str:
+    async def _arun(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet asynchronously."""
-        return self._deploy(text, reply_to_tweet_id, **kwargs)
+        return self._deploy(content, **kwargs)
