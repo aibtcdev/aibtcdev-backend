@@ -1,37 +1,19 @@
-import logging
-import sys
-from .chat_stream_langgraph import extract_filtered_content
+from .langgraph import extract_filtered_content
 from .twitter import TwitterService
-from backend.models import Profile
+from backend.models import UUID, Profile
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
 from datetime import datetime
 from enum import Enum
+from lib.logger import configure_logger
 from pydantic import BaseModel
 from textwrap import dedent
 from tools.tools_factory import filter_crewai_tools_by_names, initialize_tools
 from typing import Any, AsyncGenerator, Dict, List, Optional
-from uuid import UUID
 
-# Configure logging with console handler
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Create console handler with formatting
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-console_handler.setFormatter(formatter)
-
-# Add handler to logger if it doesn't already have handlers
-if not logger.handlers:
-    logger.addHandler(console_handler)
-
-# Ensure propagation to root logger
-logger.propagate = True
+logger = configure_logger(__name__)
 
 
-# Output schemas for tasks
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
     CONVERSATION = "thread"

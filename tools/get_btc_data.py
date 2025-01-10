@@ -2,7 +2,7 @@ import os
 import requests
 from langchain.tools import BaseTool
 from pydantic import BaseModel
-from typing import Any, Dict, Optional, Type, Union
+from typing import Type
 
 
 class GetBitcoinDataInput(BaseModel):

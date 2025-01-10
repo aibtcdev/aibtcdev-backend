@@ -1,25 +1,21 @@
 import inspect
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
-from .contracts import (
-    ContractSIP10DeployTool,
-    ContractSIP10InfoTool,
-    FetchContractSourceTool,
-)
+from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .daos import ContractDAODeployTool
 from .db import (
     AddScheduledTaskTool,
     DeleteScheduledTaskTool,
+    GetDAOByNameTool,
     GetDAOListTool,
     ListScheduledTasksTool,
     UpdateScheduledTaskTool,
-    GetDAOByNameTool,
 )
 from .get_btc_data import GetBitcoinData
 from .hiro import (
-    STXPriceTool,
     STXGetContractInfoTool,
     STXGetPrincipalAddressBalanceTool,
+    STXPriceTool,
 )
 from .jing import (
     JingCancelAskTool,
@@ -38,18 +34,13 @@ from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
-from .stxcity import (
-    StxCityCheckValidBondingTool,
-    StxCityExecuteBuyTool,
-    StxCityExecuteSellTool,
-    StxCityListBondingTokensTool,
-    StxCitySearchTool,
-)
+from .stxcity import StxCityExecuteBuyTool, StxCityExecuteSellTool
 from .transactions import (
     StacksTransactionByAddressTool,
     StacksTransactionStatusTool,
     StacksTransactionTool,
 )
+from .twitter import TwitterPostTweetTool
 from .velar import VelarGetPriceHistory, VelarGetTokens
 from .wallet import (
     WalletFundMyWalletFaucet,
@@ -60,14 +51,12 @@ from .wallet import (
     WalletSIP10SendTool,
 )
 from backend.factory import backend
-from backend.models import Profile, WalletFilter
+from backend.models import UUID, Profile, WalletFilter
 from crewai_tools import BaseTool as CrewAIBaseTool
 from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, create_model
 from typing import Any, Callable, Dict, List, Optional, Type
-from uuid import UUID
-from .twitter import TwitterPostTweetTool
 
 logger = configure_logger(__name__)
 

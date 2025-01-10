@@ -2,13 +2,14 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables from a .env file
 load_dotenv()
 
 
 class VelarApi:
     def __init__(self):
-        self.base_url = os.getenv("AIBTC_VELAR_BASE_URL", "https://gateway.velar.network/")
+        self.base_url = os.getenv(
+            "AIBTC_VELAR_BASE_URL", "https://gateway.velar.network/"
+        )
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make a GET request to the Velar API."""

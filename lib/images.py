@@ -1,7 +1,6 @@
 import requests
 from dotenv import load_dotenv
 from litellm import image_generation
-from typing import Optional
 
 load_dotenv()
 

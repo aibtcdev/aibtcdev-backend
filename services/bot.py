@@ -4,21 +4,12 @@ from backend.models import TelegramUserFilter
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
 
-# Load environment variables
 load_dotenv()
 
-# Configure logger
 logger = configure_logger(__name__)
 
-# List of admin user IDs (you can add Telegram user IDs here)
 ADMIN_IDS = [
     2051556689,
 ]
@@ -35,7 +26,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
     try:
-        # Get profile_id from command arguments
         if not context.args:
             await update.message.reply_text(
                 "Please use the registration link provided to start the bot."

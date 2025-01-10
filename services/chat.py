@@ -5,12 +5,11 @@ from backend.models import UUID, JobBase, Profile, StepCreate
 from concurrent.futures import ThreadPoolExecutor
 from lib.logger import configure_logger
 from lib.persona import generate_persona
-from services.chat_stream_langgraph import execute_chat_stream_langgraph
+from services.langgraph import execute_langgraph_stream
+from tools.tools_factory import initialize_tools
 
-# Configure logger
 logger = configure_logger(__name__)
 
-# Create a thread pool executor for running sync functions
 thread_pool = ThreadPoolExecutor()
 running_jobs = {}
 
@@ -69,8 +68,10 @@ async def process_chat_message(
 
         persona = generate_persona(agent)
 
-        async for result in execute_chat_stream_langgraph(
-            profile, agent_id, history, input_str, persona
+        tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
+
+        async for result in execute_langgraph_stream(
+            history, input_str, persona, tools_map
         ):
 
             # Handle end message first to ensure we capture subsequent tool execution

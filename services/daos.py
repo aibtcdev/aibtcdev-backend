@@ -1,9 +1,8 @@
 from backend.factory import backend
-from backend.models import DAO, DAOCreate, Token, TokenBase, TokenCreate
+from backend.models import DAO, UUID, DAOCreate, Token, TokenBase, TokenCreate
 from lib.logger import configure_logger
 from lib.token_assets import TokenAssetError, TokenAssetManager, TokenMetadata
 from typing import Dict, Tuple
-from uuid import UUID
 
 logger = configure_logger(__name__)
 

@@ -7,16 +7,15 @@ from lib.twitter import TwitterService
 from services.flow import execute_twitter_stream
 from typing import Dict, List, Optional, TypedDict
 
-# Configure logger
 logger = configure_logger(__name__)
 
 
 class UserProfile(TypedDict):
     """Type definition for user profile data."""
 
-    name: str  # User's full name
-    age: int  # User's age
-    email: str  # User's email address
+    name: str
+    age: int
+    email: str
 
 
 class TwitterMentionHandler:

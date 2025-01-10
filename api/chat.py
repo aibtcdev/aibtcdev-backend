@@ -2,14 +2,12 @@ import asyncio
 import uuid
 from api.verify_profile import verify_profile_from_token
 from backend.factory import backend
-from backend.models import JobCreate, JobFilter, Profile, StepFilter
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from backend.models import UUID, JobCreate, JobFilter, Profile, StepFilter
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
-from pydantic import BaseModel
 from services.chat import process_chat_message, running_jobs
 from typing import List
-from uuid import UUID
 
 # Configure logger
 logger = configure_logger(__name__)

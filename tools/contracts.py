@@ -1,10 +1,10 @@
 from .bun import BunScriptRunner
+from backend.models import UUID
 from langchain.tools import BaseTool
 from lib.hiro import HiroApi
 from pydantic import BaseModel, Field
 from services.daos import TokenServiceError, generate_token_dependencies
-from typing import Any, Dict, Optional, Type, Union
-from uuid import UUID
+from typing import Dict, Optional, Type, Union
 
 
 class ContractSIP10DeployInput(BaseModel):

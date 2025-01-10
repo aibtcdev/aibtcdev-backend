@@ -1,5 +1,6 @@
 from backend.factory import backend
 from backend.models import (
+    UUID,
     ExtensionFilter,
     TaskBase,
     TaskCreate,
@@ -8,9 +9,7 @@ from backend.models import (
 )
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from storage3._async.bucket import Response
-from typing import Any, Dict, Optional, Type, Union
-from uuid import UUID
+from typing import Any, Dict, Optional, Type
 
 
 class AddScheduledTaskInput(BaseModel):

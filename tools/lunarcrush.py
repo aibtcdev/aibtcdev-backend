@@ -2,7 +2,7 @@ import requests
 from langchain.tools import BaseTool
 from lib.lunarcrush import LunarcrushApi
 from pydantic import BaseModel, Field
-from typing import Any, Dict, Optional, Type, Union
+from typing import Type
 
 
 class LunarCrushTokenMetricsInput(BaseModel):

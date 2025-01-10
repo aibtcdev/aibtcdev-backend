@@ -67,6 +67,7 @@ from .models import (
     XUserCreate,
     XUserFilter,
 )
+from backend.models import UUID
 from lib.logger import configure_logger
 from sqlalchemy import Column, DateTime, Engine, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -74,7 +75,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from supabase import Client
 from typing import List, Optional
-from uuid import UUID
 
 logger = configure_logger(__name__)
 

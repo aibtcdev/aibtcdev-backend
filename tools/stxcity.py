@@ -1,9 +1,9 @@
+from backend.models import UUID
 from decimal import Decimal
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from tools.bun import BunScriptRunner
-from typing import Any, Dict, Optional, Type, Union
-from uuid import UUID
+from typing import Any, Dict, Optional, Type
 
 
 class StxCityBaseInput(BaseModel):

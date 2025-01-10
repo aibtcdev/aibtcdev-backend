@@ -1,38 +1,37 @@
 import asyncio
-from backend.models import Profile
-from langchain.agents import AgentType, initialize_agent
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
-from langgraph.graph import END, Graph
-from lib.logger import configure_logger
-from tools.tools_factory import initialize_tools
-from typing import Dict, List, Optional
-from typing import Annotated, Literal, TypedDict
-from langchain_core.tools import BaseTool
-from langgraph.prebuilt import ToolNode
-from langgraph.graph.message import add_messages
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 from lib.logger import configure_logger
-from tools.tools_factory import initialize_tools
-from typing import Dict, List, Optional
-
-# -----------------------------------------------------
-# Example placeholders - adapt these to your environment
-# -----------------------------------------------------
+from typing import Annotated, Dict, List, Optional, TypedDict
 
 logger = configure_logger(__name__)
 
 
-def extract_filtered_content(history: List[Dict]) -> List[Dict]:
-    """
-    Stub for filtering thread history. Replace or remove as needed.
-    For now, just returns the original history.
-    """
-    return history
+def extract_filtered_content(history: List) -> List[Dict]:
+    """Extract and filter content from chat history."""
+    filtered_content = []
+    for message in history:
+        logger.info(f"Processing message: {message}")
+        if message.get("role") == "user":
+            filtered_content.append(
+                {
+                    "role": "user",
+                    "content": message.get("content", ""),
+                }
+            )
+        elif message.get("role") == "assistant":
+            filtered_content.append(
+                {
+                    "role": "assistant",
+                    "content": message.get("content", ""),
+                }
+            )
+    return filtered_content
 
 
 # -----------------------------------------------------

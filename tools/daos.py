@@ -2,7 +2,7 @@ import json
 import logging
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import ExtensionCreate, TokenBase
+from backend.models import UUID, ExtensionCreate, TokenBase
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from services.daos import (
@@ -11,8 +11,7 @@ from services.daos import (
     generate_dao_dependencies,
     generate_token_dependencies,
 )
-from typing import Any, Dict, Optional, Type, Union
-from uuid import UUID
+from typing import Dict, Optional, Type, Union
 
 logger = logging.getLogger(__name__)
 
