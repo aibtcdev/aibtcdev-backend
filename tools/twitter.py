@@ -1,6 +1,6 @@
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Any, Optional, Type
+from typing import Type
 from uuid import UUID
 from backend.factory import backend
 from backend.models import XCredsFilter
@@ -10,15 +10,15 @@ from lib.twitter import TwitterService
 class TwitterPostTweetInput(BaseModel):
     """Input schema for posting tweets or replying to existing tweets."""
 
-    text: str = Field(
+    content: str = Field(
         ...,
         description="The content of the tweet to be posted",
     )
 
 
 class TwitterPostTweetTool(BaseTool):
-    name = "twitter_post_tweet"
-    description = (
+    name: str = "twitter_post_tweet"
+    description: str = (
         "Post a new tweet or reply to an existing tweet on Twitter. Returns a success "
         "message with the first 50 characters of the tweet if successful."
     )
@@ -37,7 +37,7 @@ class TwitterPostTweetTool(BaseTool):
         self.profile_id = profile_id
         self.agent_id = agent_id
 
-    def _deploy(self, text: str, **kwargs) -> str:
+    def _deploy(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet synchronously."""
         try:
             x_creds = backend.list_x_creds(
@@ -54,16 +54,16 @@ class TwitterPostTweetTool(BaseTool):
                 client_id=x_creds.client_id,
                 client_secret=x_creds.client_secret,
             )
-            response = twitter_service.post_tweet(text=text)
+            response = twitter_service.post_tweet(text=content)
             if response:
-                return f"Successfully posted tweet: {text[:50]}..."
+                return f"Successfully posted tweet: {content[:50]}..."
             return "Failed to post tweet"
         except Exception as e:
             return f"Error posting tweet: {str(e)}"
 
-    async def _run(self, text: str, **kwargs) -> str:
-        return self._deploy(text, **kwargs)
+    async def _run(self, content: str, **kwargs) -> str:
+        return self._deploy(content, **kwargs)
 
-    async def _arun(self, text: str, **kwargs) -> str:
+    async def _arun(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet asynchronously."""
-        return self._deploy(text, **kwargs)
+        return self._deploy(content, **kwargs)
