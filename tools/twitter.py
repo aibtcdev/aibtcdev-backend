@@ -6,7 +6,6 @@ from backend.factory import backend
 from backend.models import XCredsFilter
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
-import asyncio
 
 
 logger = configure_logger(__name__)
@@ -44,6 +43,9 @@ class TwitterPostTweetTool(BaseTool):
 
     def _deploy(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet synchronously."""
+        if len(content) > 280:
+            return "Error: Tweet content exceeds 280 characters limit. Please shorten your message."
+
         try:
             x_creds = backend.list_x_creds(
                 filters=XCredsFilter(agent_id=self.agent_id),
