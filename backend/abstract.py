@@ -52,6 +52,10 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    XCreds,
+    XCredsBase,
+    XCredsCreate,
+    XCredsFilter,
     XTweet,
     XTweetBase,
     XTweetCreate,
@@ -365,6 +369,29 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_token(self, token_id: UUID) -> bool:
+        pass
+
+    # ----------- X_CREDS -----------
+    @abstractmethod
+    def create_x_creds(self, new_xc: XCredsCreate) -> XCreds:
+        pass
+
+    @abstractmethod
+    def get_x_creds(self, x_creds_id: UUID) -> Optional[XCreds]:
+        pass
+
+    @abstractmethod
+    def list_x_creds(self, filters: Optional[XCredsFilter] = None) -> List[XCreds]:
+        pass
+
+    @abstractmethod
+    def update_x_creds(
+        self, x_creds_id: UUID, update_data: XCredsBase
+    ) -> Optional[XCreds]:
+        pass
+
+    @abstractmethod
+    def delete_x_creds(self, x_creds_id: UUID) -> bool:
         pass
 
     # ----------- X_USERS -----------

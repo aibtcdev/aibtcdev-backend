@@ -67,6 +67,7 @@ from lib.logger import configure_logger
 from pydantic import BaseModel, Field, create_model
 from typing import Any, Callable, Dict, List, Optional, Type
 from uuid import UUID
+from .twitter import TwitterPostTweetTool
 
 logger = configure_logger(__name__)
 
@@ -151,6 +152,7 @@ def initialize_tools(
         "stxcity_execute_buy": StxCityExecuteBuyTool(wallet_id),
         # "stxcity_check_valid_bonding": StxCityCheckValidBondingTool(wallet_id),
         # "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
+        "twitter_post_tweet": TwitterPostTweetTool(profile.id, agent_id),
     }
 
     if crewai:

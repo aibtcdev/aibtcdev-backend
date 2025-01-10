@@ -54,6 +54,10 @@ from .models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    XCreds,
+    XCredsBase,
+    XCredsCreate,
+    XCredsFilter,
     XTweet,
     XTweetBase,
     XTweetCreate,
@@ -903,6 +907,64 @@ class SupabaseBackend(AbstractBackend):
     def delete_token(self, token_id: UUID) -> bool:
         response = (
             self.client.table("tokens").delete().eq("id", str(token_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 15. X_CREDS
+    # ----------------------------------------------------------------
+    def create_x_creds(self, new_xc: "XCredsCreate") -> "XCreds":
+        payload = new_xc.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("x_creds").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from x_creds insert.")
+        return XCreds(**data[0])
+
+    def get_x_creds(self, x_creds_id: UUID) -> Optional["XCreds"]:
+        response = (
+            self.client.table("x_creds")
+            .select("*")
+            .eq("id", str(x_creds_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return XCreds(**response.data)
+
+    def list_x_creds(self, filters: Optional["XCredsFilter"] = None) -> List["XCreds"]:
+        query = self.client.table("x_creds").select("*")
+        if filters:
+            if filters.agent_id is not None:
+                query = query.eq("agent_id", str(filters.agent_id))
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+        response = query.execute()
+        data = response.data or []
+        return [XCreds(**row) for row in data]
+
+    def update_x_creds(
+        self, x_creds_id: UUID, update_data: "XCredsBase"
+    ) -> Optional["XCreds"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_x_creds(x_creds_id)
+        response = (
+            self.client.table("x_creds")
+            .update(payload)
+            .eq("id", str(x_creds_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return XCreds(**updated[0])
+
+    def delete_x_creds(self, x_creds_id: UUID) -> bool:
+        response = (
+            self.client.table("x_creds").delete().eq("id", str(x_creds_id)).execute()
         )
         deleted = response.data or []
         return len(deleted) > 0

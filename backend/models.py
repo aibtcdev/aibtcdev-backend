@@ -53,6 +53,30 @@ class Wallet(WalletBase):
 
 
 #
+#  X_CREDS
+#
+class XCredsBase(CustomBaseModel):
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    secret_id: Optional[UUID] = None
+    consumer_key: Optional[str] = None
+    consumer_secret: Optional[str] = None
+    access_token: Optional[str] = None
+    access_secret: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+
+
+class XCredsCreate(XCredsBase):
+    pass
+
+
+class XCreds(XCredsBase):
+    id: UUID
+    created_at: datetime
+
+
+#
 #  AGENTS
 #
 class AgentBase(CustomBaseModel):
@@ -410,6 +434,11 @@ class TokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+
+
+class XCredsFilter(CustomBaseModel):
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
 
 
 class XUserFilter(CustomBaseModel):
