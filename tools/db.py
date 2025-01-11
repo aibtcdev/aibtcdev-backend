@@ -37,13 +37,13 @@ class AddScheduledTaskTool(BaseTool):
     )
     args_schema: Type[BaseModel] = AddScheduledTaskInput
     return_direct: bool = False
-    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
-    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    profile_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
-        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        profile_id: Optional[UUID] = None,
+        agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -58,6 +58,9 @@ class AddScheduledTaskTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to add a scheduled task."""
+
+        if not self.agent_id:
+            return {"error": "Agent ID is required"}
         try:
             response = backend.create_task(
                 TaskCreate(
@@ -236,13 +239,13 @@ class UpdateScheduledTaskTool(BaseTool):
     )
     args_schema: Type[BaseModel] = UpdateScheduledTaskInput
     return_direct: bool = False
-    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
-    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    profile_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
-        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        profile_id: Optional[UUID] = None,
+        agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -260,6 +263,8 @@ class UpdateScheduledTaskTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to update a scheduled task."""
         try:
+            if not self.agent_id:
+                return {"error": "Agent ID is required"}
             update_data = {}
             if name is not None:
                 update_data["name"] = name
@@ -319,13 +324,13 @@ class ListScheduledTasksTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ListScheduledTasksSchema
     return_direct: bool = False
-    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
-    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    profile_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
-        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        profile_id: Optional[UUID] = None,
+        agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -338,6 +343,8 @@ class ListScheduledTasksTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to list scheduled tasks."""
         try:
+            if not self.agent_id:
+                return {"error": "Agent ID is required"}
             tasks = backend.list_tasks(
                 filters=TaskFilter(agent_id=self.agent_id, profile_id=self.profile_id)
             )
@@ -376,13 +383,13 @@ class DeleteScheduledTaskTool(BaseTool):
     description: str = "Delete a scheduled task from the database using its ID."
     args_schema: Type[BaseModel] = DeleteScheduledTaskInput
     return_direct: bool = False
-    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
-    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    profile_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
-        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        profile_id: Optional[UUID] = None,
+        agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -396,6 +403,8 @@ class DeleteScheduledTaskTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to delete a scheduled task."""
         try:
+            if not self.agent_id:
+                return {"error": "Agent ID is required"}
             response = backend.delete_task(UUID(task_id))
             return response
         except Exception as e:

@@ -117,12 +117,15 @@ async def websocket_endpoint(
                     for message in formatted_history:
                         await manager.send_session_message(message, generated_session)
                 elif data.get("type") == "message":
-                    agent_id = UUID(data.get("agent_id", None))
                     thread_id = UUID(data.get("thread_id", None))
-                    if agent_id == None or thread_id == None:
+                    agent_id = None
+                    if data.get("agent_id"):
+                        agent_id = UUID(data.get("agent_id"))
+
+                    if thread_id == None:
                         await websocket.accept()
                         await websocket.send_json(
-                            {"type": "error", "message": "Agent or Thread not passed"}
+                            {"type": "error", "message": "Thread ID is required"}
                         )
                         await websocket.close()
                         return

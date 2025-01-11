@@ -4,7 +4,7 @@ from langchain.tools import BaseTool
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from pydantic import BaseModel, Field
-from typing import Type
+from typing import Optional, Type
 
 logger = configure_logger(__name__)
 
@@ -26,13 +26,13 @@ class TwitterPostTweetTool(BaseTool):
     )
     args_schema: Type[BaseModel] = TwitterPostTweetInput
     return_direct: bool = False
-    profile_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
-    agent_id: UUID = Field(default=UUID("00000000-0000-0000-0000-000000000000"))
+    profile_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
-        agent_id: UUID = UUID("00000000-0000-0000-0000-000000000000"),
+        profile_id: Optional[UUID] = None,
+        agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -41,6 +41,10 @@ class TwitterPostTweetTool(BaseTool):
 
     def _deploy(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet synchronously."""
+
+        if not self.agent_id:
+            return "Agent ID is required"
+
         if len(content) > 280:
             return "Error: Tweet content exceeds 280 characters limit. Please shorten your message."
 

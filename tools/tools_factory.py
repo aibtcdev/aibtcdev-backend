@@ -63,8 +63,7 @@ logger = configure_logger(__name__)
 
 def initialize_tools(
     profile: Profile,
-    agent_id: UUID,
-    wallet_id: Optional[UUID] = None,
+    agent_id: Optional[UUID] = None,
     crewai: bool = True,
 ) -> Dict[str, LangChainBaseTool | CrewAIBaseTool]:
     """Initialize and return a dictionary of available LangChain tools.
@@ -78,7 +77,13 @@ def initialize_tools(
     Returns:
         Dictionary of initialized tools
     """
-    if not wallet_id:
+
+    if not agent_id:
+        wallet = backend.list_wallets(filters=WalletFilter(profile_id=profile.id))[0]
+        if not wallet:
+            raise ValueError("No wallet found for profile")
+        wallet_id = wallet.id
+    else:
         # Get the wallet associated with this agent
         try:
             wallet = backend.list_wallets(

@@ -4,9 +4,10 @@ from backend.factory import backend
 from backend.models import UUID, JobBase, Profile, StepCreate
 from concurrent.futures import ThreadPoolExecutor
 from lib.logger import configure_logger
-from lib.persona import generate_persona
+from lib.persona import generate_persona, generate_static_persona
 from services.langgraph import execute_langgraph_stream
 from tools.tools_factory import initialize_tools
+from typing import Optional
 
 logger = configure_logger(__name__)
 
@@ -18,7 +19,7 @@ async def process_chat_message(
     job_id: UUID,
     thread_id: UUID,
     profile: Profile,
-    agent_id: UUID,
+    agent_id: Optional[UUID],
     input_str: str,
     history: list,
     output_queue: asyncio.Queue,
@@ -58,15 +59,17 @@ async def process_chat_message(
             "tool": None,
             "tool_input": None,
             "tool_output": None,
-            "agent_id": str(agent_id),
+            "agent_id": str(agent_id) if agent_id else None,
         }
 
-        agent = backend.get_agent(agent_id=agent_id)
-        if not agent:
-            logger.error(f"Agent with ID {agent_id} not found")
-            return
-
-        persona = generate_persona(agent)
+        if agent_id:
+            agent = backend.get_agent(agent_id=agent_id)
+            if not agent:
+                logger.error(f"Agent with ID {agent_id} not found")
+                return
+            persona = generate_persona(agent)
+        else:
+            persona = generate_static_persona()
 
         tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
 
@@ -88,7 +91,7 @@ async def process_chat_message(
                     "content": "",
                     "created_at": datetime.datetime.now().isoformat(),
                     "role": "assistant",
-                    "agent_id": str(agent_id),
+                    "agent_id": str(agent_id) if agent_id else None,
                 }
                 await output_queue.put(stream_message)
                 continue
@@ -132,7 +135,7 @@ async def process_chat_message(
                         "tool_output": tool_output,
                         "created_at": datetime.datetime.now().isoformat(),
                         "thread_id": str(thread_id),
-                        "agent_id": str(agent_id),
+                        "agent_id": str(agent_id) if agent_id else None,
                     }
                     results.append(tool_execution)
                     await output_queue.put(tool_execution)
@@ -145,14 +148,14 @@ async def process_chat_message(
                     "tool_input": None,
                     "tool_output": None,
                     "thread_id": str(thread_id),
-                    "agent_id": str(agent_id),
+                    "agent_id": str(agent_id) if agent_id else None,
                 }
                 continue
 
             if result.get("content"):
                 if result.get("type") == "token":
                     stream_message = {
-                        "agent_id": str(agent_id),
+                        "agent_id": str(agent_id) if agent_id else None,
                         "role": "assistant",
                         "type": "token",
                         "status": "processing",
