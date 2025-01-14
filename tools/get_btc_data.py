@@ -1,39 +1,33 @@
-from typing import Type
 import os
 import requests
-from crewai_tools import BaseTool
+from langchain.tools import BaseTool
 from pydantic import BaseModel
+from typing import Type
 
 
-class GetBitcoinDataSchema(BaseModel):
+class GetBitcoinDataInput(BaseModel):
     """Input schema for GetBitcoinData tool.
     This tool doesn't require any input parameters but we still define the schema for consistency.
     """
+
     pass
 
 
 class GetBitcoinData(BaseTool):
-    """Tool for fetching current Bitcoin market data from CoinMarketCap."""
-    name: str = "GetBitcoinData"
-    description: str = "Fetches Bitcoin data including price, market cap, 24h trading volume, and percentage changes."
-    args_schema: Type[BaseModel] = GetBitcoinDataSchema
+    name: str = "get_bitcoin_data"
+    description: str = (
+        "Fetch current Bitcoin market data including price, market cap, 24h trading volume, and percentage changes from CoinMarketCap"
+    )
+    args_schema: Type[BaseModel] = GetBitcoinDataInput
+    return_direct: bool = False
 
-    def _run(self) -> str:
-        """
-        Fetches Bitcoin data using the CoinMarketCap API.
-
-        Required Environment Variables:
-            CMC_API_KEY: CoinMarketCap API key for authentication
-
-        Returns:
-            str: A formatted string containing Bitcoin price, market cap, trading volume,
-                and percentage changes. Returns an error message if the API call fails.
-        """
+    def _deploy(self, **kwargs) -> str:
+        """Execute the tool to fetch Bitcoin market data."""
         # Get the API key from the environment variable
-        api_key = os.getenv("CMC_API_KEY")
+        api_key = os.getenv("AIBTC_CMC_API_KEY")
 
         if not api_key:
-            return "Error: API key not found. Please set the 'CMC_API_KEY' environment variable."
+            return "Error: API key not found. Please set the 'AIBTC_CMC_API_KEY' environment variable."
 
         # CoinMarketCap API URL and parameters
         url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
@@ -72,3 +66,11 @@ class GetBitcoinData(BaseTool):
 
         except requests.RequestException as e:
             return f"Error fetching Bitcoin data: {e}"
+
+    def _run(self, **kwargs) -> str:
+        """Execute the tool to fetch Bitcoin market data."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> str:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)

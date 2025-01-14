@@ -1,11 +1,12 @@
-from typing import Any, Type
-from crewai_tools import BaseTool
 from .bun import BunScriptRunner
+from backend.models import UUID
+from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Any, Dict, Optional, Type
 
 
-class StacksTransactionStatusToolSchema(BaseModel):
-    """Input schema for StacksTransactionStatusTool."""
+class StacksTransactionStatusInput(BaseModel):
+    """Input schema for checking Stacks transaction status."""
 
     transaction_id: str = Field(
         ..., description="The ID of the transaction to check the status for."
@@ -13,22 +14,43 @@ class StacksTransactionStatusToolSchema(BaseModel):
 
 
 class StacksTransactionStatusTool(BaseTool):
-    name: str = "Get transaction status"
-    description: str = "Get the status of a transaction using its ID."
-    args_schema: Type[BaseModel] = StacksTransactionStatusToolSchema
+    name: str = "stacks_transaction_status"
+    description: str = (
+        "Get the current status of a Stacks blockchain transaction using its ID. "
+        "Returns success status and transaction details if available."
+    )
+    args_schema: Type[BaseModel] = StacksTransactionStatusInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def _run(self, transaction_id: str) -> dict:
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to check transaction status."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transaction-status.ts", transaction_id
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transaction-status.ts",
+                transaction_id,
             )
             return result
         except Exception as e:
             return {"output": None, "error": str(e), "success": False}
 
+    def _run(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to check transaction status."""
+        return self._deploy(transaction_id, **kwargs)
 
-class StacksTransactionToolSchema(BaseModel):
-    """Input schema for StacksTransactionTool."""
+    async def _arun(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(transaction_id, **kwargs)
+
+
+class StacksTransactionInput(BaseModel):
+    """Input schema for retrieving detailed Stacks transaction information."""
 
     transaction_id: str = Field(
         ...,
@@ -37,36 +59,78 @@ class StacksTransactionToolSchema(BaseModel):
 
 
 class StacksTransactionTool(BaseTool):
-    name: str = "Get transaction details"
-    description: str = "Retrieve detailed information about a transaction using its ID."
-    args_schema: Type[BaseModel] = StacksTransactionToolSchema
+    name: str = "stacks_transaction_details"
+    description: str = (
+        "Retrieve detailed information about a Stacks blockchain transaction using its ID. "
+        "Returns transaction details including sender, recipient, amount, and status."
+    )
+    args_schema: Type[BaseModel] = StacksTransactionInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def _run(self, transaction_id: str) -> dict:
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to get transaction details."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transaction.ts", transaction_id
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transaction.ts",
+                transaction_id,
             )
             return result
         except Exception as e:
             return {"output": None, "error": str(e), "success": False}
 
+    def _run(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to get transaction details."""
+        return self._deploy(transaction_id, **kwargs)
 
-class StacksTransactionByAddressToolSchema(BaseModel):
-    """Input schema for StacksTransactionByAddressTool."""
+    async def _arun(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(transaction_id, **kwargs)
+
+
+class StacksTransactionByAddressInput(BaseModel):
+    """Input schema for retrieving transactions by Stacks address."""
 
     address: str = Field(..., description="The address to retrieve transactions for.")
 
 
 class StacksTransactionByAddressTool(BaseTool):
-    name: str = "Get transactions by address"
-    description: str = "Retrieve transactions associated with a given address."
-    args_schema: Type[BaseModel] = StacksTransactionByAddressToolSchema
+    name: str = "stacks_transactions_by_address"
+    description: str = (
+        "Retrieve all transactions associated with a given address on the Stacks blockchain. "
+        "Returns a list of transactions including their IDs, types, and timestamps."
+    )
+    args_schema: Type[BaseModel] = StacksTransactionByAddressInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
-    def _run(self, address: str) -> dict:
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(self, address: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to get transactions by address."""
         try:
             result = BunScriptRunner.bun_run(
-                "0", "stacks-transactions", "get-transactions-by-address.ts", address
+                self.wallet_id,
+                "stacks-transactions",
+                "get-transactions-by-address.ts",
+                address,
             )
             return result
         except Exception as e:
             return {"output": None, "error": str(e), "success": False}
+
+    def _run(self, address: str, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to get transactions by address."""
+        return self._deploy(address, **kwargs)
+
+    async def _arun(self, address: str, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(address, **kwargs)

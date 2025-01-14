@@ -1,33 +1,60 @@
+import logging
+import os
+from api import chat, tools
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from api import crew
-from api import chat
-from api import metrics
-from services.cron import execute_cron_job
-import asyncio
-import os
-from services.bot import start_application, BOT_ENABLED
-import logging
+from services.bot import BOT_ENABLED, start_application
+from services.schedule import sync_schedules
+from services.twitter import execute_twitter_job
 
 # Load environment variables first
 load_dotenv()
 
 # Configure module logger
-logger = logging.getLogger('uvicorn.error')
+logger = logging.getLogger("uvicorn.error")
 
-# Initialize scheduler with environment-controlled cron settings
+# Initialize scheduler with environment-controlled settings
 scheduler = AsyncIOScheduler()
-CRON_ENABLED = os.getenv('CRON_ENABLED', 'true').lower() == 'true'
-CRON_INTERVAL_SECONDS = int(os.getenv('CRON_INTERVAL_SECONDS', 3600))
+AIBTC_TWITTER_ENABLED = os.getenv("AIBTC_TWITTER_ENABLED", "false").lower() == "true"
+AIBTC_TWITTER_INTERVAL_SECONDS = int(os.getenv("AIBTC_TWITTER_INTERVAL_SECONDS", 120))
+AIBTC_SCHEDULE_SYNC_ENABLED = (
+    os.getenv("AIBTC_SCHEDULE_SYNC_ENABLED", "false").lower() == "true"
+)
+AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS = int(
+    os.getenv("AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS", 60)
+)
 
-if CRON_ENABLED:
-    scheduler.add_job(execute_cron_job, "interval", seconds=CRON_INTERVAL_SECONDS)
-    scheduler.start()
-    logger.info(f"Cron scheduler started with interval of {CRON_INTERVAL_SECONDS} seconds")
+if AIBTC_TWITTER_ENABLED:
+    scheduler.add_job(
+        execute_twitter_job, "interval", seconds=AIBTC_TWITTER_INTERVAL_SECONDS
+    )
+    logger.info(
+        f"Twitter service started with interval of {AIBTC_TWITTER_INTERVAL_SECONDS} seconds"
+    )
 else:
-    logger.info("Cron scheduler is disabled")
+    logger.info("Twitter service disabled")
+
+if AIBTC_SCHEDULE_SYNC_ENABLED:
+    scheduler.add_job(
+        sync_schedules,
+        "interval",
+        args=[scheduler],
+        seconds=AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS,
+    )
+    logger.info(
+        f"Schedule sync service started with interval of {AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS} seconds"
+    )
+else:
+    logger.info("Schedule sync service is disabled")
+
+if AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED:
+    logger.info("Starting scheduler")
+    scheduler.start()
+    logger.info("Scheduler started")
+else:
+    logger.info("Scheduler is disabled")
 
 app = FastAPI()
 
@@ -35,8 +62,9 @@ app = FastAPI()
 cors_origins = [
     "https://sprint.aibtc.dev",
     "https://sprint-faster.aibtc.dev",
-    "https://*.aibtcdev-frontend.pages.dev", # Cloudflare preview deployments
+    "https://*.aibtcdev-frontend.pages.dev",  # Cloudflare preview deployments
     "http://localhost:3000",  # Local development
+    "https://staging.aibtc.chat",
 ]
 
 # Setup middleware to allow CORS
@@ -81,6 +109,5 @@ async def health():
     return {"status": "healthy"}
 
 
-app.include_router(crew.router)
+app.include_router(tools.router)
 app.include_router(chat.router)
-app.include_router(metrics.router)
