@@ -33,6 +33,9 @@ class TwitterMentionHandler:
         )
         self.user_id = os.getenv("AIBTC_TWITTER_AUTOMATED_USER_ID")
         self.whitelisted_authors = os.getenv("AIBTC_TWITTER_WHITELISTED", "").split(",")
+        self.whitelist_enabled = bool(
+            os.getenv("AIBTC_TWITTER_WHITELIST_ENABLED", "true")
+        )
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention and generate response if needed."""
@@ -60,15 +63,19 @@ class TwitterMentionHandler:
         }
 
         try:
-            if self._is_author_whitelisted(author_id):
-                logger.info(
-                    f"Processing whitelisted mention {tweet_id} from user {author_id}"
-                )
-                await self._generate_and_post_response(tweet_data)
+            if self.whitelist_enabled:
+                if self._is_author_whitelisted(author_id):
+                    logger.info(
+                        f"Processing whitelisted mention {tweet_id} from user {author_id}"
+                    )
+                    await self._generate_and_post_response(tweet_data)
+                else:
+                    logger.debug(
+                        f"Skipping non-whitelisted mention {tweet_id} from user {author_id}"
+                    )
             else:
-                logger.debug(
-                    f"Skipping non-whitelisted mention {tweet_id} from user {author_id}"
-                )
+                logger.info(f"Processing mention {tweet_id} from user {author_id}")
+                await self._generate_and_post_response(tweet_data)
         finally:
             authors = backend.list_x_users(filters=XUserFilter(user_id=author_id))
             if authors and len(authors) > 0:
