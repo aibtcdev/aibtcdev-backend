@@ -58,6 +58,7 @@ from lib.logger import configure_logger
 from pydantic import BaseModel, create_model
 from typing import Any, Callable, Dict, List, Optional, Type
 
+
 logger = configure_logger(__name__)
 
 
