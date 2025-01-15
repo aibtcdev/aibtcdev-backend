@@ -104,11 +104,8 @@ class GetDAOListSchema(BaseModel):
 class GetDAOListTool(BaseTool):
     name: str = "dao_list"
     description: str = (
-        "This tool is used to get/list all the daos and DAOS with their extensions and tokens. "
-        "It returns a dictionary with three keys: 'daos', 'extensions', and 'tokens'. "
-        "'daos' contains the list of daos and their details, "
-        "'extensions' contains the list of extensions and their details, "
-        "and 'tokens' contains the list of tokens and their details."
+        "This tool is used to get/list all the daos and DAOS with their single token and DEX extension. "
+        "It returns a structured response containing DAOs, each with its associated token and DEX extension. "
         "Example usage: 'show me all the daos' or 'list all the daos' or 'get all the daos'"
     )
     args_schema: Type[BaseModel] = GetDAOListSchema
@@ -123,7 +120,26 @@ class GetDAOListTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to list dao tasks."""
         try:
-            return backend.list_daos()
+            # Get all DAOs
+            daos = backend.list_daos()
+            dao_data = []
+
+            for dao in daos:
+                # Get the single token for this DAO
+                tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
+                token = tokens[0] if tokens else None
+
+                # Get the single DEX extension for this DAO
+                extensions = backend.list_extensions(
+                    filters=ExtensionFilter(dao_id=dao.id)
+                )
+                dex = next((ext for ext in extensions if ext.type == "dex"), None)
+
+                # Combine data for this DAO
+                dao_info = {"dao": dao, "token": token, "dex": dex}
+                dao_data.append(dao_info)
+
+            return {"dao_data": dao_data}
         except Exception as e:
             return {"error": str(e)}
 
