@@ -528,7 +528,7 @@ class BuyTokenTool(DaoBaseTool):
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
-            "extensions/buy-token.ts",
+            "buy-token.ts",
             dex_contract,
             token_contract,
             stx_amount,
