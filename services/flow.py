@@ -375,7 +375,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 9. IMPORTANT: Your response MUST be 220 characters or less to leave room for the URL
                 10. DO NOT include the URL in your response - it will be automatically appended
 
-                Note: The URL https://app.aibtc.dev/ will be automatically added to the end of your tweet.
+                Note: The URL https://aibtc.dev/daos will be automatically added to the end of your tweet.
                 Ensure your response is no more than 220 characters to leave room for this.
             """
             ),
@@ -387,7 +387,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 - Don't Congrats to @prompt2dao in the tweet
                 - Response must leave exactly 40 characters for the URL
                 
-                The URL https://app.aibtc.dev/ will be added automatically after your response.
+                The URL https://aibtc.dev/daos will be added automatically after your response.
                 DO NOT include the URL in your response.
             """
             ),
@@ -404,7 +404,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         # Ensure URL is added to the response
         if result and result.pydantic and result.pydantic.response:
             result.pydantic.response = (
-                f"{result.pydantic.response.strip()} https://app.aibtc.dev/"
+                f"{result.pydantic.response.strip()} https://aibtc.dev/daos"
             )
 
         self.state.response = result.pydantic if result else None
