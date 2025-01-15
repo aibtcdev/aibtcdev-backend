@@ -3,6 +3,7 @@ import os
 import sys
 from .langgraph import extract_filtered_content
 from .twitter import TwitterService
+from backend.factory import backend
 from backend.models import Profile
 from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
@@ -153,6 +154,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
     @start()
     def analyze_tweet(self):
         logger.info("Starting tweet analysis")
+        tokens = backend.list_tokens()
+        token_symbols = [token.symbol for token in tokens]
         analysis_task = Task(
             name="tweet_analysis",
             description=dedent(
@@ -168,6 +171,10 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 
                 Current Tweet:
                 {self.state.tweet_text}
+
+                Make sure the dao symbol is not already taken. If it is then generate a new symbol.
+                Current DAOs:
+                {token_symbols}
                 
                 If the text is determined to be a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
 
