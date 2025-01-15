@@ -61,6 +61,19 @@ class TwitterMentionHandler:
             "conversation_id": conversation_id,
         }
 
+        try:
+            existing_conversations = backend.list_x_tweets(
+                filters=XTweetFilter(conversation_id=conversation_id)
+            )
+            if existing_conversations and len(existing_conversations) > 0:
+                logger.info(
+                    f"Skipping already processed conversation {conversation_id}"
+                )
+                return
+        except Exception as e:
+            logger.error(
+                f"Error checking conversation {conversation_id} in database: {str(e)}"
+            )
         # Store tweet and author data
         authors = backend.list_x_users(filters=XUserFilter(user_id=author_id))
         if authors and len(authors) > 0:
@@ -86,20 +99,6 @@ class TwitterMentionHandler:
                     message=text,
                     conversation_id=conversation_id,
                 )
-            )
-
-        try:
-            existing_conversations = backend.list_x_tweets(
-                filters=XTweetFilter(conversation_id=conversation_id)
-            )
-            if existing_conversations and len(existing_conversations) > 0:
-                logger.info(
-                    f"Skipping already processed conversation {conversation_id}"
-                )
-                return
-        except Exception as e:
-            logger.error(
-                f"Error checking conversation {conversation_id} in database: {str(e)}"
             )
 
         try:
