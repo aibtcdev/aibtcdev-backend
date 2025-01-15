@@ -1,6 +1,4 @@
-import logging
 import os
-import sys
 from .langgraph import extract_filtered_content
 from .twitter import TwitterService
 from backend.factory import backend

@@ -297,6 +297,9 @@ def convert_langchain_to_crewai(langchain_tool: LangChainBaseTool) -> CrewAIBase
             "func",
             "run",
             "arun",
+            "model_computed_fields",  # Exclude Pydantic internal field
+            "model_config",  # Exclude Pydantic internal field
+            "model_fields",  # Exclude Pydantic internal field
         ):
             value = getattr(langchain_tool, attr)
             if not callable(value):
