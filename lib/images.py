@@ -46,7 +46,7 @@ def generate_token_image(name: str, symbol: str, description: str) -> bytes:
     Raises:
         ImageGenerationError: If image generation fails
     """
-    prompt = f"Create a bold, circular icon for the {name} token, featuring the symbol {symbol} clearly. Use a modern crypto style with minimal details—no busy text. Ensure high contrast and a clean design so it is easy to recognize at small sizes (like a Twitter profile pic)."
+    prompt = f"Draw from iconic, yet not overplayed references (Bauhaus geometry, Swiss minimalism, NASA mission patches, mid-century graphics, Apples refined approach, and subtle 80s neon). Synthesize or pick styles based on {description} to create a bold, circular icon for {name}, featuring {symbol}. Keep it minimal, high-contrast, and recognizable at small sizes. Avoid clutter, extraneous text, or clichés. Aim for a universal, timeless, visually striking design."
     try:
         image_url = generate_image(prompt)
         if not image_url:
