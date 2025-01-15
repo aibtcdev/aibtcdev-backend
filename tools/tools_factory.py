@@ -2,6 +2,30 @@ import inspect
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
+from .dao import (
+    ActionConcludeProposalTool,
+    ActionGetLinkedVotingContractsTool,
+    ActionGetProposalTool,
+    ActionGetTotalProposalsTool,
+    ActionGetTotalVotesTool,
+    ActionGetVotingPowerTool,
+    ActionVoteOnProposalTool,
+    BuyTokenTool,
+    CoreConcludeProposalTool,
+    CoreCreateProposalTool,
+    CoreGetLinkedVotingContractsTool,
+    CoreGetProposalTool,
+    CoreGetTotalVotesTool,
+    CoreGetVotingPowerTool,
+    CoreVoteOnProposalTool,
+    ProposeActionAddResourceTool,
+    ProposeActionAllowAssetTool,
+    ProposeActionSendMessageTool,
+    ProposeActionSetAccountHolderTool,
+    ProposeActionSetWithdrawalAmountTool,
+    ProposeActionSetWithdrawalPeriodTool,
+    ProposeActionToggleResourceTool,
+)
 from .daos import ContractDAODeployTool
 from .db import (
     AddScheduledTaskTool,
@@ -57,7 +81,6 @@ from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
 from pydantic import BaseModel, create_model
 from typing import Any, Callable, Dict, List, Optional, Type
-
 
 logger = configure_logger(__name__)
 
@@ -148,6 +171,41 @@ def initialize_tools(
         # "stxcity_check_valid_bonding": StxCityCheckValidBondingTool(wallet_id),
         # "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
         "twitter_post_tweet": TwitterPostTweetTool(profile.id, agent_id),
+        "dao_core_get_linked_voting_contracts": CoreGetLinkedVotingContractsTool(
+            wallet_id
+        ),
+        "dao_core_create_proposal": CoreCreateProposalTool(wallet_id),
+        "dao_core_get_proposal": CoreGetProposalTool(wallet_id),
+        "dao_core_get_total_votes": CoreGetTotalVotesTool(wallet_id),
+        "dao_core_get_voting_power": CoreGetVotingPowerTool(wallet_id),
+        "dao_core_vote_on_proposal": CoreVoteOnProposalTool(wallet_id),
+        "dao_core_conclude_proposal": CoreConcludeProposalTool(wallet_id),
+        "dao_action_get_linked_voting_contracts": ActionGetLinkedVotingContractsTool(
+            wallet_id
+        ),
+        "dao_action_get_proposal": ActionGetProposalTool(wallet_id),
+        "dao_action_get_total_votes": ActionGetTotalVotesTool(wallet_id),
+        "dao_action_get_voting_power": ActionGetVotingPowerTool(wallet_id),
+        "dao_action_vote_on_proposal": ActionVoteOnProposalTool(wallet_id),
+        "dao_action_conclude_proposal": ActionConcludeProposalTool(wallet_id),
+        "dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
+        "dao_buy_token": BuyTokenTool(wallet_id),
+        # DAO Propose Action Tools
+        "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
+        "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
+        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
+        "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(
+            wallet_id
+        ),
+        "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
+            wallet_id
+        ),
+        "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
+            wallet_id
+        ),
+        "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
+            wallet_id
+        ),
     }
 
     if crewai:

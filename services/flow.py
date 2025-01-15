@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from .langgraph import extract_filtered_content
 from .twitter import TwitterService
@@ -7,13 +8,12 @@ from crewai import Agent, Task
 from crewai.flow.flow import Flow, listen, router, start
 from datetime import datetime
 from enum import Enum
+from lib.logger import configure_logger
 from pydantic import BaseModel
 from textwrap import dedent
 from tools.tools_factory import filter_crewai_tools_by_names, initialize_tools
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from uuid import UUID
-from lib.logger import configure_logger
-import os
 
 # Configure logging with console handler
 logger = configure_logger(__name__)
@@ -67,7 +67,6 @@ class TweetAnalysisState(BaseModel):
     tool_result: str = None
     response: TweetResponseOutput = None
     tool_success: bool = False
-    has_feedback: bool = False
 
 
 class TweetProcessingFlow(Flow[TweetAnalysisState]):
@@ -169,6 +168,10 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 
                 Current Tweet:
                 {self.state.tweet_text}
+                
+                If the text is determined to be a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
+
+               Exclude tweets that are purely promotional and lack actionable parameters. If the tweet includes both praise and actionable details describing deploying a DAO, proceed with DAO deployment
 
                 Only craft the parameters for the tool contract_dao_deploy.
 
@@ -184,6 +187,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 We’ll help refine ideas, but their worth depends on substance and alignment with basic principles.
 
                 Provide confidence score and detailed reasoning.
+
+                Hashtags are not allowed in the response.
             """
             ),
             expected_output=dedent(
@@ -372,9 +377,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 A well-crafted tweet response with:
                 - Main message (≤220 chars, URL will be added automatically)
                 - Appropriate tone
-                - Relevant hashtags
-                - Necessary mentions
-                - Don't Congrats to @aibtcdevagent in the tweet
+                - Don't Congrats to @prompt2dao in the tweet
                 - Response must leave exactly 40 characters for the URL
                 
                 The URL https://app.aibtc.dev/ will be added automatically after your response.
@@ -403,68 +406,6 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
     @listen("skip")
     def handle_skip(self):
         logger.info(f"Skipping tweet. Type: {self.state.tweet_type}")
-        if not self.state.is_worthy:
-            feedback_task = Task(
-                name="feedback_generation",
-                description=dedent(
-                    f"""
-                    Your name is {self.account_name} on twitter.
-                    
-                    Generate constructive feedback for an unworthy tweet:
-                    
-                    
-                    Tweet:
-                    {self.state.tweet_text}
-
-                    "You are receiving this because your DAO creation request was missing key information, such as a description, mission, name, and symbol. While providing a name is a great start, we’ll need a bit more detail to proceed."
-                    
-                    Requirements:
-                    1. Be constructive and encouraging
-                    2. Explain what information would make the proposal better
-                    3. Maximum 200 characters
-                    4. Maintain professional yet friendly tone
-                    5. Include relevant hashtags
-                    6. Use appropriate mentions
-
-                    7. Gently Incomplete:
-                        "Appreciate it! What does this DAO aim to accomplish?"
-
-                    8. Need More Details:
-                        "Looking good! Add goals, token use, and target community."
-
-                    9. Mission Missing:
-                        "Great start! Let’s clarify the purpose before deployment."
-
-                    10. Add Some Flavor:
-                        "Love it! What’s the unique twist to grab attention?"
-
-                    11. One-Liner to Next Level:
-                        "Almost there! Add more vision or strategy for impact."
-                    
-                    """
-                ),
-                expected_output=dedent(
-                    """
-                    A constructive feedback response with:
-                    - Main message (≤200 chars)
-                    - Appropriate tone
-                    - Relevant hashtags
-                    - Necessary mentions
-                    """
-                ),
-                agent=self.response_agent,
-                output_pydantic=TweetResponseOutput,
-            )
-
-            logger.info("Generating feedback for unworthy tweet")
-            result = feedback_task.execute_sync()
-            if result and result.pydantic:
-                self.state.response = result.pydantic
-                self.state.has_feedback = True
-                logger.info("Feedback generated successfully")
-            else:
-                logger.warning("Failed to generate feedback")
-
         return "complete"
 
     async def kickoff_async(self) -> Dict[str, Any]:
@@ -473,7 +414,6 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         result = {
             "tool_result": self.state.tool_result,
             "response": self.state.response.dict() if self.state.response else None,
-            "has_feedback": self.state.has_feedback,
         }
         logger.info(f"Kickoff result: {result}")
         return result
@@ -506,8 +446,8 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
             result = await self.kickoff_async()
             logger.info(f"Flow execution completed. Result: {result}")
 
-            if not self.state.is_worthy and not self.state.has_feedback:
-                logger.info("Tweet not worthy of processing and no feedback generated")
+            if not self.state.is_worthy:
+                logger.info("Tweet not worthy of processing")
                 yield {
                     "type": "result",
                     "reason": "Tweet not worthy of processing",
@@ -580,8 +520,8 @@ async def execute_twitter_stream(
         result = await flow.kickoff_async()
         logger.info(f"Flow execution completed. Result: {result}")
 
-        if not flow.state.is_worthy and not flow.state.has_feedback:
-            logger.info("Tweet not worthy of processing and no feedback generated")
+        if not flow.state.is_worthy:
+            logger.info("Tweet not worthy of processing")
             yield {
                 "type": "result",
                 "reason": "Tweet not worthy of processing",
