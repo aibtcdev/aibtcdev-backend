@@ -372,7 +372,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 6. Use appropriate mentions
                 7. REQUIRED: Include 2-3 relevant emojis to make the response engaging and friendly
                 8. IMPORTANT: Your response MUST be 200 characters or less to leave room for the URL
-                9. Include the URL in your response example https://aibtc.dev/daos/DAO-UUID-GOES-HERE
+                9. Include the URL in your response example https://aibtc.dev/daos
 
                 Ensure your response is no more than 260 characters.
             """
@@ -384,7 +384,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 - Appropriate tone
                 - No hashtags
                 - Don't Congrats to @prompt2dao in the tweet
-                - Include the URL in your response at the end example https://aibtc.dev/daos/DAO-UUID-GOES-HERE
+                - Include the URL in your response at the end example https://aibtc.dev/daos
             """
             ),
             agent=self.response_agent,
