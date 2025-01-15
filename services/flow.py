@@ -364,31 +364,27 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Make a post like congrats to the user for the dao deployment.
                 
                 Requirements:
-                1. Maximum 220 characters (leave 40 chars for URL)
+                1. Maximum 260 characters
                 2. Include: Name, Token Amount, Symbol, and Description
                 3. Maintain professional yet engaging tone thats witty
-                4. Include relevant hashtags
-                5. Reference tool execution results if applicable
-                6. Avoid financial advice
-                7. Use appropriate mentions
-                8. REQUIRED: Include 2-3 relevant emojis to make the response engaging and friendly
-                9. IMPORTANT: Your response MUST be 220 characters or less to leave room for the URL
-                10. DO NOT include the URL in your response - it will be automatically appended
+                4. Reference tool execution results if applicable
+                5. Avoid financial advice
+                6. Use appropriate mentions
+                7. REQUIRED: Include 2-3 relevant emojis to make the response engaging and friendly
+                8. IMPORTANT: Your response MUST be 200 characters or less to leave room for the URL
+                9. Include the URL in your response example https://aibtc.dev/daos/DAO-UUID-GOES-HERE
 
-                Note: The URL https://aibtc.dev/daos will be automatically added to the end of your tweet.
-                Ensure your response is no more than 220 characters to leave room for this.
+                Ensure your response is no more than 260 characters.
             """
             ),
             expected_output=dedent(
                 """
                 A well-crafted tweet response with:
-                - Main message (≤220 chars, URL will be added automatically)
+                - Main message (≤260 chars)
                 - Appropriate tone
+                - No hashtags
                 - Don't Congrats to @prompt2dao in the tweet
-                - Response must leave exactly 40 characters for the URL
-                
-                The URL https://aibtc.dev/daos will be added automatically after your response.
-                DO NOT include the URL in your response.
+                - Include the URL in your response at the end example https://aibtc.dev/daos/DAO-UUID-GOES-HERE
             """
             ),
             agent=self.response_agent,
@@ -400,12 +396,6 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
         logger.info(
             f"Response generation result: {result.pydantic if result else 'None'}"
         )
-
-        # Ensure URL is added to the response
-        if result and result.pydantic and result.pydantic.response:
-            result.pydantic.response = (
-                f"{result.pydantic.response.strip()} https://aibtc.dev/daos"
-            )
 
         self.state.response = result.pydantic if result else None
         return "complete"

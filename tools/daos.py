@@ -204,6 +204,8 @@ class ContractDAODeployTool(BaseTool):
                 logger.debug("Deployment completed successfully")
                 return {
                     "output": result["output"],
+                    "dao_id": dao_record.id,
+                    "image_url": token_record.image_url,
                     "error": None,
                     "success": True,
                 }
