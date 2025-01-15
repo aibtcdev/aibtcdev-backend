@@ -48,8 +48,9 @@ class TwitterMentionHandler:
                 filters=XTweetFilter(tweet_id=tweet_id)
             )
             if existing_tweets and len(existing_tweets) > 0:
-                logger.debug(f"Skipping already processed tweet {tweet_id}")
+                logger.info(f"Skipping already processed tweet {tweet_id}")
                 return
+
         except Exception as e:
             logger.error(f"Error checking tweet {tweet_id} in database: {str(e)}")
 
@@ -60,6 +61,47 @@ class TwitterMentionHandler:
             "conversation_id": conversation_id,
         }
 
+        # Store tweet and author data
+        authors = backend.list_x_users(filters=XUserFilter(user_id=author_id))
+        if authors and len(authors) > 0:
+            author = authors[0]
+            backend.create_x_tweet(
+                XTweetCreate(
+                    author_id=author.id,
+                    tweet_id=tweet_id,
+                    message=text,
+                    conversation_id=conversation_id,
+                )
+            )
+        else:
+            author = backend.create_x_user(
+                XUserCreate(
+                    user_id=author_id,
+                )
+            )
+            backend.create_x_tweet(
+                XTweetCreate(
+                    author_id=author.id,
+                    tweet_id=tweet_id,
+                    message=text,
+                    conversation_id=conversation_id,
+                )
+            )
+
+        try:
+            existing_conversations = backend.list_x_tweets(
+                filters=XTweetFilter(conversation_id=conversation_id)
+            )
+            if existing_conversations and len(existing_conversations) > 0:
+                logger.info(
+                    f"Skipping already processed conversation {conversation_id}"
+                )
+                return
+        except Exception as e:
+            logger.error(
+                f"Error checking conversation {conversation_id} in database: {str(e)}"
+            )
+
         try:
             if self.whitelist_enabled:
                 if self._is_author_whitelisted(author_id):
@@ -68,42 +110,19 @@ class TwitterMentionHandler:
                     )
                     await self._generate_and_post_response(tweet_data)
                 else:
-                    logger.debug(
+                    logger.info(
                         f"Skipping non-whitelisted mention {tweet_id} from user {author_id}"
                     )
             else:
                 logger.info(f"Processing mention {tweet_id} from user {author_id}")
                 await self._generate_and_post_response(tweet_data)
-        finally:
-            authors = backend.list_x_users(filters=XUserFilter(user_id=author_id))
-            if authors and len(authors) > 0:
-                author = authors[0]
-                backend.create_x_tweet(
-                    XTweetCreate(
-                        author_id=author.id,
-                        tweet_id=tweet_id,
-                        message=text,
-                        conversation_id=conversation_id,
-                    )
-                )
-            else:
-                author = backend.create_x_user(
-                    XUserCreate(
-                        user_id=author_id,
-                    )
-                )
-                backend.create_x_tweet(
-                    XTweetCreate(
-                        author_id=author.id,
-                        tweet_id=tweet_id,
-                        message=text,
-                        conversation_id=conversation_id,
-                    )
-                )
+        except Exception as e:
+            logger.error(f"Error processing mention response: {str(e)}")
+            raise
 
     def _is_author_whitelisted(self, author_id: str) -> bool:
         """Check if the author is in the whitelist."""
-        logger.debug(
+        logger.info(
             f"Checking author {author_id} against whitelist {self.whitelisted_authors}"
         )
         return str(author_id) in self.whitelisted_authors
@@ -141,8 +160,8 @@ class TwitterMentionHandler:
         logger.info(
             f"Processing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}"
         )
-        logger.debug(f"Tweet text: {tweet_data['text']}")
-        logger.debug(f"Conversation history: {len(history)} messages")
+        logger.info(f"Tweet text: {tweet_data['text']}")
+        logger.info(f"Conversation history: {len(history)} messages")
 
         response_content = None
         async for response in execute_twitter_stream(
@@ -157,9 +176,9 @@ class TwitterMentionHandler:
                 elif response.get("reason"):
                     logger.info(f"No response generated. Reason: {response['reason']}")
             elif response["type"] == "step":
-                logger.debug(f"Step: {response['content']}")
+                logger.info(f"Step: {response['content']}")
                 if response["result"]:
-                    logger.debug(f"Result: {response['result']}")
+                    logger.info(f"Result: {response['result']}")
 
         return response_content
 
@@ -188,7 +207,7 @@ class TwitterMentionHandler:
             await self.twitter_service._ainitialize()
             mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)
             if not mentions:
-                logger.debug("No mentions found")
+                logger.info("No mentions found")
                 return
 
             for mention in mentions:
