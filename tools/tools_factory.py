@@ -10,6 +10,7 @@ from .dao import (
     ActionGetTotalVotesTool,
     ActionGetVotingPowerTool,
     ActionVoteOnProposalTool,
+    BuyTokenTool,
     CoreConcludeProposalTool,
     CoreCreateProposalTool,
     CoreGetLinkedVotingContractsTool,
@@ -181,6 +182,7 @@ def initialize_tools(
         "dao_action_vote_on_proposal": ActionVoteOnProposalTool(wallet_id),
         "dao_action_conclude_proposal": ActionConcludeProposalTool(wallet_id),
         "dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
+        "dao_buy_token": BuyTokenTool(wallet_id),
     }
 
     if crewai:

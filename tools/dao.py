@@ -16,6 +16,8 @@ class DaoBaseTool(BaseTool):
 class DAOBaseInput(BaseModel):
     """Base input schema for DAO tools."""
 
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
 
 class CoreContractInput(DAOBaseInput):
     """Input schema for core proposal contract-related tools."""
@@ -60,6 +62,18 @@ class ActionVoteInput(ActionProposalInput):
     for_vote: bool = Field(
         ..., description="True for voting in favor, False for voting against"
     )
+
+
+class BuyTokenInput(DAOBaseInput):
+    """Input schema for buying tokens from the DEX."""
+
+    dex_contract: str = Field(
+        ..., description="The DEX contract address and name (e.g. ST1234.token-dex)"
+    )
+    token_contract: str = Field(
+        ..., description="The token contract address and name (e.g. ST1234.token)"
+    )
+    stx_amount: str = Field(..., description="Amount of STX to spend on tokens")
 
 
 # Core Proposal Tools
@@ -499,3 +513,35 @@ class ActionGetTotalProposalsTool(DaoBaseTool):
     async def _arun(self, action_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(action_proposals_contract, **kwargs)
+
+
+class BuyTokenTool(DaoBaseTool):
+    name: str = "dao_buy_token"
+    description: str = "Buy tokens from the bonding curve DEX"
+    args_schema: Type[BaseModel] = BuyTokenInput
+    return_direct: bool = False
+
+    def _deploy(
+        self, dex_contract: str, token_contract: str, stx_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to buy tokens."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/buy-token.ts",
+            dex_contract,
+            token_contract,
+            stx_amount,
+        )
+
+    def _run(
+        self, dex_contract: str, token_contract: str, stx_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to buy tokens."""
+        return self._deploy(dex_contract, token_contract, stx_amount, **kwargs)
+
+    async def _arun(
+        self, dex_contract: str, token_contract: str, stx_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(dex_contract, token_contract, stx_amount, **kwargs)
