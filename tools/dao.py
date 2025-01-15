@@ -545,3 +545,306 @@ class BuyTokenTool(DaoBaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(dex_contract, token_contract, stx_amount, **kwargs)
+
+
+class ProposeActionBaseInput(DAOBaseInput):
+    """Base input schema for propose action tools."""
+
+    action_proposals_contract: str = Field(
+        ...,
+        description="The action proposals contract address and name (e.g. ST1234.wed-action-proposals)",
+    )
+    action_proposal_contract: str = Field(
+        ...,
+        description="The action proposal contract address (e.g. ST1234.wed-action-add-resource)",
+    )
+
+
+class ProposeActionAddResourceInput(ProposeActionBaseInput):
+    """Input schema for proposing to add a resource."""
+
+    resource_name: str = Field(..., description="Name of the resource to add")
+    resource_description: str = Field(..., description="Description of the resource")
+    resource_price: int = Field(..., description="Price of the resource in microSTX")
+    resource_url: Optional[str] = Field(
+        None, description="Optional URL for the resource"
+    )
+
+
+class ProposeActionAllowAssetInput(ProposeActionBaseInput):
+    """Input schema for proposing to allow an asset."""
+
+    token_contract: str = Field(
+        ...,
+        description="The token contract address to allow (e.g. ST1234.shiny-new-token)",
+    )
+
+
+class ProposeActionSendMessageInput(ProposeActionBaseInput):
+    """Input schema for proposing to send a message."""
+
+    message: str = Field(..., description="The message to send")
+
+
+class ProposeActionSetAccountHolderInput(ProposeActionBaseInput):
+    """Input schema for proposing to set an account holder."""
+
+    account_holder: str = Field(
+        ..., description="The new account holder address (e.g. ST1234...)"
+    )
+
+
+class ProposeActionSetWithdrawalAmountInput(ProposeActionBaseInput):
+    """Input schema for proposing to set a withdrawal amount."""
+
+    withdrawal_amount: int = Field(
+        ..., description="The new withdrawal amount in microSTX"
+    )
+
+
+class ProposeActionSetWithdrawalPeriodInput(ProposeActionBaseInput):
+    """Input schema for proposing to set a withdrawal period."""
+
+    withdrawal_period: int = Field(
+        ..., description="The new withdrawal period in blocks"
+    )
+
+
+class ProposeActionToggleResourceInput(ProposeActionBaseInput):
+    """Input schema for proposing to toggle a resource."""
+
+    resource_name: str = Field(..., description="Name of the resource to toggle")
+
+
+class ProposeActionAddResourceTool(DaoBaseTool):
+    name: str = "dao_propose_action_add_resource"
+    description: str = "Propose adding a new resource to the DAO"
+    args_schema: Type[BaseModel] = ProposeActionAddResourceInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        resource_name: str,
+        resource_description: str,
+        resource_price: int,
+        resource_url: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose adding a resource."""
+        args = [
+            action_proposals_contract,
+            action_proposal_contract,
+            resource_name,
+            resource_description,
+            str(resource_price),
+        ]
+        if resource_url:
+            args.append(resource_url)
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-add-resource.ts",
+            *args
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose adding a resource."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionAllowAssetTool(DaoBaseTool):
+    name: str = "dao_propose_action_allow_asset"
+    description: str = "Propose allowing a new asset in the DAO"
+    args_schema: Type[BaseModel] = ProposeActionAllowAssetInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        token_contract: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose allowing an asset."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-allow-asset.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            token_contract,
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose allowing an asset."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionSendMessageTool(DaoBaseTool):
+    name: str = "dao_propose_action_send_message"
+    description: str = "Propose sending a message through the DAO"
+    args_schema: Type[BaseModel] = ProposeActionSendMessageInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        message: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose sending a message."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-send-message.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            message,
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose sending a message."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionSetAccountHolderTool(DaoBaseTool):
+    name: str = "dao_propose_action_set_account_holder"
+    description: str = "Propose setting a new account holder in the DAO"
+    args_schema: Type[BaseModel] = ProposeActionSetAccountHolderInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        account_holder: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting an account holder."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-set-account-holder.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            account_holder,
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose setting an account holder."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionSetWithdrawalAmountTool(DaoBaseTool):
+    name: str = "dao_propose_action_set_withdrawal_amount"
+    description: str = "Propose setting a new withdrawal amount in the DAO"
+    args_schema: Type[BaseModel] = ProposeActionSetWithdrawalAmountInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        withdrawal_amount: int,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a withdrawal amount."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-set-withdrawal-amount.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            str(withdrawal_amount),
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose setting a withdrawal amount."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionSetWithdrawalPeriodTool(DaoBaseTool):
+    name: str = "dao_propose_action_set_withdrawal_period"
+    description: str = "Propose setting a new withdrawal period in the DAO"
+    args_schema: Type[BaseModel] = ProposeActionSetWithdrawalPeriodInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        withdrawal_period: int,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a withdrawal period."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-set-withdrawal-period.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            str(withdrawal_period),
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose setting a withdrawal period."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
+
+
+class ProposeActionToggleResourceTool(DaoBaseTool):
+    name: str = "dao_propose_action_toggle_resource"
+    description: str = "Propose toggling a resource in the DAO"
+    args_schema: Type[BaseModel] = ProposeActionToggleResourceInput
+    return_direct: bool = False
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        resource_name: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose toggling a resource."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "extensions/action-proposals/propose-action-toggle-resource-by-name.ts",
+            action_proposals_contract,
+            action_proposal_contract,
+            resource_name,
+        )
+
+    def _run(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool to propose toggling a resource."""
+        return self._deploy(**kwargs)
+
+    async def _arun(self, **kwargs) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(**kwargs)
