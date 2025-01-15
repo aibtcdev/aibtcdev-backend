@@ -33,9 +33,7 @@ class TwitterMentionHandler:
         )
         self.user_id = os.getenv("AIBTC_TWITTER_AUTOMATED_USER_ID")
         self.whitelisted_authors = os.getenv("AIBTC_TWITTER_WHITELISTED", "").split(",")
-        self.whitelist_enabled = bool(
-            os.getenv("AIBTC_TWITTER_WHITELIST_ENABLED", "true")
-        )
+        self.whitelist_enabled = False
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention and generate response if needed."""
