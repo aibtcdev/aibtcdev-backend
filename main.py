@@ -66,6 +66,7 @@ cors_origins = [
     "http://localhost:3000",  # Local development
     "https://staging.aibtc.chat",
     "https://app.aibtc.dev",
+    "https://aibtc.dev",
     "https://app-staging.aibtc.dev",
 ]
 

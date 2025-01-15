@@ -130,6 +130,7 @@ class ContractDAODeployTool(BaseTool):
                 token_max_supply,
                 token_decimals,  # Keep as string for TypeScript
                 metadata_url,
+                mission,
             )
             logger.debug(f"Contract deployment result type: {type(result)}")
             logger.debug(f"Contract deployment result content: {result}")
