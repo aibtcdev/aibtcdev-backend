@@ -1,3 +1,4 @@
+import json
 from backend.factory import backend
 from dataclasses import dataclass
 from lib.images import generate_token_image
@@ -94,7 +95,7 @@ class TokenAssetManager:
 
         try:
             return backend.upload_file(
-                f"{self.token_id}.json", str(json_data).encode("utf-8")
+                f"{self.token_id}.json", json.dumps(json_data).encode("utf-8")
             )
         except Exception as e:
             raise StorageError(
