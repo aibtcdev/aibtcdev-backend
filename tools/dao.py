@@ -68,12 +68,17 @@ class BuyTokenInput(DAOBaseInput):
     """Input schema for buying tokens from the DEX."""
 
     dex_contract: str = Field(
-        ..., description="The DEX contract address and name (e.g. ST1234.token-dex)"
+        ...,
+        description="The DEX contract address and name (e.g. SP2XCME6ED8RERGR9R7YDZW7CA6G3F113Y8JMVA46.fresd-stxcity-dex)",
     )
     token_contract: str = Field(
-        ..., description="The token contract address and name (e.g. ST1234.token)"
+        ...,
+        description="The token contract address and name (e.g. SP2XCME6ED8RERGR9R7YDZW7CA6G3F113Y8JMVA46.fresd-stxcity)",
     )
-    stx_amount: str = Field(..., description="Amount of STX to spend on tokens")
+    stx_amount: str = Field(
+        ...,
+        description="Amount of STX to spend on tokens in microstacks (e.g. 1000000 which is 1 STX)",
+    )
 
 
 # Core Proposal Tools
@@ -88,7 +93,7 @@ class CoreGetLinkedVotingContractsTool(DaoBaseTool):
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
-            "extensions/core-proposals/get-linked-voting-contracts.ts",
+            "extensions/core-proposals/get-linked-voting-   contracts.ts",
             core_proposals_contract,
         )
 
@@ -545,6 +550,57 @@ class BuyTokenTool(DaoBaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(dex_contract, token_contract, stx_amount, **kwargs)
+
+
+class SellTokenInput(DAOBaseInput):
+    """Input schema for selling tokens to the bonding curve DEX."""
+
+    dex_contract: str = Field(
+        ...,
+        description="The DEX contract address and name (e.g. SP2XCME6ED8RERGR9R7YDZW7CA6G3F113Y8JMVA46.fresd-stxcity-dex)",
+    )
+    token_contract: str = Field(
+        ...,
+        description="The token contract address and name (e.g. SP2XCME6ED8RERGR9R7YDZW7CA6G3F113Y8JMVA46.fresd-stxcity)",
+    )
+    token_amount: str = Field(
+        ...,
+        description="Amount of tokens to sell (e.g. 1000000 which is 1 token)",
+    )
+
+
+class SellTokenTool(DaoBaseTool):
+    name: str = "dao_sell_token"
+    description: str = (
+        "Sell tokens to the bonding curve DEX (e.g. 1000000 which is 1 token)"
+    )
+    args_schema: Type[BaseModel] = SellTokenInput
+    return_direct: bool = False
+
+    def _deploy(
+        self, dex_contract: str, token_contract: str, token_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to sell tokens."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtcdev-dao",
+            "sell-token.ts",
+            dex_contract,
+            token_contract,
+            token_amount,
+        )
+
+    def _run(
+        self, dex_contract: str, token_contract: str, token_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Execute the tool to sell tokens."""
+        return self._deploy(dex_contract, token_contract, token_amount, **kwargs)
+
+    async def _arun(
+        self, dex_contract: str, token_contract: str, token_amount: str, **kwargs
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(dex_contract, token_contract, token_amount, **kwargs)
 
 
 class ProposeActionBaseInput(DAOBaseInput):

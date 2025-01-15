@@ -25,6 +25,7 @@ from .dao import (
     ProposeActionSetWithdrawalAmountTool,
     ProposeActionSetWithdrawalPeriodTool,
     ProposeActionToggleResourceTool,
+    SellTokenTool,
 )
 from .daos import ContractDAODeployTool
 from .db import (
@@ -136,8 +137,8 @@ def initialize_tools(
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
         "db_add_scheduled_task": AddScheduledTaskTool(profile.id, agent_id),
-        "db_list_daos_daos": GetDAOListTool(),
-        "db_get_dao_by_name": GetDAOByNameTool(),
+        "dao_list": GetDAOListTool(),
+        "dao_get_by_name": GetDAOByNameTool(),
         "db_list_scheduled_tasks": ListScheduledTasksTool(profile.id, agent_id),
         "db_update_scheduled_task": UpdateScheduledTaskTool(profile.id, agent_id),
         "db_delete_scheduled_task": DeleteScheduledTaskTool(profile.id, agent_id),
@@ -196,6 +197,7 @@ def initialize_tools(
         "dao_action_conclude_proposal": ActionConcludeProposalTool(wallet_id),
         "dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
         "dao_buy_token": BuyTokenTool(wallet_id),
+        "dao_sell_token": SellTokenTool(wallet_id),
         # DAO Propose Action Tools
         "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
         "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
@@ -297,6 +299,9 @@ def convert_langchain_to_crewai(langchain_tool: LangChainBaseTool) -> CrewAIBase
             "func",
             "run",
             "arun",
+            "model_computed_fields",  # Exclude Pydantic internal field
+            "model_config",  # Exclude Pydantic internal field
+            "model_fields",  # Exclude Pydantic internal field
         ):
             value = getattr(langchain_tool, attr)
             if not callable(value):

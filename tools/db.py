@@ -102,7 +102,7 @@ class GetDAOListSchema(BaseModel):
 
 
 class GetDAOListTool(BaseTool):
-    name: str = "db_list_daos"
+    name: str = "dao_list"
     description: str = (
         "This tool is used to get/list all the daos and DAOS with their extensions and tokens. "
         "It returns a dictionary with three keys: 'daos', 'extensions', and 'tokens'. "
@@ -147,16 +147,16 @@ class GetDAOByNameInput(BaseModel):
 
     name: str = Field(
         ...,
-        description="Name of the DAO to search for",
+        description="Name or partial name of the DAO to search for",
     )
 
 
 class GetDAOByNameTool(BaseTool):
-    name: str = "db_get_dao_by_name"
+    name: str = "dao_get_by_name"
     description: str = (
-        "This tool is used to get a specific DAO by searching for its name. "
-        "It returns the DAO details if found, or an error if not found. "
-        "Example usage: 'find the dao named bitcoin' or 'get details for ethereum dao'"
+        "This tool is used to search for DAOs by name, supporting partial matches. "
+        "It returns details for all DAOs that have similar names to the search term. "
+        "Example usage: 'find daos related to bitcoin' or 'search for eth daos'"
     )
     args_schema: Type[BaseModel] = GetDAOByNameInput
     return_direct: bool = False
@@ -169,21 +169,25 @@ class GetDAOByNameTool(BaseTool):
         name: str,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to get a specific DAO by name."""
+        """Execute the tool to search for DAOs by name."""
         try:
             daos = backend.list_daos()
-            # Search for the DAO case-insensitively
-            found_dao = next(
-                (dao for dao in daos if dao.name.lower() == name.lower()), None
-            )
-            if found_dao:
-                extensions = backend.list_extensions(
-                    filters=ExtensionFilter(dao_id=found_dao.id)
-                )
-                tokens = backend.list_tokens(filters=TokenFilter(dao_id=found_dao.id))
-                return {"dao": found_dao, "extensions": extensions, "tokens": tokens}
+            # Search for DAOs with names containing the search term (case-insensitive)
+            matching_daos = [dao for dao in daos if name.lower() in dao.name.lower()]
+
+            if matching_daos:
+                results = []
+                for dao in matching_daos:
+                    extensions = backend.list_extensions(
+                        filters=ExtensionFilter(dao_id=dao.id)
+                    )
+                    tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
+                    results.append(
+                        {"dao": dao, "extensions": extensions, "tokens": tokens}
+                    )
+                return {"matches": results}
             else:
-                return {"error": f"DAO with name '{name}' not found"}
+                return {"error": f"No DAOs found matching '{name}'"}
         except Exception as e:
             return {"error": str(e)}
 
