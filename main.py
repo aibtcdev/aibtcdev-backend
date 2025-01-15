@@ -65,6 +65,8 @@ cors_origins = [
     "https://*.aibtcdev-frontend.pages.dev",  # Cloudflare preview deployments
     "http://localhost:3000",  # Local development
     "https://staging.aibtc.chat",
+    "https://app.aibtc.dev",
+    "https://app-staging.aibtc.dev",
 ]
 
 # Setup middleware to allow CORS
