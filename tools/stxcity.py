@@ -90,49 +90,6 @@ class StxCityExecuteBuyTool(BaseTool):
         )
 
 
-class StxCityCheckValidBondingInput(BaseModel):
-    """Input schema for checking valid bonding contracts."""
-
-    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
-    token_contract_id: str = Field(..., description="Contract ID of the token")
-
-
-class StxCityCheckValidBondingTool(BaseTool):
-    name: str = "stxcity_check_valid_bonding"
-    description: str = "Check if a token contract has valid bonding curves on STXCity"
-    args_schema: Type[BaseModel] = StxCityCheckValidBondingInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self, dex_contract_id: str, token_contract_id: str, **kwargs
-    ) -> Dict[str, Any]:
-        """Execute the tool to check valid bonding."""
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "stacks-stxcity",
-            "check-valid-bonding.ts",
-            dex_contract_id,
-            token_contract_id,
-        )
-
-    def _run(
-        self, dex_contract_id: str, token_contract_id: str, **kwargs
-    ) -> Dict[str, Any]:
-        """Execute the tool to check valid bonding."""
-        return self._deploy(dex_contract_id, token_contract_id)
-
-    async def _arun(
-        self, dex_contract_id: str, token_contract_id: str, **kwargs
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(dex_contract_id, token_contract_id)
-
-
 class StxCityListBondingTokensTool(BaseTool):
     name: str = "stxcity_list_bonding_tokens"
     description: str = "Get a list of all available tokens for bonding on STXCity"
@@ -146,9 +103,7 @@ class StxCityListBondingTokensTool(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to list available bonding tokens."""
-        return BunScriptRunner.bun_run(
-            self.wallet_id, "stacks-stxcity", "list-bonding-tokens.ts"
-        )
+        return BunScriptRunner.bun_run(self.wallet_id, "stacks-stxcity", "exec-list.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to list available bonding tokens."""
@@ -197,7 +152,7 @@ class StxCitySearchTool(BaseTool):
         if token_contract:
             args.append(token_contract)
         return BunScriptRunner.bun_run(
-            self.wallet_id, "stacks-stxcity", "search.ts", *args
+            self.wallet_id, "stacks-stxcity", "exec-search.ts", *args
         )
 
     def _run(
