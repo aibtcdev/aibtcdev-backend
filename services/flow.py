@@ -169,21 +169,20 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 
                 Current Tweet:
                 {self.state.tweet_text}
-
-                Make sure the dao symbol is not already taken. If it is then generate a new symbol.
-                Current DAOs:
-                {token_symbols}
                 
                 If the text is determined to be a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
 
-               Exclude tweets that are purely promotional and lack actionable parameters. If the tweet includes both praise and actionable details describing deploying a DAO, proceed with DAO deployment
+                Exclude tweets that are purely promotional and lack actionable parameters. If the tweet includes both praise and actionable details describing deploying a DAO, proceed with DAO deployment
 
                 Only craft the parameters for the tool contract_dao_deploy.
 
-                Don't execute the tool contract_dao_deploy as your sole purpose is to generate the parameters for the tool.
                                 
                 Requirements:
-                1. Expand upon any missing details in the request for a dao to be deployed to meet the needs of the tool parameterss 
+                1. Expand upon any missing details in the request for a dao to be deployed to meet the needs of the tool parameters
+                2. If the tweet is a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
+                3. Dont execute the tool contract_dao_deploy as your sole purpose is to generate the parameters for the tool.
+                4. Make sure the DAO symbol is not already taken. Provided is a list of current DAO symbols. If it is already taken, make sure choose a new symbol for the parameters.
+                5. Only craft the parameters for the tool contract_dao_deploy if Worthiness determination is True.
                 
                 Worthiness criteria:
                 We welcome creativity—funny or edgy ideas are always welcome. 
@@ -194,6 +193,10 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Provide confidence score and detailed reasoning.
 
                 Hashtags are not allowed in the response.
+
+                Make sure the DAO symbol is not already taken. Provided is a list of current DAO symbols. If it is already taken, make sure choose a new symbol for the parameters.
+                Current DAO Symbols already taken:
+                {token_symbols}
             """
             ),
             expected_output=dedent(
