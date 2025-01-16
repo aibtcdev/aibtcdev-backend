@@ -74,7 +74,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
                     role="assistant",
                     tool=event["tool"],
                     tool_input=event["input"],
-                    tool_output=event["output"],
+                    tool_output=event["output"] if event["output"] else None,
                     profile_id=profile_id,
                 )
             )
