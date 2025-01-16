@@ -60,7 +60,6 @@ from .lunarcrush import (
     SearchLunarCrushTool,
 )
 from .stxcity import (
-    StxCityCheckValidBondingTool,
     StxCityExecuteBuyTool,
     StxCityExecuteSellTool,
     StxCityListBondingTokensTool,
@@ -175,7 +174,6 @@ def initialize_tools(
         "stxcity_search": StxCitySearchTool(wallet_id),
         "stxcity_execute_sell": StxCityExecuteSellTool(wallet_id),
         "stxcity_execute_buy": StxCityExecuteBuyTool(wallet_id),
-        "stxcity_check_valid_bonding": StxCityCheckValidBondingTool(wallet_id),
         "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
         "twitter_post_tweet": TwitterPostTweetTool(profile.id, agent_id),
         "dao_core_get_linked_voting_contracts": CoreGetLinkedVotingContractsTool(
