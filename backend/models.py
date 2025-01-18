@@ -116,7 +116,7 @@ class Agent(AgentBase):
 #
 class ExtensionBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
-    type: str
+    type: Optional[str] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     status: Optional[ContractStatus] = ContractStatus.DRAFT
@@ -135,7 +135,7 @@ class Extension(ExtensionBase):
 # DAOS
 #
 class DAOBase(CustomBaseModel):
-    name: str
+    name: Optional[str] = None
     mission: Optional[str] = None
     description: Optional[str] = None
     is_deployed: Optional[bool] = False
