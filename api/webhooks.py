@@ -72,17 +72,17 @@ async def chainhook(
         logger.debug(f"Received chainhook webhook: {data}")
         non_processed_extensions = backend.list_extensions(
             filters=ExtensionFilter(
-                status=ContractStatus.DRAFT,
+                status=ContractStatus.PENDING,
             )
         )
         non_processed_tokens = backend.list_tokens(
             filters=TokenFilter(
-                status=ContractStatus.DRAFT,
+                status=ContractStatus.PENDING,
             )
         )
         non_processed_proposals = backend.list_proposals(
             filters=ProposalFilter(
-                status=ContractStatus.DRAFT,
+                status=ContractStatus.PENDING,
             )
         )
         for apply in data.apply:
