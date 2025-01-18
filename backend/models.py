@@ -18,6 +18,9 @@ class ContractStatus(Enum):
     DEPLOYED = "DEPLOYED"
     FAILED = "FAILED"
 
+    def __str__(self):
+        return self.value
+
 
 #
 #  SECRETS

@@ -81,6 +81,7 @@ class ContractDAODeployTool(BaseTool):
             chainhook = platform.create_contract_deployment_hook(
                 deployer_address=wallet_address,
                 network=network,
+                expire_after_occurrence=19,
             )
             logger.debug(f"Created chainhook: {chainhook}")
 
