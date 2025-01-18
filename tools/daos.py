@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 from .bun import BunScriptRunner
 from backend.factory import backend
 from backend.models import UUID, ExtensionCreate, ProposalCreate, TokenBase
 from langchain.tools import BaseTool
+from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
@@ -66,6 +68,22 @@ class ContractDAODeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Core deployment logic used by both sync and async methods."""
         try:
+            ## get the address for the wallet based on network from os.getenv
+            network = os.getenv("NETWORK", "testnet")
+            wallet = backend.get_wallet(self.wallet_id)
+
+            if network == "mainnet":
+                wallet_address = wallet.mainnet_address
+            else:
+                wallet_address = wallet.testnet_address
+
+            platform = PlatformApi()
+            chainhook = platform.create_contract_deployment_hook(
+                deployer_address=wallet_address,
+                network=network,
+            )
+            logger.debug(f"Created chainhook: {chainhook}")
+
             logger.debug(
                 f"Starting deployment with token_symbol={token_symbol}, "
                 f"token_name={token_name}, token_description={token_description}, "
