@@ -2,7 +2,7 @@ import json
 import logging
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import UUID, ExtensionCreate, TokenBase
+from backend.models import UUID, ExtensionCreate, ProposalCreate, TokenBase
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from services.daos import (
@@ -166,6 +166,7 @@ class ContractDAODeployTool(BaseTool):
                 token_updates = TokenBase(
                     contract_principal=contracts["token"]["contractPrincipal"],
                     tx_id=contracts["token"]["transactionId"],
+                    status="PENDING",
                 )
                 logger.debug(f"Token updates: {token_updates}")
                 if not backend.update_token(token_record.id, token_updates):
@@ -179,7 +180,10 @@ class ContractDAODeployTool(BaseTool):
                 # Create extensions
                 logger.debug("Step 8: Creating extensions...")
                 for contract_name, contract_data in contracts.items():
-                    if contract_name != "token":
+                    if (
+                        contract_name != "token"
+                        and contract_name != "aibtc-base-bootstrap-initialization"
+                    ):
                         logger.debug(f"Creating extension for {contract_name}")
                         extension_result = backend.create_extension(
                             ExtensionCreate(
@@ -187,7 +191,7 @@ class ContractDAODeployTool(BaseTool):
                                 type=contract_name,
                                 contract_principal=contract_data["contractPrincipal"],
                                 tx_id=contract_data["transactionId"],
-                                status="deployed",
+                                status="PENDING",
                             )
                         )
                         if not extension_result:
@@ -199,6 +203,20 @@ class ContractDAODeployTool(BaseTool):
                             }
                         logger.debug(
                             f"Successfully created extension for {contract_name}"
+                        )
+                    if contract_name == "aibtc-base-bootstrap-initialization":
+                        logger.debug(
+                            f"Successfully created extension for {contract_name}"
+                        )
+                        proposal_result = backend.create_proposal(
+                            ProposalCreate(
+                                dao_id=dao_record.id,
+                                status="PENDING",
+                                tx_id=contract_data["transactionId"],
+                                contract_principal=contract_data["contractPrincipal"],
+                                title="Initialize DAO",
+                                description="Initialize the DAO",
+                            )
                         )
 
                 logger.debug("Deployment completed successfully")

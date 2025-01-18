@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from uuid import UUID
@@ -8,6 +9,14 @@ class CustomBaseModel(BaseModel):
     model_config = ConfigDict(
         json_encoders={UUID: str, datetime: lambda v: v.isoformat()}
     )
+
+
+# need to create status enum
+class ContractStatus(Enum):
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    DEPLOYED = "DEPLOYED"
+    FAILED = "FAILED"
 
 
 #
@@ -107,7 +116,7 @@ class ExtensionBase(CustomBaseModel):
     type: str
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    status: Optional[str] = "DRAFT"
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
 
 
 class ExtensionCreate(ExtensionBase):
@@ -126,6 +135,7 @@ class DAOBase(CustomBaseModel):
     name: str
     mission: Optional[str] = None
     description: Optional[str] = None
+    is_deployed: Optional[bool] = False
 
 
 class DAOCreate(DAOBase):
@@ -207,10 +217,9 @@ class ProposalBase(CustomBaseModel):
     code: Optional[str] = None
     link: Optional[str] = None
     monetary_ask: Optional[float] = None
-    status: Optional[str] = "DRAFT"
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    is_deployed: bool = False
 
 
 class ProposalCreate(ProposalBase):
@@ -306,6 +315,7 @@ class TokenBase(CustomBaseModel):
     x_url: Optional[str] = None
     telegram_url: Optional[str] = None
     website_url: Optional[str] = None
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
 
 
 class TokenCreate(TokenBase):
@@ -379,11 +389,12 @@ class AgentFilter(CustomBaseModel):
 class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[ContractStatus] = None
 
 
 class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
+    is_deployed: Optional[bool] = None
 
 
 class ThreadFilter(CustomBaseModel):
@@ -404,8 +415,7 @@ class ProfileFilter(CustomBaseModel):
 
 class ProposalFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
-    status: Optional[str] = None
-    is_deployed: Optional[bool] = None
+    status: Optional[ContractStatus] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -434,6 +444,7 @@ class TokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+    status: Optional[ContractStatus] = None
 
 
 class XCredsFilter(CustomBaseModel):

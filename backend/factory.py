@@ -4,7 +4,7 @@ from .supabase import SupabaseBackend
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 load_dotenv()
 
@@ -28,9 +28,13 @@ def get_backend() -> AbstractBackend:
         URL = os.getenv("AIBTC_SUPABASE_URL")
         SERVICE_KEY = os.getenv("AIBTC_SUPABASE_SERVICE_KEY")
         supabase: Client = create_client(URL, SERVICE_KEY)
+        supabase_queue: Client = create_client(
+            URL, SERVICE_KEY, ClientOptions(schema="pgmq_public")
+        )
 
         return SupabaseBackend(
             supabase,
+            supabase_queue,
             sqlalchemy_engine=engine,
             bucket_name=os.getenv("AIBTC_SUPABASE_BUCKET_NAME"),
         )

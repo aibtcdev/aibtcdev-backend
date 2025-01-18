@@ -78,6 +78,14 @@ class AbstractBackend(ABC):
     def upload_file(self, file_path: str, file: bytes) -> str:
         pass
 
+    @abstractmethod
+    def send_message(self, queue_name: str, message: dict) -> dict:
+        pass
+
+    @abstractmethod
+    def get_next_message(self, queue_name: str) -> dict:
+        pass
+
     # ----------- SECRETS -----------
     # @abstractmethod
     # def create_secret(self, new_secret: SecretBase) -> Secret:

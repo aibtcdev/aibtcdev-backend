@@ -88,6 +88,7 @@ def generate_token_dependencies(
             description=token_description,
             decimals=token_decimals,
             max_supply=token_max_supply,
+            status="DRAFT",
         )
         logger.debug(f"TokenCreate object: {token_create}")
 

@@ -1,6 +1,6 @@
 import logging
 import os
-from api import chat, tools
+from api import chat, tools, webhooks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -114,3 +114,4 @@ async def health():
 
 app.include_router(tools.router)
 app.include_router(chat.router)
+app.include_router(webhooks.router)

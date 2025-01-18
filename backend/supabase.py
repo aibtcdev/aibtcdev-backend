@@ -127,9 +127,12 @@ class SupabaseBackend(AbstractBackend):
     MAX_UPLOAD_RETRIES = 3
     RETRY_DELAY_SECONDS = 1
 
-    def __init__(self, client: Client, sqlalchemy_engine: Engine, **kwargs):
+    def __init__(
+        self, client: Client, queue: Client, sqlalchemy_engine: Engine, **kwargs
+    ):
         # super().__init__()  # If your AbstractDatabase has an __init__ to call
         self.client = client
+        self.queue = queue
         self.sqlalchemy_engine = sqlalchemy_engine
         self.bucket_name = kwargs.get("bucket_name")
         self.Session = sessionmaker(bind=self.sqlalchemy_engine)
@@ -192,6 +195,10 @@ class SupabaseBackend(AbstractBackend):
                 if not public_url:
                     raise Exception("Failed to generate public URL")
 
+                # Remove trailing '?' if there are no query parameters
+                if public_url.endswith("?"):
+                    public_url = public_url[:-1]
+
                 return public_url
 
             except Exception as e:
@@ -214,6 +221,16 @@ class SupabaseBackend(AbstractBackend):
         raise Exception(
             f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
         )
+
+    def send_message(self, queue_name: str, message: dict) -> dict:
+        return (
+            self.queue.rpc("send", {"queue_name": queue_name, "message": message})
+            .execute()
+            .data
+        )
+
+    def get_next_message(self, queue_name: str) -> dict:
+        return self.queue.rpc("pop", {"queue_name": queue_name}).execute().data
 
     # ----------------------------------------------------------------
     # 0. WALLETS
@@ -428,6 +445,8 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.name is not None:
                 query = query.eq("name", filters.name)
+            if filters.is_deployed is not None:
+                query = query.eq("is_deployed", filters.is_deployed)
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]
@@ -652,8 +671,6 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
                 query = query.eq("status", filters.status)
-            if filters.is_deployed is not None:
-                query = query.eq("is_deployed", filters.is_deployed)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -883,6 +900,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("name", filters.name)
             if filters.symbol is not None:
                 query = query.eq("symbol", filters.symbol)
+            if filters.status is not None:
+                query = query.eq("status", filters.status)
         response = query.execute()
         data = response.data or []
         return [Token(**row) for row in data]
