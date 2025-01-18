@@ -33,6 +33,7 @@ class TokenMetadata:
     description: str
     decimals: int
     max_supply: str
+    dao_mission: str
     image_url: Optional[str] = None
     uri: Optional[str] = None
 
@@ -56,7 +57,7 @@ class TokenAssetManager:
             image_bytes = generate_token_image(
                 name=metadata.name,
                 symbol=metadata.symbol,
-                description=metadata.description,
+                description=metadata.dao_mission,  # Always use dao_mission
             )
 
             if not isinstance(image_bytes, bytes):

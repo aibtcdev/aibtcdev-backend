@@ -57,30 +57,47 @@ def generate_token_dependencies(
     token_description: str,
     token_decimals: int,
     token_max_supply: str,
+    dao_id: UUID,
 ) -> Tuple[str, Token]:
     """Generate token dependencies including database record, image, and metadata.
 
     Args:
         token_name: Name of the token
         token_symbol: Symbol of the token
-        token_description: Description of the token
+        token_description: Description of the token (for metadata only)
         token_decimals: Number of decimals for the token
         token_max_supply: Maximum supply of the token
+        dao_id: UUID of the associated DAO (required)
 
     Returns:
         Tuple[str, Dict]: Token metadata URL and token details
 
     Raises:
-        TokenCreationError: If token record creation fails
+        TokenCreationError: If token record creation fails or if DAO mission is not available
         TokenAssetError: If asset generation fails
         TokenUpdateError: If token update fails
     """
     try:
+        # First fetch the DAO and validate mission
+        dao = backend.get_dao(dao_id)
+        if not dao:
+            raise TokenCreationError(
+                "DAO not found",
+                {"dao_id": dao_id}
+            )
+        if not dao.mission:
+            raise TokenCreationError(
+                "DAO must have a mission",
+                {"dao_id": dao_id}
+            )
+        
         logger.debug(
             f"Creating token with name={token_name}, symbol={token_symbol}, "
             f"description={token_description}, decimals={token_decimals}, "
-            f"max_supply={token_max_supply}"
+            f"max_supply={token_max_supply}, dao_id={dao_id}, "
+            f"dao_mission={dao.mission}"
         )
+
         # Create initial token record
         token_create = TokenCreate(
             name=token_name,
@@ -89,6 +106,7 @@ def generate_token_dependencies(
             decimals=token_decimals,
             max_supply=token_max_supply,
             status="DRAFT",
+            dao_id=dao_id,
         )
         logger.debug(f"TokenCreate object: {token_create}")
 
@@ -99,13 +117,14 @@ def generate_token_dependencies(
         token_id = new_token.id
         logger.debug(f"Created token record with ID: {token_id}")
 
-        # Create metadata object
+        # Create metadata object with required DAO mission
         metadata = TokenMetadata(
             name=token_name,
             symbol=token_symbol,
             description=token_description,
             decimals=token_decimals,
             max_supply=token_max_supply,
+            dao_mission=dao.mission,  # Required field now
         )
         logger.debug(f"Created TokenMetadata: {metadata}")
 
