@@ -85,6 +85,9 @@ async def chainhook(
                 status=ContractStatus.PENDING,
             )
         )
+        logger.info(f"Non-processed extensions: {non_processed_extensions}")
+        logger.info(f"Non-processed tokens: {non_processed_tokens}")
+        logger.info(f"Non-processed proposals: {non_processed_proposals}")
         for apply in data.apply:
             for transaction in apply.transactions:
                 tx_id = transaction.transaction_identifier.hash

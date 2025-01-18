@@ -388,7 +388,7 @@ class SupabaseBackend(AbstractBackend):
             if filters.type is not None:
                 query = query.eq("type", filters.type)
             if filters.status is not None:
-                query = query.eq("status", filters.status)
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Extension(**row) for row in data]
@@ -670,7 +670,7 @@ class SupabaseBackend(AbstractBackend):
             if filters.dao_id is not None:
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
-                query = query.eq("status", filters.status)
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -901,7 +901,7 @@ class SupabaseBackend(AbstractBackend):
             if filters.symbol is not None:
                 query = query.eq("symbol", filters.symbol)
             if filters.status is not None:
-                query = query.eq("status", filters.status)
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Token(**row) for row in data]
