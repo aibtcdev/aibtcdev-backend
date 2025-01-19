@@ -24,7 +24,6 @@ class TweetRunner:
     def __init__(self):
         """Initialize the Twitter handler."""
         self.twitter_handler = TwitterMentionHandler()
-        self.twitter_handler.
 
     async def run(self) -> None:
         """Process tweet responses from queue."""
