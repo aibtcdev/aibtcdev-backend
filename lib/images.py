@@ -46,7 +46,7 @@ def generate_token_image(name: str, symbol: str, description: str) -> bytes:
     Raises:
         ImageGenerationError: If image generation fails
     """
-    prompt = f"Draw from iconic, yet not overplayed references (Bauhaus geometry, Swiss minimalism, NASA mission patches, mid-century graphics, Apples refined approach, and subtle 80s neon). Synthesize or pick styles based on {description} to create a bold, circular icon for {name}, featuring {symbol}. Keep it minimal, high-contrast, and recognizable at small sizes. Avoid clutter, extraneous text, or clichés. Aim for a universal, timeless, visually striking design."
+    prompt = f"Create a single, bold circular icon for {name}, featuring {symbol} in a minimal geometric style that reflects the DAO’s mission: {description}. Use only these colors: • Orange #FF4F03 • Electric Blue #0533D1 • Black #000000 • White #FFFFFF • Grey #58595B • Orange→Blue gradient (sparingly) Keep lines clean, shapes few, and contrast high for immediate recognition, drawing from Swiss minimalism or NASA-inspired design."
     try:
         image_url = generate_image(prompt)
         if not image_url:

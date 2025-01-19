@@ -109,7 +109,7 @@ class ContractDAODeployTool(BaseTool):
             metadata_url, token_record = generate_token_dependencies(
                 token_name,
                 token_symbol,
-                token_description,
+                mission,
                 token_decimals_int,  # Convert to int for database
                 token_max_supply,
             )
