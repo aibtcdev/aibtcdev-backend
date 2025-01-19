@@ -46,14 +46,18 @@ class ContractDAODeployInput(BaseModel):
         ...,
         description="Number of decimals for the token for the DAO. Default is 6",
     )
-    mission: str = Field(..., description="The mission statement for the DAO")
+    mission: str = Field(
+        ...,
+        description="The mission of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.",
+    )
 
 
 class ContractDAODeployTool(BaseTool):
     name: str = "contract_dao_deploy"
     description: str = (
-        "Deploy a new DAO with a token and a bonding curve for stacks. "
-        "Example usage: 'deploy a dao named 'Human' with a token named 'Human' and a mission statement 'The Human Token'"
+        "Deploy a new DAO with a token and a bonding curve for Stacks blockchain. "
+        "Example usage: 'deploy a community DAO named 'GreenEarth' with a token named 'Green Token' and a purpose statement "
+        "'Promoting global environmental sustainability through decentralized collaboration and funding.'"
     )
     args_schema: Type[BaseModel] = ContractDAODeployInput
     return_direct: bool = False
