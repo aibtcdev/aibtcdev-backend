@@ -36,52 +36,79 @@ class TweetRunner:
                 logger.info("No tweet messages in queue")
                 return
 
-            ## the tweet type messages don't have the tweet_id and conversation_id so we need to look through the dao type messages to get them
+            ## Get all DAO messages that are processed
             dao_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(type="daos", is_processed=True)
             )
-
-            ## i need to make a map of dao_id to tweet_id and conversation_id
-            dao_messages_map = {message.dao_id: message for message in dao_messages}
+            logger.info(f"Found {len(dao_messages)} processed DAO messages")
 
             for message in queue_messages:
                 logger.info(f"Processing tweet message: {message}")
                 try:
-                    response_content = ""
+                    if not message.dao_id:
+                        logger.error(f"Tweet message {message.id} has no dao_id")
+                        continue
 
-                    # Get the DAO info if available and generate tweet
-                    if message.dao_id:
-                        dao = backend.get_dao(message.dao_id)
-                        token = backend.list_tokens(
-                            filters=TokenFilter(dao_id=message.dao_id)
-                        )
-                        dao_message = dao_messages_map[message.dao_id]
-                        if dao and token and len(token) > 0:
-                            # Generate an exciting tweet about the DAO deployment
-                            generated_tweet = await generate_dao_tweet(
-                                dao_name=dao.name,
-                                dao_symbol=token[0].symbol,
-                                dao_mission=dao.mission,
+                    # Get the DAO and token info for this tweet message
+                    dao = backend.get_dao(message.dao_id)
+                    if not dao:
+                        logger.error(f"No DAO found for id: {message.dao_id}")
+                        continue
+
+                    token = backend.list_tokens(
+                        filters=TokenFilter(dao_id=message.dao_id)
+                    )
+                    if not token or len(token) == 0:
+                        logger.error(f"No token found for DAO: {message.dao_id}")
+                        continue
+
+                    # Find matching DAO message by comparing token details
+                    matching_dao_message = None
+                    for dao_message in dao_messages:
+                        if not isinstance(dao_message.message, dict):
+                            continue
+
+                        params = dao_message.message.get("parameters", {})
+                        if (
+                            params.get("token_symbol") == token[0].symbol
+                            and params.get("token_name") == token[0].name
+                            and params.get("token_max_supply") == token[0].max_supply
+                        ):
+                            matching_dao_message = dao_message
+                            logger.info(
+                                f"Found matching DAO message: {dao_message.id} for token {token[0].symbol}"
                             )
-                            response_content = generated_tweet["tweet_text"]
-                    else:
-                        # Use the base message if no DAO info
-                        response_content = (
-                            message.message.get("message", "")
-                            if isinstance(message.message, dict)
-                            else ""
-                        )
+                            break
 
-                    # Post the response
+                    if not matching_dao_message:
+                        logger.error(
+                            f"No matching DAO message found for dao_id: {message.dao_id} "
+                            f"with token symbol: {token[0].symbol}, name: {token[0].name}"
+                        )
+                        continue
+
+                    # Generate an exciting tweet about the DAO deployment
+                    generated_tweet = await generate_dao_tweet(
+                        dao_name=dao.name,
+                        dao_symbol=token[0].symbol,
+                        dao_mission=dao.mission,
+                    )
+                    response_content = generated_tweet["tweet_text"]
+
+                    # Post the response using the matching DAO message details
+                    logger.info(
+                        f"Posting response for tweet_id: {matching_dao_message.tweet_id}, "
+                        f"conversation_id: {matching_dao_message.conversation_id}"
+                    )
                     await self.twitter_handler._post_response(
                         {
-                            "tweet_id": dao_message.tweet_id,
-                            "conversation_id": dao_message.conversation_id,
+                            "tweet_id": matching_dao_message.tweet_id,
+                            "conversation_id": matching_dao_message.conversation_id,
                         },
                         response_content,
                     )
 
-                    # Mark message as processed
+                    # Mark message as processed only after successful posting
                     backend.update_queue_message(
                         queue_message_id=message.id,
                         update_data=QueueMessageBase(is_processed=True),
@@ -90,12 +117,13 @@ class TweetRunner:
 
                 except Exception as e:
                     logger.error(
-                        f"Error processing tweet message {message.id}: {str(e)}"
+                        f"Error processing tweet message {message.id} for DAO {message.dao_id}: {str(e)}",
+                        exc_info=True,
                     )
                     continue
 
         except Exception as e:
-            logger.error(f"Error in tweet runner: {str(e)}")
+            logger.error(f"Error in tweet runner: {str(e)}", exc_info=True)
             raise
 
 

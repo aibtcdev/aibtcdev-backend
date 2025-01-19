@@ -69,7 +69,7 @@ async def chainhook(
         HTTPException: If the webhook cannot be processed
     """
     try:
-        logger.debug(f"Received chainhook webhook: {data}")
+        logger.info(f"Processing chainhook webhook with {len(data.apply)} apply blocks")
         non_processed_extensions = backend.list_extensions(
             filters=ExtensionFilter(
                 status=ContractStatus.PENDING,
@@ -85,36 +85,55 @@ async def chainhook(
                 status=ContractStatus.PENDING,
             )
         )
+        logger.info(
+            f"Found {len(non_processed_extensions)} pending extensions, {len(non_processed_tokens)} pending tokens, {len(non_processed_proposals)} pending proposals"
+        )
+
         for apply in data.apply:
             for transaction in apply.transactions:
                 tx_id = transaction.transaction_identifier.hash
+                logger.info(f"Processing transaction {tx_id}")
+
                 for extension in non_processed_extensions:
                     if extension.tx_id == tx_id:
+                        logger.info(
+                            f"Updating extension {extension.id} from {extension.status} to {ContractStatus.DEPLOYED}"
+                        )
                         extension.status = ContractStatus.DEPLOYED
                         backend.update_extension(
                             extension.id,
                             update_data=ExtensionBase(status=ContractStatus.DEPLOYED),
                         )
+
                 for token in non_processed_tokens:
                     if token.tx_id == tx_id:
+                        logger.info(
+                            f"Updating token {token.id} from {token.status} to {ContractStatus.DEPLOYED}"
+                        )
                         token.status = ContractStatus.DEPLOYED
                         backend.update_token(
                             token.id,
                             update_data=TokenBase(status=ContractStatus.DEPLOYED),
                         )
+
                 for proposal in non_processed_proposals:
                     if proposal.tx_id == tx_id:
+                        logger.info(
+                            f"Updating proposal {proposal.id} from {proposal.status} to {ContractStatus.DEPLOYED}"
+                        )
                         proposal.status = ContractStatus.DEPLOYED
                         backend.update_proposal(
                             proposal.id,
                             update_data=ProposalBase(status=ContractStatus.DEPLOYED),
                         )
+
+        logger.info("Finished processing all transactions in webhook")
         return TestMessageResponse(
             success=True,
             message=f"Successfully processed webhook",
         )
     except Exception as e:
-        logger.error(f"Error handling chainhook webhook: {str(e)}")
+        logger.error(f"Error handling chainhook webhook: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Internal server error while processing webhook",
