@@ -28,7 +28,7 @@ class GeneratorState(TypedDict):
 def create_generator_prompt() -> PromptTemplate:
     """Create the generator prompt template."""
     return PromptTemplate(
-        input_variables=["dao_name", "dao_symbol", "dao_mission"],
+        input_variables=["dao_name", "dao_symbol", "dao_mission", "dao_id"],
         template="""
         Generate an exciting tweet announcing the successful deployment of a new DAO.
         
@@ -36,13 +36,14 @@ def create_generator_prompt() -> PromptTemplate:
         - Name: {dao_name}
         - Symbol: {dao_symbol}
         - Mission: {dao_mission}
-        
+
         Requirements:
-        1. Must be under 280 characters
+        1. Must be under 200 characters (not including URL) to leave room for the URL
         2. Should be enthusiastic and welcoming
         3. Include the DAO symbol with $ prefix
         4. Mention key aspects of the mission
-        5. Use emojis appropriately but don't overdo it
+        5. Use emojis appropriately but don't overdo it (2-3 max)
+        6. REQUIRED: End the tweet with the URL https://aibtc.dev/daos/{dao_id}
         
         Output format:
         {{
@@ -69,6 +70,7 @@ def create_generator_graph() -> Graph:
             dao_name=state["dao_name"],
             dao_symbol=state["dao_symbol"],
             dao_mission=state["dao_mission"],
+            dao_id=state["dao_id"],
         )
 
         # Get generation from LLM
@@ -103,7 +105,9 @@ def create_generator_graph() -> Graph:
     return workflow.compile()
 
 
-async def generate_dao_tweet(dao_name: str, dao_symbol: str, dao_mission: str) -> Dict:
+async def generate_dao_tweet(
+    dao_name: str, dao_symbol: str, dao_mission: str, dao_id: str
+) -> Dict:
     """Generate a tweet announcing a new DAO deployment."""
     # Initialize state
     state = {
@@ -112,6 +116,7 @@ async def generate_dao_tweet(dao_name: str, dao_symbol: str, dao_mission: str) -
         "dao_mission": dao_mission,
         "generated_tweet": "",
         "confidence_score": 0.0,
+        "dao_id": dao_id,
     }
 
     # Create and run graph

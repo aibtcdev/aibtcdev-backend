@@ -24,6 +24,7 @@ class TweetRunner:
     def __init__(self):
         """Initialize the Twitter handler."""
         self.twitter_handler = TwitterMentionHandler()
+        self.twitter_handler.
 
     async def run(self) -> None:
         """Process tweet responses from queue."""
@@ -92,6 +93,7 @@ class TweetRunner:
                         dao_name=dao.name,
                         dao_symbol=token[0].symbol,
                         dao_mission=dao.mission,
+                        dao_id=dao.id,
                     )
                     response_content = generated_tweet["tweet_text"]
 
