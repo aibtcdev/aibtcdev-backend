@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from services.bot import BOT_ENABLED, start_application
+from services.runner import execute_runner_job
 from services.schedule import sync_schedules
 from services.twitter import execute_twitter_job
 
@@ -24,6 +25,12 @@ AIBTC_SCHEDULE_SYNC_ENABLED = (
 )
 AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS = int(
     os.getenv("AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS", 60)
+)
+AIBTC_DAO_RUNNER_ENABLED = (
+    os.getenv("AIBTC_DAO_RUNNER_ENABLED", "false").lower() == "true"
+)
+AIBTC_DAO_RUNNER_INTERVAL_SECONDS = int(
+    os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", 30)
 )
 
 if AIBTC_TWITTER_ENABLED:
@@ -49,7 +56,19 @@ if AIBTC_SCHEDULE_SYNC_ENABLED:
 else:
     logger.info("Schedule sync service is disabled")
 
-if AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED:
+if AIBTC_DAO_RUNNER_ENABLED:
+    scheduler.add_job(
+        execute_runner_job,
+        "interval",
+        seconds=AIBTC_DAO_RUNNER_INTERVAL_SECONDS,
+    )
+    logger.info(
+        f"DAO runner service started with interval of {AIBTC_DAO_RUNNER_INTERVAL_SECONDS} seconds"
+    )
+else:
+    logger.info("DAO runner service is disabled")
+
+if AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED or AIBTC_DAO_RUNNER_ENABLED:
     logger.info("Starting scheduler")
     scheduler.start()
     logger.info("Scheduler started")
