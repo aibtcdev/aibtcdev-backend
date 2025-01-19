@@ -23,6 +23,7 @@ class GeneratorState(TypedDict):
     dao_mission: str
     generated_tweet: str
     confidence_score: float
+    dao_id: str
 
 
 def create_generator_prompt() -> PromptTemplate:
