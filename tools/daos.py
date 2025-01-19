@@ -3,7 +3,7 @@ import logging
 import os
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import UUID, ExtensionCreate, ProposalCreate, TokenBase
+from backend.models import UUID, DAOBase, ExtensionCreate, ProposalCreate, TokenBase
 from langchain.tools import BaseTool
 from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
@@ -179,6 +179,9 @@ class ContractDAODeployTool(BaseTool):
                         "success": False,
                     }
 
+                backend.update_dao(
+                    dao_record.id, update_data=DAOBase(is_broadcasted=True)
+                )
                 # Update token record with contract information
                 logger.debug("Step 7: Updating token with contract information...")
                 contracts = deployment_data["contracts"]

@@ -26,6 +26,10 @@ from .models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    QueueMessage,
+    QueueMessageBase,
+    QueueMessageCreate,
+    QueueMessageFilter,
     Secret,
     SecretBase,
     SecretCreate,
@@ -127,12 +131,9 @@ class SupabaseBackend(AbstractBackend):
     MAX_UPLOAD_RETRIES = 3
     RETRY_DELAY_SECONDS = 1
 
-    def __init__(
-        self, client: Client, queue: Client, sqlalchemy_engine: Engine, **kwargs
-    ):
+    def __init__(self, client: Client, sqlalchemy_engine: Engine, **kwargs):
         # super().__init__()  # If your AbstractDatabase has an __init__ to call
         self.client = client
-        self.queue = queue
         self.sqlalchemy_engine = sqlalchemy_engine
         self.bucket_name = kwargs.get("bucket_name")
         self.Session = sessionmaker(bind=self.sqlalchemy_engine)
@@ -222,15 +223,70 @@ class SupabaseBackend(AbstractBackend):
             f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
         )
 
-    def send_message(self, queue_name: str, message: dict) -> dict:
-        return (
-            self.queue.rpc("send", {"queue_name": queue_name, "message": message})
-            .execute()
-            .data
-        )
+    # ----------------------------------------------------------------
+    # 0. QUEUE MESSAGES
+    # ----------------------------------------------------------------
+    def create_queue_message(
+        self, new_queue_message: "QueueMessageCreate"
+    ) -> "QueueMessage":
+        payload = new_queue_message.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("queue").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from Supabase insert for queue message.")
+        return QueueMessage(**data[0])
 
-    def get_next_message(self, queue_name: str) -> dict:
-        return self.queue.rpc("pop", {"queue_name": queue_name}).execute().data
+    def get_queue_message(self, queue_message_id: UUID) -> Optional["QueueMessage"]:
+        response = (
+            self.client.table("queue")
+            .select("*")
+            .eq("id", str(queue_message_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return QueueMessage(**response.data)
+
+    def list_queue_messages(
+        self, filters: Optional["QueueMessageFilter"] = None
+    ) -> List["QueueMessage"]:
+        query = self.client.table("queue").select("*")
+        if filters:
+            if filters.type is not None:
+                query = query.eq("type", filters.type)
+            if filters.is_processed is not None:
+                query = query.eq("is_processed", filters.is_processed)
+        response = query.execute()
+        data = response.data or []
+        return [QueueMessage(**row) for row in data]
+
+    def update_queue_message(
+        self, queue_message_id: UUID, update_data: "QueueMessageBase"
+    ) -> Optional["QueueMessage"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_queue_message(queue_message_id)
+        response = (
+            self.client.table("queue")
+            .update(payload)
+            .eq("id", str(queue_message_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return QueueMessage(**updated[0])
+
+    def delete_queue_message(self, queue_message_id: UUID) -> bool:
+        response = (
+            self.client.table("queue")
+            .delete()
+            .eq("id", str(queue_message_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # 0. WALLETS
@@ -447,6 +503,16 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("name", filters.name)
             if filters.is_deployed is not None:
                 query = query.eq("is_deployed", filters.is_deployed)
+            if filters.is_broadcasted is not None:
+                query = query.eq("is_broadcasted", filters.is_broadcasted)
+            if filters.source is not None:
+                query = query.eq("source", filters.source)
+            if filters.source_profile_id is not None:
+                query = query.eq("source_profile_id", str(filters.source_profile_id))
+            if filters.source_agent_id is not None:
+                query = query.eq("source_agent_id", str(filters.source_agent_id))
+            if filters.source_tweet_id is not None:
+                query = query.eq("source_tweet_id", str(filters.source_tweet_id))
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]
