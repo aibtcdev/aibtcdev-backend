@@ -3,7 +3,14 @@ import logging
 import os
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import UUID, DAOBase, ExtensionCreate, ProposalCreate, TokenBase
+from backend.models import (
+    UUID,
+    ContractStatus,
+    DAOBase,
+    ExtensionCreate,
+    ProposalCreate,
+    TokenBase,
+)
 from langchain.tools import BaseTool
 from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
@@ -188,7 +195,7 @@ class ContractDAODeployTool(BaseTool):
                 token_updates = TokenBase(
                     contract_principal=contracts["token"]["contractPrincipal"],
                     tx_id=contracts["token"]["transactionId"],
-                    status="PENDING",
+                    status=ContractStatus.PENDING,
                 )
                 logger.debug(f"Token updates: {token_updates}")
                 if not backend.update_token(token_record.id, token_updates):
@@ -233,7 +240,7 @@ class ContractDAODeployTool(BaseTool):
                         proposal_result = backend.create_proposal(
                             ProposalCreate(
                                 dao_id=dao_record.id,
-                                status="PENDING",
+                                status=ContractStatus.PENDING,
                                 tx_id=contract_data["transactionId"],
                                 contract_principal=contract_data["contractPrincipal"],
                                 title="Initialize DAO",
