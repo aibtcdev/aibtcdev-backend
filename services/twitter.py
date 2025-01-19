@@ -134,7 +134,10 @@ class TwitterMentionHandler:
 
         # Analyze tweet
         analysis_result = await analyze_tweet(
-            tweet_text=tweet_data["text"], filtered_content=filtered_content
+            conversation_id=tweet_data["conversation_id"],
+            tweet_id=tweet_data["tweet_id"],
+            tweet_text=tweet_data["text"],
+            filtered_content=filtered_content,
         )
 
         logger.info(f"Analysis result: {analysis_result}")

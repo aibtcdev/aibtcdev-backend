@@ -1,6 +1,6 @@
 import os
 from backend.factory import backend
-from backend.models import QueueMessageCreate, TweetType
+from backend.models import QueueMessageCreate, QueueMessageFilter, TweetType
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph, StateGraph
@@ -40,9 +40,6 @@ class AnalysisState(TypedDict):
 
 def create_analysis_prompt() -> PromptTemplate:
     """Create the analysis prompt template."""
-    tokens = backend.list_tokens()
-    token_symbols = [token.symbol for token in tokens]
-
     return PromptTemplate(
         input_variables=[
             "tweet_text",
@@ -127,7 +124,16 @@ def create_analysis_graph(account_name: str = "@aibtcdevagent") -> Graph:
     def analyze_tweet(state: AnalysisState) -> AnalysisState:
         """Analyze the tweet and determine if it's worthy of processing."""
         tokens = backend.list_tokens()
-        token_symbols = [token.symbol for token in tokens]
+        token_symbols_in_db = [token.symbol for token in tokens]
+        queued_messages = backend.list_queue_messages(
+            filters=QueueMessageFilter(type="daos", is_processed=False)
+        )
+        token_symbols_in_queue = [
+            message.message["parameters"]["token_symbol"] for message in queued_messages
+        ]
+
+        # make alist of token symbols in queue and token symbols in db
+        token_symbols = list(set(token_symbols_in_db + token_symbols_in_queue))
 
         # Format prompt with state
         formatted_prompt = prompt.format(
@@ -172,7 +178,9 @@ def create_analysis_graph(account_name: str = "@aibtcdevagent") -> Graph:
     return workflow.compile()
 
 
-async def analyze_tweet(tweet_text: str, filtered_content: str) -> Dict:
+async def analyze_tweet(
+    conversation_id: str, tweet_id: str, tweet_text: str, filtered_content: str
+) -> Dict:
     """Analyze a tweet and determine if it's worthy of processing."""
     # Initialize state
     state = {
@@ -194,6 +202,8 @@ async def analyze_tweet(tweet_text: str, filtered_content: str) -> Dict:
         backend.create_queue_message(
             new_queue_message=QueueMessageCreate(
                 type="daos",
+                tweet_id=tweet_id,
+                conversation_id=conversation_id,
                 message=result["tool_request"].model_dump(),
             )
         )

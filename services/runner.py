@@ -1,13 +1,102 @@
 import os
 from backend.factory import backend
-from backend.models import DAOFilter, Profile, QueueMessageBase, QueueMessageFilter
+from backend.models import (
+    DAOFilter,
+    Profile,
+    QueueMessageBase,
+    QueueMessageFilter,
+    TokenFilter,
+)
 from datetime import datetime
 from lib.logger import configure_logger
 from services.langgraph import execute_langgraph_stream
+from services.tweet_generator import generate_dao_tweet
+from services.twitter import TwitterMentionHandler
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 from uuid import UUID
 
 logger = configure_logger(__name__)
+
+
+class TweetRunner:
+    """Handles processing of queued tweet responses."""
+
+    def __init__(self):
+        """Initialize the Twitter handler."""
+        self.twitter_handler = TwitterMentionHandler()
+
+    async def run(self) -> None:
+        """Process tweet responses from queue."""
+        try:
+            # Get unprocessed tweet messages from queue
+            queue_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(type="tweet", is_processed=False)
+            )
+            if not queue_messages:
+                logger.info("No tweet messages in queue")
+                return
+
+            ## the tweet type messages don't have the tweet_id and conversation_id so we need to look through the dao type messages to get them
+            dao_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(type="daos", is_processed=True)
+            )
+
+            ## i need to make a map of dao_id to tweet_id and conversation_id
+            dao_messages_map = {message.dao_id: message for message in dao_messages}
+
+            for message in queue_messages:
+                logger.info(f"Processing tweet message: {message}")
+                try:
+                    response_content = ""
+
+                    # Get the DAO info if available and generate tweet
+                    if message.dao_id:
+                        dao = backend.get_dao(message.dao_id)
+                        token = backend.list_tokens(
+                            filters=TokenFilter(dao_id=message.dao_id)
+                        )
+                        dao_message = dao_messages_map[message.dao_id]
+                        if dao and token and len(token) > 0:
+                            # Generate an exciting tweet about the DAO deployment
+                            generated_tweet = await generate_dao_tweet(
+                                dao_name=dao.name,
+                                dao_symbol=token[0].symbol,
+                                dao_mission=dao.mission,
+                            )
+                            response_content = generated_tweet["tweet_text"]
+                    else:
+                        # Use the base message if no DAO info
+                        response_content = (
+                            message.message.get("message", "")
+                            if isinstance(message.message, dict)
+                            else ""
+                        )
+
+                    # Post the response
+                    await self.twitter_handler._post_response(
+                        {
+                            "tweet_id": dao_message.tweet_id,
+                            "conversation_id": dao_message.conversation_id,
+                        },
+                        response_content,
+                    )
+
+                    # Mark message as processed
+                    backend.update_queue_message(
+                        queue_message_id=message.id,
+                        update_data=QueueMessageBase(is_processed=True),
+                    )
+                    logger.info(f"Successfully processed tweet message {message.id}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Error processing tweet message {message.id}: {str(e)}"
+                    )
+                    continue
+
+        except Exception as e:
+            logger.error(f"Error in tweet runner: {str(e)}")
+            raise
 
 
 class DAORunner:
@@ -59,7 +148,10 @@ class DAORunner:
 
             message = queue_messages[0]
             logger.info(f"Processing message: {message}")
-
+            backend.update_queue_message(
+                queue_message_id=message.id,
+                update_data=QueueMessageBase(is_processed=True),
+            )
             # Construct the input for the tool
             tool_input = (
                 f"Please deploy a DAO with the following parameters:\n"
@@ -78,10 +170,7 @@ class DAORunner:
                 if chunk["type"] == "result":
                     logger.info(f"DAO deployment completed: {chunk['content']}")
                     # Mark message as processed after successful deployment
-                    backend.update_queue_message(
-                        queue_message_id=message.id,
-                        update_data=QueueMessageBase(is_processed=True),
-                    )
+
                 elif chunk["type"] == "tool":
                     logger.info(f"Tool execution: {chunk}")
 
@@ -90,16 +179,21 @@ class DAORunner:
             raise
 
 
-# Global runner instance
-runner = DAORunner()
+# Global runner instances
+dao_runner = DAORunner()
+tweet_runner = TweetRunner()
 
 
 async def execute_runner_job() -> None:
-    """Execute the runner job to process DAO deployments."""
+    """Execute the runner jobs to process DAO deployments and tweets."""
     try:
         logger.info("Starting DAO runner")
-        await runner.run()
+        await dao_runner.run()
         logger.info("Completed DAO runner")
+
+        logger.info("Starting Tweet runner")
+        await tweet_runner.run()
+        logger.info("Completed Tweet runner")
 
     except Exception as e:
         logger.error(f"Error in runner job: {str(e)}")

@@ -60,6 +60,9 @@ class QueueMessageBase(CustomBaseModel):
     type: Optional[str] = None
     message: Optional[dict] = None
     is_processed: Optional[bool] = False
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    dao_id: Optional[UUID] = None
 
 
 class QueueMessageCreate(QueueMessageBase):
@@ -417,6 +420,8 @@ class WalletFilter(CustomBaseModel):
 class QueueMessageFilter(CustomBaseModel):
     type: Optional[str] = None
     is_processed: Optional[bool] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class AgentFilter(CustomBaseModel):

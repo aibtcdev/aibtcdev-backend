@@ -257,6 +257,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("type", filters.type)
             if filters.is_processed is not None:
                 query = query.eq("is_processed", filters.is_processed)
+            if filters.tweet_id is not None:
+                query = query.eq("tweet_id", filters.tweet_id)
+            if filters.conversation_id is not None:
+                query = query.eq("conversation_id", filters.conversation_id)
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]
