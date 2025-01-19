@@ -59,7 +59,7 @@ def create_analysis_prompt() -> PromptTemplate:
            - token_description: Description of the token (e.g., 'The Human Token')
            - token_max_supply: Initial supply (default: 1000000000)
            - token_decimals: Number of decimals (default: 6)
-           - mission: The mission statement for the DAO
+           - mission: The mission statement of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.
         
         Tweet History:
         {filtered_content}
