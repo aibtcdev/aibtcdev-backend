@@ -1,12 +1,6 @@
 import os
 from backend.factory import backend
-from backend.models import (
-    DAOFilter,
-    DAOSource,
-    Profile,
-    QueueMessageBase,
-    QueueMessageFilter,
-)
+from backend.models import DAOFilter, Profile, QueueMessageBase, QueueMessageFilter
 from datetime import datetime
 from lib.logger import configure_logger
 from services.langgraph import execute_langgraph_stream
@@ -26,14 +20,14 @@ class DAORunner:
                 id=UUID(
                     os.getenv(
                         "AIBTC_TWITTER_PROFILE_ID",
-                        "abd612f0-c184-40b2-b20f-3fe6bd88ecb3",
+                        "9e650de6-93b8-4160-9f4b-938d00b5c6f8",
                     )
                 ),
                 created_at=datetime.now(),
             ),
             agent_id=UUID(
                 os.getenv(
-                    "AIBTC_TWITTER_AGENT_ID", "d98f9e70-31b6-4643-bbf5-16fd90794109"
+                    "AIBTC_TWITTER_AGENT_ID", "13059e46-1b4d-4b87-9593-b556dcefdeb2"
                 )
             ),
             crewai=False,

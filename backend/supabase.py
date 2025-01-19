@@ -505,14 +505,6 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("is_deployed", filters.is_deployed)
             if filters.is_broadcasted is not None:
                 query = query.eq("is_broadcasted", filters.is_broadcasted)
-            if filters.source is not None:
-                query = query.eq("source", filters.source)
-            if filters.source_profile_id is not None:
-                query = query.eq("source_profile_id", str(filters.source_profile_id))
-            if filters.source_agent_id is not None:
-                query = query.eq("source_agent_id", str(filters.source_agent_id))
-            if filters.source_tweet_id is not None:
-                query = query.eq("source_tweet_id", str(filters.source_tweet_id))
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]
