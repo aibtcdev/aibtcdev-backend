@@ -32,6 +32,12 @@ AIBTC_DAO_RUNNER_ENABLED = (
 AIBTC_DAO_RUNNER_INTERVAL_SECONDS = int(
     os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", 30)
 )
+AIBTC_TWEET_RUNNER_ENABLED = (
+    os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "true").lower() == "true"
+)
+AIBTC_TWEET_RUNNER_INTERVAL_SECONDS = int(
+    os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", 60)
+)
 
 if AIBTC_TWITTER_ENABLED:
     scheduler.add_job(
@@ -61,6 +67,7 @@ if AIBTC_DAO_RUNNER_ENABLED:
         execute_runner_job,
         "interval",
         seconds=AIBTC_DAO_RUNNER_INTERVAL_SECONDS,
+        args=["dao"],
     )
     logger.info(
         f"DAO runner service started with interval of {AIBTC_DAO_RUNNER_INTERVAL_SECONDS} seconds"
@@ -68,7 +75,25 @@ if AIBTC_DAO_RUNNER_ENABLED:
 else:
     logger.info("DAO runner service is disabled")
 
-if AIBTC_TWITTER_ENABLED or AIBTC_SCHEDULE_SYNC_ENABLED or AIBTC_DAO_RUNNER_ENABLED:
+if AIBTC_TWEET_RUNNER_ENABLED:
+    scheduler.add_job(
+        execute_runner_job,
+        "interval",
+        seconds=AIBTC_TWEET_RUNNER_INTERVAL_SECONDS,
+        args=["tweet"],
+    )
+    logger.info(
+        f"Tweet runner service started with interval of {AIBTC_TWEET_RUNNER_INTERVAL_SECONDS} seconds"
+    )
+else:
+    logger.info("Tweet runner service is disabled")
+
+if (
+    AIBTC_TWITTER_ENABLED
+    or AIBTC_SCHEDULE_SYNC_ENABLED
+    or AIBTC_DAO_RUNNER_ENABLED
+    or AIBTC_TWEET_RUNNER_ENABLED
+):
     logger.info("Starting scheduler")
     scheduler.start()
     logger.info("Scheduler started")

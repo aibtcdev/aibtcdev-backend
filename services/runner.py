@@ -184,16 +184,24 @@ dao_runner = DAORunner()
 tweet_runner = TweetRunner()
 
 
-async def execute_runner_job() -> None:
-    """Execute the runner jobs to process DAO deployments and tweets."""
-    try:
-        logger.info("Starting DAO runner")
-        await dao_runner.run()
-        logger.info("Completed DAO runner")
+async def execute_runner_job(runner_type: str = "dao") -> None:
+    """Execute the runner jobs to process DAO deployments and tweets.
 
-        logger.info("Starting Tweet runner")
-        await tweet_runner.run()
-        logger.info("Completed Tweet runner")
+    Args:
+        runner_type: The type of runner to execute ("dao" or "tweet")
+    """
+    try:
+        if runner_type == "dao":
+            logger.info("Starting DAO runner")
+            await dao_runner.run()
+            logger.info("Completed DAO runner")
+        elif runner_type == "tweet":
+            logger.info("Starting Tweet runner")
+            await tweet_runner.run()
+            logger.info("Completed Tweet runner")
+        else:
+            logger.error(f"Unknown runner type: {runner_type}")
+            raise ValueError(f"Unknown runner type: {runner_type}")
 
     except Exception as e:
         logger.error(f"Error in runner job: {str(e)}")
