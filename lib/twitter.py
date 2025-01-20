@@ -24,7 +24,6 @@ class TwitterService:
         self.client_id = client_id
         self.client_secret = client_secret
         self.client = None
-        self.initialize()
 
     async def _ainitialize(self) -> None:
         self.initialize()
