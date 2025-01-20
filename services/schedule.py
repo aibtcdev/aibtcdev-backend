@@ -147,6 +147,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
                         execute_scheduled_job,
                         CronTrigger.from_crontab(cron_expression),
                         args=[agent_id, task_id, profile_id],
+                        misfire_grace_time=60,
                         id=job_id,
                     )
                     logger.info(f"Updated schedule {job_id} with new cron expression")

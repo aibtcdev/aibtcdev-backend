@@ -80,21 +80,21 @@ class ContractDAODeployTool(BaseTool):
         """Core deployment logic used by both sync and async methods."""
         try:
             ## get the address for the wallet based on network from os.getenv
-            network = os.getenv("NETWORK", "testnet")
-            wallet = backend.get_wallet(self.wallet_id)
+            # network = os.getenv("NETWORK", "testnet")
+            # wallet = backend.get_wallet(self.wallet_id)
 
-            if network == "mainnet":
-                wallet_address = wallet.mainnet_address
-            else:
-                wallet_address = wallet.testnet_address
+            # if network == "mainnet":
+            #     wallet_address = wallet.mainnet_address
+            # else:
+            #     wallet_address = wallet.testnet_address
 
-            platform = PlatformApi()
-            chainhook = platform.create_contract_deployment_hook(
-                deployer_address=wallet_address,
-                network=network,
-                expire_after_occurrence=19,
-            )
-            logger.debug(f"Created chainhook: {chainhook}")
+            # platform = PlatformApi()
+            # chainhook = platform.create_contract_deployment_hook(
+            #     deployer_address=wallet_address,
+            #     network=network,
+            #     expire_after_occurrence=19,
+            # )
+            # logger.debug(f"Created chainhook: {chainhook}")
 
             logger.debug(
                 f"Starting deployment with token_symbol={token_symbol}, "
