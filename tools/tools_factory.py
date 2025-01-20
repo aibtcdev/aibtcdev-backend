@@ -87,6 +87,7 @@ from langchain.tools.base import BaseTool as LangChainBaseTool
 from lib.logger import configure_logger
 from pydantic import BaseModel, create_model
 from typing import Any, Callable, Dict, List, Optional, Type
+from .telegram import SendTelegramNotificationTool   
 
 logger = configure_logger(__name__)
 
@@ -211,6 +212,9 @@ def initialize_tools(
         ),
         "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
             wallet_id
+        ),
+         "telegram_nofication_to_user": SendTelegramNotificationTool(
+            profile.id
         ),
     }
 

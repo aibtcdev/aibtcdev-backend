@@ -33,7 +33,7 @@ AIBTC_DAO_RUNNER_INTERVAL_SECONDS = int(
     os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", 30)
 )
 AIBTC_TWEET_RUNNER_ENABLED = (
-    os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "true").lower() == "true"
+    os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "false").lower() == "true"
 )
 AIBTC_TWEET_RUNNER_INTERVAL_SECONDS = int(
     os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", 30)

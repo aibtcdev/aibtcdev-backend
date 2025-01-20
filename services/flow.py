@@ -365,14 +365,14 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
                 Make a post like congrats to the user for the dao deployment.
                 
                 Requirements:
-                1. Maximum 260 characters
-                2. Include: Name, Token Amount, Symbol, and Description
+                1. Maximum 255 characters
+                2. Include: Name, Token Amount, Symbol, Mission, Description
                 3. Maintain professional yet engaging tone thats witty
                 4. Reference tool execution results if applicable
                 5. Avoid financial advice
                 6. Use appropriate mentions
                 7. REQUIRED: Include 2-3 relevant emojis to make the response engaging and friendly
-                8. IMPORTANT: Your response MUST be 200 characters or less to leave room for the URL
+                8. IMPORTANT: Your response MUST be 255 characters or less to leave room for the URL
                 9. Include the URL in your response example https://aibtc.dev/daos
 
                 Ensure your response is no more than 260 characters.
@@ -381,7 +381,7 @@ class TweetProcessingFlow(Flow[TweetAnalysisState]):
             expected_output=dedent(
                 """
                 A well-crafted tweet response with:
-                - Main message (≤260 chars)
+                - Main message (≤255 chars)
                 - Appropriate tone
                 - No hashtags
                 - Don't Congrats to @prompt2dao in the tweet

@@ -1,10 +1,13 @@
 import os
+import asyncio
 from backend.factory import backend
-from backend.models import TelegramUserFilter
+from backend.models import TelegramUserFilter, TelegramUserBase
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes 
+
+
 
 load_dotenv()
 
@@ -37,23 +40,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Check if user exists with this profile_id
         result = backend.get_telegram_user(telegram_user_id)
 
-        if not result.data:
+        if not result:
             await update.message.reply_text(
                 "Invalid registration link. Please use the correct link to register."
             )
             return
 
-        # Update existing record with Telegram user information
-        user_data = {
-            "telegram_user_id": str(user_id),
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "is_registered": True,
-        }
+    # Update existing record with Telegram user information
+        user_data = TelegramUserBase(
+            telegram_user_id=str(user_id),
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            is_registered=True,
+        )
 
         # Update the user data for the existing profile_id
-        result = backend.update_telegram_user(telegram_user_id, user_data)
+        result = backend.update_telegram_user(telegram_user_id, update_data=user_data)
 
         is_user_admin = is_admin(user_id)
         admin_status = "You are an admin!" if is_user_admin else "You are not an admin."
@@ -209,6 +212,18 @@ async def get_bot():
         await _bot_app.initialize()
         await _bot_app.start()
     return _bot_app
+
+
+def send_message_to_user_sync(profile_id: str, message: str) -> bool:
+    """Synchronous version of send_message_to_user."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # If no event loop exists, create a new one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(send_message_to_user(profile_id, message))
 
 
 async def send_message_to_user(profile_id: str, message: str) -> bool:

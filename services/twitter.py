@@ -162,6 +162,7 @@ class TwitterMentionHandler:
 
     async def _post_response(self, tweet_data: Dict, response_content: str) -> None:
         """Post the response to Twitter and store in database."""
+        self.twitter_service.initialize()
         response_tweet = await self.twitter_service._apost_tweet(
             text=response_content, reply_in_reply_to_tweet_id=tweet_data["tweet_id"]
         )
