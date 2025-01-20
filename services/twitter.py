@@ -4,7 +4,7 @@ from backend.models import XTweetCreate, XTweetFilter, XUserCreate, XUserFilter
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
-from services.flow import execute_twitter_stream
+from services.tweet_analysis import analyze_tweet
 from typing import Dict, List, Optional, TypedDict
 
 logger = configure_logger(__name__)
@@ -36,7 +36,7 @@ class TwitterMentionHandler:
         self.whitelist_enabled = False
 
     async def _handle_mention(self, mention) -> None:
-        """Process a single mention and generate response if needed."""
+        """Process a single mention for analysis."""
         tweet_id = mention.id or ""
         author_id = mention.author_id or ""
         conversation_id = mention.conversation_id or ""
@@ -94,16 +94,16 @@ class TwitterMentionHandler:
                     logger.info(
                         f"Processing whitelisted mention {tweet_id} from user {author_id}"
                     )
-                    await self._generate_and_post_response(tweet_data)
+                    await self._analyze_tweet(tweet_data)
                 else:
                     logger.info(
                         f"Skipping non-whitelisted mention {tweet_id} from user {author_id}"
                     )
             else:
                 logger.info(f"Processing mention {tweet_id} from user {author_id}")
-                await self._generate_and_post_response(tweet_data)
+                await self._analyze_tweet(tweet_data)
         except Exception as e:
-            logger.error(f"Error processing mention response: {str(e)}")
+            logger.error(f"Error analyzing mention: {str(e)}")
             raise
 
     def _is_author_whitelisted(self, author_id: str) -> bool:
@@ -113,14 +113,34 @@ class TwitterMentionHandler:
         )
         return str(author_id) in self.whitelisted_authors
 
-    async def _generate_and_post_response(self, tweet_data: Dict) -> None:
-        """Generate and post a response to a tweet."""
-        # history = await self._get_conversation_history(tweet_data)
+    async def _analyze_tweet(self, tweet_data: Dict) -> None:
+        """Analyze tweet and queue if needed."""
+        # currently don't want to have history but keeping it here for now
         history = []
-        response = await self._generate_response(tweet_data, history)
+        await self._run_analysis(tweet_data, history)
 
-        if response:
-            await self._post_response(tweet_data, response)
+    async def _run_analysis(self, tweet_data: Dict, history: List[Dict]) -> None:
+        """Run analysis on tweet and queue tool requests if needed."""
+        logger.info(
+            f"Analyzing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}"
+        )
+        logger.info(f"Tweet text: {tweet_data['text']}")
+        logger.info(f"Conversation history: {len(history)} messages")
+
+        # Convert history to filtered content
+        filtered_content = "\n".join(
+            f"{msg['role']}: {msg['content']}" for msg in history
+        )
+
+        # Analyze tweet
+        analysis_result = await analyze_tweet(
+            conversation_id=tweet_data["conversation_id"],
+            tweet_id=tweet_data["tweet_id"],
+            tweet_text=tweet_data["text"],
+            filtered_content=filtered_content,
+        )
+
+        logger.info(f"Analysis result: {analysis_result}")
 
     async def _get_conversation_history(self, tweet_data: Dict) -> List[Dict]:
         """Retrieve and format conversation history."""
@@ -139,35 +159,6 @@ class TwitterMentionHandler:
             for tweet in conversation_tweets
             if tweet.message
         ]
-
-    async def _generate_response(
-        self, tweet_data: Dict, history: List[Dict]
-    ) -> Optional[str]:
-        """Generate a response using the AI model."""
-        logger.info(
-            f"Processing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}"
-        )
-        logger.info(f"Tweet text: {tweet_data['text']}")
-        logger.info(f"Conversation history: {len(history)} messages")
-
-        response_content = None
-        async for response in execute_twitter_stream(
-            twitter_service=self.twitter_service,
-            history=history,
-            input_str=tweet_data["text"],
-        ):
-            if response["type"] == "result":
-                if response.get("content"):
-                    logger.info(f"Final Response: {response['content']}")
-                    response_content = response["content"]
-                elif response.get("reason"):
-                    logger.info(f"No response generated. Reason: {response['reason']}")
-            elif response["type"] == "step":
-                logger.info(f"Step: {response['content']}")
-                if response["result"]:
-                    logger.info(f"Result: {response['result']}")
-
-        return response_content
 
     async def _post_response(self, tweet_data: Dict, response_content: str) -> None:
         """Post the response to Twitter and store in database."""
@@ -189,7 +180,7 @@ class TwitterMentionHandler:
             )
 
     async def process_mentions(self) -> None:
-        """Process all new mentions for the bot user."""
+        """Process all new mentions for analysis."""
         try:
             await self.twitter_service._ainitialize()
             mentions = await self.twitter_service.get_mentions_by_user_id(self.user_id)

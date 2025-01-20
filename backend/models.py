@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from uuid import UUID
@@ -8,6 +9,26 @@ class CustomBaseModel(BaseModel):
     model_config = ConfigDict(
         json_encoders={UUID: str, datetime: lambda v: v.isoformat()}
     )
+
+
+# need to create status enum
+class ContractStatus(Enum):
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    DEPLOYED = "DEPLOYED"
+    FAILED = "FAILED"
+
+    def __str__(self):
+        return self.value
+
+
+class TweetType(str, Enum):
+    TOOL_REQUEST = "tool_request"
+    CONVERSATION = "thread"
+    INVALID = "invalid"
+
+    def __str__(self):
+        return self.value
 
 
 #
@@ -30,6 +51,27 @@ class Secret(SecretBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+#
+#  QUEUE MESSAGES
+#
+class QueueMessageBase(CustomBaseModel):
+    type: Optional[str] = None
+    message: Optional[dict] = None
+    is_processed: Optional[bool] = False
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    dao_id: Optional[UUID] = None
+
+
+class QueueMessageCreate(QueueMessageBase):
+    pass
+
+
+class QueueMessage(QueueMessageBase):
+    id: UUID
+    created_at: datetime
 
 
 #
@@ -104,10 +146,10 @@ class Agent(AgentBase):
 #
 class ExtensionBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
-    type: str
+    type: Optional[str] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    status: Optional[str] = "DRAFT"
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
 
 
 class ExtensionCreate(ExtensionBase):
@@ -123,9 +165,11 @@ class Extension(ExtensionBase):
 # DAOS
 #
 class DAOBase(CustomBaseModel):
-    name: str
+    name: Optional[str] = None
     mission: Optional[str] = None
     description: Optional[str] = None
+    is_deployed: Optional[bool] = False
+    is_broadcasted: Optional[bool] = False
 
 
 class DAOCreate(DAOBase):
@@ -207,10 +251,9 @@ class ProposalBase(CustomBaseModel):
     code: Optional[str] = None
     link: Optional[str] = None
     monetary_ask: Optional[float] = None
-    status: Optional[str] = "DRAFT"
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    is_deployed: bool = False
 
 
 class ProposalCreate(ProposalBase):
@@ -306,6 +349,7 @@ class TokenBase(CustomBaseModel):
     x_url: Optional[str] = None
     telegram_url: Optional[str] = None
     website_url: Optional[str] = None
+    status: Optional[ContractStatus] = ContractStatus.DRAFT
 
 
 class TokenCreate(TokenBase):
@@ -344,6 +388,10 @@ class XTweetBase(CustomBaseModel):
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    is_worthy: Optional[bool] = False
+    tweet_type: Optional[TweetType] = TweetType.INVALID
+    confidence_score: Optional[float] = 0.0
+    reason: Optional[str] = None
 
 
 class XTweetCreate(XTweetBase):
@@ -369,6 +417,13 @@ class WalletFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
 
 
+class QueueMessageFilter(CustomBaseModel):
+    type: Optional[str] = None
+    is_processed: Optional[bool] = None
+    tweet_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+
 class AgentFilter(CustomBaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
@@ -379,11 +434,13 @@ class AgentFilter(CustomBaseModel):
 class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[ContractStatus] = None
 
 
 class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
+    is_deployed: Optional[bool] = None
+    is_broadcasted: Optional[bool] = None
 
 
 class ThreadFilter(CustomBaseModel):
@@ -404,8 +461,7 @@ class ProfileFilter(CustomBaseModel):
 
 class ProposalFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
-    status: Optional[str] = None
-    is_deployed: Optional[bool] = None
+    status: Optional[ContractStatus] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -434,6 +490,7 @@ class TokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+    status: Optional[ContractStatus] = None
 
 
 class XCredsFilter(CustomBaseModel):

@@ -26,6 +26,10 @@ from .models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    QueueMessage,
+    QueueMessageBase,
+    QueueMessageCreate,
+    QueueMessageFilter,
     Secret,
     SecretBase,
     SecretCreate,
@@ -192,6 +196,10 @@ class SupabaseBackend(AbstractBackend):
                 if not public_url:
                     raise Exception("Failed to generate public URL")
 
+                # Remove trailing '?' if there are no query parameters
+                if public_url.endswith("?"):
+                    public_url = public_url[:-1]
+
                 return public_url
 
             except Exception as e:
@@ -214,6 +222,75 @@ class SupabaseBackend(AbstractBackend):
         raise Exception(
             f"Failed to upload file after {self.MAX_UPLOAD_RETRIES} attempts: {str(last_error)}"
         )
+
+    # ----------------------------------------------------------------
+    # 0. QUEUE MESSAGES
+    # ----------------------------------------------------------------
+    def create_queue_message(
+        self, new_queue_message: "QueueMessageCreate"
+    ) -> "QueueMessage":
+        payload = new_queue_message.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("queue").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from Supabase insert for queue message.")
+        return QueueMessage(**data[0])
+
+    def get_queue_message(self, queue_message_id: UUID) -> Optional["QueueMessage"]:
+        response = (
+            self.client.table("queue")
+            .select("*")
+            .eq("id", str(queue_message_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return QueueMessage(**response.data)
+
+    def list_queue_messages(
+        self, filters: Optional["QueueMessageFilter"] = None
+    ) -> List["QueueMessage"]:
+        query = self.client.table("queue").select("*")
+        if filters:
+            if filters.type is not None:
+                query = query.eq("type", filters.type)
+            if filters.is_processed is not None:
+                query = query.eq("is_processed", filters.is_processed)
+            if filters.tweet_id is not None:
+                query = query.eq("tweet_id", filters.tweet_id)
+            if filters.conversation_id is not None:
+                query = query.eq("conversation_id", filters.conversation_id)
+        response = query.execute()
+        data = response.data or []
+        return [QueueMessage(**row) for row in data]
+
+    def update_queue_message(
+        self, queue_message_id: UUID, update_data: "QueueMessageBase"
+    ) -> Optional["QueueMessage"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_queue_message(queue_message_id)
+        response = (
+            self.client.table("queue")
+            .update(payload)
+            .eq("id", str(queue_message_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return QueueMessage(**updated[0])
+
+    def delete_queue_message(self, queue_message_id: UUID) -> bool:
+        response = (
+            self.client.table("queue")
+            .delete()
+            .eq("id", str(queue_message_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # 0. WALLETS
@@ -371,7 +448,7 @@ class SupabaseBackend(AbstractBackend):
             if filters.type is not None:
                 query = query.eq("type", filters.type)
             if filters.status is not None:
-                query = query.eq("status", filters.status)
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Extension(**row) for row in data]
@@ -428,6 +505,10 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.name is not None:
                 query = query.eq("name", filters.name)
+            if filters.is_deployed is not None:
+                query = query.eq("is_deployed", filters.is_deployed)
+            if filters.is_broadcasted is not None:
+                query = query.eq("is_broadcasted", filters.is_broadcasted)
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]
@@ -651,9 +732,7 @@ class SupabaseBackend(AbstractBackend):
             if filters.dao_id is not None:
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
-                query = query.eq("status", filters.status)
-            if filters.is_deployed is not None:
-                query = query.eq("is_deployed", filters.is_deployed)
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -883,6 +962,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("name", filters.name)
             if filters.symbol is not None:
                 query = query.eq("symbol", filters.symbol)
+            if filters.status is not None:
+                query = query.eq("status", str(filters.status))
         response = query.execute()
         data = response.data or []
         return [Token(**row) for row in data]

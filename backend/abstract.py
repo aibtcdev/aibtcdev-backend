@@ -25,6 +25,10 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    QueueMessage,
+    QueueMessageBase,
+    QueueMessageCreate,
+    QueueMessageFilter,
     Secret,
     SecretBase,
     SecretFilter,
@@ -100,6 +104,33 @@ class AbstractBackend(ABC):
     # @abstractmethod
     # def delete_secret(self, secret_id: UUID) -> bool:
     #     pass
+
+    # ----------- QUEUE MESSAGES -----------
+    @abstractmethod
+    def create_queue_message(
+        self, new_queue_message: QueueMessageCreate
+    ) -> QueueMessage:
+        pass
+
+    @abstractmethod
+    def get_queue_message(self, queue_message_id: UUID) -> Optional[QueueMessage]:
+        pass
+
+    @abstractmethod
+    def list_queue_messages(
+        self, filters: Optional[QueueMessageFilter] = None
+    ) -> List[QueueMessage]:
+        pass
+
+    @abstractmethod
+    def update_queue_message(
+        self, queue_message_id: UUID, update_data: QueueMessageBase
+    ) -> Optional[QueueMessage]:
+        pass
+
+    @abstractmethod
+    def delete_queue_message(self, queue_message_id: UUID) -> bool:
+        pass
 
     # ----------- WALLETS ----------
     @abstractmethod

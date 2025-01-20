@@ -1,9 +1,18 @@
 import json
 import logging
+import os
 from .bun import BunScriptRunner
 from backend.factory import backend
-from backend.models import UUID, ExtensionCreate, TokenBase
+from backend.models import (
+    UUID,
+    ContractStatus,
+    DAOBase,
+    ExtensionCreate,
+    ProposalCreate,
+    TokenBase,
+)
 from langchain.tools import BaseTool
+from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
@@ -37,14 +46,18 @@ class ContractDAODeployInput(BaseModel):
         ...,
         description="Number of decimals for the token for the DAO. Default is 6",
     )
-    mission: str = Field(..., description="The mission statement for the DAO")
+    mission: str = Field(
+        ...,
+        description="The mission of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.",
+    )
 
 
 class ContractDAODeployTool(BaseTool):
     name: str = "contract_dao_deploy"
     description: str = (
-        "Deploy a new DAO with a token and a bonding curve for stacks. "
-        "Example usage: 'deploy a dao named 'Human' with a token named 'Human' and a mission statement 'The Human Token'"
+        "Deploy a new DAO with a token and a bonding curve for Stacks blockchain. "
+        "Example usage: 'deploy a community DAO named 'GreenEarth' with a token named 'Green Token' and a purpose statement "
+        "'Promoting global environmental sustainability through decentralized collaboration and funding.'"
     )
     args_schema: Type[BaseModel] = ContractDAODeployInput
     return_direct: bool = False
@@ -66,6 +79,23 @@ class ContractDAODeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Core deployment logic used by both sync and async methods."""
         try:
+            ## get the address for the wallet based on network from os.getenv
+            network = os.getenv("NETWORK", "testnet")
+            wallet = backend.get_wallet(self.wallet_id)
+
+            if network == "mainnet":
+                wallet_address = wallet.mainnet_address
+            else:
+                wallet_address = wallet.testnet_address
+
+            platform = PlatformApi()
+            chainhook = platform.create_contract_deployment_hook(
+                deployer_address=wallet_address,
+                network=network,
+                expire_after_occurrence=19,
+            )
+            logger.debug(f"Created chainhook: {chainhook}")
+
             logger.debug(
                 f"Starting deployment with token_symbol={token_symbol}, "
                 f"token_name={token_name}, token_description={token_description}, "
@@ -90,7 +120,7 @@ class ContractDAODeployTool(BaseTool):
             metadata_url, token_record = generate_token_dependencies(
                 token_name,
                 token_symbol,
-                token_description,
+                mission,
                 token_decimals_int,  # Convert to int for database
                 token_max_supply,
             )
@@ -160,12 +190,16 @@ class ContractDAODeployTool(BaseTool):
                         "success": False,
                     }
 
+                backend.update_dao(
+                    dao_record.id, update_data=DAOBase(is_broadcasted=True)
+                )
                 # Update token record with contract information
                 logger.debug("Step 7: Updating token with contract information...")
                 contracts = deployment_data["contracts"]
                 token_updates = TokenBase(
                     contract_principal=contracts["token"]["contractPrincipal"],
                     tx_id=contracts["token"]["transactionId"],
+                    status=ContractStatus.PENDING,
                 )
                 logger.debug(f"Token updates: {token_updates}")
                 if not backend.update_token(token_record.id, token_updates):
@@ -179,7 +213,10 @@ class ContractDAODeployTool(BaseTool):
                 # Create extensions
                 logger.debug("Step 8: Creating extensions...")
                 for contract_name, contract_data in contracts.items():
-                    if contract_name != "token":
+                    if (
+                        contract_name != "token"
+                        and contract_name != "aibtc-base-bootstrap-initialization"
+                    ):
                         logger.debug(f"Creating extension for {contract_name}")
                         extension_result = backend.create_extension(
                             ExtensionCreate(
@@ -187,7 +224,7 @@ class ContractDAODeployTool(BaseTool):
                                 type=contract_name,
                                 contract_principal=contract_data["contractPrincipal"],
                                 tx_id=contract_data["transactionId"],
-                                status="deployed",
+                                status="PENDING",
                             )
                         )
                         if not extension_result:
@@ -199,6 +236,20 @@ class ContractDAODeployTool(BaseTool):
                             }
                         logger.debug(
                             f"Successfully created extension for {contract_name}"
+                        )
+                    if contract_name == "aibtc-base-bootstrap-initialization":
+                        logger.debug(
+                            f"Successfully created extension for {contract_name}"
+                        )
+                        proposal_result = backend.create_proposal(
+                            ProposalCreate(
+                                dao_id=dao_record.id,
+                                status=ContractStatus.PENDING,
+                                tx_id=contract_data["transactionId"],
+                                contract_principal=contract_data["contractPrincipal"],
+                                title="Initialize DAO",
+                                description="Initialize the DAO",
+                            )
                         )
 
                 logger.debug("Deployment completed successfully")
