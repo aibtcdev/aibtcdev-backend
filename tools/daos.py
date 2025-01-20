@@ -12,6 +12,7 @@ from backend.models import (
     TokenBase,
 )
 from langchain.tools import BaseTool
+from lib.hiro import HiroApi
 from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
 from services.daos import (
@@ -79,22 +80,12 @@ class ContractDAODeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Core deployment logic used by both sync and async methods."""
         try:
-            ## get the address for the wallet based on network from os.getenv
-            # network = os.getenv("NETWORK", "testnet")
-            # wallet = backend.get_wallet(self.wallet_id)
+            # get the address for the wallet based on network from os.getenv
+            network = os.getenv("NETWORK", "testnet")
 
-            # if network == "mainnet":
-            #     wallet_address = wallet.mainnet_address
-            # else:
-            #     wallet_address = wallet.testnet_address
-
-            # platform = PlatformApi()
-            # chainhook = platform.create_contract_deployment_hook(
-            #     deployer_address=wallet_address,
-            #     network=network,
-            #     expire_after_occurrence=19,
-            # )
-            # logger.debug(f"Created chainhook: {chainhook}")
+            hiro = HiroApi()
+            current_block_height = hiro.get_current_block_height()
+            logger.debug(f"Current block height: {current_block_height}")
 
             logger.debug(
                 f"Starting deployment with token_symbol={token_symbol}, "
@@ -213,6 +204,16 @@ class ContractDAODeployTool(BaseTool):
                 # Create extensions
                 logger.debug("Step 8: Creating extensions...")
                 for contract_name, contract_data in contracts.items():
+                    platform = PlatformApi()
+                    chainhook = platform.create_contract_deployment_hook(
+                        txid=contract_data.get("transactionId"),
+                        network=network,
+                        name=f"{dao_record.id}",
+                        start_block=current_block_height,
+                        expire_after_occurrence=1,
+                    )
+                    logger.debug(f"Created chainhook: {chainhook}")
+
                     if (
                         contract_name != "token"
                         and contract_name != "aibtc-base-bootstrap-initialization"

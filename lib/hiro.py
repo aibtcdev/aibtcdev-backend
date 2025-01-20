@@ -180,6 +180,16 @@ class HiroApi:
         except Exception as e:
             raise Exception(f"Failed to get STX price: {str(e)}")
 
+    def get_current_block_height(self) -> int:
+        """Get the current block height."""
+        try:
+            response = self._get(
+                "/extended/v2/blocks", params={"limit": 1, "offset": 0}
+            )
+            return response["results"][0]["height"]
+        except Exception as e:
+            raise Exception(f"Failed to get current block height: {str(e)}")
+
     def search(self, query_id: str) -> dict:
         """Search for blocks, transactions, contracts, or addresses."""
         return self._get(f"/extended/v1/search/{query_id}")

@@ -85,6 +85,10 @@ class TweetRunner:
                             f"No matching DAO message found for dao_id: {message.dao_id} "
                             f"with token symbol: {token[0].symbol}, name: {token[0].name}"
                         )
+                        backend.update_queue_message(
+                            queue_message_id=message.id,
+                            update_data=QueueMessageBase(is_processed=True),
+                        )
                         continue
 
                     # Generate an exciting tweet about the DAO deployment

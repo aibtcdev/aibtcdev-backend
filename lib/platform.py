@@ -15,27 +15,32 @@ class PlatformApi:
         )
         self.api_key = os.getenv("HIRO_API_KEY")
         self.webhook_url = os.getenv("AIBTC_WEBHOOK_URL")
-        self.webhook_auth = os.getenv("AIBTC_WEBHOOK_AUTH")
+        self.webhook_auth = os.getenv("AIBTC_WEBHOOK_AUTH", "Bearer 1234567890")
         if not self.api_key:
             raise ValueError("HIRO_API_KEY environment variable is required")
 
     def generate_contract_deployment_predicate(
         self,
-        deployer_address: str,
-        start_block: int = 63416,
+        txid: str,
+        start_block: int = 75996,
         network: str = "testnet",
-        name: str = "aibtcdevtestnet",
+        name: str = "test",
         end_block: Optional[int] = None,
-        expire_after_occurrence: Optional[int] = None,
+        expire_after_occurrence: int = 1,
+        webhook_url: Optional[str] = None,
+        webhook_auth: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generate a chainhook predicate for contract deployments.
+        """Generate a chainhook predicate for specific transaction monitoring.
 
         Args:
-            deployer_address: The address of the contract deployer to monitor
+            txid: The transaction ID to monitor
             start_block: The block height to start monitoring from
             name: Name of the chainhook
+            network: Network to monitor (testnet or mainnet)
             end_block: Optional block height to stop monitoring
-            expire_after_occurrence: Optional number of occurrences before expiring
+            expire_after_occurrence: Number of occurrences before expiring
+            webhook_url: Optional custom webhook URL
+            webhook_auth: Optional custom webhook authorization header
 
         Returns:
             Dict containing the chainhook predicate configuration
@@ -46,15 +51,12 @@ class PlatformApi:
             "version": 1,
             "networks": {
                 f"{network}": {
-                    "if_this": {
-                        "scope": "contract_deployment",
-                        "deployer": deployer_address,
-                    },
+                    "if_this": {"scope": "txid", "equals": txid},
                     "end_block": end_block,
                     "then_that": {
                         "http_post": {
-                            "url": self.webhook_url,
-                            "authorization_header": self.webhook_auth,
+                            "url": webhook_url or self.webhook_url,
+                            "authorization_header": webhook_auth or self.webhook_auth,
                         }
                     },
                     "start_block": start_block,
@@ -64,21 +66,17 @@ class PlatformApi:
             },
         }
 
-    def create_contract_deployment_hook(
-        self, deployer_address: str, **kwargs
-    ) -> Dict[str, Any]:
+    def create_contract_deployment_hook(self, txid: str, **kwargs) -> Dict[str, Any]:
         """Create a chainhook for monitoring contract deployments.
 
         Args:
-            deployer_address: The address of the contract deployer to monitor
+            txid: The transaction ID to monitor
             **kwargs: Additional arguments to pass to generate_contract_deployment_predicate
 
         Returns:
             Dict containing the response from the API
         """
-        predicate = self.generate_contract_deployment_predicate(
-            deployer_address, **kwargs
-        )
+        predicate = self.generate_contract_deployment_predicate(txid, **kwargs)
         return self.create_chainhook(predicate)
 
     def create_chainhook(self, chainhook_predicate: Dict[str, Any]) -> Dict[str, Any]:
