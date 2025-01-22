@@ -203,6 +203,89 @@ class FaktoryExecuteSellTool(BaseTool):
             token_amount, dex_contract_id, slippage
         )
 
+
+class FaktoryGetDaoTokensInput(BaseModel):
+    """Input schema for getting DAO tokens from Faktory."""
+
+    page: Optional[str] = Field(
+        default="1",
+        description="Page number for pagination",
+    )
+    limit: Optional[str] = Field(
+        default="10",
+        description="Number of items per page",
+    )
+    search: Optional[str] = Field(
+        default=None,
+        description="Search term to filter tokens",
+    )
+    sort_order: Optional[str] = Field(
+        default=None,
+        description="Sort order for the results",
+    )
+
+
+class FaktoryGetDaoTokensTool(BaseTool):
+    name: str = "faktory_get_dao_tokens"
+    description: str = (
+        "Get a list of DAO tokens from Faktory with optional pagination, search, and sorting"
+    )
+    args_schema: Type[BaseModel] = FaktoryGetDaoTokensInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        page: Optional[str] = "1",
+        limit: Optional[str] = "10",
+        search: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get DAO tokens."""
+        args = [page, limit]
+        if search:
+            args.append(search)
+            if sort_order:
+                args.append(sort_order)
+        
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "get-dao-tokens.ts",
+            *args,
+        )
+    
+    def _run(
+        self,
+        page: Optional[str] = "1",
+        limit: Optional[str] = "10",
+        search: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get DAO tokens."""
+        return self._deploy(
+            page, limit, search, sort_order
+        )
+
+    async def _arun(
+        self,
+        page: Optional[str] = "1",
+        limit: Optional[str] = "10",
+        search: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get DAO tokens (async)."""
+        return self._deploy(
+            page, limit, search, sort_order
+        )
+
     async def _arun(
         self,
         token_amount: str,
