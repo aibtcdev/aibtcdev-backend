@@ -138,8 +138,8 @@ class ContractDAODeployTool(BaseTool):
             logger.debug(
                 f"BunScriptRunner parameters: wallet_id={self.wallet_id}, "
                 f"token_symbol={token_symbol}, token_name={token_name}, "
-                f"token_max_supply={token_max_supply}, token_decimals={token_decimals}, "
-                f"metadata_url={metadata_url}"
+                f"token_max_supply={token_max_supply}, metadata_url={metadata_url}, "
+                f"logo_url={token_record.image_url}, dao_manifest={mission}"
             )
 
             result = BunScriptRunner.bun_run(
@@ -149,8 +149,8 @@ class ContractDAODeployTool(BaseTool):
                 token_symbol,
                 token_name,
                 token_max_supply,
-                token_decimals,  # Keep as string for TypeScript
                 metadata_url,
+                token_record.image_url,
                 mission,
             )
             logger.debug(f"Contract deployment result type: {type(result)}")
