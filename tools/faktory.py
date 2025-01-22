@@ -372,3 +372,52 @@ class FaktoryGetSellQuoteTool(BaseTool):
             token_amount, dex_contract_id, slippage, network
         )
 
+
+class FaktoryGetTokenInput(BaseModel):
+    """Input schema for getting token information from Faktory."""
+
+    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+
+
+class FaktoryGetTokenTool(BaseTool):
+    name: str = "faktory_get_token"
+    description: str = (
+        "Get detailed information about a token from its DEX contract"
+    )
+    args_schema: Type[BaseModel] = FaktoryGetTokenInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dex_contract_id: str,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get token information."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "get-token.ts",
+            dex_contract_id,
+        )
+    
+    def _run(
+        self,
+        dex_contract_id: str,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get token information."""
+        return self._deploy(dex_contract_id)
+
+    async def _arun(
+        self,
+        dex_contract_id: str,
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get token information (async)."""
+        return self._deploy(dex_contract_id)
+
