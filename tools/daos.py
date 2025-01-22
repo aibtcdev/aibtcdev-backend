@@ -108,7 +108,7 @@ class ContractDAODeployTool(BaseTool):
             token_decimals_int = int(token_decimals)
             logger.debug(f"Converted token_decimals to: {token_decimals_int}")
 
-            image_url, metadata_url, token_record = generate_token_dependencies(
+            metadata_url, token_record = generate_token_dependencies(
                 token_name,
                 token_symbol,
                 mission,
@@ -139,7 +139,7 @@ class ContractDAODeployTool(BaseTool):
                 f"BunScriptRunner parameters: wallet_id={self.wallet_id}, "
                 f"token_symbol={token_symbol}, token_name={token_name}, "
                 f"token_max_supply={token_max_supply}, metadata_url={metadata_url}, "
-                f"logo_url={image_url}, dao_manifest={mission}"
+                f"logo_url={token_record.image_url}, dao_manifest={mission}"
             )
 
             result = BunScriptRunner.bun_run(
@@ -150,7 +150,7 @@ class ContractDAODeployTool(BaseTool):
                 token_name,
                 token_max_supply,
                 metadata_url,
-                image_url,
+                token_record.image_url,
                 mission,
             )
             logger.debug(f"Contract deployment result type: {type(result)}")

@@ -136,7 +136,7 @@ def generate_token_dependencies(
 
             logger.debug(f"Final token data content: {update_result}")
 
-            return assets["image_url"], assets["metadata_url"], update_result
+            return assets["metadata_url"], update_result
 
         except TokenAssetError as e:
             logger.error(f"Failed to generate token assets: {e}", exc_info=True)
