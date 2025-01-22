@@ -11,6 +11,80 @@ class FaktoryBaseInput(BaseModel):
 
     pass
 
+
+class FaktoryGetBuyQuoteInput(BaseModel):
+    """Input schema for getting a Faktory buy quote."""
+
+    stx_amount: str = Field(..., description="Amount of STX to spend in standard units (e.g. 1.5 = 1.5 STX)")
+    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+    slippage: Optional[str] = Field(
+        default="15",
+        description="Slippage tolerance in percentage (default: 15%)",
+    )
+    network: Optional[str] = Field(
+        default="mainnet",
+        description="Network to use (mainnet or testnet)",
+    )
+
+
+class FaktoryGetBuyQuoteTool(BaseTool):
+    name: str = "faktory_get_buy_quote"
+    description: str = (
+        "Get a quote for buying tokens on Faktory DEX with specified STX amount"
+    )
+    args_schema: Type[BaseModel] = FaktoryGetBuyQuoteInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        stx_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a buy quote."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "get-buy-quote.ts",
+            stx_amount,
+            dex_contract_id,
+            slippage,
+            network,
+        )
+    
+    def _run(
+        self,
+        stx_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a buy quote."""
+        return self._deploy(
+            stx_amount, dex_contract_id, slippage, network
+        )
+
+    async def _arun(
+        self,
+        stx_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a buy quote (async)."""
+        return self._deploy(
+            stx_amount, dex_contract_id, slippage, network
+        )
+
 class FaktoryExecuteBuyInput(BaseModel):
     """Input schema for Faktory buy order execution."""
 
