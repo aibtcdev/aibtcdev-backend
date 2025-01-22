@@ -48,7 +48,7 @@ class ContractSIP10DeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to deploy a SIP-10 token contract."""
         try:
-            token_url, token_data = generate_token_dependencies(
+            image_url, token_url, token_data = generate_token_dependencies(
                 token_name,
                 token_symbol,
                 token_description,
