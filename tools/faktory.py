@@ -298,3 +298,77 @@ class FaktoryGetDaoTokensTool(BaseTool):
             token_amount, dex_contract_id, slippage
         )
 
+
+class FaktoryGetSellQuoteInput(BaseModel):
+    """Input schema for getting a Faktory sell quote."""
+
+    token_amount: str = Field(..., description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)")
+    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+    slippage: Optional[str] = Field(
+        default="15",
+        description="Slippage tolerance in percentage (default: 15%)",
+    )
+    network: Optional[str] = Field(
+        default="mainnet",
+        description="Network to use (mainnet or testnet)",
+    )
+
+
+class FaktoryGetSellQuoteTool(BaseTool):
+    name: str = "faktory_get_sell_quote"
+    description: str = (
+        "Get a quote for selling tokens on Faktory DEX with specified token amount"
+    )
+    args_schema: Type[BaseModel] = FaktoryGetSellQuoteInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a sell quote."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "get-sell-quote.ts",
+            token_amount,
+            dex_contract_id,
+            slippage,
+            network,
+        )
+    
+    def _run(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a sell quote."""
+        return self._deploy(
+            token_amount, dex_contract_id, slippage, network
+        )
+
+    async def _arun(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        network: Optional[str] = "mainnet",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to get a sell quote (async)."""
+        return self._deploy(
+            token_amount, dex_contract_id, slippage, network
+        )
+
