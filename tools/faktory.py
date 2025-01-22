@@ -14,7 +14,7 @@ class FaktoryBaseInput(BaseModel):
 class FaktoryExecuteBuyInput(BaseModel):
     """Input schema for Faktory buy order execution."""
 
-    stx_amount: str = Field(..., description="Amount of STX to spend on the purchase")
+    stx_amount: str = Field(..., description="Amount of STX to spend on the purchase in standard units (e.g. 1.5 = 1.5 STX)")
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="50",
@@ -79,7 +79,7 @@ class FaktoryExecuteBuyTool(BaseTool):
 class FaktoryExecuteSellInput(BaseModel):
     """Input schema for Faktory sell order execution."""
 
-    token_amount: str = Field(..., description="Amount of tokens to sell")
+    token_amount: str = Field(..., description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)")
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="15",
