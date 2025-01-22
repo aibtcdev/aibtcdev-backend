@@ -36,6 +36,14 @@ from .db import (
     ListScheduledTasksTool,
     UpdateScheduledTaskTool,
 )
+from .faktory import (
+    FaktoryExecuteBuyTool,
+    FaktoryExecuteSellTool,
+    FaktoryGetBuyQuoteTool,
+    FaktoryGetDaoTokensTool,
+    FaktoryGetSellQuoteTool,
+    FaktoryGetTokenTool
+)
 from .get_btc_data import GetBitcoinData
 from .hiro import (
     STXGetContractInfoTool,
@@ -142,6 +150,12 @@ def initialize_tools(
         "db_list_scheduled_tasks": ListScheduledTasksTool(profile.id, agent_id),
         "db_update_scheduled_task": UpdateScheduledTaskTool(profile.id, agent_id),
         "db_delete_scheduled_task": DeleteScheduledTaskTool(profile.id, agent_id),
+        "faktory_exec_buy": FaktoryExecuteBuyTool(wallet_id),
+        "faktory_exec_sell": FaktoryExecuteSellTool(wallet_id),
+        "faktory_get_buy_quote": FaktoryGetBuyQuoteTool(wallet_id),
+        "faktory_get_dao_tokens": FaktoryGetDaoTokensTool(wallet_id),
+        "faktory_get_sell_quote": FaktoryGetSellQuoteTool(wallet_id),
+        "faktory_get_token": FaktoryGetTokenTool(wallet_id),
         "jing_get_order_book": JingGetOrderBookTool(wallet_id),
         "jing_create_bid": JingCreateBidTool(wallet_id),
         "jing_cancel_ask": JingCancelAskTool(wallet_id),
