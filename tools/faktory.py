@@ -41,7 +41,7 @@ class FaktoryExecuteBuyTool(BaseTool):
         self,
         stx_amount: str,
         dex_contract_id: str,
-        silppage: Optional[str] = "50",
+        slippage: Optional[str] = "50",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
@@ -222,11 +222,11 @@ class FaktoryGetDaoTokensInput(BaseModel):
         description="Number of items per page",
     )
     search: Optional[str] = Field(
-        default=None,
+        default="",
         description="Search term to filter tokens",
     )
     sort_order: Optional[str] = Field(
-        default=None,
+        default="",
         description="Sort order for the results",
     )
 
@@ -248,30 +248,28 @@ class FaktoryGetDaoTokensTool(BaseTool):
         self,
         page: Optional[str] = "1",
         limit: Optional[str] = "10",
-        search: Optional[str] = None,
-        sort_order: Optional[str] = None,
+        search: Optional[str] = "",
+        sort_order: Optional[str] = "",
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens."""
-        args = [page, limit]
-        if search:
-            args.append(search)
-            if sort_order:
-                args.append(sort_order)
         
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
             "get-dao-tokens.ts",
-            *args,
+            page,
+            limit,
+            search,
+            sort_order,
         )
     
     def _run(
         self,
         page: Optional[str] = "1",
         limit: Optional[str] = "10",
-        search: Optional[str] = None,
-        sort_order: Optional[str] = None,
+        search: Optional[str] = "",
+        sort_order: Optional[str] = "",
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens."""
@@ -283,8 +281,8 @@ class FaktoryGetDaoTokensTool(BaseTool):
         self,
         page: Optional[str] = "1",
         limit: Optional[str] = "10",
-        search: Optional[str] = None,
-        sort_order: Optional[str] = None,
+        search: Optional[str] = "",
+        sort_order: Optional[str] = "",
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens (async)."""
