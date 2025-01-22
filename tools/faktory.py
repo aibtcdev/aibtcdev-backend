@@ -12,7 +12,7 @@ class FaktoryBaseInput(BaseModel):
     pass
 
 class FaktoryExecuteBuyInput(BaseModel):
-      """Input schema for Faktory buy order execution."""
+    """Input schema for Faktory buy order execution."""
 
     stx_amount: str = Field(..., description="Amount of STX to spend on the purchase")
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
@@ -76,4 +76,68 @@ class FaktoryExecuteBuyTool(BaseTool):
         )
 
 
+class FaktoryExecuteSellInput(BaseModel):
+    """Input schema for Faktory sell order execution."""
+
+    token_amount: str = Field(..., description="Amount of tokens to sell")
+    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+    slippage: Optional[str] = Field(
+        default="15",
+        description="Slippage tolerance in percentage (default: 15%)",
+    )
+
+
+class FaktoryExecuteSellTool(BaseTool):
+    name: str = "faktory_execute_sell"
+    description: str = (
+        "Execute a sell order on Faktory DEX with specified token amount and DEX details"
+    )
+    args_schema: Type[BaseModel] = FaktoryExecuteSellInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a sell order."""
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "exec-sell.ts",
+            token_amount,
+            dex_contract_id,
+            slippage,
+        )
+    
+    def _run(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a sell order."""
+        return self._deploy(
+            token_amount, dex_contract_id, slippage
+        )
+
+    async def _arun(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a sell order (async)."""
+        return self._deploy(
+            token_amount, dex_contract_id, slippage
+        )
 
