@@ -157,15 +157,19 @@ class TwitterMentionHandler:
 
         logger.info(f"Analysis result: {analysis_result}")
 
-        backend.update_x_tweet(
-            x_tweet_id=tweet_data.tweet_id,
-            update_data=XTweetBase(
-                is_worthy=analysis_result["is_worthy"],
-                tweet_type=analysis_result["tweet_type"],
-                confidence_score=analysis_result["confidence_score"],
-                reason=analysis_result["reason"],
-            ),
+        tweets = backend.list_x_tweets(
+            filters=XTweetFilter(tweet_id=tweet_data.tweet_id)
         )
+        if tweets and len(tweets) > 0:
+            backend.update_x_tweet(
+                x_tweet_id=tweets[0].id,
+                update_data=XTweetBase(
+                    is_worthy=analysis_result["is_worthy"],
+                    tweet_type=analysis_result["tweet_type"],
+                    confidence_score=analysis_result["confidence_score"],
+                    reason=analysis_result["reason"],
+                ),
+            )
 
         # If worthy and tool request, send to queue
         if analysis_result["is_worthy"] and analysis_result["tool_request"]:
