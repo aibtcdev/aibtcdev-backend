@@ -11,6 +11,7 @@ from backend.models import (
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
+from pydantic import BaseModel
 from services.tweet_analysis import analyze_tweet
 from typing import Dict, List, Optional, TypedDict
 
@@ -25,8 +26,8 @@ class UserProfile(TypedDict):
     email: str
 
 
-class TweetData(TypedDict):
-    """Type definition for tweet data."""
+class TweetData(BaseModel):
+    """Pydantic model for tweet data."""
 
     tweet_id: str
     author_id: str
@@ -70,12 +71,12 @@ class TwitterMentionHandler:
         except Exception as e:
             logger.error(f"Error checking tweet {tweet_id} in database: {str(e)}")
 
-        tweet_data: TweetData = {
-            "tweet_id": tweet_id,
-            "author_id": author_id,
-            "text": text,
-            "conversation_id": conversation_id,
-        }
+        tweet_data = TweetData(
+            tweet_id=tweet_id,
+            author_id=author_id,
+            text=text,
+            conversation_id=conversation_id,
+        )
 
         # Store tweet and author data
         authors = backend.list_x_users(filters=XUserFilter(user_id=author_id))
