@@ -29,10 +29,10 @@ class UserProfile(TypedDict):
 class TweetData(BaseModel):
     """Pydantic model for tweet data."""
 
-    tweet_id: str
-    author_id: str
-    text: str
-    conversation_id: str
+    tweet_id: Optional[str] = None
+    author_id: Optional[str] = None
+    text: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class TwitterMentionHandler:
