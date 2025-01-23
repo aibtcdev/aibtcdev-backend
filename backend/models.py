@@ -172,6 +172,7 @@ class DAOBase(CustomBaseModel):
     is_deployed: Optional[bool] = False
     is_broadcasted: Optional[bool] = False
     wallet_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
 
 
 class DAOCreate(DAOBase):
@@ -367,9 +368,18 @@ class Token(TokenBase):
 # X_USERS
 #
 class XUserBase(CustomBaseModel):
-    realname: Optional[str] = None
+    name: Optional[str] = None
     username: Optional[str] = None
     user_id: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    profile_banner_url: Optional[str] = None
+    protected: Optional[bool] = None
+    url: Optional[str] = None
+    verified: Optional[bool] = None
+    verified_type: Optional[str] = None
+    subscription_type: Optional[str] = None
 
 
 class XUserCreate(XUserBase):
@@ -505,7 +515,16 @@ class XCredsFilter(CustomBaseModel):
 class XUserFilter(CustomBaseModel):
     user_id: Optional[str] = None
     username: Optional[str] = None
-    realname: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    profile_banner_url: Optional[str] = None
+    protected: Optional[bool] = None
+    url: Optional[str] = None
+    verified: Optional[bool] = None
+    verified_type: Optional[str] = None
+    subscription_type: Optional[str] = None
 
 
 class XTweetFilter(CustomBaseModel):

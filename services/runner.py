@@ -1,12 +1,14 @@
 import os
 from backend.factory import backend
 from backend.models import (
+    DAOBase,
     DAOFilter,
     Profile,
     QueueMessageBase,
     QueueMessageFilter,
     TokenFilter,
     WalletFilter,
+    XUserBase,
 )
 from datetime import datetime
 from lib.logger import configure_logger
@@ -130,6 +132,45 @@ class TweetRunner:
                         },
                         response_content,
                     )
+
+                    tweet_info = backend.get_x_tweet(matching_dao_message.tweet_id)
+                    if not tweet_info:
+                        logger.error(
+                            f"No tweet info found for tweet_id: {matching_dao_message.tweet_id}"
+                        )
+                        continue
+
+                    author_id = tweet_info.author_id
+
+                    backend.update_dao(
+                        dao_id=dao.id,
+                        update_data=DAOBase(
+                            author_id=author_id,
+                        ),
+                    )
+                    user = (
+                        await self.twitter_handler.twitter_service.get_user_by_user_id(
+                            matching_dao_message.author_id
+                        )
+                    )
+                    if user:
+                        logger.info(f"User: {user}")
+                        # update user info in db
+                        backend.update_x_user(
+                            x_user_id=user.id,
+                            update_data=XUserBase(
+                                name=user.name,
+                                username=user.username,
+                                description=user.description,
+                                location=user.location,
+                                profile_image_url=user.profile_image_url,
+                                profile_banner_url=user.profile_banner_url,
+                                protected=user.protected,
+                                verified=user.verified,
+                                verified_type=user.verified_type,
+                                subscription_type=user.subscription_type,
+                            ),
+                        )
 
                     # Mark message as processed only after successful posting
                     backend.update_queue_message(

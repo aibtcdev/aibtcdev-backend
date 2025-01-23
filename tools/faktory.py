@@ -198,7 +198,7 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote."""
-        return self._deploy(stx_amount, dex_contract_id, slippage, network)
+        return self._deploy(stx_amount, dex_contract_id, slippage)
 
     async def _arun(
         self,
@@ -208,7 +208,7 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote (async)."""
-        return self._deploy(stx_amount, dex_contract_id, slippage, network)
+        return self._deploy(stx_amount, dex_contract_id, slippage)
 
 
 class FaktoryGetDaoTokensInput(BaseModel):
@@ -343,10 +343,7 @@ class FaktoryGetSellQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage
-        )
-
+        return self._deploy(token_amount, dex_contract_id, slippage)
 
     async def _arun(
         self,
@@ -356,9 +353,7 @@ class FaktoryGetSellQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote (async)."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage
-        )
+        return self._deploy(token_amount, dex_contract_id, slippage)
 
 
 class FaktoryGetTokenInput(BaseModel):

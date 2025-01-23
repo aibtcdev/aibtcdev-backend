@@ -1082,10 +1082,26 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.username is not None:
                 query = query.eq("username", filters.username)
-            if filters.realname is not None:
-                query = query.eq("realname", filters.realname)
+            if filters.name is not None:
+                query = query.eq("name", filters.name)
             if filters.user_id is not None:
                 query = query.eq("user_id", filters.user_id)
+            if filters.description is not None:
+                query = query.eq("description", filters.description)
+            if filters.location is not None:
+                query = query.eq("location", filters.location)
+            if filters.profile_image_url is not None:
+                query = query.eq("profile_image_url", filters.profile_image_url)
+            if filters.profile_banner_url is not None:
+                query = query.eq("profile_banner_url", filters.profile_banner_url)
+            if filters.protected is not None:
+                query = query.eq("protected", filters.protected)
+            if filters.verified is not None:
+                query = query.eq("verified", filters.verified)
+            if filters.verified_type is not None:
+                query = query.eq("verified_type", filters.verified_type)
+            if filters.subscription_type is not None:
+                query = query.eq("subscription_type", filters.subscription_type)
         response = query.execute()
         data = response.data or []
         return [XUser(**row) for row in data]
