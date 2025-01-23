@@ -8,6 +8,7 @@ from backend.models import (
     QueueMessageFilter,
     TokenFilter,
     WalletFilter,
+    XTweetFilter,
     XUserBase,
 )
 from datetime import datetime
@@ -133,14 +134,16 @@ class TweetRunner:
                         response_content=response_content,
                     )
 
-                    tweet_info = backend.get_x_tweet(matching_dao_message.tweet_id)
-                    if not tweet_info:
+                    tweet_info = backend.list_x_tweets(
+                        filters=XTweetFilter(tweet_id=matching_dao_message.tweet_id)
+                    )
+                    if not tweet_info or len(tweet_info) == 0:
                         logger.error(
                             f"No tweet info found for tweet_id: {matching_dao_message.tweet_id}"
                         )
                         continue
 
-                    author_id = tweet_info.author_id
+                    author_id = tweet_info[0].author_id
 
                     backend.update_dao(
                         dao_id=dao.id,
