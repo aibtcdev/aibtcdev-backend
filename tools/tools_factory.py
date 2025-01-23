@@ -183,46 +183,46 @@ def initialize_tools(
         "contract_dao_deploy": ContractDAODeployTool(wallet_id),
         "contract_source_fetch": FetchContractSourceTool(wallet_id),
         "btc_price": GetBitcoinData(),
-        "stxcity_search": StxCitySearchTool(wallet_id),
-        "stxcity_execute_sell": StxCityExecuteSellTool(wallet_id),
-        "stxcity_execute_buy": StxCityExecuteBuyTool(wallet_id),
-        "stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
+        #"stxcity_search": StxCitySearchTool(wallet_id),
+        #"stxcity_execute_sell": StxCityExecuteSellTool(wallet_id),
+        #"stxcity_execute_buy": StxCityExecuteBuyTool(wallet_id),
+        #"stxcity_list_bonding_tokens": StxCityListBondingTokensTool(wallet_id),
         "twitter_post_tweet": TwitterPostTweetTool(agent_id),
         "dao_core_get_linked_voting_contracts": CoreGetLinkedVotingContractsTool(
             wallet_id
         ),
-        "dao_core_create_proposal": CoreCreateProposalTool(wallet_id),
-        "dao_core_get_proposal": CoreGetProposalTool(wallet_id),
-        "dao_core_get_total_votes": CoreGetTotalVotesTool(wallet_id),
-        "dao_core_get_voting_power": CoreGetVotingPowerTool(wallet_id),
-        "dao_core_vote_on_proposal": CoreVoteOnProposalTool(wallet_id),
-        "dao_core_conclude_proposal": CoreConcludeProposalTool(wallet_id),
-        "dao_action_get_linked_voting_contracts": ActionGetLinkedVotingContractsTool(
-            wallet_id
-        ),
-        "dao_action_get_proposal": ActionGetProposalTool(wallet_id),
-        "dao_action_get_total_votes": ActionGetTotalVotesTool(wallet_id),
-        "dao_action_get_voting_power": ActionGetVotingPowerTool(wallet_id),
-        "dao_action_vote_on_proposal": ActionVoteOnProposalTool(wallet_id),
-        "dao_action_conclude_proposal": ActionConcludeProposalTool(wallet_id),
-        "dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
-        "dao_buy_token": BuyTokenTool(wallet_id),
-        "dao_sell_token": SellTokenTool(wallet_id),
-        "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
-        "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
-        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
-        "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(
-            wallet_id
-        ),
-        "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
-            wallet_id
-        ),
-        "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
-            wallet_id
-        ),
-        "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
-            wallet_id
-        ),
+        #"dao_core_create_proposal": CoreCreateProposalTool(wallet_id),
+        #"dao_core_get_proposal": CoreGetProposalTool(wallet_id),
+        #"dao_core_get_total_votes": CoreGetTotalVotesTool(wallet_id),
+        #"dao_core_get_voting_power": CoreGetVotingPowerTool(wallet_id),
+        #"dao_core_vote_on_proposal": CoreVoteOnProposalTool(wallet_id),
+        #"dao_core_conclude_proposal": CoreConcludeProposalTool(wallet_id),
+        #"dao_action_get_linked_voting_contracts": ActionGetLinkedVotingContractsTool(
+        #    wallet_id
+        #),
+        #"dao_action_get_proposal": ActionGetProposalTool(wallet_id),
+        #"dao_action_get_total_votes": ActionGetTotalVotesTool(wallet_id),
+        #"dao_action_get_voting_power": ActionGetVotingPowerTool(wallet_id),
+        #"dao_action_vote_on_proposal": ActionVoteOnProposalTool(wallet_id),
+        #"dao_action_conclude_proposal": ActionConcludeProposalTool(wallet_id),
+        #"dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
+        #"dao_buy_token": BuyTokenTool(wallet_id),
+        #"dao_sell_token": SellTokenTool(wallet_id),
+        #"dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
+        #"dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
+        #"dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
+        #"dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(
+        #    wallet_id
+        #),
+        #"dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
+        #    wallet_id
+        #),
+        #"dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
+        #    wallet_id
+        #),
+        #"dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
+        #    wallet_id
+        #),
         "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
     }
 
