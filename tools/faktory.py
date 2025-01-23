@@ -132,6 +132,18 @@ class FaktoryExecuteSellTool(BaseTool):
         return self._deploy(
             token_amount, dex_contract_id, slippage
         )
+    
+    async def _arun(
+        self,
+        token_amount: str,
+        dex_contract_id: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a sell order (async)."""
+        return self._deploy(
+            token_amount, dex_contract_id, slippage
+        )
 
 # agent-tools-ts/src/stacks-faktory/get-buy-quote.ts
 
@@ -288,18 +300,6 @@ class FaktoryGetDaoTokensTool(BaseTool):
         """Execute the tool to get DAO tokens (async)."""
         return self._deploy(
             page, limit, search, sort_order
-        )
-
-    async def _arun(
-        self,
-        token_amount: str,
-        dex_contract_id: str,
-        slippage: Optional[str] = "15",
-        **kwargs,
-    ) -> str:
-        """Execute the tool to place a sell order (async)."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage
         )
 
 # agent-tools-ts/src/stacks-faktory/get-sell-quote.ts
