@@ -38,7 +38,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
 
     persona = generate_persona(agent)
 
-    tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
+    tools_map = initialize_tools(profile, agent_id=agent_id)
     # if agent.agent_tools is not None:
     #     tools_map_filtered = filter_tools_by_names(agent.agent_tools, tools_map)
     # else:

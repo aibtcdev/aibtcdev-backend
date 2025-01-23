@@ -61,6 +61,8 @@ class AddScheduledTaskTool(BaseTool):
 
         if not self.agent_id:
             return {"error": "Agent ID is required"}
+        if self.profile_id is None:
+            return {"error": "Profile ID is required"}
         try:
             response = backend.create_task(
                 TaskCreate(
@@ -245,7 +247,7 @@ class UpdateScheduledTaskInput(BaseModel):
     )
     enabled: Optional[str] = Field(
         None,
-        description="Whether the schedule is enabled or not (true or false)",
+        description="Whether the schedule is enabled or not (true or false) default is true",
     )
 
 
@@ -285,6 +287,8 @@ class UpdateScheduledTaskTool(BaseTool):
         try:
             if not self.agent_id:
                 return {"error": "Agent ID is required"}
+            if self.profile_id is None:
+                return {"error": "Profile ID is required"}
             update_data = {}
             if name is not None:
                 update_data["name"] = name
@@ -363,6 +367,8 @@ class ListScheduledTasksTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to list scheduled tasks."""
         try:
+            if self.profile_id is None:
+                return {"error": "Profile ID is required"}
             if not self.agent_id:
                 return {"error": "Agent ID is required"}
             tasks = backend.list_tasks(
@@ -422,11 +428,12 @@ class DeleteScheduledTaskTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to delete a scheduled task."""
+        if self.profile_id is None:
+            return {"error": "Profile ID is required"}
+        if not self.agent_id:
+            return {"error": "Agent ID is required"}
         try:
-            if not self.agent_id:
-                return {"error": "Agent ID is required"}
-            response = backend.delete_task(UUID(task_id))
-            return response
+            return backend.delete_task(UUID(task_id))
         except Exception as e:
             return {"error": str(e)}
 

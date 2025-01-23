@@ -27,14 +27,7 @@ def get_avaliable_tools() -> List[Dict[str, str]]:
     """
     logger.debug("Fetching available tools")
     try:
-        mock_profile = Profile(
-            id="419781f6-c250-4bd6-be9e-fb347d1f77f9",
-            created_at=datetime.datetime.now(),
-            updated_at=datetime.datetime.now(),
-        )
-        tools_map = initialize_tools(
-            mock_profile, "419781f6-c250-4bd6-be9e-fb347d1f77f9", crewai=False
-        )
+        tools_map = initialize_tools(None, None)
 
         tools_array = []
         for tool_name, tool_instance in tools_map.items():

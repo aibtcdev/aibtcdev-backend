@@ -26,24 +26,21 @@ class TwitterPostTweetTool(BaseTool):
     )
     args_schema: Type[BaseModel] = TwitterPostTweetInput
     return_direct: bool = False
-    profile_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
 
     def __init__(
         self,
-        profile_id: Optional[UUID] = None,
         agent_id: Optional[UUID] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.profile_id = profile_id
         self.agent_id = agent_id
 
     def _deploy(self, content: str, **kwargs) -> str:
         """Execute the tool to post a tweet synchronously."""
 
-        if not self.agent_id:
-            return "Agent ID is required"
+        if self.agent_id is None:
+            raise ValueError("Agent ID is required")
 
         if len(content) > 280:
             return "Error: Tweet content exceeds 280 characters limit. Please shorten your message."

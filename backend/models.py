@@ -63,6 +63,7 @@ class QueueMessageBase(CustomBaseModel):
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
     dao_id: Optional[UUID] = None
+    wallet_id: Optional[UUID] = None
 
 
 class QueueMessageCreate(QueueMessageBase):
@@ -170,6 +171,8 @@ class DAOBase(CustomBaseModel):
     description: Optional[str] = None
     is_deployed: Optional[bool] = False
     is_broadcasted: Optional[bool] = False
+    wallet_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
 
 
 class DAOCreate(DAOBase):
@@ -365,9 +368,18 @@ class Token(TokenBase):
 # X_USERS
 #
 class XUserBase(CustomBaseModel):
-    realname: Optional[str] = None
+    name: Optional[str] = None
     username: Optional[str] = None
     user_id: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    profile_banner_url: Optional[str] = None
+    protected: Optional[bool] = None
+    url: Optional[str] = None
+    verified: Optional[bool] = None
+    verified_type: Optional[str] = None
+    subscription_type: Optional[str] = None
 
 
 class XUserCreate(XUserBase):
@@ -390,7 +402,7 @@ class XTweetBase(CustomBaseModel):
     conversation_id: Optional[str] = None
     is_worthy: Optional[bool] = False
     tweet_type: Optional[TweetType] = TweetType.INVALID
-    confidence_score: Optional[float] = 0.0
+    confidence_score: Optional[float] = None
     reason: Optional[str] = None
 
 
@@ -422,6 +434,7 @@ class QueueMessageFilter(CustomBaseModel):
     is_processed: Optional[bool] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    wallet_id: Optional[UUID] = None
 
 
 class AgentFilter(CustomBaseModel):
@@ -441,6 +454,7 @@ class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
     is_deployed: Optional[bool] = None
     is_broadcasted: Optional[bool] = None
+    wallet_id: Optional[UUID] = None
 
 
 class ThreadFilter(CustomBaseModel):
@@ -501,10 +515,23 @@ class XCredsFilter(CustomBaseModel):
 class XUserFilter(CustomBaseModel):
     user_id: Optional[str] = None
     username: Optional[str] = None
-    realname: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    profile_banner_url: Optional[str] = None
+    protected: Optional[bool] = None
+    url: Optional[str] = None
+    verified: Optional[bool] = None
+    verified_type: Optional[str] = None
+    subscription_type: Optional[str] = None
 
 
 class XTweetFilter(CustomBaseModel):
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    is_worthy: Optional[bool] = None
+    tweet_type: Optional[TweetType] = None
+    confidence_score: Optional[float] = None
+    reason: Optional[str] = None

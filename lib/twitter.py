@@ -106,6 +106,26 @@ class TwitterService:
             logger.error(f"Failed to get user info for {username}: {str(e)}")
             return None
 
+    async def get_user_by_user_id(self, user_id: str) -> Optional[User]:
+        """
+        Get user information by user ID.
+
+        Args:
+            username: Twitter username without @ symbol
+
+        Returns:
+            User data if found, None if not found or error
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+            response = self.client.get_user(user_id=user_id)
+            if type(response) == User:
+                return response
+        except Exception as e:
+            logger.error(f"Failed to get user info for {user_id}: {str(e)}")
+            return None
+
     async def get_mentions_by_user_id(
         self, user_id: str, max_results: int = 100
     ) -> List[Tweet]:

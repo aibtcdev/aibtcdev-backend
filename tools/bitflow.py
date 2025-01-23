@@ -35,15 +35,16 @@ class BitflowGetAvailableTokens(BaseTool):
     description: str = "Get the list of available tokens for trading on Bitflow"
     args_schema: Type[BaseModel] = BitflowBaseInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
-        if wallet_id:
-            self.wallet_id = wallet_id
+        self.wallet_id = wallet_id
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get available tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-bitflow", "get-tokens.ts"
         )
@@ -64,7 +65,7 @@ class BitflowExecuteTradeTool(BaseTool):
     )
     args_schema: Type[BaseModel] = BitflowExecuteTradeInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -74,6 +75,8 @@ class BitflowExecuteTradeTool(BaseTool):
         self, slippage: str, amount: str, tokenA: str, tokenB: str, **kwargs
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to perform a token swap."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-bitflow",

@@ -21,7 +21,7 @@ class StacksTransactionStatusTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionStatusInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -29,6 +29,8 @@ class StacksTransactionStatusTool(BaseTool):
 
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to check transaction status."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -66,7 +68,7 @@ class StacksTransactionTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -74,6 +76,8 @@ class StacksTransactionTool(BaseTool):
 
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transaction details."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -108,7 +112,7 @@ class StacksTransactionByAddressTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StacksTransactionByAddressInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -116,6 +120,8 @@ class StacksTransactionByAddressTool(BaseTool):
 
     def _deploy(self, address: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transactions by address."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,

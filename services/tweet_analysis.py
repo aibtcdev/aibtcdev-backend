@@ -1,6 +1,6 @@
 import os
 from backend.factory import backend
-from backend.models import QueueMessageCreate, QueueMessageFilter, TweetType
+from backend.models import QueueMessageCreate, QueueMessageFilter, TweetType, XTweetBase
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph, StateGraph
@@ -178,9 +178,7 @@ def create_analysis_graph(account_name: str = "@aibtcdevagent") -> Graph:
     return workflow.compile()
 
 
-async def analyze_tweet(
-    conversation_id: str, tweet_id: str, tweet_text: str, filtered_content: str
-) -> Dict:
+async def analyze_tweet(tweet_text: str, filtered_content: str) -> Dict:
     """Analyze a tweet and determine if it's worthy of processing."""
     # Initialize state
     state = {
@@ -196,16 +194,5 @@ async def analyze_tweet(
     # Create and run graph
     graph = create_analysis_graph()
     result = await graph.ainvoke(state)
-
-    # If worthy and tool request, send to queue
-    if result["is_worthy"] and result["tool_request"]:
-        backend.create_queue_message(
-            new_queue_message=QueueMessageCreate(
-                type="daos",
-                tweet_id=tweet_id,
-                conversation_id=conversation_id,
-                message=result["tool_request"].model_dump(),
-            )
-        )
 
     return result

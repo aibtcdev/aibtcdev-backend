@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 from .bun import BunScriptRunner
 from backend.factory import backend
@@ -13,6 +12,7 @@ from backend.models import (
 )
 from langchain.tools import BaseTool
 from lib.hiro import HiroApi
+from lib.logger import configure_logger
 from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
 from services.daos import (
@@ -23,7 +23,7 @@ from services.daos import (
 )
 from typing import Dict, Optional, Type, Union
 
-logger = logging.getLogger(__name__)
+logger = configure_logger(__name__)
 
 
 class ContractDAODeployInput(BaseModel):
@@ -62,7 +62,7 @@ class ContractDAODeployTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ContractDAODeployInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -80,6 +80,9 @@ class ContractDAODeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Core deployment logic used by both sync and async methods."""
         try:
+            if self.wallet_id is None:
+                raise ValueError("Wallet ID is required")
+
             # get the address for the wallet based on network from os.getenv
             network = os.getenv("NETWORK", "testnet")
 
@@ -97,7 +100,7 @@ class ContractDAODeployTool(BaseTool):
             # Generate dao dependencies and get dao record
             logger.debug("Step 1: Generating dao dependencies...")
             dao_record = generate_dao_dependencies(
-                token_name, mission, token_description
+                token_name, mission, token_description, self.wallet_id
             )
             logger.debug(f"Generated dao record type: {type(dao_record)}")
             logger.debug(f"Generated dao record content: {dao_record}")
@@ -138,8 +141,8 @@ class ContractDAODeployTool(BaseTool):
             logger.debug(
                 f"BunScriptRunner parameters: wallet_id={self.wallet_id}, "
                 f"token_symbol={token_symbol}, token_name={token_name}, "
-                f"token_max_supply={token_max_supply}, token_decimals={token_decimals}, "
-                f"metadata_url={metadata_url}"
+                f"token_max_supply={token_max_supply}, metadata_url={metadata_url}, "
+                f"logo_url={token_record.image_url}, dao_manifest={mission}"
             )
 
             result = BunScriptRunner.bun_run(
@@ -149,8 +152,8 @@ class ContractDAODeployTool(BaseTool):
                 token_symbol,
                 token_name,
                 token_max_supply,
-                token_decimals,  # Keep as string for TypeScript
                 metadata_url,
+                token_record.image_url,
                 mission,
             )
             logger.debug(f"Contract deployment result type: {type(result)}")

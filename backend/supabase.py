@@ -261,6 +261,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("tweet_id", filters.tweet_id)
             if filters.conversation_id is not None:
                 query = query.eq("conversation_id", filters.conversation_id)
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", filters.wallet_id)
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]
@@ -509,6 +511,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("is_deployed", filters.is_deployed)
             if filters.is_broadcasted is not None:
                 query = query.eq("is_broadcasted", filters.is_broadcasted)
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]
@@ -1078,10 +1082,26 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.username is not None:
                 query = query.eq("username", filters.username)
-            if filters.realname is not None:
-                query = query.eq("realname", filters.realname)
+            if filters.name is not None:
+                query = query.eq("name", filters.name)
             if filters.user_id is not None:
                 query = query.eq("user_id", filters.user_id)
+            if filters.description is not None:
+                query = query.eq("description", filters.description)
+            if filters.location is not None:
+                query = query.eq("location", filters.location)
+            if filters.profile_image_url is not None:
+                query = query.eq("profile_image_url", filters.profile_image_url)
+            if filters.profile_banner_url is not None:
+                query = query.eq("profile_banner_url", filters.profile_banner_url)
+            if filters.protected is not None:
+                query = query.eq("protected", filters.protected)
+            if filters.verified is not None:
+                query = query.eq("verified", filters.verified)
+            if filters.verified_type is not None:
+                query = query.eq("verified_type", filters.verified_type)
+            if filters.subscription_type is not None:
+                query = query.eq("subscription_type", filters.subscription_type)
         response = query.execute()
         data = response.data or []
         return [XUser(**row) for row in data]
@@ -1137,6 +1157,14 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("conversation_id", filters.conversation_id)
             if filters.tweet_id is not None:
                 query = query.eq("tweet_id", filters.tweet_id)
+            if filters.is_worthy is not None:
+                query = query.eq("is_worthy", filters.is_worthy)
+            if filters.tweet_type is not None:
+                query = query.eq("tweet_type", filters.tweet_type)
+            if filters.confidence_score is not None:
+                query = query.eq("confidence_score", filters.confidence_score)
+            if filters.reason is not None:
+                query = query.eq("reason", filters.reason)
         response = query.execute()
         data = response.data or []
         return [XTweet(**row) for row in data]

@@ -1,17 +1,22 @@
 import os
 from backend.factory import backend
 from backend.models import (
+    DAOBase,
     DAOFilter,
     Profile,
     QueueMessageBase,
     QueueMessageFilter,
     TokenFilter,
+    WalletFilter,
+    XTweetFilter,
+    XUserBase,
+    XUserFilter,
 )
 from datetime import datetime
 from lib.logger import configure_logger
 from services.langgraph import execute_langgraph_stream
 from services.tweet_generator import generate_dao_tweet
-from services.twitter import TwitterMentionHandler
+from services.twitter import TweetData, TwitterMentionHandler
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 from uuid import UUID
 
@@ -23,6 +28,23 @@ class TweetRunner:
 
     def __init__(self):
         """Initialize the Twitter handler."""
+        twitter_profile_id = os.getenv("AIBTC_TWITTER_PROFILE_ID")
+        if not twitter_profile_id:
+            raise ValueError("AIBTC_TWITTER_PROFILE_ID environment variable is not set")
+        self.twitter_profile_id = UUID(twitter_profile_id)
+
+        twitter_agent_id = os.getenv("AIBTC_TWITTER_AGENT_ID")
+        if not twitter_agent_id:
+            raise ValueError("AIBTC_TWITTER_AGENT_ID environment variable is not set")
+        self.twitter_agent_id = UUID(twitter_agent_id)
+        twitter_wallet = backend.list_wallets(
+            filters=WalletFilter(profile_id=self.twitter_profile_id)
+        )
+        if not twitter_wallet:
+            logger.error("No Twitter wallet found")
+            return
+
+        self.twitter_wallet_id = twitter_wallet[0].id
         self.twitter_handler = TwitterMentionHandler()
 
     async def run(self) -> None:
@@ -106,12 +128,58 @@ class TweetRunner:
                         f"conversation_id: {matching_dao_message.conversation_id}"
                     )
                     await self.twitter_handler._post_response(
-                        {
-                            "tweet_id": matching_dao_message.tweet_id,
-                            "conversation_id": matching_dao_message.conversation_id,
-                        },
-                        response_content,
+                        tweet_data=TweetData(
+                            tweet_id=matching_dao_message.tweet_id,
+                            conversation_id=matching_dao_message.conversation_id,
+                        ),
+                        response_content=response_content,
                     )
+
+                    tweet_info = backend.list_x_tweets(
+                        filters=XTweetFilter(tweet_id=matching_dao_message.tweet_id)
+                    )
+                    if not tweet_info or len(tweet_info) == 0:
+                        logger.error(
+                            f"No tweet info found for tweet_id: {matching_dao_message.tweet_id}"
+                        )
+                        continue
+
+                    author_id = tweet_info[0].author_id
+
+                    author_info = backend.get_x_user(author_id)
+                    if not author_info:
+                        logger.error(f"No author info found for author_id: {author_id}")
+                        continue
+
+                    backend.update_dao(
+                        dao_id=dao.id,
+                        update_data=DAOBase(
+                            author_id=author_id,
+                        ),
+                    )
+                    user = (
+                        await self.twitter_handler.twitter_service.get_user_by_user_id(
+                            author_info.user_id
+                        )
+                    )
+                    if user:
+                        logger.info(f"User: {user}")
+                        # update user info in db
+                        backend.update_x_user(
+                            x_user_id=author_info.id,
+                            update_data=XUserBase(
+                                name=user.name,
+                                username=user.username,
+                                description=user.description,
+                                location=user.location,
+                                profile_image_url=user.profile_image_url,
+                                profile_banner_url=user.profile_banner_url,
+                                protected=user.protected,
+                                verified=user.verified,
+                                verified_type=user.verified_type,
+                                subscription_type=user.subscription_type,
+                            ),
+                        )
 
                     # Mark message as processed only after successful posting
                     backend.update_queue_message(
@@ -137,34 +205,47 @@ class DAORunner:
 
     def __init__(self):
         """Initialize the runner with necessary tools."""
+        twitter_profile_id = os.getenv("AIBTC_TWITTER_PROFILE_ID")
+        if not twitter_profile_id:
+            raise ValueError("AIBTC_TWITTER_PROFILE_ID environment variable is not set")
+        self.twitter_profile_id = UUID(twitter_profile_id)
+
+        twitter_agent_id = os.getenv("AIBTC_TWITTER_AGENT_ID")
+        if not twitter_agent_id:
+            raise ValueError("AIBTC_TWITTER_AGENT_ID environment variable is not set")
+        self.twitter_agent_id = UUID(twitter_agent_id)
         self.tools_map_all = initialize_tools(
             Profile(
-                id=UUID(
-                    os.getenv(
-                        "AIBTC_TWITTER_PROFILE_ID",
-                        "9e650de6-93b8-4160-9f4b-938d00b5c6f8",
-                    )
-                ),
+                id=self.twitter_profile_id,
                 created_at=datetime.now(),
             ),
-            agent_id=UUID(
-                os.getenv(
-                    "AIBTC_TWITTER_AGENT_ID", "13059e46-1b4d-4b87-9593-b556dcefdeb2"
-                )
-            ),
-            crewai=False,
+            agent_id=self.twitter_agent_id,
         )
         self.tools_map = filter_tools_by_names(
             ["contract_dao_deploy"], self.tools_map_all
         )
+        twitter_wallet = backend.list_wallets(
+            filters=WalletFilter(profile_id=self.twitter_profile_id)
+        )
+        if not twitter_wallet:
+            logger.error("No Twitter wallet found")
+            return
+
+        self.twitter_wallet_id = twitter_wallet[0].id
+
         logger.info(f"Initialized tools_map with {len(self.tools_map)} tools")
 
     async def run(self) -> None:
         """Process DAO deployments and queue."""
         try:
+
             # Check for any pending Twitter DAOs
             pending_daos = backend.list_daos(
-                filters=DAOFilter(is_deployed=False, is_broadcasted=True)
+                filters=DAOFilter(
+                    is_deployed=False,
+                    is_broadcasted=True,
+                    wallet_id=self.twitter_wallet_id,
+                )
             )
 
             if pending_daos:
