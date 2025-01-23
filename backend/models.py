@@ -402,7 +402,7 @@ class XTweetBase(CustomBaseModel):
     conversation_id: Optional[str] = None
     is_worthy: Optional[bool] = False
     tweet_type: Optional[TweetType] = TweetType.INVALID
-    confidence_score: Optional[float] = 0.0
+    confidence_score: Optional[float] = None
     reason: Optional[str] = None
 
 
@@ -531,3 +531,7 @@ class XTweetFilter(CustomBaseModel):
     author_id: Optional[UUID] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    is_worthy: Optional[bool] = None
+    tweet_type: Optional[TweetType] = None
+    confidence_score: Optional[float] = None
+    reason: Optional[str] = None

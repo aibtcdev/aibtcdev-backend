@@ -1157,6 +1157,14 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("conversation_id", filters.conversation_id)
             if filters.tweet_id is not None:
                 query = query.eq("tweet_id", filters.tweet_id)
+            if filters.is_worthy is not None:
+                query = query.eq("is_worthy", filters.is_worthy)
+            if filters.tweet_type is not None:
+                query = query.eq("tweet_type", filters.tweet_type)
+            if filters.confidence_score is not None:
+                query = query.eq("confidence_score", filters.confidence_score)
+            if filters.reason is not None:
+                query = query.eq("reason", filters.reason)
         response = query.execute()
         data = response.data or []
         return [XTweet(**row) for row in data]

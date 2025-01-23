@@ -1,6 +1,13 @@
 import os
 from backend.factory import backend
-from backend.models import XTweetCreate, XTweetFilter, XUserCreate, XUserFilter
+from backend.models import (
+    QueueMessageCreate,
+    XTweetBase,
+    XTweetCreate,
+    XTweetFilter,
+    XUserCreate,
+    XUserFilter,
+)
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
@@ -16,6 +23,15 @@ class UserProfile(TypedDict):
     name: str
     age: int
     email: str
+
+
+class TweetData(TypedDict):
+    """Type definition for tweet data."""
+
+    tweet_id: str
+    author_id: str
+    text: str
+    conversation_id: str
 
 
 class TwitterMentionHandler:
@@ -54,7 +70,7 @@ class TwitterMentionHandler:
         except Exception as e:
             logger.error(f"Error checking tweet {tweet_id} in database: {str(e)}")
 
-        tweet_data = {
+        tweet_data: TweetData = {
             "tweet_id": tweet_id,
             "author_id": author_id,
             "text": text,
@@ -113,18 +129,18 @@ class TwitterMentionHandler:
         )
         return str(author_id) in self.whitelisted_authors
 
-    async def _analyze_tweet(self, tweet_data: Dict) -> None:
+    async def _analyze_tweet(self, tweet_data: TweetData) -> None:
         """Analyze tweet and queue if needed."""
         # currently don't want to have history but keeping it here for now
         history = []
         await self._run_analysis(tweet_data, history)
 
-    async def _run_analysis(self, tweet_data: Dict, history: List[Dict]) -> None:
+    async def _run_analysis(self, tweet_data: TweetData, history: List[Dict]) -> None:
         """Run analysis on tweet and queue tool requests if needed."""
         logger.info(
-            f"Analyzing tweet {tweet_data['tweet_id']} from user {tweet_data['author_id']}"
+            f"Analyzing tweet {tweet_data.tweet_id} from user {tweet_data.author_id}"
         )
-        logger.info(f"Tweet text: {tweet_data['text']}")
+        logger.info(f"Tweet text: {tweet_data.text}")
         logger.info(f"Conversation history: {len(history)} messages")
 
         # Convert history to filtered content
@@ -134,22 +150,41 @@ class TwitterMentionHandler:
 
         # Analyze tweet
         analysis_result = await analyze_tweet(
-            conversation_id=tweet_data["conversation_id"],
-            tweet_id=tweet_data["tweet_id"],
-            tweet_text=tweet_data["text"],
+            tweet_text=tweet_data.text,
             filtered_content=filtered_content,
         )
 
         logger.info(f"Analysis result: {analysis_result}")
 
-    async def _get_conversation_history(self, tweet_data: Dict) -> List[Dict]:
+        backend.update_x_tweet(
+            x_tweet_id=tweet_data.tweet_id,
+            update_data=XTweetBase(
+                is_worthy=analysis_result["is_worthy"],
+                tweet_type=analysis_result["tweet_type"],
+                confidence_score=analysis_result["confidence_score"],
+                reason=analysis_result["reason"],
+            ),
+        )
+
+        # If worthy and tool request, send to queue
+        if analysis_result["is_worthy"] and analysis_result["tool_request"]:
+            backend.create_queue_message(
+                new_queue_message=QueueMessageCreate(
+                    type="daos",
+                    tweet_id=tweet_data.tweet_id,
+                    conversation_id=tweet_data.conversation_id,
+                    message=analysis_result["tool_request"].model_dump(),
+                )
+            )
+
+    async def _get_conversation_history(self, tweet_data: TweetData) -> List[Dict]:
         """Retrieve and format conversation history."""
-        if not tweet_data["conversation_id"]:
+        if not tweet_data.conversation_id:
             return []
 
         # Get all tweets in the conversation
         conversation_tweets = backend.list_x_tweets(
-            filters=XTweetFilter(conversation_id=tweet_data["conversation_id"])
+            filters=XTweetFilter(conversation_id=tweet_data.conversation_id)
         )
         return [
             {
@@ -160,11 +195,13 @@ class TwitterMentionHandler:
             if tweet.message
         ]
 
-    async def _post_response(self, tweet_data: Dict, response_content: str) -> None:
+    async def _post_response(
+        self, tweet_data: TweetData, response_content: str
+    ) -> None:
         """Post the response to Twitter and store in database."""
         self.twitter_service.initialize()
         response_tweet = await self.twitter_service._apost_tweet(
-            text=response_content, reply_in_reply_to_tweet_id=tweet_data["tweet_id"]
+            text=response_content, reply_in_reply_to_tweet_id=tweet_data.tweet_id
         )
 
         if response_tweet and response_tweet.id:
@@ -173,7 +210,7 @@ class TwitterMentionHandler:
                 XTweetCreate(
                     tweet_id=response_tweet.id,
                     message=response_content,
-                    conversation_id=tweet_data["conversation_id"],
+                    conversation_id=tweet_data.conversation_id,
                 )
             )
             logger.info(
