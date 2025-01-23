@@ -156,10 +156,6 @@ class FaktoryGetBuyQuoteInput(BaseModel):
         default="15",
         description="Slippage tolerance in percentage (default: 15%)",
     )
-    network: Optional[str] = Field(
-        default="mainnet",
-        description="Network to use (mainnet or testnet)",
-    )
 
 
 class FaktoryGetBuyQuoteTool(BaseTool):
@@ -180,7 +176,6 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         stx_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote."""
@@ -191,7 +186,6 @@ class FaktoryGetBuyQuoteTool(BaseTool):
             stx_amount,
             dex_contract_id,
             slippage,
-            network,
         )
     
     def _run(
@@ -199,7 +193,6 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         stx_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote."""
@@ -212,7 +205,6 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         stx_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote (async)."""
@@ -313,10 +305,6 @@ class FaktoryGetSellQuoteInput(BaseModel):
         default="15",
         description="Slippage tolerance in percentage (default: 15%)",
     )
-    network: Optional[str] = Field(
-        default="mainnet",
-        description="Network to use (mainnet or testnet)",
-    )
 
 
 class FaktoryGetSellQuoteTool(BaseTool):
@@ -337,7 +325,6 @@ class FaktoryGetSellQuoteTool(BaseTool):
         token_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote."""
@@ -348,7 +335,6 @@ class FaktoryGetSellQuoteTool(BaseTool):
             token_amount,
             dex_contract_id,
             slippage,
-            network,
         )
     
     def _run(
@@ -356,12 +342,11 @@ class FaktoryGetSellQuoteTool(BaseTool):
         token_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote."""
         return self._deploy(
-            token_amount, dex_contract_id, slippage, network
+            token_amount, dex_contract_id, slippage
         )
 
     async def _arun(
@@ -369,12 +354,11 @@ class FaktoryGetSellQuoteTool(BaseTool):
         token_amount: str,
         dex_contract_id: str,
         slippage: Optional[str] = "15",
-        network: Optional[str] = "mainnet",
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote (async)."""
         return self._deploy(
-            token_amount, dex_contract_id, slippage, network
+            token_amount, dex_contract_id, slippage
         )
 
 # agent-tools-ts/src/stacks-faktory/get-token.ts
