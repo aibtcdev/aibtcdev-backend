@@ -6,6 +6,7 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     TokenFilter,
+    WalletFilter,
 )
 from datetime import datetime
 from lib.logger import configure_logger
@@ -23,6 +24,23 @@ class TweetRunner:
 
     def __init__(self):
         """Initialize the Twitter handler."""
+        twitter_profile_id = os.getenv("AIBTC_TWITTER_PROFILE_ID")
+        if not twitter_profile_id:
+            raise ValueError("AIBTC_TWITTER_PROFILE_ID environment variable is not set")
+        self.twitter_profile_id = UUID(twitter_profile_id)
+
+        twitter_agent_id = os.getenv("AIBTC_TWITTER_AGENT_ID")
+        if not twitter_agent_id:
+            raise ValueError("AIBTC_TWITTER_AGENT_ID environment variable is not set")
+        self.twitter_agent_id = UUID(twitter_agent_id)
+        twitter_wallet = backend.list_wallets(
+            filters=WalletFilter(profile_id=self.twitter_profile_id)
+        )
+        if not twitter_wallet:
+            logger.error("No Twitter wallet found")
+            return
+
+        self.twitter_wallet_id = twitter_wallet[0].id
         self.twitter_handler = TwitterMentionHandler()
 
     async def run(self) -> None:
@@ -137,34 +155,47 @@ class DAORunner:
 
     def __init__(self):
         """Initialize the runner with necessary tools."""
+        twitter_profile_id = os.getenv("AIBTC_TWITTER_PROFILE_ID")
+        if not twitter_profile_id:
+            raise ValueError("AIBTC_TWITTER_PROFILE_ID environment variable is not set")
+        self.twitter_profile_id = UUID(twitter_profile_id)
+
+        twitter_agent_id = os.getenv("AIBTC_TWITTER_AGENT_ID")
+        if not twitter_agent_id:
+            raise ValueError("AIBTC_TWITTER_AGENT_ID environment variable is not set")
+        self.twitter_agent_id = UUID(twitter_agent_id)
         self.tools_map_all = initialize_tools(
             Profile(
-                id=UUID(
-                    os.getenv(
-                        "AIBTC_TWITTER_PROFILE_ID",
-                        "9e650de6-93b8-4160-9f4b-938d00b5c6f8",
-                    )
-                ),
+                id=self.twitter_profile_id,
                 created_at=datetime.now(),
             ),
-            agent_id=UUID(
-                os.getenv(
-                    "AIBTC_TWITTER_AGENT_ID", "13059e46-1b4d-4b87-9593-b556dcefdeb2"
-                )
-            ),
-            crewai=False,
+            agent_id=self.twitter_agent_id,
         )
         self.tools_map = filter_tools_by_names(
             ["contract_dao_deploy"], self.tools_map_all
         )
+        twitter_wallet = backend.list_wallets(
+            filters=WalletFilter(profile_id=self.twitter_profile_id)
+        )
+        if not twitter_wallet:
+            logger.error("No Twitter wallet found")
+            return
+
+        self.twitter_wallet_id = twitter_wallet[0].id
+
         logger.info(f"Initialized tools_map with {len(self.tools_map)} tools")
 
     async def run(self) -> None:
         """Process DAO deployments and queue."""
         try:
+
             # Check for any pending Twitter DAOs
             pending_daos = backend.list_daos(
-                filters=DAOFilter(is_deployed=False, is_broadcasted=True)
+                filters=DAOFilter(
+                    is_deployed=False,
+                    is_broadcasted=True,
+                    wallet_id=self.twitter_wallet_id,
+                )
             )
 
             if pending_daos:

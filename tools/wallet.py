@@ -21,7 +21,7 @@ class WalletGetMyBalance(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetBalanceInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -29,6 +29,8 @@ class WalletGetMyBalance(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet balance."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-balance.ts"
         )
@@ -55,7 +57,7 @@ class WalletGetMyAddress(BaseTool):
     description: str = "Get my Stacks STX address"
     args_schema: Type[BaseModel] = WalletGetAddressInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -63,6 +65,8 @@ class WalletGetMyAddress(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet address."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-address.ts"
         )
@@ -84,7 +88,7 @@ class WalletFundMyWalletFaucet(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetAddressInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -92,6 +96,8 @@ class WalletFundMyWalletFaucet(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to fund wallet on testnet."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "testnet-stx-faucet-me.ts"
         )
@@ -128,7 +134,7 @@ class WalletSendSTX(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletSendSTXInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -143,6 +149,8 @@ class WalletSendSTX(BaseTool):
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to send STX tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-wallet",
@@ -192,7 +200,7 @@ class WalletGetMyTransactions(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletGetTransactionsInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -200,6 +208,8 @@ class WalletGetMyTransactions(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get transaction history."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-transactions.ts"
         )
@@ -235,7 +245,7 @@ class WalletSIP10SendTool(BaseTool):
     )
     args_schema: Type[BaseModel] = WalletSIP10SendInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -249,6 +259,8 @@ class WalletSIP10SendTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to send SIP-010 tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             return BunScriptRunner.bun_run(
                 self.wallet_id,

@@ -31,7 +31,7 @@ class ContractSIP10DeployTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ContractSIP10DeployInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -47,6 +47,8 @@ class ContractSIP10DeployTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to deploy a SIP-10 token contract."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             token_url, token_data = generate_token_dependencies(
                 token_name,
@@ -132,7 +134,7 @@ class ContractSIP10InfoTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ContractSIP10InfoInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -143,6 +145,8 @@ class ContractSIP10InfoTool(BaseTool):
         contract_address: str,
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get SIP-10 token information."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             return BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -191,7 +195,7 @@ class FetchContractSourceTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FetchContractSourceInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -203,6 +207,8 @@ class FetchContractSourceTool(BaseTool):
         contract_name: str,
     ):
         """Execute the tool to fetch contract source code."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         try:
             api = HiroApi()
             result = api.get_contract_source(contract_address, contract_name)
