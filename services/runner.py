@@ -14,7 +14,7 @@ from datetime import datetime
 from lib.logger import configure_logger
 from services.langgraph import execute_langgraph_stream
 from services.tweet_generator import generate_dao_tweet
-from services.twitter import TwitterMentionHandler
+from services.twitter import TweetData, TwitterMentionHandler
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 from uuid import UUID
 
@@ -126,11 +126,11 @@ class TweetRunner:
                         f"conversation_id: {matching_dao_message.conversation_id}"
                     )
                     await self.twitter_handler._post_response(
-                        {
-                            "tweet_id": matching_dao_message.tweet_id,
-                            "conversation_id": matching_dao_message.conversation_id,
-                        },
-                        response_content,
+                        tweet_data=TweetData(
+                            tweet_id=matching_dao_message.tweet_id,
+                            conversation_id=matching_dao_message.conversation_id,
+                        ),
+                        response_content=response_content,
                     )
 
                     tweet_info = backend.get_x_tweet(matching_dao_message.tweet_id)
