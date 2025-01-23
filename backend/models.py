@@ -63,6 +63,7 @@ class QueueMessageBase(CustomBaseModel):
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
     dao_id: Optional[UUID] = None
+    wallet_id: Optional[UUID] = None
 
 
 class QueueMessageCreate(QueueMessageBase):
@@ -170,6 +171,7 @@ class DAOBase(CustomBaseModel):
     description: Optional[str] = None
     is_deployed: Optional[bool] = False
     is_broadcasted: Optional[bool] = False
+    wallet_id: Optional[UUID] = None
 
 
 class DAOCreate(DAOBase):
@@ -422,6 +424,7 @@ class QueueMessageFilter(CustomBaseModel):
     is_processed: Optional[bool] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    wallet_id: Optional[UUID] = None
 
 
 class AgentFilter(CustomBaseModel):
@@ -441,6 +444,7 @@ class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
     is_deployed: Optional[bool] = None
     is_broadcasted: Optional[bool] = None
+    wallet_id: Optional[UUID] = None
 
 
 class ThreadFilter(CustomBaseModel):

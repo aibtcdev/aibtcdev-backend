@@ -77,7 +77,7 @@ class JingGetMarketsInput(BaseModel):
 
 # Base Tool with common initialization
 class JingBaseTool(BaseTool):
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -93,6 +93,8 @@ class JingGetOrderBookTool(JingBaseTool):
 
     def _deploy(self, pair: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get order book data."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(self.wallet_id, "jing", "get-orderbook.ts", pair)
 
     def _run(self, pair: str, **kwargs) -> Dict[str, Any]:
@@ -120,6 +122,8 @@ class JingCreateBidTool(JingBaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to create a bid offer."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         args = [pair, str(stx_amount), str(token_amount)]
         if recipient:
             args.append(recipient)
@@ -164,6 +168,8 @@ class JingSubmitBidTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to submit a bid."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "submit-bid.ts", str(swap_id)
         )
@@ -193,6 +199,8 @@ class JingCreateAskTool(JingBaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to create an ask offer."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         args = [pair, str(token_amount), str(stx_amount)]
         if recipient:
             args.append(recipient)
@@ -235,6 +243,8 @@ class JingSubmitAskTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to submit an ask."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "submit-ask.ts", str(swap_id)
         )
@@ -256,6 +266,8 @@ class JingGetPrivateOffersTool(JingBaseTool):
 
     def _deploy(self, pair: str, user_address: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get private offers."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "get-private-offers.ts", pair, user_address
         )
@@ -277,6 +289,8 @@ class JingGetPendingOrdersTool(JingBaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get pending orders."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(self.wallet_id, "jing", "get-pending-orders.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
@@ -304,6 +318,8 @@ class JingRepriceBidTool(JingBaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to reprice a bid."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         args = [str(swap_id), str(new_amount), pair]
         if recipient:
             args.append(recipient)
@@ -354,6 +370,8 @@ class JingRepriceAskTool(JingBaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to reprice an ask."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         args = [str(swap_id), str(new_amount), pair]
         if recipient:
             args.append(recipient)
@@ -396,6 +414,8 @@ class JingCancelBidTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to cancel a bid."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "cancel-bid.ts", str(swap_id)
         )
@@ -417,6 +437,8 @@ class JingCancelAskTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to cancel an ask."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "cancel-ask.ts", str(swap_id)
         )
@@ -438,6 +460,8 @@ class JingGetBidTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get bid details."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "get-bid.ts", str(swap_id)
         )
@@ -459,6 +483,8 @@ class JingGetAskTool(JingBaseTool):
 
     def _deploy(self, swap_id: int, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get ask details."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id, "jing", "get-ask.ts", str(swap_id)
         )
@@ -482,6 +508,8 @@ class JingGetMarketsTool(JingBaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get available markets."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(self.wallet_id, "jing", "list-markets.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:

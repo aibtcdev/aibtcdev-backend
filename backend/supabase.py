@@ -261,6 +261,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("tweet_id", filters.tweet_id)
             if filters.conversation_id is not None:
                 query = query.eq("conversation_id", filters.conversation_id)
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", filters.wallet_id)
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]
@@ -509,6 +511,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("is_deployed", filters.is_deployed)
             if filters.is_broadcasted is not None:
                 query = query.eq("is_broadcasted", filters.is_broadcasted)
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]

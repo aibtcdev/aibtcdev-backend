@@ -1,5 +1,4 @@
 from backend.models import UUID
-from decimal import Decimal
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from tools.bun import BunScriptRunner
@@ -12,17 +11,19 @@ class FaktoryBaseInput(BaseModel):
     pass
 
 
-# agent-tools-ts/src/stacks-faktory/exec-buy.ts
-
 class FaktoryExecuteBuyInput(BaseModel):
     """Input schema for Faktory buy order execution."""
 
-    stx_amount: str = Field(..., description="Amount of STX to spend on the purchase in standard units (e.g. 1.5 = 1.5 STX)")
+    stx_amount: str = Field(
+        ...,
+        description="Amount of STX to spend on the purchase in standard units (e.g. 1.5 = 1.5 STX)",
+    )
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="50",
         description="Slippage tolerance in basis points (default: 50, which is 0.5%)",
     )
+
 
 class FaktoryExecuteBuyTool(BaseTool):
     name: str = "faktory_execute_buy"
@@ -31,7 +32,7 @@ class FaktoryExecuteBuyTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FaktoryExecuteBuyInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -45,6 +46,8 @@ class FaktoryExecuteBuyTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -53,7 +56,7 @@ class FaktoryExecuteBuyTool(BaseTool):
             dex_contract_id,
             slippage,
         )
-    
+
     def _run(
         self,
         stx_amount: str,
@@ -62,9 +65,7 @@ class FaktoryExecuteBuyTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
-        return self._deploy(
-            stx_amount, dex_contract_id, slippage
-        )
+        return self._deploy(stx_amount, dex_contract_id, slippage)
 
     async def _arun(
         self,
@@ -74,16 +75,16 @@ class FaktoryExecuteBuyTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order (async)."""
-        return self._deploy(
-            stx_amount, dex_contract_id, slippage
-        )
+        return self._deploy(stx_amount, dex_contract_id, slippage)
 
-# agent-tools-ts/src/stacks-faktory/exec-sell.ts
 
 class FaktoryExecuteSellInput(BaseModel):
     """Input schema for Faktory sell order execution."""
 
-    token_amount: str = Field(..., description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)")
+    token_amount: str = Field(
+        ...,
+        description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)",
+    )
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="15",
@@ -98,7 +99,7 @@ class FaktoryExecuteSellTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FaktoryExecuteSellInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -112,6 +113,8 @@ class FaktoryExecuteSellTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -120,7 +123,7 @@ class FaktoryExecuteSellTool(BaseTool):
             dex_contract_id,
             slippage,
         )
-    
+
     def _run(
         self,
         token_amount: str,
@@ -129,10 +132,8 @@ class FaktoryExecuteSellTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage
-        )
-    
+        return self._deploy(token_amount, dex_contract_id, slippage)
+
     async def _arun(
         self,
         token_amount: str,
@@ -141,16 +142,15 @@ class FaktoryExecuteSellTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order (async)."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage
-        )
+        return self._deploy(token_amount, dex_contract_id, slippage)
 
-# agent-tools-ts/src/stacks-faktory/get-buy-quote.ts
 
 class FaktoryGetBuyQuoteInput(BaseModel):
     """Input schema for getting a Faktory buy quote."""
 
-    stx_amount: str = Field(..., description="Amount of STX to spend in standard units (e.g. 1.5 = 1.5 STX)")
+    stx_amount: str = Field(
+        ..., description="Amount of STX to spend in standard units (e.g. 1.5 = 1.5 STX)"
+    )
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="15",
@@ -169,7 +169,7 @@ class FaktoryGetBuyQuoteTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FaktoryGetBuyQuoteInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -184,6 +184,8 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -193,7 +195,7 @@ class FaktoryGetBuyQuoteTool(BaseTool):
             slippage,
             network,
         )
-    
+
     def _run(
         self,
         stx_amount: str,
@@ -203,9 +205,7 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote."""
-        return self._deploy(
-            stx_amount, dex_contract_id, slippage, network
-        )
+        return self._deploy(stx_amount, dex_contract_id, slippage, network)
 
     async def _arun(
         self,
@@ -216,11 +216,8 @@ class FaktoryGetBuyQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a buy quote (async)."""
-        return self._deploy(
-            stx_amount, dex_contract_id, slippage, network
-        )
+        return self._deploy(stx_amount, dex_contract_id, slippage, network)
 
-# agent-tools-ts/src/stacks-faktory/get-dao-tokens.ts
 
 class FaktoryGetDaoTokensInput(BaseModel):
     """Input schema for getting DAO tokens from Faktory."""
@@ -250,7 +247,7 @@ class FaktoryGetDaoTokensTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FaktoryGetDaoTokensInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -265,7 +262,8 @@ class FaktoryGetDaoTokensTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens."""
-        
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -275,7 +273,7 @@ class FaktoryGetDaoTokensTool(BaseTool):
             search,
             sort_order,
         )
-    
+
     def _run(
         self,
         page: Optional[str] = "1",
@@ -285,9 +283,7 @@ class FaktoryGetDaoTokensTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens."""
-        return self._deploy(
-            page, limit, search, sort_order
-        )
+        return self._deploy(page, limit, search, sort_order)
 
     async def _arun(
         self,
@@ -298,16 +294,16 @@ class FaktoryGetDaoTokensTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get DAO tokens (async)."""
-        return self._deploy(
-            page, limit, search, sort_order
-        )
+        return self._deploy(page, limit, search, sort_order)
 
-# agent-tools-ts/src/stacks-faktory/get-sell-quote.ts
 
 class FaktoryGetSellQuoteInput(BaseModel):
     """Input schema for getting a Faktory sell quote."""
 
-    token_amount: str = Field(..., description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)")
+    token_amount: str = Field(
+        ...,
+        description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)",
+    )
     dex_contract_id: str = Field(..., description="Contract ID of the DEX")
     slippage: Optional[str] = Field(
         default="15",
@@ -326,7 +322,7 @@ class FaktoryGetSellQuoteTool(BaseTool):
     )
     args_schema: Type[BaseModel] = FaktoryGetSellQuoteInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -341,6 +337,8 @@ class FaktoryGetSellQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -350,7 +348,7 @@ class FaktoryGetSellQuoteTool(BaseTool):
             slippage,
             network,
         )
-    
+
     def _run(
         self,
         token_amount: str,
@@ -360,9 +358,7 @@ class FaktoryGetSellQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage, network
-        )
+        return self._deploy(token_amount, dex_contract_id, slippage, network)
 
     async def _arun(
         self,
@@ -373,11 +369,8 @@ class FaktoryGetSellQuoteTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get a sell quote (async)."""
-        return self._deploy(
-            token_amount, dex_contract_id, slippage, network
-        )
+        return self._deploy(token_amount, dex_contract_id, slippage, network)
 
-# agent-tools-ts/src/stacks-faktory/get-token.ts
 
 class FaktoryGetTokenInput(BaseModel):
     """Input schema for getting token information from Faktory."""
@@ -387,12 +380,10 @@ class FaktoryGetTokenInput(BaseModel):
 
 class FaktoryGetTokenTool(BaseTool):
     name: str = "faktory_get_token"
-    description: str = (
-        "Get detailed information about a token from its DEX contract"
-    )
+    description: str = "Get detailed information about a token from its DEX contract"
     args_schema: Type[BaseModel] = FaktoryGetTokenInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -404,13 +395,15 @@ class FaktoryGetTokenTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to get token information."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
             "get-token.ts",
             dex_contract_id,
         )
-    
+
     def _run(
         self,
         dex_contract_id: str,

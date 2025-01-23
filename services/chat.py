@@ -71,7 +71,7 @@ async def process_chat_message(
         else:
             persona = generate_static_persona()
 
-        tools_map = initialize_tools(profile, agent_id=agent_id, crewai=False)
+        tools_map = initialize_tools(profile, agent_id=agent_id)
 
         async for result in execute_langgraph_stream(
             history, input_str, persona, tools_map

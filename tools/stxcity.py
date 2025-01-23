@@ -34,7 +34,7 @@ class StxCityExecuteBuyTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StxCityExecuteBuyInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -50,6 +50,8 @@ class StxCityExecuteBuyTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-stxcity",
@@ -95,7 +97,7 @@ class StxCityListBondingTokensTool(BaseTool):
     description: str = "Get a list of all available tokens for bonding on STXCity"
     args_schema: Type[BaseModel] = StxCityBaseInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -103,6 +105,8 @@ class StxCityListBondingTokensTool(BaseTool):
 
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to list available bonding tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(self.wallet_id, "stacks-stxcity", "exec-list.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
@@ -133,7 +137,7 @@ class StxCitySearchTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StxCitySearchInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -146,6 +150,8 @@ class StxCitySearchTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to search for bonding opportunities."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         args = []
         if keyword:
             args.append(keyword)
@@ -194,7 +200,7 @@ class StxCityExecuteSellTool(BaseTool):
     )
     args_schema: Type[BaseModel] = StxCityExecuteSellInput
     return_direct: bool = False
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -210,6 +216,8 @@ class StxCityExecuteSellTool(BaseTool):
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-stxcity",

@@ -27,20 +27,31 @@ class TokenUpdateError(TokenServiceError):
     pass
 
 
-def generate_dao_dependencies(name: str, mission: str, description: str) -> DAO:
+def generate_dao_dependencies(
+    name: str, mission: str, description: str, wallet_id: UUID
+) -> DAO:
     """Generate dao dependencies including database record and metadata.
 
     Args:
         name: Name of the dao
         mission: Mission of the dao
         description: Description of the dao
+        wallet_id: ID of the wallet to bind to the dao
+
+    Returns:
+        DAO: The created DAO record
     """
     logger.debug(
-        f"Creating dao with name={name}, mission={mission}, description={description}"
+        f"Creating dao with name={name}, mission={mission}, description={description}, wallet_id={wallet_id}"
     )
     try:
         dao = backend.create_dao(
-            DAOCreate(name=name, mission=mission, description=description)
+            DAOCreate(
+                name=name,
+                mission=mission,
+                description=description,
+                wallet_id=wallet_id,
+            )
         )
         logger.debug(f"Created dao type: {type(dao)}")
         logger.debug(f"Created dao content: {dao}")

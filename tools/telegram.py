@@ -1,16 +1,8 @@
-from backend.factory import backend
-from backend.models import (
-    UUID,
-    ExtensionFilter,
-    TaskBase,
-    TaskCreate,
-    TaskFilter,
-    TokenFilter,
-)
+from backend.models import UUID
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Any, Dict, Optional, Type
 from services.bot import send_message_to_user_sync
+from typing import Any, Dict, Optional, Type
 
 
 class SendTelegramNotificationInput(BaseModel):
@@ -43,11 +35,12 @@ class SendTelegramNotificationTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to add a scheduled task."""
-
+        if self.profile_id is None:
+            raise ValueError("Profile ID is required")
         try:
-           
-            response = send_message_to_user_sync(profile_id=self.profile_id, message=message)
-
+            response = send_message_to_user_sync(
+                profile_id=self.profile_id, message=message
+            )
             return response
         except Exception as e:
             return {"error": str(e)}

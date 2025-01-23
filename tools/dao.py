@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Type, Union
 
 
 class DaoBaseTool(BaseTool):
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
+    wallet_id: Optional[UUID] = None
 
     def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
         super().__init__(**kwargs)
@@ -15,8 +15,6 @@ class DaoBaseTool(BaseTool):
 
 class DAOBaseInput(BaseModel):
     """Base input schema for DAO tools."""
-
-    wallet_id: Optional[UUID] = UUID("00000000-0000-0000-0000-000000000000")
 
 
 class CoreContractInput(DAOBaseInput):
@@ -90,10 +88,12 @@ class CoreGetLinkedVotingContractsTool(DaoBaseTool):
 
     def _deploy(self, core_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get linked voting contracts."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
-            "extensions/core-proposals/get-linked-voting-   contracts.ts",
+            "extensions/core-proposals/get-linked-voting-contracts.ts",
             core_proposals_contract,
         )
 
@@ -116,6 +116,8 @@ class CoreCreateProposalTool(DaoBaseTool):
         self, core_proposals_contract: str, proposal_contract: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to create a proposal."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -147,6 +149,8 @@ class CoreGetProposalTool(DaoBaseTool):
         self, core_proposals_contract: str, proposal_contract: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to get proposal details."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -178,6 +182,8 @@ class CoreGetTotalVotesTool(DaoBaseTool):
         self, core_proposals_contract: str, proposal_contract: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to get total votes."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -207,6 +213,8 @@ class CoreGetVotingPowerTool(DaoBaseTool):
 
     def _deploy(self, core_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get voting power."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -237,6 +245,8 @@ class CoreVoteOnProposalTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to vote on a proposal."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -281,6 +291,8 @@ class CoreConcludeProposalTool(DaoBaseTool):
         self, core_proposals_contract: str, proposal_contract: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to conclude a proposal."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -311,6 +323,8 @@ class ActionGetLinkedVotingContractsTool(DaoBaseTool):
 
     def _deploy(self, action_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get linked voting contracts."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -337,6 +351,8 @@ class ActionGetProposalTool(DaoBaseTool):
         self, action_proposals_contract: str, proposal_id: int, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to get proposal details."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -368,6 +384,8 @@ class ActionGetTotalVotesTool(DaoBaseTool):
         self, action_proposals_contract: str, proposal_id: int, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to get total votes."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -397,6 +415,8 @@ class ActionGetVotingPowerTool(DaoBaseTool):
 
     def _deploy(self, action_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get voting power."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -428,6 +448,8 @@ class ActionVoteOnProposalTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to vote on a proposal."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -475,6 +497,8 @@ class ActionConcludeProposalTool(DaoBaseTool):
         self, action_proposals_contract: str, proposal_id: int, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to conclude a proposal."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -504,6 +528,8 @@ class ActionGetTotalProposalsTool(DaoBaseTool):
 
     def _deploy(self, action_proposals_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get total proposals."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -530,6 +556,8 @@ class BuyTokenTool(DaoBaseTool):
         self, dex_contract: str, token_contract: str, stx_amount: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to buy tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -581,6 +609,8 @@ class SellTokenTool(DaoBaseTool):
         self, dex_contract: str, token_contract: str, token_amount: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to sell tokens."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -696,6 +726,8 @@ class ProposeActionAddResourceTool(DaoBaseTool):
             resource_description,
             str(resource_price),
         ]
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         if resource_url:
             args.append(resource_url)
         return BunScriptRunner.bun_run(
@@ -728,6 +760,8 @@ class ProposeActionAllowAssetTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -760,6 +794,8 @@ class ProposeActionSendMessageTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -792,6 +828,8 @@ class ProposeActionSetAccountHolderTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting an account holder."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -824,6 +862,8 @@ class ProposeActionSetWithdrawalAmountTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a withdrawal amount."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -856,6 +896,8 @@ class ProposeActionSetWithdrawalPeriodTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a withdrawal period."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",
@@ -888,6 +930,8 @@ class ProposeActionToggleResourceTool(DaoBaseTool):
         **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
+        if self.wallet_id is None:
+            raise ValueError("Wallet ID is required")
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtcdev-dao",

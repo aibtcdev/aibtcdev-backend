@@ -111,7 +111,6 @@ The backend provides several API endpoints:
 
 - `/` - Health check
 - `/bot` - Telegram bot functionality
-- `/crew` - Crew management
 - `/chat` - Chat functionality
 
 For detailed API documentation, visit the `/docs` endpoint when running the server.
