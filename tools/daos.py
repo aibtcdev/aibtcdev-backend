@@ -81,7 +81,11 @@ class ContractDAODeployTool(BaseTool):
         """Core deployment logic used by both sync and async methods."""
         try:
             if self.wallet_id is None:
-                raise ValueError("Wallet ID is required")
+                return {
+                    "success": False,
+                    "error": "Wallet ID is required",
+                    "output": "",
+                }
 
             # get the address for the wallet based on network from os.getenv
             network = os.getenv("NETWORK", "testnet")

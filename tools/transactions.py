@@ -30,7 +30,11 @@ class StacksTransactionStatusTool(BaseTool):
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to check transaction status."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -77,7 +81,11 @@ class StacksTransactionTool(BaseTool):
     def _deploy(self, transaction_id: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transaction details."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -121,7 +129,11 @@ class StacksTransactionByAddressTool(BaseTool):
     def _deploy(self, address: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get transactions by address."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             result = BunScriptRunner.bun_run(
                 self.wallet_id,

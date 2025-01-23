@@ -48,7 +48,11 @@ class ContractSIP10DeployTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to deploy a SIP-10 token contract."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             token_url, token_data = generate_token_dependencies(
                 token_name,
@@ -146,7 +150,11 @@ class ContractSIP10InfoTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get SIP-10 token information."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             return BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -208,7 +216,11 @@ class FetchContractSourceTool(BaseTool):
     ):
         """Execute the tool to fetch contract source code."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             api = HiroApi()
             result = api.get_contract_source(contract_address, contract_name)

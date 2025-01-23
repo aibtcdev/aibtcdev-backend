@@ -30,7 +30,11 @@ class WalletGetMyBalance(BaseTool):
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet balance."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-balance.ts"
         )
@@ -66,7 +70,11 @@ class WalletGetMyAddress(BaseTool):
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get wallet address."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-address.ts"
         )
@@ -97,7 +105,11 @@ class WalletFundMyWalletFaucet(BaseTool):
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to fund wallet on testnet."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "testnet-stx-faucet-me.ts"
         )
@@ -150,7 +162,11 @@ class WalletSendSTX(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to send STX tokens."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-wallet",
@@ -209,7 +225,11 @@ class WalletGetMyTransactions(BaseTool):
     def _deploy(self, **kwargs) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to get transaction history."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id, "stacks-wallet", "get-my-wallet-transactions.ts"
         )
@@ -260,7 +280,11 @@ class WalletSIP10SendTool(BaseTool):
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to send SIP-010 tokens."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         try:
             return BunScriptRunner.bun_run(
                 self.wallet_id,
