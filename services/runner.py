@@ -10,6 +10,7 @@ from backend.models import (
     WalletFilter,
     XTweetFilter,
     XUserBase,
+    XUserFilter,
 )
 from datetime import datetime
 from lib.logger import configure_logger
@@ -145,6 +146,11 @@ class TweetRunner:
 
                     author_id = tweet_info[0].author_id
 
+                    author_info = backend.get_x_user(author_id)
+                    if not author_info:
+                        logger.error(f"No author info found for author_id: {author_id}")
+                        continue
+
                     backend.update_dao(
                         dao_id=dao.id,
                         update_data=DAOBase(
@@ -153,14 +159,14 @@ class TweetRunner:
                     )
                     user = (
                         await self.twitter_handler.twitter_service.get_user_by_user_id(
-                            matching_dao_message.author_id
+                            author_info.user_id
                         )
                     )
                     if user:
                         logger.info(f"User: {user}")
                         # update user info in db
                         backend.update_x_user(
-                            x_user_id=user.id,
+                            x_user_id=author_info.id,
                             update_data=XUserBase(
                                 name=user.name,
                                 username=user.username,
