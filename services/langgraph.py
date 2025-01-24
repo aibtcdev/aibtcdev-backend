@@ -14,9 +14,12 @@ logger = configure_logger(__name__)
 
 def extract_filtered_content(history: List) -> List[Dict]:
     """Extract and filter content from chat history."""
+    logger.debug(
+        f"Starting content extraction from history with {len(history)} messages"
+    )
     filtered_content = []
     for message in history:
-        logger.info(f"Processing message: {message}")
+        logger.debug(f"Processing message type: {message.get('role')}")
         if message.get("role") == "user":
             filtered_content.append(
                 {
@@ -31,6 +34,9 @@ def extract_filtered_content(history: List) -> List[Dict]:
                     "content": message.get("content", ""),
                 }
             )
+    logger.debug(
+        f"Finished filtering content, extracted {len(filtered_content)} messages"
+    )
     return filtered_content
 
 
@@ -51,12 +57,14 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         self.tokens = []
         self.current_tool = None
         self._loop = None
+        logger.debug("Initialized StreamingCallbackHandler")
 
     def _ensure_loop(self):
         """Ensure we have a valid event loop."""
         try:
             self._loop = asyncio.get_event_loop()
         except RuntimeError:
+            logger.warning("No event loop found, creating new one")
             self._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._loop)
         return self._loop
@@ -64,11 +72,18 @@ class StreamingCallbackHandler(BaseCallbackHandler):
     def _put_to_queue(self, item):
         """Helper method to put items in queue."""
         loop = self._ensure_loop()
-        if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self.queue.put(item), loop)
-            future.result()  # Wait for it to complete
-        else:
-            loop.run_until_complete(self.queue.put(item))
+        try:
+            if loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(self.queue.put(item), loop)
+                future.result()  # Wait for it to complete
+            else:
+                loop.run_until_complete(self.queue.put(item))
+            logger.debug(
+                f"Successfully queued item of type: {item.get('type', 'unknown')}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to put item in queue: {str(e)}")
+            raise
 
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
         """Run when tool starts running."""
@@ -80,7 +95,9 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             "status": "start",
         }
         self._put_to_queue(tool_execution)
-        logger.debug(f"Tool started: {self.current_tool}")
+        logger.info(
+            f"Tool started: {self.current_tool} with input: {input_str[:100]}..."
+        )
 
     def on_tool_end(self, output: str, **kwargs):
         """Run when tool ends running."""
@@ -92,34 +109,36 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             tool_execution = {
                 "type": "tool",
                 "tool": self.current_tool,
-                "input": None,  # We don't have access to the input here
+                "input": None,
                 "output": str(output),
                 "status": "end",
             }
             self._put_to_queue(tool_execution)
+            logger.info(
+                f"Tool {self.current_tool} completed with output length: {len(str(output))}"
+            )
             self.current_tool = None
-            logger.debug(f"Tool ended with output: {output}")
 
     def on_llm_start(self, *args, **kwargs):
         """Run when LLM starts running."""
-        logger.debug("LLM started")
+        logger.info("LLM processing started")
 
     def on_llm_new_token(self, token: str, **kwargs):
         """Run on new token. Only available when streaming is enabled."""
-        # If there's a custom on_llm_new_token callback, call it
         if self._on_llm_new_token:
             self._on_llm_new_token(token, **kwargs)
         self.tokens.append(token)
+        logger.debug(f"Received new token (length: {len(token)})")
 
     def on_llm_end(self, response: LLMResult, **kwargs):
         """Run when LLM ends running."""
-        logger.debug("LLM ended")
+        logger.info("LLM processing completed")
         if self._on_llm_end:
             self._on_llm_end(response, **kwargs)
 
     def on_llm_error(self, error: Exception, **kwargs):
         """Run when LLM errors."""
-        logger.error(f"LLM error: {str(error)}")
+        logger.error(f"LLM error occurred: {str(error)}", exc_info=True)
 
     def on_tool_error(self, error: Exception, **kwargs):
         """Run when tool errors."""
@@ -127,13 +146,16 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             tool_execution = {
                 "type": "tool",
                 "tool": self.current_tool,
-                "input": None,  # We don't have access to the input here
+                "input": None,
                 "output": f"Error: {str(error)}",
                 "status": "error",
             }
             self._put_to_queue(tool_execution)
+            logger.error(
+                f"Tool {self.current_tool} failed with error: {str(error)}",
+                exc_info=True,
+            )
             self.current_tool = None
-        logger.error(f"Tool error: {str(error)}")
 
 
 # -----------------------------------------------------
@@ -160,7 +182,11 @@ async def execute_langgraph_stream(
     :param input_str: The current user input.
     :param persona: Optional system-level message to define persona or style.
     """
-    logger.debug("Starting execute_chat_stream_langgraph")
+    logger.info("Starting new LangGraph chat stream execution")
+    logger.debug(
+        f"Input parameters - History length: {len(history)}, Persona present: {bool(persona)}, Tools count: {len(tools_map) if tools_map else 0}"
+    )
+
     callback_queue = asyncio.Queue()
 
     # Filter the history if needed
@@ -170,28 +196,25 @@ async def execute_langgraph_stream(
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        logger.warning("No running event loop found, creating new one")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-    logger.debug(
-        f"Converting history to messages, history length: {len(filtered_content)}"
-    )
 
     # Convert thread history to LangChain message format
     messages = []
 
     # 1. Optionally add the persona as a SystemMessage
     if persona:
-        logger.debug("Adding persona as a SystemMessage")
+        logger.debug(f"Adding persona message: {persona[:100]}...")
         messages.append(SystemMessage(content=persona))
 
     # 2. Convert existing thread
+    logger.debug("Converting thread history to LangChain format")
     for msg in filtered_content:
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))
         else:
-            # Handle assistant messages, ensuring content is not None
-            content = msg.get("content") or ""  # Default to empty string if None
+            content = msg.get("content") or ""
             if "tool_calls" in msg:
                 messages.append(
                     AIMessage(content=content, tool_calls=msg["tool_calls"])
@@ -200,8 +223,9 @@ async def execute_langgraph_stream(
                 messages.append(AIMessage(content=content))
 
     # 3. Add the current user input
+    logger.debug(f"Adding current user input: {input_str[:100]}...")
     messages.append(HumanMessage(content=input_str))
-    logger.debug(f"Final messages length (including persona if any): {len(messages)}")
+    logger.info(f"Prepared message chain with {len(messages)} total messages")
 
     # Create a streaming callback handler
     callback_handler = StreamingCallbackHandler(
@@ -215,9 +239,10 @@ async def execute_langgraph_stream(
     )
 
     # Create the chat model with streaming
+    logger.debug("Initializing ChatOpenAI model")
     chat = ChatOpenAI(
         streaming=True,
-        model="gpt-4o",  # Replace with your desired model
+        model="gpt-4o",
         callbacks=[callback_handler],
         temperature=0.7,
     ).bind_tools(list(tools_map.values()))
@@ -230,39 +255,33 @@ async def execute_langgraph_stream(
     def should_continue(state: State) -> str:
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools"
-        return END
+        result = "tools" if last_message.tool_calls else END
+        logger.debug(f"Continue decision: {result}")
+        return result
 
     # Define the function that calls the model
     def call_model(state: State):
+        logger.debug("Calling model with current state")
         messages = state["messages"]
         response = chat.invoke(messages)
+        logger.debug("Received model response")
         return {"messages": [response]}
 
     # Define the graph
+    logger.debug("Setting up LangGraph workflow")
     workflow = StateGraph(State)
-
-    # Define the nodes we will cycle between
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", tool_node)
-
-    # Set the entrypoint as 'agent'
     workflow.add_edge(START, "agent")
-
-    # Add conditional edges
-    workflow.add_conditional_edges(
-        "agent",
-        should_continue,
-    )
-
-    # Add edge from tools to agent
+    workflow.add_conditional_edges("agent", should_continue)
     workflow.add_edge("tools", "agent")
 
     # Compile the graph
+    logger.debug("Compiling workflow")
     runnable = workflow.compile()
 
     # Run the graph with config including callbacks
+    logger.info("Starting workflow execution")
     task = asyncio.create_task(runnable.ainvoke({"messages": messages}, config=config))
 
     # Stream tokens while waiting for completion
@@ -270,25 +289,29 @@ async def execute_langgraph_stream(
         try:
             data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
             if data["type"] == "end":
+                logger.debug("Received end signal")
                 yield data
             else:
                 yield data
         except asyncio.TimeoutError:
             continue
         except asyncio.CancelledError:
-            logger.error("Task cancelled")
+            logger.error("Task cancelled unexpectedly")
             task.cancel()
             raise
         except Exception as e:
-            logger.error(f"Error in streaming loop: {str(e)}")
+            logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
             raise
 
     # Get final result
     try:
         result = await task
-        logger.debug(f"Final result received: {result}")
+        logger.info("Workflow execution completed successfully")
+        logger.debug(
+            f"Final result content length: {len(result['messages'][-1].content)}"
+        )
     except Exception as e:
-        logger.error(f"Error getting final result: {str(e)}")
+        logger.error(f"Failed to get final result: {str(e)}", exc_info=True)
         raise
 
     yield {
