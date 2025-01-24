@@ -38,7 +38,7 @@ async def execute_scheduled_job(agent_id: str, task_id: str, profile_id: str):
 
     persona = generate_persona(agent)
 
-    tools_map = initialize_tools(profile, agent_id=agent_id)
+    tools_map = initialize_tools(profile, agent.id)
     # if agent.agent_tools is not None:
     #     tools_map_filtered = filter_tools_by_names(agent.agent_tools, tools_map)
     # else:
@@ -156,6 +156,7 @@ async def sync_schedules(scheduler: AsyncIOScheduler):
                     execute_scheduled_job,
                     CronTrigger.from_crontab(cron_expression),
                     args=[agent_id, task_id, profile_id],
+                    misfire_grace_time=60,
                     id=job_id,
                 )
                 logger.info(f"Added new schedule {job_id}")

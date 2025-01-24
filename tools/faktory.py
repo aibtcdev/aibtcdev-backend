@@ -47,7 +47,11 @@ class FaktoryExecuteBuyTool(BaseTool):
     ) -> str:
         """Execute the tool to place a buy order."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -114,7 +118,11 @@ class FaktoryExecuteSellTool(BaseTool):
     ) -> str:
         """Execute the tool to place a sell order."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -180,7 +188,11 @@ class FaktoryGetBuyQuoteTool(BaseTool):
     ) -> str:
         """Execute the tool to get a buy quote."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -255,7 +267,11 @@ class FaktoryGetDaoTokensTool(BaseTool):
     ) -> str:
         """Execute the tool to get DAO tokens."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -325,7 +341,11 @@ class FaktoryGetSellQuoteTool(BaseTool):
     ) -> str:
         """Execute the tool to get a sell quote."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",
@@ -380,7 +400,11 @@ class FaktoryGetTokenTool(BaseTool):
     ) -> str:
         """Execute the tool to get token information."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-faktory",

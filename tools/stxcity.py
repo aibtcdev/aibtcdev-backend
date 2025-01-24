@@ -51,7 +51,11 @@ class StxCityExecuteBuyTool(BaseTool):
     ) -> str:
         """Execute the tool to place a buy order."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-stxcity",
@@ -106,7 +110,11 @@ class StxCityListBondingTokensTool(BaseTool):
     def _deploy(self, **kwargs) -> Dict[str, Any]:
         """Execute the tool to list available bonding tokens."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(self.wallet_id, "stacks-stxcity", "exec-list.ts")
 
     def _run(self, **kwargs) -> Dict[str, Any]:
@@ -151,7 +159,11 @@ class StxCitySearchTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to search for bonding opportunities."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         args = []
         if keyword:
             args.append(keyword)
@@ -217,7 +229,11 @@ class StxCityExecuteSellTool(BaseTool):
     ) -> str:
         """Execute the tool to place a sell order."""
         if self.wallet_id is None:
-            raise ValueError("Wallet ID is required")
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
         return BunScriptRunner.bun_run(
             self.wallet_id,
             "stacks-stxcity",
