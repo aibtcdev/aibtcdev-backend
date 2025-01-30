@@ -214,18 +214,13 @@ async def get_bot():
 
 def send_message_to_user_sync(profile_id: str, message: str) -> bool:
     """Synchronous version of send_message_to_user."""
-    try:
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(send_message_to_user(profile_id, message))
-    except RuntimeError:
-        # If no event loop exists, create a new one
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(send_message_to_user(profile_id, message))
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # If the loop is already running (e.g., called inside another async function), use this:
+        return loop.create_task(send_message_to_user(profile_id, message))
+
+    # If no event loop is running, create a new loop
+    return loop.run_until_complete(send_message_to_user(profile_id, message))
 
 
 async def send_message_to_user(profile_id: str, message: str) -> bool:
