@@ -1,13 +1,11 @@
-import os
 import asyncio
+import os
 from backend.factory import backend
-from backend.models import TelegramUserFilter, TelegramUserBase
+from backend.models import TelegramUserBase, TelegramUserFilter
 from dotenv import load_dotenv
 from lib.logger import configure_logger
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes 
-
-
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 load_dotenv()
 
@@ -46,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
 
-    # Update existing record with Telegram user information
+        # Update existing record with Telegram user information
         user_data = TelegramUserBase(
             telegram_user_id=str(user_id),
             username=user.username,
@@ -218,12 +216,16 @@ def send_message_to_user_sync(profile_id: str, message: str) -> bool:
     """Synchronous version of send_message_to_user."""
     try:
         loop = asyncio.get_event_loop()
+        return loop.run_until_complete(send_message_to_user(profile_id, message))
     except RuntimeError:
         # If no event loop exists, create a new one
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(send_message_to_user(profile_id, message))
+        try:
+            return loop.run_until_complete(send_message_to_user(profile_id, message))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 
 async def send_message_to_user(profile_id: str, message: str) -> bool:
