@@ -47,9 +47,17 @@ class ContractDAODeployInput(BaseModel):
         ...,
         description="Number of decimals for the token for the DAO. Default is 6",
     )
+    origin_address: str = Field(
+        ...,
+        description="The address of the originator of the DAO (e.g., 'ST1PQHQKV0Y2Q6Z7X1QZQ4VH6QZ6QZJWZQXGJ5YJ8')",
+    )
     mission: str = Field(
         ...,
         description="The mission of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.",
+    )
+    tweet_origin: str = Field(
+        ...,
+        description="The ID of the tweet that originated the DAO (e.g., '1440000000000000000')",
     )
 
 
@@ -75,7 +83,9 @@ class ContractDAODeployTool(BaseTool):
         token_description: str,
         token_max_supply: str,
         token_decimals: str,
+        origin_address: str,
         mission: str,
+        tweet_origin: str = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Core deployment logic used by both sync and async methods."""
@@ -146,8 +156,10 @@ class ContractDAODeployTool(BaseTool):
                 f"BunScriptRunner parameters: wallet_id={self.wallet_id}, "
                 f"token_symbol={token_symbol}, token_name={token_name}, "
                 f"token_max_supply={token_max_supply}, metadata_url={metadata_url}, "
-                f"logo_url={token_record.image_url}, dao_manifest={mission}"
+                f"logo_url={token_record.image_url}, origin_address={origin_address}, "
+                f"dao_manifest={mission}, tweet_origin={tweet_origin}"
             )
+            # "Usage: bun run deploy-dao.ts <tokenSymbol> <tokenName> <tokenMaxSupply> <tokenUri> <logoUrl> <originAddress> <daoManifest> <tweetOrigin>"
 
             result = BunScriptRunner.bun_run(
                 self.wallet_id,
@@ -158,7 +170,9 @@ class ContractDAODeployTool(BaseTool):
                 token_max_supply,
                 metadata_url,
                 token_record.image_url,
+                origin_address,
                 mission,
+                tweet_origin,
             )
             logger.debug(f"Contract deployment result type: {type(result)}")
             logger.debug(f"Contract deployment result content: {result}")
@@ -304,7 +318,9 @@ class ContractDAODeployTool(BaseTool):
         token_description: str,
         token_max_supply: str,
         token_decimals: str,
+        origin_address: str,
         mission: str,
+        tweet_origin: str = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Execute the tool to deploy a new dao."""
@@ -314,7 +330,9 @@ class ContractDAODeployTool(BaseTool):
             token_description,
             token_max_supply,
             token_decimals,
+            origin_address,
             mission,
+            tweet_origin,
             **kwargs,
         )
 
@@ -325,7 +343,9 @@ class ContractDAODeployTool(BaseTool):
         token_description: str,
         token_max_supply: str,
         token_decimals: str,
+        origin_address: str,
         mission: str,
+        tweet_origin: str = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
         """Async version of the tool."""
@@ -335,6 +355,8 @@ class ContractDAODeployTool(BaseTool):
             token_description,
             token_max_supply,
             token_decimals,
+            origin_address,
             mission,
+            tweet_origin,
             **kwargs,
         )

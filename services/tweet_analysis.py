@@ -59,7 +59,9 @@ def create_analysis_prompt() -> PromptTemplate:
            - token_description: Description of the token (e.g., 'The Human Token')
            - token_max_supply: Initial supply (default: 1000000000)
            - token_decimals: Number of decimals (default: 6)
+           - origin_address: The address of the DAO creator
            - mission: The mission statement of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.
+           - tweet_id: The ID of the tweet
         
         Tweet History:
         {filtered_content}
@@ -102,7 +104,9 @@ def create_analysis_prompt() -> PromptTemplate:
                     "token_description": str,
                     "token_max_supply": str,
                     "token_decimals": str,
-                    "mission": str
+                    "origin_address": str,
+                    "mission": str,
+                    "tweet_id": str,
                 }},
                 "priority": int
             }} if worthy and tweet_type == "tool_request" else None,
