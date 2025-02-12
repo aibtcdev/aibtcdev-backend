@@ -1,17 +1,32 @@
 import logging
-from api import chat, tools, webhooks
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from lib.startup import init_background_tasks
 
 # Load environment variables first
 load_dotenv()
 
+from api import chat, tools, webhooks
+from config import config
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from services.startup import init_background_tasks, shutdown
+
 # Configure module logger
 logger = logging.getLogger("uvicorn.error")
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events."""
+    try:
+        await init_background_tasks()
+        logger.info("Background tasks initialized")
+        yield
+    finally:
+        await shutdown()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Setup CORS origins
 cors_origins = [
@@ -34,17 +49,6 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup."""
-    try:
-        await init_background_tasks()
-        logger.info("Background tasks initialized")
-    except Exception as e:
-        logger.error(f"Error during startup: {e}")
-        raise e
 
 
 # Lightweight health check endpoint

@@ -1,21 +1,15 @@
-import os
 import requests
-from dotenv import load_dotenv
+from config import config
 from typing import Any, Dict, Optional
-
-# Load environment variables from a .env file
-load_dotenv()
 
 
 class PlatformApi:
-
     def __init__(self):
-        self.base_url = os.getenv(
-            "AIBTC_PLATFORM_API_URL", "https://api.platform.hiro.so"
-        )
-        self.api_key = os.getenv("HIRO_API_KEY")
-        self.webhook_url = os.getenv("AIBTC_WEBHOOK_URL")
-        self.webhook_auth = os.getenv("AIBTC_WEBHOOK_AUTH", "Bearer 1234567890")
+        """Initialize the Platform API client."""
+        self.base_url = "https://api.platform.hiro.so"
+        self.api_key = config.api.hiro_api_key
+        self.webhook_url = config.api.webhook_url
+        self.webhook_auth = config.api.webhook_auth
         if not self.api_key:
             raise ValueError("HIRO_API_KEY environment variable is required")
 

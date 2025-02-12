@@ -2,7 +2,7 @@ import asyncio
 import logging
 from lib.logger import configure_logger
 from services.runner import execute_runner_job
-from services.tweet_analysis import analyze_tweet
+from services.workflows import analyze_tweet
 
 logger = configure_logger(__name__)
 logging.getLogger().setLevel(logging.INFO)

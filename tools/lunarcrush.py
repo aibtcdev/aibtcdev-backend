@@ -1,6 +1,6 @@
 import requests
 from langchain.tools import BaseTool
-from lib.lunarcrush import LunarcrushApi
+from lib.lunarcrush import LunarCrushApi
 from pydantic import BaseModel, Field
 from typing import Type
 
@@ -25,7 +25,7 @@ class LunarCrushTokenMetricsTool(BaseTool):
     def _deploy(self, token_symbol: str, **kwargs) -> str:
         """Execute the tool to fetch token social metrics."""
         try:
-            obj = LunarcrushApi()
+            obj = LunarCrushApi()
             return obj.get_token_socials(token_symbol)
 
         except requests.RequestException as e:
@@ -58,7 +58,7 @@ class LunarCrushTokenMetadataTool(BaseTool):
     def _deploy(self, token_symbol: str, **kwargs) -> str:
         """Execute the tool to fetch token metadata."""
         try:
-            obj = LunarcrushApi()
+            obj = LunarCrushApi()
             return obj.get_token_metadata(token_symbol)
 
         except requests.RequestException as e:
@@ -91,7 +91,7 @@ class SearchLunarCrushTool(BaseTool):
     def _deploy(self, term: str, **kwargs) -> str:
         """Execute the tool to search social posts."""
         try:
-            obj = LunarcrushApi()
+            obj = LunarCrushApi()
             return obj.search(term)
 
         except requests.RequestException as e:

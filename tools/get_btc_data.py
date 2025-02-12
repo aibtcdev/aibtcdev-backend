@@ -1,5 +1,6 @@
 import os
 import requests
+from config import config
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 from typing import Type
@@ -23,8 +24,8 @@ class GetBitcoinData(BaseTool):
 
     def _deploy(self, **kwargs) -> str:
         """Execute the tool to fetch Bitcoin market data."""
-        # Get the API key from the environment variable
-        api_key = os.getenv("AIBTC_CMC_API_KEY")
+        # Get the API key from the config
+        api_key = config.api.cmc_api_key
 
         if not api_key:
             return "Error: API key not found. Please set the 'AIBTC_CMC_API_KEY' environment variable."
