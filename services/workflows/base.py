@@ -36,7 +36,7 @@ StateType = TypeVar("StateType", bound=Dict[str, Any])
 class BaseWorkflow(Generic[StateType]):
     """Base class for all LangGraph workflows."""
 
-    def __init__(self, model_name: str = "gpt-4", temperature: float = 0.7):
+    def __init__(self, model_name: str = "gpt-4o", temperature: float = 0.7):
         """Initialize the workflow."""
         self.llm = ChatOpenAI(
             temperature=temperature,

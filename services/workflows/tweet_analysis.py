@@ -15,9 +15,13 @@ logger = configure_logger(__name__)
 
 
 class ToolRequest(BaseModel):
-    tool_name: str = "contract_dao_deploy"
-    parameters: ContractDAODeployInput
-    priority: int = 1
+    tool_name: str = Field(
+        description="The name of the tool to be executed its always contract_dao_deploy"
+    )
+    parameters: ContractDAODeployInput = Field(
+        description="The parameters for the tool"
+    )
+    priority: int = Field(description="The priority of the tool request")
 
 
 class TweetAnalysisOutput(BaseModel):
@@ -158,6 +162,7 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
 
             structured_output = self.llm.with_structured_output(
                 TweetAnalysisOutput,
+                method="json_schema",
                 include_raw=True,
             )
             # Get analysis from LLM
