@@ -77,8 +77,6 @@ class TweetGeneratorWorkflow(BaseWorkflow[GeneratorState]):
             # Get generation from LLM
             structured_output = self.llm.with_structured_output(
                 TweetGeneratorOutput,
-                method="json_schema",
-                include_raw=True,
             )
             result = structured_output.invoke(formatted_prompt)
 

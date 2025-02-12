@@ -162,8 +162,6 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
 
             structured_output = self.llm.with_structured_output(
                 TweetAnalysisOutput,
-                method="json_schema",
-                include_raw=True,
             )
             # Get analysis from LLM
             result = structured_output.invoke(formatted_prompt)
