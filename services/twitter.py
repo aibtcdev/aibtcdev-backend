@@ -218,6 +218,7 @@ class TwitterMentionHandler:
             response_content: Content of the response tweet
         """
         logger.debug(f"Posting response to tweet {tweet_data.tweet_id}")
+        await self.twitter_service._ainitialize()
         await self.twitter_service._apost_tweet(
             text=response_content, reply_in_reply_to_tweet_id=tweet_data.tweet_id
         )
