@@ -33,6 +33,60 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         super().__init__(config)
         self.twitter_handler = create_twitter_handler()
 
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate tweet task configuration."""
+        try:
+            logger.debug("Checking Twitter handler initialization")
+            if not self.twitter_handler:
+                logger.error("Twitter handler not initialized")
+                return False
+
+            logger.debug("Checking Twitter handler configuration")
+            if not self.twitter_handler.config:
+                logger.error("Twitter handler configuration not set")
+                return False
+
+            logger.debug("Tweet task configuration validation successful")
+            return True
+        except Exception as e:
+            logger.error(f"Error validating tweet config: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_prerequisites(self, context: JobContext) -> bool:
+        """Validate tweet task prerequisites."""
+        try:
+            logger.debug("Checking Twitter service initialization")
+            if not self.twitter_handler.twitter_service:
+                logger.error("Twitter service not initialized")
+                return False
+
+            logger.debug("Tweet task prerequisites validation successful")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating tweet prerequisites: {str(e)}", exc_info=True
+            )
+            return False
+
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate tweet task specific conditions."""
+        try:
+            logger.debug("Checking for unprocessed tweet messages")
+            queue_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(type="tweet", is_processed=False)
+            )
+            has_messages = bool(queue_messages)
+            if not has_messages:
+                logger.info("No unprocessed tweet messages found in queue")
+            else:
+                logger.debug(f"Found {len(queue_messages)} unprocessed tweet messages")
+            return has_messages
+        except Exception as e:
+            logger.error(
+                f"Error in tweet task-specific validation: {str(e)}", exc_info=True
+            )
+            return False
+
     async def _process_tweet_message(
         self, message: Any, dao_messages: list
     ) -> TweetProcessingResult:

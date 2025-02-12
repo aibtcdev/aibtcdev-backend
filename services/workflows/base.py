@@ -71,7 +71,12 @@ class BaseWorkflow(Generic[StateType]):
                 raise ValueError("Invalid initial state")
 
             graph = self._create_graph()
-            app = graph.compile()
+            # Check if the graph is already compiled
+            if hasattr(graph, "compile"):
+                app = graph.compile()
+            else:
+                # Graph is already compiled
+                app = graph
             result = await app.ainvoke(initial_state)
             return result
 

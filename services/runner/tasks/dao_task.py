@@ -34,6 +34,67 @@ class DAOTask(BaseTask[DAOProcessingResult]):
         )
         logger.debug(f"Initialized tools_map with {len(self.tools_map)} tools")
 
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate DAO task configuration."""
+        try:
+            logger.debug("Checking DAO deployment tools availability")
+            if not self.tools_map:
+                logger.error("No DAO deployment tools available")
+                return False
+
+            logger.debug("Checking tools initialization")
+            if not self.tools_map_all:
+                logger.error("Tools not properly initialized")
+                return False
+
+            logger.debug("DAO task configuration validation successful")
+            return True
+        except Exception as e:
+            logger.error(f"Error validating DAO config: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_prerequisites(self, context: JobContext) -> bool:
+        """Validate DAO task prerequisites."""
+        try:
+            logger.debug("Checking for pending DAO deployments")
+            pending_daos = backend.list_daos(
+                filters=DAOFilter(
+                    is_deployed=False,
+                    is_broadcasted=True,
+                    wallet_id=self.config.twitter_wallet_id,
+                )
+            )
+            if pending_daos:
+                logger.info(
+                    f"Found {len(pending_daos)} pending Twitter DAO(s), skipping queue processing"
+                )
+                return False
+
+            logger.debug("DAO task prerequisites validation successful")
+            return True
+        except Exception as e:
+            logger.error(f"Error validating DAO prerequisites: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate DAO task specific conditions."""
+        try:
+            logger.debug("Checking for unprocessed DAO messages")
+            queue_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(type="daos", is_processed=False)
+            )
+            has_messages = bool(queue_messages)
+            if not has_messages:
+                logger.info("No unprocessed DAO messages found in queue")
+            else:
+                logger.debug(f"Found {len(queue_messages)} unprocessed DAO messages")
+            return has_messages
+        except Exception as e:
+            logger.error(
+                f"Error in DAO task-specific validation: {str(e)}", exc_info=True
+            )
+            return False
+
     def _get_dao_parameters(self, message: Dict[str, Any]) -> Optional[str]:
         """Extract and validate DAO parameters from message."""
         try:
