@@ -1,5 +1,6 @@
 """Base workflow functionality."""
 
+import json
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import Graph
@@ -45,12 +46,32 @@ class BaseWorkflow(Generic[StateType]):
         self.logger = configure_logger(self.__class__.__name__)
 
     def _clean_llm_response(self, content: str) -> str:
-        """Clean the LLM response content."""
-        if "```json" in content:
-            return content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            return content.split("```")[1].split("```")[0].strip()
-        return content.strip()
+        """Clean the LLM response content and ensure valid JSON."""
+        try:
+            # First try to parse as-is in case it's already valid JSON
+            json.loads(content)
+            return content.strip()
+        except json.JSONDecodeError:
+            # If not valid JSON, try to extract from markdown blocks
+            if "```json" in content:
+                json_content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                json_content = content.split("```")[1].split("```")[0].strip()
+            else:
+                json_content = content.strip()
+
+            # Replace any Python boolean values with JSON boolean values
+            json_content = json_content.replace("True", "true").replace(
+                "False", "false"
+            )
+
+            # Validate the cleaned JSON
+            try:
+                json.loads(json_content)
+                return json_content
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to parse JSON after cleaning: {str(e)}")
+                raise ValueError(f"Invalid JSON response from LLM: {str(e)}")
 
     def _create_prompt(self) -> PromptTemplate:
         """Create the prompt template for this workflow."""
