@@ -1,6 +1,6 @@
 from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 from backend.factory import backend
-from backend.models import DAOFilter, Profile, QueueMessageBase, QueueMessageFilter
+from backend.models import DAOFilter, Profile, QueueMessage, QueueMessageFilter
 from dataclasses import dataclass
 from datetime import datetime
 from lib.logger import configure_logger
@@ -95,10 +95,10 @@ class DAOTask(BaseTask[DAOProcessingResult]):
             )
             return False
 
-    def _get_dao_parameters(self, message: Dict[str, Any]) -> Optional[str]:
+    def _get_dao_parameters(self, message: QueueMessage) -> Optional[str]:
         """Extract and validate DAO parameters from message."""
         try:
-            params = message["parameters"]
+            params = message.message["parameters"]
             return (
                 f"Please deploy a DAO with the following parameters:\n"
                 f"Token Symbol: {params['token_symbol']}\n"
@@ -107,17 +107,17 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                 f"Token Max Supply: {params['token_max_supply']}\n"
                 f"Token Decimals: {params['token_decimals']}\n"
                 f"Origin Address: {params['origin_address']}\n"
-                f"Tweet Origin: {params['tweet_origin']}\n"
+                f"Tweet Origin: {message.tweet_id}\n"
                 f"Mission: {params['mission']}"
             )
         except KeyError as e:
             logger.error(f"Missing required parameter in message: {e}")
             return None
 
-    async def _process_dao_message(self, message: Any) -> DAOProcessingResult:
+    async def _process_dao_message(self, message: QueueMessage) -> DAOProcessingResult:
         """Process a single DAO message."""
         try:
-            tool_input = self._get_dao_parameters(message.message)
+            tool_input = self._get_dao_parameters(message)
             if not tool_input:
                 return DAOProcessingResult(
                     success=False,
