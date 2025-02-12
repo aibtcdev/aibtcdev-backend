@@ -6,7 +6,7 @@ from backend.models import QueueMessageCreate, QueueMessageFilter, TweetType, XT
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from lib.logger import configure_logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.workflows.base import BaseWorkflow
 from tools.daos import ContractDAODeployInput
 from typing import Dict, Optional, TypedDict
@@ -21,11 +21,15 @@ class ToolRequest(BaseModel):
 
 
 class TweetAnalysisOutput(BaseModel):
-    worthy: bool
-    reason: str
-    tweet_type: TweetType
-    tool_request: Optional[ToolRequest] = None
-    confidence_score: float
+    worthy: bool = Field(description="Whether the tweet is worthy of processing")
+    reason: str = Field(description="The reason for the worthy determination")
+    tweet_type: TweetType = Field(description="The type of tweet")
+    tool_request: Optional[ToolRequest] = Field(
+        description="The tool request to be executed if the tweet is worthy"
+    )
+    confidence_score: float = Field(
+        description="The confidence score for the worthy determination"
+    )
 
 
 class AnalysisState(TypedDict):
@@ -152,19 +156,23 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
                 token_symbols=token_symbols,
             )
 
+            structured_output = self.llm.with_structured_output(
+                TweetAnalysisOutput,
+                include_raw=True,
+            )
             # Get analysis from LLM
-            result = self.llm.invoke(formatted_prompt)
+            result = structured_output.invoke(formatted_prompt)
 
             # Clean and parse the response
-            content = self._clean_llm_response(result.content)
-            parsed_result = TweetAnalysisOutput.model_validate_json(content)
+            # content = self._clean_llm_response(result.content)
+            # parsed_result = TweetAnalysisOutput.model_validate_json(result)
 
             # Update state
-            state["is_worthy"] = parsed_result.worthy
-            state["tweet_type"] = parsed_result.tweet_type
-            state["tool_request"] = parsed_result.tool_request
-            state["confidence_score"] = parsed_result.confidence_score
-            state["reason"] = parsed_result.reason
+            state["is_worthy"] = result.worthy
+            state["tweet_type"] = result.tweet_type
+            state["tool_request"] = result.tool_request
+            state["confidence_score"] = result.confidence_score
+            state["reason"] = result.reason
 
             return state
 
