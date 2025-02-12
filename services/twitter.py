@@ -284,7 +284,7 @@ class TwitterMentionHandler:
         if analysis_result["is_worthy"] and analysis_result["tool_request"]:
             logger.info(
                 f"Queueing tool request for tweet {tweet_data.tweet_id} - "
-                f"Type: {analysis_result['tool_request'].type}"
+                f"Tool: {analysis_result['tool_request'].tool_name}"
             )
             backend.create_queue_message(
                 new_queue_message=QueueMessageCreate(
