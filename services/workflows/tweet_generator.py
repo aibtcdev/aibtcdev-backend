@@ -3,7 +3,7 @@
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from lib.logger import configure_logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.workflows.base import BaseWorkflow
 from typing import Dict, TypedDict
 
@@ -13,8 +13,8 @@ logger = configure_logger(__name__)
 class TweetGeneratorOutput(BaseModel):
     """Output model for tweet generation."""
 
-    tweet_text: str
-    confidence_score: float
+    tweet_text: str = Field(description="The generated tweet text")
+    confidence_score: float = Field(description="The confidence score for the tweet")
 
 
 class GeneratorState(TypedDict):
@@ -75,15 +75,20 @@ class TweetGeneratorWorkflow(BaseWorkflow[GeneratorState]):
             )
 
             # Get generation from LLM
-            result = self.llm.invoke(formatted_prompt)
+            structured_output = self.llm.with_structured_output(
+                TweetGeneratorOutput,
+                method="json_schema",
+                include_raw=True,
+            )
+            result = structured_output.invoke(formatted_prompt)
 
             # Clean and parse the response
-            content = self._clean_llm_response(result.content)
-            parsed_result = TweetGeneratorOutput.model_validate_json(content)
+            # content = self._clean_llm_response(result.content)
+            # parsed_result = TweetGeneratorOutput.model_validate_json(content)
 
             # Update state
-            state["generated_tweet"] = parsed_result.tweet_text
-            state["confidence_score"] = parsed_result.confidence_score
+            state["generated_tweet"] = result.tweet_text
+            state["confidence_score"] = result.confidence_score
 
             return state
 
