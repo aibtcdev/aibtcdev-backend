@@ -10,7 +10,7 @@ from backend.models import (
 )
 from dataclasses import dataclass
 from lib.logger import configure_logger
-from services.twitter import TweetData, TwitterMentionHandler
+from services.twitter import TweetData, TwitterMentionHandler, create_twitter_handler
 from services.workflows import generate_dao_tweet
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -31,7 +31,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
-        self.twitter_handler = TwitterMentionHandler()
+        self.twitter_handler = create_twitter_handler()
 
     async def _process_tweet_message(
         self, message: Any, dao_messages: list

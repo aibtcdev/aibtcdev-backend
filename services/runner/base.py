@@ -87,6 +87,11 @@ class BaseTask(ABC, Generic[T]):
     def __init__(self, config: Optional[RunnerConfig] = None):
         self.config = config or RunnerConfig.from_env()
 
+    @classmethod
+    def get_result_class(cls) -> Type[RunnerResult]:
+        """Get the result class for this task."""
+        return cls.__orig_bases__[0].__args__[0]  # type: ignore
+
     @abstractmethod
     async def execute(self, context: JobContext) -> List[T]:
         """Execute the task with given context."""
