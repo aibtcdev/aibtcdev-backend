@@ -31,8 +31,13 @@ class Apply:
 
 
 @dataclass
-class ChainHookData:
+class ChainHookInner:
     apply: List[Apply]
+
+
+@dataclass
+class ChainHookData:
+    chainhook: ChainHookInner
 
 
 class ChainhookParser(WebhookParser):
@@ -50,7 +55,7 @@ class ChainhookHandler(WebhookHandler):
         """Handle Chainhook webhook data."""
         try:
             self.logger.info(
-                f"Processing chainhook webhook with {len(parsed_data.apply)} apply blocks"
+                f"Processing chainhook webhook with {len(parsed_data.chainhook.apply)} apply blocks"
             )
 
             non_processed_extensions = backend.list_extensions(
@@ -75,7 +80,7 @@ class ChainhookHandler(WebhookHandler):
                 f"{len(non_processed_proposals)} pending proposals"
             )
 
-            for apply in parsed_data.apply:
+            for apply in parsed_data.chainhook.apply:
                 for transaction in apply.transactions:
                     tx_id = transaction.transaction_identifier.hash
                     self.logger.info(f"Processing transaction {tx_id}")
