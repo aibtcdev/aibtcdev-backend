@@ -300,23 +300,13 @@ def get_bot_service() -> Optional[TelegramBotService]:
 
 async def start_application() -> Optional[Application]:
     """Start the Telegram bot application if enabled."""
-    if not config.telegram.enabled:
-        logger.info("Telegram bot is disabled")
-        return None
-
     try:
-        application = Application.builder().token(config.telegram.token).build()
-
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("help", help_command))
-
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-
-        logger.info("Telegram bot started successfully")
-        return application
+        bot_service = get_bot_service()
+        if bot_service:
+            await bot_service.initialize()
+            logger.info("Telegram bot started successfully")
+            return bot_service._app
+        return None
     except Exception as e:
         logger.error(f"Failed to start Telegram bot: {e}")
         return None
