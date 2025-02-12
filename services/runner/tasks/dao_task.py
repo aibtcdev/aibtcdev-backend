@@ -106,6 +106,8 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                 f"Token Description: {params['token_description']}\n"
                 f"Token Max Supply: {params['token_max_supply']}\n"
                 f"Token Decimals: {params['token_decimals']}\n"
+                f"Origin Address: {params['origin_address']}\n"
+                f"Tweet Origin: {params['tweet_origin']}\n"
                 f"Mission: {params['mission']}"
             )
         except KeyError as e:
