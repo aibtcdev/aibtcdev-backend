@@ -1,6 +1,12 @@
 from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 from backend.factory import backend
-from backend.models import DAOFilter, Profile, QueueMessage, QueueMessageFilter
+from backend.models import (
+    DAOFilter,
+    Profile,
+    QueueMessage,
+    QueueMessageBase,
+    QueueMessageFilter,
+)
 from dataclasses import dataclass
 from datetime import datetime
 from lib.logger import configure_logger
