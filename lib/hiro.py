@@ -1,16 +1,13 @@
-import os
 import requests
-from dotenv import load_dotenv
+from config import config
 from typing import Any, Dict
-
-# Load environment variables from a .env file
-load_dotenv()
 
 
 class HiroApi:
 
     def __init__(self):
-        self.base_url = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
+        """Initialize the Hiro API client."""
+        self.base_url = config.api.hiro_api_url
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make a GET request to the Hiro API."""

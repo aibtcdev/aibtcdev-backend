@@ -1,39 +1,29 @@
-import os
-from .abstract import AbstractBackend
 from .supabase import SupabaseBackend
-from dotenv import load_dotenv
+from backend.abstract import AbstractBackend
+from config import config
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 from supabase import Client, create_client
 
-load_dotenv()
-
 
 def get_backend() -> AbstractBackend:
-    """
-    Factory function to get the appropriate backend implementation
-    based on the AIBTC_BACKEND environment variable.
-    """
-    backend = os.getenv("AIBTC_BACKEND", "supabase")
-    if backend == "supabase":
+    """Get the backend implementation based on configuration."""
+    if config.db.backend == "supabase":
+        return _get_supabase_backend()
+    else:
+        raise ValueError(f"Unsupported backend: {config.db.backend}")
 
-        USER = os.getenv("AIBTC_SUPABASE_USER")
-        PASSWORD = os.getenv("AIBTC_SUPABASE_PASSWORD")
-        HOST = os.getenv("AIBTC_SUPABASE_HOST")
-        PORT = os.getenv("AIBTC_SUPABASE_PORT")
-        DBNAME = os.getenv("AIBTC_SUPABASE_DBNAME")
-        DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
-        engine = create_engine(DATABASE_URL, poolclass=NullPool)
 
-        URL = os.getenv("AIBTC_SUPABASE_URL")
-        SERVICE_KEY = os.getenv("AIBTC_SUPABASE_SERVICE_KEY")
-        supabase: Client = create_client(URL, SERVICE_KEY)
-
-        return SupabaseBackend(
-            supabase,
-            sqlalchemy_engine=engine,
-            bucket_name=os.getenv("AIBTC_SUPABASE_BUCKET_NAME"),
-        )
+def _get_supabase_backend() -> SupabaseBackend:
+    """Get a Supabase backend implementation."""
+    client: Client = create_client(config.db.url, config.db.service_key)
+    DATABASE_URL = f"postgresql+psycopg2://{config.db.user}:{config.db.password}@{config.db.host}:{config.db.port}/{config.db.dbname}?sslmode=require"
+    engine = create_engine(DATABASE_URL, poolclass=NullPool)
+    return SupabaseBackend(
+        client=client,
+        sqlalchemy_engine=engine,
+        bucket_name=config.db.bucket_name,
+    )
 
 
 # Create an instance

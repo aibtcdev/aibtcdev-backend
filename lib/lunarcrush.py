@@ -1,20 +1,13 @@
-import os
 import requests
-from dotenv import load_dotenv
-
-# Load environment variables from a .env file
-load_dotenv()
+from config import config
 
 
-class LunarcrushApi:
+class LunarCrushApi:
 
     def __init__(self):
-        # Base URL for the Lunarcrush API
-        self.base_url = os.getenv(
-            "AIBTC_LUNARCRUSH_BASE_URL", "https://lunarcrush.com/api4/public/"
-        )
-        # Retrieve the API key from environment variables
-        self.api_key = os.getenv("AIBTC_LUNARCRUSH_API_KEY")
+        """Initialize the LunarCrush API client."""
+        self.base_url = "https://lunarcrush.com/api/v2"
+        self.api_key = config.api.lunarcrush_api_key
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make a GET request to the Lunarcrush API."""

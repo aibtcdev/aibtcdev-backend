@@ -1,15 +1,12 @@
-import os
 import requests
-from dotenv import load_dotenv
-
-# Load environment variables from a .env file
-load_dotenv()
+from config import config
 
 
 class AlexApi:
 
     def __init__(self):
-        self.base_url = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
+        """Initialize the Alex API client."""
+        self.base_url = config.api.alex_base_url
         self.limits = 500
 
     def _get(self, endpoint: str, params: dict = {}):

@@ -1,10 +1,9 @@
 import openai
 import os
 import requests
-from dotenv import load_dotenv
+from config import config
 
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = config.api.openai_api_key
 
 
 class ImageGenerationError(Exception):
