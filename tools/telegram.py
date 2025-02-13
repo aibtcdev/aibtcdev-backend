@@ -1,7 +1,7 @@
 from backend.models import UUID
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from services.bot import send_message_to_user_sync
+from services.bot import _bot_service
 from typing import Any, Dict, Optional, Type
 
 
@@ -38,7 +38,7 @@ class SendTelegramNotificationTool(BaseTool):
         if self.profile_id is None:
             raise ValueError("Profile ID is required")
         try:
-            response = send_message_to_user_sync(
+            response = _bot_service.send_message_to_user_sync(
                 profile_id=self.profile_id, message=message
             )
             return response

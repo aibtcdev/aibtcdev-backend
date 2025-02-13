@@ -1,8 +1,10 @@
 from backend.factory import backend
-from backend.models import DAO, UUID, DAOCreate, Token, TokenBase, TokenCreate
+from backend.models import DAO, DAOCreate, Token, TokenBase, TokenCreate
+from dataclasses import dataclass
 from lib.logger import configure_logger
 from lib.token_assets import TokenAssetError, TokenAssetManager, TokenMetadata
 from typing import Dict, Tuple
+from uuid import UUID
 
 logger = configure_logger(__name__)
 
@@ -27,102 +29,113 @@ class TokenUpdateError(TokenServiceError):
     pass
 
 
-def generate_dao_dependencies(
-    name: str, mission: str, description: str, wallet_id: UUID
-) -> DAO:
-    """Generate dao dependencies including database record and metadata.
+@dataclass
+class DAORequest:
+    """Data class for DAO creation request"""
 
-    Args:
-        name: Name of the dao
-        mission: Mission of the dao
-        description: Description of the dao
-        wallet_id: ID of the wallet to bind to the dao
+    name: str
+    mission: str
+    description: str
+    wallet_id: UUID
 
-    Returns:
-        DAO: The created DAO record
-    """
-    logger.debug(
-        f"Creating dao with name={name}, mission={mission}, description={description}, wallet_id={wallet_id}"
-    )
-    try:
-        dao = backend.create_dao(
-            DAOCreate(
-                name=name,
-                mission=mission,
-                description=description,
-                wallet_id=wallet_id,
-            )
+    def to_dao_create(self) -> DAOCreate:
+        """Convert to DAOCreate model"""
+        return DAOCreate(
+            name=self.name,
+            mission=self.mission,
+            description=self.description,
+            wallet_id=self.wallet_id,
         )
-        logger.debug(f"Created dao type: {type(dao)}")
-        logger.debug(f"Created dao content: {dao}")
-
-        return dao
-    except Exception as e:
-        logger.error(f"Failed to create dao: {str(e)}", exc_info=True)
-        raise
 
 
-def generate_token_dependencies(
-    token_name: str,
-    token_symbol: str,
-    token_description: str,
-    token_decimals: int,
-    token_max_supply: str,
-) -> Tuple[str, Token]:
-    """Generate token dependencies including database record, image, and metadata.
+@dataclass
+class TokenRequest:
+    """Data class for token creation request"""
 
-    Args:
-        token_name: Name of the token
-        token_symbol: Symbol of the token
-        token_description: Description of the token
-        token_decimals: Number of decimals for the token
-        token_max_supply: Maximum supply of the token
+    name: str
+    symbol: str
+    description: str
+    decimals: int
+    max_supply: str
 
-    Returns:
-        Tuple[str, Dict]: Token metadata URL and token details
-
-    Raises:
-        TokenCreationError: If token record creation fails
-        TokenAssetError: If asset generation fails
-        TokenUpdateError: If token update fails
-    """
-    try:
-        logger.debug(
-            f"Creating token with name={token_name}, symbol={token_symbol}, "
-            f"description={token_description}, decimals={token_decimals}, "
-            f"max_supply={token_max_supply}"
-        )
-        # Create initial token record
-        token_create = TokenCreate(
-            name=token_name,
-            symbol=token_symbol,
-            description=token_description,
-            decimals=token_decimals,
-            max_supply=token_max_supply,
+    def to_token_create(self) -> TokenCreate:
+        """Convert to TokenCreate model"""
+        return TokenCreate(
+            name=self.name,
+            symbol=self.symbol,
+            description=self.description,
+            decimals=self.decimals,
+            max_supply=self.max_supply,
             status="DRAFT",
         )
-        logger.debug(f"TokenCreate object: {token_create}")
 
-        new_token = backend.create_token(new_token=token_create)
-        logger.debug(f"Created token type: {type(new_token)}")
-        logger.debug(f"Created token content: {new_token}")
-
-        token_id = new_token.id
-        logger.debug(f"Created token record with ID: {token_id}")
-
-        # Create metadata object
-        metadata = TokenMetadata(
-            name=token_name,
-            symbol=token_symbol,
-            description=token_description,
-            decimals=token_decimals,
-            max_supply=token_max_supply,
+    def to_token_metadata(self) -> TokenMetadata:
+        """Convert to TokenMetadata"""
+        return TokenMetadata(
+            name=self.name,
+            symbol=self.symbol,
+            description=self.description,
+            decimals=self.decimals,
+            max_supply=self.max_supply,
         )
-        logger.debug(f"Created TokenMetadata: {metadata}")
 
-        # Generate and store assets
-        asset_manager = TokenAssetManager(token_id)
+
+class DAOService:
+    """Service class for DAO-related operations"""
+
+    @staticmethod
+    def create_dao(request: DAORequest) -> DAO:
+        """Create a new DAO with the given parameters
+
+        Args:
+            request: The DAO creation request
+
+        Returns:
+            DAO: The created DAO record
+
+        Raises:
+            TokenServiceError: If DAO creation fails
+        """
+        logger.debug(f"Creating dao with request: {request}")
         try:
+            dao = backend.create_dao(request.to_dao_create())
+            logger.debug(f"Created dao: {dao}")
+            return dao
+        except Exception as e:
+            logger.error(f"Failed to create dao: {str(e)}", exc_info=True)
+            raise TokenServiceError(f"Failed to create dao: {str(e)}")
+
+
+class TokenService:
+    """Service class for token-related operations"""
+
+    def __init__(self):
+        self.backend = backend
+
+    def create_token(self, request: TokenRequest) -> Tuple[str, Token]:
+        """Create a new token with the given parameters
+
+        Args:
+            request: The token creation request
+
+        Returns:
+            Tuple[str, Token]: Token metadata URL and token details
+
+        Raises:
+            TokenCreationError: If token creation fails
+            TokenAssetError: If asset generation fails
+            TokenUpdateError: If token update fails
+        """
+        logger.debug(f"Creating token with request: {request}")
+        try:
+            # Create initial token record
+            new_token = self.backend.create_token(request.to_token_create())
+            logger.debug(f"Created initial token: {new_token}")
+
+            # Generate and store assets
+            asset_manager = TokenAssetManager(new_token.id)
+            metadata = request.to_token_metadata()
+
             logger.debug("Generating token assets...")
             assets = asset_manager.generate_all_assets(metadata)
             logger.debug(f"Generated assets: {assets}")
@@ -134,53 +147,83 @@ def generate_token_dependencies(
             )
             logger.debug(f"Updating token with: {token_update}")
 
-            update_result = backend.update_token(
-                token_id=token_id, update_data=token_update
+            update_result = self.backend.update_token(
+                token_id=new_token.id, update_data=token_update
             )
-            logger.debug(f"Token update result: {update_result}")
 
             if not update_result:
                 raise TokenUpdateError(
                     "Failed to update token record with asset URLs",
-                    {"token_id": token_id, "assets": assets},
+                    {"token_id": new_token.id, "assets": assets},
                 )
 
-            logger.debug(f"Final token data content: {update_result}")
-
+            logger.debug(f"Final token data: {update_result}")
             return assets["metadata_url"], update_result
 
-        except TokenAssetError as e:
-            logger.error(f"Failed to generate token assets: {e}", exc_info=True)
-            logger.error(f"Token ID: {token_id}")
-            logger.error(f"Metadata: {metadata}")
+        except TokenAssetError:
+            logger.error("Failed to generate token assets", exc_info=True)
             raise
+        except Exception as e:
+            logger.error(f"Unexpected error during token creation: {e}", exc_info=True)
+            raise TokenCreationError(
+                f"Unexpected error during token creation: {str(e)}",
+                {"original_error": str(e)},
+            ) from e
 
-    except Exception as e:
-        logger.error(f"Unexpected error during token creation: {e}", exc_info=True)
-        raise TokenCreationError(
-            f"Unexpected error during token creation: {str(e)}",
-            {"original_error": str(e)},
-        ) from e
+    def bind_token_to_dao(self, token_id: UUID, dao_id: UUID) -> bool:
+        """Bind a token to a DAO
+
+        Args:
+            token_id: ID of the token to bind
+            dao_id: ID of the DAO to bind to
+
+        Returns:
+            bool: True if binding was successful, False otherwise
+        """
+        logger.debug(f"Binding token {token_id} to DAO {dao_id}")
+        try:
+            token_update = TokenBase(dao_id=dao_id)
+            logger.debug(f"Token update data: {token_update}")
+
+            result = self.backend.update_token(
+                token_id=token_id, update_data=token_update
+            )
+            logger.debug(f"Bind result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to bind token to DAO: {str(e)}", exc_info=True)
+            return False
 
 
-def bind_token_to_dao(token_id: UUID, dao_id: UUID):
-    """Bind a token to a DAO.
+# Facade functions for backward compatibility
+def generate_dao_dependencies(
+    name: str, mission: str, description: str, wallet_id: UUID
+) -> DAO:
+    """Generate dao dependencies including database record and metadata."""
+    request = DAORequest(
+        name=name, mission=mission, description=description, wallet_id=wallet_id
+    )
+    return DAOService.create_dao(request)
 
-    Args:
-        token_id: ID of the token to bind
-        dao_id: ID of the DAO to bind to
 
-    Returns:
-        bool: True if binding was successful, False otherwise
-    """
-    logger.debug(f"Binding token {token_id} to DAO {dao_id}")
-    try:
-        token_update = TokenBase(dao_id=dao_id)
-        logger.debug(f"Token update data: {token_update}")
+def generate_token_dependencies(
+    token_name: str,
+    token_symbol: str,
+    token_description: str,
+    token_decimals: int,
+    token_max_supply: str,
+) -> Tuple[str, Token]:
+    """Generate token dependencies including database record, image, and metadata."""
+    request = TokenRequest(
+        name=token_name,
+        symbol=token_symbol,
+        description=token_description,
+        decimals=token_decimals,
+        max_supply=token_max_supply,
+    )
+    return TokenService().create_token(request)
 
-        result = backend.update_token(token_id=token_id, update_data=token_update)
-        logger.debug(f"Bind result: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Failed to bind token to DAO: {str(e)}", exc_info=True)
-        return False
+
+def bind_token_to_dao(token_id: UUID, dao_id: UUID) -> bool:
+    """Bind a token to a DAO."""
+    return TokenService().bind_token_to_dao(token_id, dao_id)

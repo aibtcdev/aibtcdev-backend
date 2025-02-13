@@ -10,6 +10,7 @@ from backend.models import (
     ProposalCreate,
     TokenBase,
 )
+from config import config
 from langchain.tools import BaseTool
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
@@ -97,8 +98,8 @@ class ContractDAODeployTool(BaseTool):
                     "output": "",
                 }
 
-            # get the address for the wallet based on network from os.getenv
-            network = os.getenv("NETWORK", "testnet")
+            # get the address for the wallet based on network from config
+            network = config.network.network
 
             hiro = HiroApi()
             current_block_height = hiro.get_current_block_height()

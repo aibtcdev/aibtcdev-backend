@@ -1,18 +1,264 @@
 import asyncio
 import datetime
 from backend.factory import backend
-from backend.models import UUID, JobBase, Profile, StepCreate
+from backend.models import JobBase, Profile, StepCreate
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from lib.logger import configure_logger
 from lib.persona import generate_persona, generate_static_persona
-from services.langgraph import execute_langgraph_stream
+from services.workflows import execute_langgraph_stream
 from tools.tools_factory import initialize_tools
-from typing import Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from uuid import UUID
 
 logger = configure_logger(__name__)
 
 thread_pool = ThreadPoolExecutor()
-running_jobs = {}
+running_jobs: Dict[UUID, Any] = {}
+
+
+@dataclass
+class Message:
+    content: str
+    type: str
+    thread_id: str
+    tool: Optional[str] = None
+    tool_input: Optional[str] = None
+    tool_output: Optional[str] = None
+    agent_id: Optional[str] = None
+    role: str = "assistant"
+    status: Optional[str] = None
+    created_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+
+class MessageHandler:
+    def process_token_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a token message and prepare it for streaming."""
+        return {
+            "type": "token",
+            "status": "processing",
+            "content": message.get("content", ""),
+            "created_at": datetime.datetime.now().isoformat(),
+            "role": "assistant",
+            "thread_id": message.get("thread_id"),
+            "agent_id": message.get("agent_id"),
+        }
+
+
+class ToolExecutionHandler:
+    def process_tool_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a tool execution message."""
+        return {
+            "role": "assistant",
+            "type": "tool",
+            "tool": message.get("tool"),
+            "tool_input": message.get("input"),
+            "tool_output": message.get("output"),
+            "created_at": datetime.datetime.now().isoformat(),
+            "thread_id": message.get("thread_id"),
+            "agent_id": message.get("agent_id"),
+        }
+
+
+class ChatProcessor:
+    def __init__(
+        self,
+        job_id: UUID,
+        thread_id: UUID,
+        profile: Profile,
+        agent_id: Optional[UUID],
+        input_str: str,
+        history: List[Dict[str, Any]],
+        output_queue: asyncio.Queue,
+    ):
+        self.job_id = job_id
+        self.thread_id = thread_id
+        self.profile = profile
+        self.agent_id = agent_id
+        self.input_str = input_str
+        self.history = history
+        self.output_queue = output_queue
+        self.results: List[Dict[str, Any]] = []
+        self.message_handler = MessageHandler()
+        self.tool_handler = ToolExecutionHandler()
+        self.current_message = self._create_empty_message()
+
+    def _create_empty_message(self) -> Dict[str, Any]:
+        """Create an empty message template."""
+        return Message(
+            content="",
+            type="result",
+            thread_id=str(self.thread_id),
+            agent_id=str(self.agent_id) if self.agent_id else None,
+        ).to_dict()
+
+    async def _handle_tool_execution(
+        self, tool_name: str, tool_input: str, tool_output: str, tool_phase: str
+    ) -> None:
+        """Handle tool execution messages."""
+        if tool_phase == "end":
+            try:
+                new_step = StepCreate(
+                    profile_id=self.profile.id,
+                    job_id=self.job_id,
+                    agent_id=self.agent_id,
+                    role="assistant",
+                    tool=tool_name,
+                    tool_input=tool_input,
+                    tool_output=tool_output,
+                )
+                backend.create_step(new_step=new_step)
+            except Exception as e:
+                logger.error(f"Error creating tool execution step: {e}")
+                raise
+        elif tool_phase == "start":
+            tool_execution = self.tool_handler.process_tool_message(
+                {
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": tool_output,
+                    "thread_id": str(self.thread_id),
+                    "agent_id": str(self.agent_id) if self.agent_id else None,
+                }
+            )
+            self.results.append(tool_execution)
+            await self.output_queue.put(tool_execution)
+
+    async def process_stream(self) -> None:
+        """Process the chat stream and handle different message types."""
+        try:
+            # Add initial user message
+            self.results.append(
+                {
+                    "role": "user",
+                    "type": "user",
+                    "content": self.input_str,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                }
+            )
+
+            if self.agent_id:
+                agent = backend.get_agent(agent_id=self.agent_id)
+                if not agent:
+                    logger.error(f"Agent with ID {self.agent_id} not found")
+                    return
+                persona = generate_persona(agent)
+            else:
+                persona = generate_static_persona()
+
+            tools_map = initialize_tools(self.profile, agent_id=self.agent_id)
+            first_end = True
+
+            async for result in execute_langgraph_stream(
+                self.history, self.input_str, persona, tools_map
+            ):
+                await self._process_stream_result(result, first_end)
+                if result.get("type") == "end" and first_end:
+                    first_end = False
+
+            await self._finalize_processing()
+
+        except Exception as e:
+            logger.error(f"Error in chat stream for job {self.job_id}: {str(e)}")
+            logger.exception("Full traceback:")
+            raise
+        finally:
+            await self._cleanup()
+
+    async def _process_stream_result(
+        self, result: Dict[str, Any], first_end: bool
+    ) -> None:
+        """Process a single stream result."""
+        if result.get("type") == "end":
+            if not first_end:
+                await self.output_queue.put(
+                    Message(
+                        type="token",
+                        status="end",
+                        content="",
+                        thread_id=str(self.thread_id),
+                        role="assistant",
+                        agent_id=str(self.agent_id) if self.agent_id else None,
+                        created_at=datetime.datetime.now().isoformat(),
+                    ).to_dict()
+                )
+            return
+
+        if result.get("type") == "token" and not result.get("content"):
+            return
+
+        if result.get("type") == "tool":
+            await self._handle_tool_execution(
+                str(result.get("tool", "")),
+                str(result.get("input", "")),
+                str(result.get("output", "")),
+                str(result.get("status", "")),
+            )
+            self.current_message = self._create_empty_message()
+            return
+
+        if result.get("content"):
+            if result.get("type") == "token":
+                stream_message = self.message_handler.process_token_message(
+                    {
+                        "content": result.get("content", ""),
+                        "thread_id": str(self.thread_id),
+                        "agent_id": str(self.agent_id) if self.agent_id else None,
+                    }
+                )
+                await self.output_queue.put(stream_message)
+            elif result.get("type") == "result":
+                self.current_message["content"] = result.get("content", "")
+                backend.create_step(
+                    new_step=StepCreate(
+                        profile_id=self.profile.id,
+                        job_id=self.job_id,
+                        agent_id=self.agent_id,
+                        role="assistant",
+                        content=self.current_message["content"],
+                        tool=None,
+                        tool_input=None,
+                        thought=None,
+                        tool_output=None,
+                    )
+                )
+                self.results.append(
+                    {
+                        **self.current_message,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                    }
+                )
+
+    async def _finalize_processing(self) -> None:
+        """Finalize the chat processing and update the job."""
+        final_result = None
+        for result in reversed(self.results):
+            if result.get("content"):
+                final_result = result
+                break
+
+        final_result_content = final_result.get("content", "") if final_result else ""
+
+        backend.update_job(
+            job_id=self.job_id,
+            update_data=JobBase(
+                profile_id=self.profile.id,
+                thread_id=self.thread_id,
+                input=self.input_str,
+                result=final_result_content,
+            ),
+        )
+        logger.info(f"Chat job {self.job_id} completed and stored")
+
+    async def _cleanup(self) -> None:
+        """Clean up resources after processing."""
+        logger.debug(f"Cleaning up job {self.job_id}")
+        await self.output_queue.put(None)
+        if self.job_id in running_jobs:
+            del running_jobs[self.job_id]
 
 
 async def process_chat_message(
@@ -21,197 +267,30 @@ async def process_chat_message(
     profile: Profile,
     agent_id: Optional[UUID],
     input_str: str,
-    history: list,
+    history: List[Dict[str, Any]],
     output_queue: asyncio.Queue,
-):
+) -> None:
     """Process a chat message.
 
     Args:
         job_id (UUID): The ID of the job
         thread_id (UUID): The ID of the thread
         profile (Profile): The user's profile information
+        agent_id (Optional[UUID]): The ID of the agent
         input_str (str): The input string for the chat job
-        history (list): The thread history
+        history (List[Dict[str, Any]]): The thread history
         output_queue (asyncio.Queue): The output queue for WebSocket streaming
 
     Raises:
         Exception: If the chat message cannot be processed
     """
-    try:
-        results = []
-        first_end = True
-
-        # Add initial user message
-        results.append(
-            {
-                "role": "user",
-                "type": "user",
-                "content": input_str,
-                "timestamp": datetime.datetime.now().isoformat(),
-            }
-        )
-
-        # For langgraph, accumulate tokens and only save complete messages
-        current_message = {
-            "content": "",
-            "type": "result",
-            "thread_id": str(thread_id),
-            "tool": None,
-            "tool_input": None,
-            "tool_output": None,
-            "agent_id": str(agent_id) if agent_id else None,
-        }
-
-        if agent_id:
-            agent = backend.get_agent(agent_id=agent_id)
-            if not agent:
-                logger.error(f"Agent with ID {agent_id} not found")
-                return
-            persona = generate_persona(agent)
-        else:
-            persona = generate_static_persona()
-
-        tools_map = initialize_tools(profile, agent_id=agent_id)
-
-        async for result in execute_langgraph_stream(
-            history, input_str, persona, tools_map
-        ):
-
-            # Handle end message first to ensure we capture subsequent tool execution
-            if result.get("type") == "end":
-                if first_end:
-                    first_end = False
-                    continue
-
-                # Only stream the end message, don't save or reset yet
-                stream_message = {
-                    "type": "token",
-                    "thread_id": str(thread_id),
-                    "status": "end",
-                    "content": "",
-                    "created_at": datetime.datetime.now().isoformat(),
-                    "role": "assistant",
-                    "agent_id": str(agent_id) if agent_id else None,
-                }
-                await output_queue.put(stream_message)
-                continue
-
-            # Skip empty content for token messages
-            if result.get("type") == "token" and not result.get("content"):
-                continue
-
-            # Handle tool execution
-            if result.get("type") == "tool":
-                # Ensure all values are strings
-                tool_name = str(result.get("tool", ""))
-                tool_input = str(result.get("input", ""))
-                tool_output = str(result.get("output", ""))
-                tool_phase = str(result.get("status", ""))
-
-                # check if tools, inputs and outputs are keys in result
-                if tool_phase == "end":
-                    # Create a new step for the tool execution
-                    logger.debug("Creating tool execution step")
-                    try:
-                        new_step = StepCreate(
-                            profile_id=profile.id,
-                            job_id=job_id,
-                            agent_id=agent_id,
-                            role="assistant",
-                            tool=tool_name,
-                            tool_input=tool_input,
-                            tool_output=tool_output,
-                        )
-                        backend.create_step(new_step=new_step)
-                    except Exception as e:
-                        logger.error(f"Error creating tool execution step: {e}")
-                elif tool_phase == "start":
-                    # Add to results for streaming
-                    tool_execution = {
-                        "role": "assistant",
-                        "type": "tool",
-                        "tool": tool_name,
-                        "tool_input": tool_input,
-                        "tool_output": tool_output,
-                        "created_at": datetime.datetime.now().isoformat(),
-                        "thread_id": str(thread_id),
-                        "agent_id": str(agent_id) if agent_id else None,
-                    }
-                    results.append(tool_execution)
-                    await output_queue.put(tool_execution)
-
-                # Reset current message
-                current_message = {
-                    "content": "",
-                    "type": "result",
-                    "tool": None,
-                    "tool_input": None,
-                    "tool_output": None,
-                    "thread_id": str(thread_id),
-                    "agent_id": str(agent_id) if agent_id else None,
-                }
-                continue
-
-            if result.get("content"):
-                if result.get("type") == "token":
-                    stream_message = {
-                        "agent_id": str(agent_id) if agent_id else None,
-                        "role": "assistant",
-                        "type": "token",
-                        "status": "processing",
-                        "content": result.get("content", ""),
-                        "created_at": datetime.datetime.now().isoformat(),
-                        "thread_id": str(thread_id),
-                    }
-                    await output_queue.put(stream_message)
-                elif result.get("type") == "result":
-                    current_message["content"] = result.get("content", "")
-                    backend.create_step(
-                        new_step=StepCreate(
-                            profile_id=profile.id,
-                            job_id=job_id,
-                            agent_id=agent_id,
-                            role="assistant",
-                            content=current_message["content"],
-                            tool=None,
-                            tool_input=None,
-                            thought=None,
-                            tool_output=None,
-                        )
-                    )
-                    results.append(
-                        {
-                            **current_message,
-                            "timestamp": datetime.datetime.now().isoformat(),
-                        }
-                    )
-
-        final_result = None
-        for result in reversed(results):
-            if result.get("content"):
-                final_result = result
-                break
-
-        final_result_content = final_result.get("content", "") if final_result else ""
-
-        backend.update_job(
-            job_id=job_id,
-            update_data=JobBase(
-                profile_id=profile.id,
-                thread_id=thread_id,
-                input=input_str,
-                result=final_result_content,
-            ),
-        )
-        logger.info(f"Chat job {job_id} completed and stored")
-
-    except Exception as e:
-        logger.error(f"Error in chat stream for job {job_id}: {str(e)}")
-        logger.exception("Full traceback:")
-        raise
-    finally:
-        # Signal completion
-        logger.debug(f"Cleaning up job {job_id}")
-        await output_queue.put(None)
-        if job_id in running_jobs:
-            del running_jobs[job_id]
+    processor = ChatProcessor(
+        job_id=job_id,
+        thread_id=thread_id,
+        profile=profile,
+        agent_id=agent_id,
+        input_str=input_str,
+        history=history,
+        output_queue=output_queue,
+    )
+    await processor.process_stream()

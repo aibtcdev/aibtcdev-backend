@@ -55,13 +55,19 @@ async def verify_profile_from_token(
 
     try:
         identifier = backend.verify_session_token(token)
+        if not identifier:
+            logger.error("Invalid or expired token")
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
         profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
-            logger.error("Profile not found in database")
-            raise HTTPException(status_code=404, detail="Profile not found")
+            logger.error(f"No profile found for email: {identifier}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No profile found for the authenticated email. Please ensure your profile is properly set up.",
+            )
 
         profile = profile_response[0]
-
         return profile
 
     except HTTPException:
