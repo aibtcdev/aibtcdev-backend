@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Type
 # tool imports
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
+from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_action_proposals import (
     ConcludeActionProposalTool,
@@ -26,8 +27,9 @@ from .dao_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
-from .daos import ContractDAODeployTool
-from .db import (
+# from .dao_core_proposals import ( TBD )
+from .dao_deployments import ContractDAODeployTool
+from .database import (
     AddScheduledTaskTool,
     DeleteScheduledTaskTool,
     GetDAOByNameTool,
@@ -43,7 +45,6 @@ from .faktory import (
     FaktoryGetSellQuoteTool,
     FaktoryGetTokenTool,
 )
-from .get_btc_data import GetBitcoinData
 from .hiro import (
     STXGetContractInfoTool,
     STXGetPrincipalAddressBalanceTool,
@@ -130,17 +131,33 @@ def initialize_tools(
         "alex_get_price_history": AlexGetPriceHistory(),
         "alex_get_swap_info": AlexGetSwapInfo(),
         "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
-        "bitflow_available_tokens": BitflowGetAvailableTokens(wallet_id),
+        "coinmarketcap_get_market_data": GetBitcoinData(),
+        "bitflow_get_available_tokens": BitflowGetAvailableTokens(wallet_id),
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
-        "lunarcrush_get_token_data": LunarCrushTokenMetricsTool(),
-        "lunarcrush_search": SearchLunarCrushTool(),
-        "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
-        "db_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
-        "dao_list": GetDAOListTool(),
-        "dao_get_by_name": GetDAOByNameTool(),
-        "db_list_scheduled_tasks": ListScheduledTasksTool(profile_id, agent_id),
-        "db_update_scheduled_task": UpdateScheduledTaskTool(profile_id, agent_id),
-        "db_delete_scheduled_task": DeleteScheduledTaskTool(profile_id, agent_id),
+        "contracts_get_sip10_info": ContractSIP10InfoTool(wallet_id),
+        "contracts_deploy_dao": ContractDAODeployTool(wallet_id),
+        "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
+        "dao_actionproposals_conclude_proposal": ConcludeActionProposalTool(wallet_id),
+        "dao_actionproposals_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
+        "dao_actionproposals_get_proposal": GetProposalTool(wallet_id),
+        "dao_actionproposals_get_total_votes": GetTotalVotesTool(wallet_id),
+        "dao_actionproposals_get_voting_configuration": GetVotingConfigurationTool(wallet_id),
+        "dao_actionproposals_get_voting_power": GetVotingPowerTool(wallet_id),
+        "dao_actionproposals_vote_on_proposal": VoteOnActionProposalTool(wallet_id),
+        "dao_actionproposals_propose_add_resource": ProposeActionAddResourceTool(wallet_id),
+        "dao_actionproposals_propose_allow_asset": ProposeActionAllowAssetTool(wallet_id),
+        "dao_actionproposals_propose_send_message": ProposeActionSendMessageTool(wallet_id),
+        "dao_actionproposals_propose_set_account_holder": ProposeActionSetAccountHolderTool(wallet_id),
+        "dao_actionproposals_propose_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(wallet_id),
+        "dao_actionproposals_propose_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(wallet_id),
+        "dao_actionproposals_propose_toggle_resource": ProposeActionToggleResourceTool(wallet_id),
+        # "dao_coreproposals_*": TBD
+        "database_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
+        "database_dao_list": GetDAOListTool(),
+        "database_dao_get_by_name": GetDAOByNameTool(),
+        "database_list_scheduled_tasks": ListScheduledTasksTool(profile_id, agent_id),
+        "database_update_scheduled_task": UpdateScheduledTaskTool(profile_id, agent_id),
+        "database_delete_scheduled_task": DeleteScheduledTaskTool(profile_id, agent_id),
         "faktory_exec_buy": FaktoryExecuteBuyTool(wallet_id),
         "faktory_exec_sell": FaktoryExecuteSellTool(wallet_id),
         "faktory_get_buy_quote": FaktoryGetBuyQuoteTool(wallet_id),
@@ -157,6 +174,17 @@ def initialize_tools(
         "jing_get_pending_orders": JingGetPendingOrdersTool(wallet_id),
         "jing_submit_ask": JingSubmitAskTool(wallet_id),
         "jing_submit_bid": JingSubmitBidTool(wallet_id),
+        "lunarcrush_get_token_metrics": LunarCrushTokenMetricsTool(),
+        "lunarcrush_search": SearchLunarCrushTool(),
+        "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
+        "stacks_transaction_status": StacksTransactionStatusTool(wallet_id),
+        "stacks_transaction": StacksTransactionTool(wallet_id),
+        "stacks_transaction_by_address": StacksTransactionByAddressTool(wallet_id),
+        "stacks_stx_price": STXPriceTool(),
+        "stacks_get_contract_info": STXGetContractInfoTool(),
+        "stacks_get_principal_address_balance": STXGetPrincipalAddressBalanceTool(),
+        "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
+        "twitter_post_tweet": TwitterPostTweetTool(agent_id),
         "velar_get_token_price_history": VelarGetPriceHistory(),
         "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(wallet_id),
@@ -165,32 +193,6 @@ def initialize_tools(
         "wallet_send_stx": WalletSendSTX(wallet_id),
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_sip10_send": WalletSIP10SendTool(wallet_id),
-        "stacks_transaction_status": StacksTransactionStatusTool(wallet_id),
-        "stacks_transaction": StacksTransactionTool(wallet_id),
-        "stacks_transaction_by_address": StacksTransactionByAddressTool(wallet_id),
-        "stacks_stx_price": STXPriceTool(),
-        "stacks_get_contract_info": STXGetContractInfoTool(),
-        "stacks_get_principal_address_balance": STXGetPrincipalAddressBalanceTool(),
-        "contract_sip10_info": ContractSIP10InfoTool(wallet_id),
-        "contract_dao_deploy": ContractDAODeployTool(wallet_id),
-        "contract_source_fetch": FetchContractSourceTool(wallet_id),
-        "btc_price": GetBitcoinData(),
-        "twitter_post_tweet": TwitterPostTweetTool(agent_id),
-        "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
-        "dao_action_conclude_proposal": ConcludeActionProposalTool(wallet_id),
-        "dao_action_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
-        "dao_action_get_proposal": GetProposalTool(wallet_id),
-        "dao_action_get_total_votes": GetTotalVotesTool(wallet_id),
-        "dao_action_get_voting_configuration": GetVotingConfigurationTool(wallet_id),
-        "dao_action_get_voting_power": GetVotingPowerTool(wallet_id),
-        "dao_action_vote_on_proposal": VoteOnActionProposalTool(wallet_id),
-        "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
-        "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
-        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
-        "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(wallet_id),
-        "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(wallet_id),
-        "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(wallet_id),
-        "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(wallet_id),
     }
 
     return tools
