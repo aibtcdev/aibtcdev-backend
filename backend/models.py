@@ -108,6 +108,7 @@ class XCredsBase(CustomBaseModel):
     access_secret: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
+    dao_id: Optional[UUID] = None
 
 
 class XCredsCreate(XCredsBase):
@@ -448,6 +449,7 @@ class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
     status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
 
 
 class DAOFilter(CustomBaseModel):
@@ -508,6 +510,7 @@ class TokenFilter(CustomBaseModel):
 
 
 class XCredsFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
 
