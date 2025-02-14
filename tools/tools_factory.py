@@ -2,14 +2,23 @@ import inspect
 from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
+from .dao_action_proposals import (
+    ConcludeActionProposalTool,
+    GetLiquidSupplyTool,
+    GetProposalTool,
+    GetTotalVotesTool,
+    GetVotingConfigurationTool,
+    GetVotingPowerTool,
+    ProposeActionAddResourceTool,
+    ProposeActionAllowAssetTool,
+    ProposeActionSendMessageTool,
+    ProposeActionSetAccountHolderTool,
+    ProposeActionSetWithdrawalAmountTool,
+    ProposeActionSetWithdrawalPeriodTool,
+    ProposeActionToggleResourceTool,
+    VoteOnActionProposalTool,
+)
 from .dao import (
-    ActionConcludeProposalTool,
-    ActionGetLinkedVotingContractsTool,
-    ActionGetProposalTool,
-    ActionGetTotalProposalsTool,
-    ActionGetTotalVotesTool,
-    ActionGetVotingPowerTool,
-    ActionVoteOnProposalTool,
     BuyTokenTool,
     CoreConcludeProposalTool,
     CoreCreateProposalTool,
@@ -224,6 +233,20 @@ def initialize_tools(
             wallet_id
         ),
         "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
+        "dao_action_conclude_proposal": ConcludeActionProposalTool(wallet_id),
+        "dao_action_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
+        "dao_action_get_proposal": GetProposalTool(wallet_id),
+        "dao_action_get_total_votes": GetTotalVotesTool(wallet_id),
+        "dao_action_get_voting_configuration": GetVotingConfigurationTool(wallet_id),
+        "dao_action_get_voting_power": GetVotingPowerTool(wallet_id),
+        "dao_action_vote_on_proposal": VoteOnActionProposalTool(wallet_id),
+        "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
+        "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
+        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
+        "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(wallet_id),
+        "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(wallet_id),
+        "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(wallet_id),
+        "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(wallet_id),
     }
 
     return tools
