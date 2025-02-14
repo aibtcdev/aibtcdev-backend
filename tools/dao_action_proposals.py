@@ -999,6 +999,73 @@ class GetTotalVotesTool(BaseTool):
             **kwargs
         )
 
+class GetVotingConfigurationInput(BaseModel):
+    """Input schema for getting voting configuration."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+
+class GetVotingConfigurationTool(BaseTool):
+    name: str = "dao_action_get_voting_configuration"
+    description: str = (
+        "Get the voting configuration from the DAO action proposals contract. "
+        "Returns the current voting parameters and settings used for proposals."
+    )
+    args_schema: Type[BaseModel] = GetVotingConfigurationInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting configuration."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "get-voting-configuration.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting configuration."""
+        return self._deploy(
+            action_proposals_contract,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            **kwargs
+        )
+
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
     description: str = (
