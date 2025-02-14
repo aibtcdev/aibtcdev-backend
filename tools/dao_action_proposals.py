@@ -304,3 +304,91 @@ class ProposeActionSendMessageTool(BaseTool):
             **kwargs
         )
 
+class ProposeActionSetAccountHolderInput(BaseModel):
+    """Input schema for proposing to set account holder action."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+    action_proposal_contract: str = Field(
+        ..., 
+        description="Contract ID of the action proposal"
+    )
+    account_holder: str = Field(
+        ..., 
+        description="Address of the new account holder"
+    )
+
+class ProposeActionSetAccountHolderTool(BaseTool):
+    name: str = "dao_propose_action_set_account_holder"
+    description: str = (
+        "Propose an action to set a new account holder for the DAO. "
+        "This creates a proposal that DAO members can vote on to change "
+        "the account holder to a specified address."
+    )
+    args_schema: Type[BaseModel] = ProposeActionSetAccountHolderInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        account_holder: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a new account holder."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+            action_proposal_contract,
+            account_holder,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "propose-action-set-account-holder.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        account_holder: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a new account holder."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            account_holder,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        account_holder: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            account_holder,
+            **kwargs
+        )
+
