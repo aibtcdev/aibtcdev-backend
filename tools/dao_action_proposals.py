@@ -392,3 +392,91 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             **kwargs
         )
 
+class ProposeActionSetWithdrawalAmountInput(BaseModel):
+    """Input schema for proposing to set withdrawal amount action."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+    action_proposal_contract: str = Field(
+        ..., 
+        description="Contract ID of the action proposal"
+    )
+    withdrawal_amount: int = Field(
+        ..., 
+        description="New withdrawal amount to set"
+    )
+
+class ProposeActionSetWithdrawalAmountTool(BaseTool):
+    name: str = "dao_propose_action_set_withdrawal_amount"
+    description: str = (
+        "Propose an action to set a new withdrawal amount for the DAO's bank account. "
+        "This creates a proposal that DAO members can vote on to change "
+        "the withdrawal amount to a specified value."
+    )
+    args_schema: Type[BaseModel] = ProposeActionSetWithdrawalAmountInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        withdrawal_amount: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a new withdrawal amount."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+            action_proposal_contract,
+            str(withdrawal_amount),
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "propose-action-set-withdrawal-amount.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        withdrawal_amount: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose setting a new withdrawal amount."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            withdrawal_amount,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        withdrawal_amount: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            withdrawal_amount,
+            **kwargs
+        )
+
