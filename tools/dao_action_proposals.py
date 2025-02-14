@@ -835,6 +835,83 @@ class GetLiquidSupplyTool(BaseTool):
             **kwargs
         )
 
+class GetProposalInput(BaseModel):
+    """Input schema for getting proposal data."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+    proposal_id: int = Field(
+        ...,
+        description="ID of the proposal to retrieve"
+    )
+
+class GetProposalTool(BaseTool):
+    name: str = "dao_action_get_proposal"
+    description: str = (
+        "Get the data for a specific proposal from the DAO action proposals contract. "
+        "Returns all stored information about the proposal if it exists."
+    )
+    args_schema: Type[BaseModel] = GetProposalInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get proposal data."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+            str(proposal_id),
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "get-proposal.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get proposal data."""
+        return self._deploy(
+            action_proposals_contract,
+            proposal_id,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            proposal_id,
+            **kwargs
+        )
+
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
     description: str = (
