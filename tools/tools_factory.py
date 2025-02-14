@@ -208,21 +208,21 @@ def initialize_tools(
         # "dao_action_get_total_proposals": ActionGetTotalProposalsTool(wallet_id),
         # "dao_buy_token": BuyTokenTool(wallet_id),
         # "dao_sell_token": SellTokenTool(wallet_id),
-        # "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
-        # "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
-        # "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
-        # "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(
-        #    wallet_id
-        # ),
-        # "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
-        #    wallet_id
-        # ),
-        # "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
-        #    wallet_id
-        # ),
-        # "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
-        #    wallet_id
-        # ),
+        "dao_propose_action_add_resource": ProposeActionAddResourceTool(wallet_id),
+        "dao_propose_action_allow_asset": ProposeActionAllowAssetTool(wallet_id),
+        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
+        "dao_propose_action_set_account_holder": ProposeActionSetAccountHolderTool(
+            wallet_id
+        ),
+        "dao_propose_action_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
+            wallet_id
+        ),
+        "dao_propose_action_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
+            wallet_id
+        ),
+        "dao_propose_action_toggle_resource": ProposeActionToggleResourceTool(
+            wallet_id
+        ),
         "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
     }
 
