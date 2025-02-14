@@ -128,3 +128,91 @@ class ProposeActionAddResourceTool(BaseTool):
             **kwargs
         )
 
+class ProposeActionAllowAssetInput(BaseModel):
+    """Input schema for proposing to allow an asset action."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+    action_proposal_contract: str = Field(
+        ..., 
+        description="Contract ID of the action proposal"
+    )
+    token_contract: str = Field(
+        ..., 
+        description="Contract ID of the token to allow"
+    )
+
+class ProposeActionAllowAssetTool(BaseTool):
+    name: str = "dao_propose_action_allow_asset"
+    description: str = (
+        "Propose an action to allow a new asset/token in the DAO. "
+        "This creates a proposal that DAO members can vote on to allow "
+        "a specific token contract to be used within the DAO."
+    )
+    args_schema: Type[BaseModel] = ProposeActionAllowAssetInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose allowing an asset."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+            action_proposal_contract,
+            token_contract,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "propose-action-allow-asset.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose allowing an asset."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            token_contract,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        action_proposal_contract: str,
+        token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            action_proposal_contract,
+            token_contract,
+            **kwargs
+        )
+
