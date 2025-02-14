@@ -912,6 +912,93 @@ class GetProposalTool(BaseTool):
             **kwargs
         )
 
+class GetTotalVotesInput(BaseModel):
+    """Input schema for getting total votes for a voter."""
+    action_proposals_contract: str = Field(
+        ..., 
+        description="Contract ID of the DAO action proposals"
+    )
+    proposal_id: int = Field(
+        ...,
+        description="ID of the proposal to check"
+    )
+    voter_address: str = Field(
+        ...,
+        description="Address of the voter to check"
+    )
+
+class GetTotalVotesTool(BaseTool):
+    name: str = "dao_action_get_total_votes"
+    description: str = (
+        "Get the total votes cast by a specific voter on a proposal. "
+        "Returns the number of votes the voter has cast on the given proposal."
+    )
+    args_schema: Type[BaseModel] = GetTotalVotesInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total votes."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+
+        args = [
+            action_proposals_contract,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "action-proposals",
+            "get-total-votes.ts",
+            *args
+        )
+
+    def _run(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total votes."""
+        return self._deploy(
+            action_proposals_contract,
+            proposal_id,
+            voter_address,
+            **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_contract,
+            proposal_id,
+            voter_address,
+            **kwargs
+        )
+
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
     description: str = (
