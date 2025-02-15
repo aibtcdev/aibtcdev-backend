@@ -79,7 +79,21 @@ class StartupService:
         else:
             logger.info("DAO runner service is disabled")
 
+        if config.scheduler.dao_tweet_runner_enabled:
+            self.scheduler.add_job(
+                execute_runner_job,
+                "interval",
+                seconds=config.scheduler.dao_tweet_runner_interval_seconds,
+                args=["dao_tweet"],
+            )
+            logger.info(
+                f"DAO tweet runner service started with interval of {config.scheduler.dao_tweet_runner_interval_seconds} seconds"
+            )
+        else:
+            logger.info("DAO tweet runner service is disabled")
+
         if config.scheduler.tweet_runner_enabled:
+            # Add tweet posting task
             self.scheduler.add_job(
                 execute_runner_job,
                 "interval",
@@ -87,7 +101,7 @@ class StartupService:
                 args=["tweet"],
             )
             logger.info(
-                f"Tweet runner service started with interval of {config.scheduler.tweet_runner_interval_seconds} seconds"
+                f"Tweet posting service started with interval of {config.scheduler.tweet_runner_interval_seconds} seconds"
             )
         else:
             logger.info("Tweet runner service is disabled")
@@ -97,6 +111,7 @@ class StartupService:
                 config.twitter.enabled,
                 config.scheduler.sync_enabled,
                 config.scheduler.dao_runner_enabled,
+                config.scheduler.dao_tweet_runner_enabled,
                 config.scheduler.tweet_runner_enabled,
             ]
         ):

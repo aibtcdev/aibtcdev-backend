@@ -1,10 +1,12 @@
 from .base import BaseTask, JobContext, JobType, RunnerConfig, RunnerResult
 from .registry import JobRegistry, execute_runner_job
 from .tasks.dao_task import DAOProcessingResult, DAOTask
+from .tasks.dao_tweet_task import DAOTweetProcessingResult, DAOTweetTask
 from .tasks.tweet_task import TweetProcessingResult, TweetTask
 
 # Register tasks
 JobRegistry.register(JobType.DAO, DAOTask)
+JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
 
 __all__ = [
@@ -17,6 +19,8 @@ __all__ = [
     "execute_runner_job",
     "DAOProcessingResult",
     "DAOTask",
+    "DAOTweetProcessingResult",
+    "DAOTweetTask",
     "TweetProcessingResult",
     "TweetTask",
 ]
