@@ -1,4 +1,5 @@
 """Chainhook webhook implementation."""
+import json
 
 from .base import WebhookHandler, WebhookParser, WebhookService
 from backend.factory import backend
@@ -10,6 +11,7 @@ from backend.models import (
     ProposalFilter,
     TokenBase,
     TokenFilter,
+    QueueMessageCreate,
 )
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -23,21 +25,26 @@ class TransactionIdentifier:
 @dataclass
 class TransactionWithReceipt:
     transaction_identifier: TransactionIdentifier
+    metadata: Dict[str, Any]  # Added to access transaction metadata
+    operations: List[Dict[str, Any]]  # Added to include the operations field
+
+
+@dataclass
+class BlockIdentifier:
+    hash: str
+    index: int
 
 
 @dataclass
 class Apply:
+    block_identifier: BlockIdentifier
     transactions: List[TransactionWithReceipt]
-
-
-@dataclass
-class ChainHookInner:
-    apply: List[Apply]
+    # Add other fields if necessary
 
 
 @dataclass
 class ChainHookData:
-    chainhook: ChainHookInner
+    apply: List[Apply]  # Ensure this matches the structure of your incoming data
 
 
 class ChainhookParser(WebhookParser):
@@ -45,7 +52,22 @@ class ChainhookParser(WebhookParser):
 
     def parse(self, raw_data: Dict[str, Any]) -> ChainHookData:
         """Parse Chainhook webhook data."""
-        return ChainHookData(**raw_data)
+        return ChainHookData(
+            apply=[
+                Apply(
+                    block_identifier=BlockIdentifier(**apply_data['block_identifier']),
+                    transactions=[
+                        TransactionWithReceipt(
+                            transaction_identifier=TransactionIdentifier(**tx['transaction_identifier']),
+                            metadata=tx['metadata'],
+                            operations=tx.get('operations', [])  # Ensure operations are included
+                        )
+                        for tx in apply_data.get('transactions', [])
+                    ]
+                )
+                for apply_data in raw_data.get('apply', [])
+            ]
+        )
 
 
 class ChainhookHandler(WebhookHandler):
@@ -55,9 +77,10 @@ class ChainhookHandler(WebhookHandler):
         """Handle Chainhook webhook data."""
         try:
             self.logger.info(
-                f"Processing chainhook webhook with {len(parsed_data.chainhook.apply)} apply blocks"
+                f"Processing chainhook webhook with {len(parsed_data.apply)} apply blocks"
             )
 
+            # Existing logic for processing non-processed extensions, tokens, and proposals
             non_processed_extensions = backend.list_extensions(
                 filters=ExtensionFilter(
                     status=ContractStatus.PENDING,
@@ -80,8 +103,46 @@ class ChainhookHandler(WebhookHandler):
                 f"{len(non_processed_proposals)} pending proposals"
             )
 
-            for apply in parsed_data.chainhook.apply:
+            for apply in parsed_data.apply:
                 for transaction in apply.transactions:
+                    tx_metadata = transaction.metadata
+                    tx_kind = tx_metadata.get("kind", {})
+                    tx_data = tx_kind.get("data", {})
+                    
+                    # New logic: Check if the transaction is a contract call and matches the conditions
+                    self.logger.debug(f"Transaction kind: {tx_kind}")
+                    self.logger.debug(f"Transaction data: {tx_data}")
+                    self.logger.debug(f"Transaction metadata: {tx_metadata}")
+                    if (
+                        tx_kind.get("type") == "ContractCall" and
+                        tx_data.get("method") == "send" and
+                        tx_metadata.get("success") is False
+                    ):
+                        sender = tx_metadata.get("sender")
+                        args = tx_data.get("args", [0])
+                        self.logger.info(f"Transaction from sender {sender} with args: {args}")
+                        # Print args in a clean format
+                        # print("Transaction Arguments:")
+                        # for arg in args:
+                        #     print(f"- {arg}")
+
+                        extension = backend.list_extensions(
+                            filters=ExtensionFilter(
+                                contract_principal=tx_data.get("contract_identifier")
+                            )
+                    
+                        )
+                        if extension:
+                            new_message = backend.create_queue_message(QueueMessageCreate( 
+                                type="tweet",
+                                message={"message": args[0]},
+                                dao_id=extension[0].dao_id,
+                            )
+                            )
+                            self.logger.info(f"New message: {new_message}")
+
+
+                    # Existing logic for processing transactions
                     tx_id = transaction.transaction_identifier.hash
                     self.logger.info(f"Processing transaction {tx_id}")
 
