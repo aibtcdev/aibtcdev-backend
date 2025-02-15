@@ -108,6 +108,7 @@ class XCredsBase(CustomBaseModel):
     access_secret: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
+    username: Optional[str] = None
     dao_id: Optional[UUID] = None
 
 

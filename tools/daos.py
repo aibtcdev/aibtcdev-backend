@@ -236,6 +236,15 @@ class ContractDAODeployTool(BaseTool):
                     )
                     logger.debug(f"Created chainhook: {chainhook}")
 
+                    if contract_name == "aibtc-ext004-messaging":
+                        chainhook = platform.create_dao_x_linkage_hook(
+                            contract_identifier=contract_data["contractPrincipal"],
+                            method="send",
+                            network=network,
+                            name=f"{dao_record.id}",
+                            start_block=current_block_height,
+                        )
+
                     if (
                         contract_name != "token"
                         and contract_name != "aibtc-base-bootstrap-initialization"

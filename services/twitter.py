@@ -8,12 +8,11 @@ from backend.models import (
     XUserFilter,
 )
 from config import config
-from dotenv import load_dotenv
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from pydantic import BaseModel
 from services.workflows import analyze_tweet
-from typing import AsyncIterator, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 logger = configure_logger(__name__)
 

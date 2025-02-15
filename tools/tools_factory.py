@@ -89,6 +89,8 @@ from .wallet import (
     WalletSendSTX,
     WalletSIP10SendTool,
 )
+from .x_credentials import CollectXCredentialsTool
+
 from backend.factory import backend
 from backend.models import UUID, Profile, WalletFilter
 from langchain.tools.base import BaseTool as LangChainBaseTool
@@ -224,6 +226,7 @@ def initialize_tools(
         #    wallet_id
         # ),
         "telegram_nofication_to_user": SendTelegramNotificationTool(profile_id),
+        "x_credentials": CollectXCredentialsTool(profile_id),
     }
 
     return tools

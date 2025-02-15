@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from lib.logger import configure_logger
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
@@ -66,8 +66,12 @@ class JobType(str, Enum):
     """Enum for different types of jobs."""
 
     DAO = "dao"
+    DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
     # Add new job types here
+
+    def __str__(self):
+        return self.value
 
 
 @dataclass

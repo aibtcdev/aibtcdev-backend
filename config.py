@@ -55,6 +55,12 @@ class SchedulerConfig:
     dao_runner_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", "30")
     )
+    dao_tweet_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_TWEET_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    dao_tweet_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_TWEET_RUNNER_INTERVAL_SECONDS", "30")
+    )
     tweet_runner_enabled: bool = (
         os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "false").lower() == "true"
     )
