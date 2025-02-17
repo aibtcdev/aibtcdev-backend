@@ -6,13 +6,12 @@ from typing import Any, Dict, Optional
 class PlatformApi:
     def __init__(self):
         """Initialize the Platform API client."""
-        self.base_url = "https://api.platform.hiro.so"
+        self.base_url = config.api.platform_base_url
         self.api_key = config.api.hiro_api_key
         self.webhook_url = config.api.webhook_url
         self.webhook_auth = config.api.webhook_auth
         if not self.api_key:
             raise ValueError("HIRO_API_KEY environment variable is required")
-        
 
     def generate_contract_deployment_predicate(
         self,
@@ -92,7 +91,6 @@ class PlatformApi:
         except Exception as e:
             raise Exception(f"Hiro API POST request error: {str(e)}")
 
-
     def generate_dao_x_linkage(
         self,
         contract_identifier: str,
@@ -103,7 +101,6 @@ class PlatformApi:
         end_block: Optional[int] = None,
         webhook_url: Optional[str] = "",
         webhook_auth: Optional[str] = "",
-      
     ) -> Dict[str, Any]:
         """Generate a chainhook predicate for DAO X linkage monitoring.
 
@@ -131,7 +128,7 @@ class PlatformApi:
                     "if_this": {
                         "scope": "contract_call",
                         "method": method,
-                        "contract_identifier": contract_identifier
+                        "contract_identifier": contract_identifier,
                     },
                     "end_block": end_block,
                     "then_that": {
@@ -144,10 +141,11 @@ class PlatformApi:
                     "decode_clarity_values": True,
                 }
             },
-            
         }
 
-    def create_dao_x_linkage_hook(self, contract_identifier: str, method: str, **kwargs) -> Dict[str, Any]:
+    def create_dao_x_linkage_hook(
+        self, contract_identifier: str, method: str, **kwargs
+    ) -> Dict[str, Any]:
         """Create a chainhook for monitoring DAO X linkage.
 
         Args:

@@ -1,6 +1,4 @@
-import datetime
 import json
-from backend.models import Profile
 from fastapi import APIRouter, HTTPException
 from lib.logger import configure_logger
 from starlette.responses import JSONResponse

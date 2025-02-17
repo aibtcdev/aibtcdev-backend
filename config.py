@@ -73,6 +73,15 @@ class SchedulerConfig:
 class APIConfig:
     alex_base_url: str = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
     hiro_api_url: str = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
+    platform_base_url: str = os.getenv(
+        "AIBTC_PLATFORM_API_URL", "https://api.platform.hiro.so"
+    )
+    velar_base_url: str = os.getenv(
+        "AIBTC_VELAR_BASE_URL", "https://gateway.velar.network/"
+    )
+    lunarcrush_base_url: str = os.getenv(
+        "AIBTC_LUNARCRUSH_BASE_URL", "https://lunarcrush.com/api/v2"
+    )
     hiro_api_key: str = os.getenv("HIRO_API_KEY", "")
     webhook_url: str = os.getenv("AIBTC_WEBHOOK_URL", "")
     webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH", "Bearer 1234567890")
