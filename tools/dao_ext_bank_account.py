@@ -46,13 +46,13 @@ class GetAccountTermsTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved account terms"),
+            result.get("data")
         )
 
     def _run(
@@ -120,13 +120,13 @@ class DepositSTXTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully deposited STX"),
+            result.get("data")
         )
 
     def _run(
@@ -188,13 +188,13 @@ class WithdrawSTXTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully withdrew STX"),
+            result.get("data")
         )
 
     def _run(
