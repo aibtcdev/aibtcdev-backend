@@ -365,11 +365,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new account holder."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
@@ -377,7 +373,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             account_holder,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "propose-action-set-account-holder.ts",
