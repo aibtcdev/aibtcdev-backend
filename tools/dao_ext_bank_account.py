@@ -44,6 +44,17 @@ class GetAccountTermsTool(BaseTool):
             *args
         )
 
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
+        )
+
     def _run(
         self,
         bank_account_contract: str,
