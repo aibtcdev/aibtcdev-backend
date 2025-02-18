@@ -776,11 +776,22 @@ class ConcludeActionProposalTool(BaseTool):
             action_proposal_contract,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "conclude-proposal.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
@@ -857,11 +868,22 @@ class GetLiquidSupplyTool(BaseTool):
             str(stacks_block_height),
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "get-liquid-supply.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
