@@ -54,13 +54,13 @@ class GetInvoiceTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved invoice details"),
+            result.get("data")
         )
 
     def _run(
@@ -130,13 +130,13 @@ class GetResourceTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved resource details"),
+            result.get("data")
         )
 
     def _run(
@@ -206,13 +206,13 @@ class GetResourceByNameTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved resource details by name"),
+            result.get("data")
         )
 
     def _run(
@@ -290,13 +290,13 @@ class PayInvoiceTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully processed invoice payment"),
+            result.get("data")
         )
 
     def _run(
@@ -376,13 +376,13 @@ class PayInvoiceByResourceNameTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully processed invoice payment by resource name"),
+            result.get("data")
         )
 
     def _run(
