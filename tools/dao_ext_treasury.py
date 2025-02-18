@@ -54,13 +54,13 @@ class GetAllowedAssetTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully checked allowed asset status"),
+            result.get("data")
         )
 
     def _run(
@@ -130,13 +130,13 @@ class IsAllowedAssetTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully verified asset allowance status"),
+            result.get("data")
         )
 
     def _run(
