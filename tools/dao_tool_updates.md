@@ -13,23 +13,46 @@ export type ToolResponse<T> = {
 ## Files to Update
 
 ### Charter Tools
-- [ ] tools/dao_ext_charter.py
+- [x] tools/dao_ext_charter.py
   - GetCurrentDaoCharterTool
   - GetCurrentDaoCharterVersionTool 
   - GetDaoCharterTool
 
 ### Treasury Tools
-- [ ] tools/dao_ext_treasury.py
+- [x] tools/dao_ext_treasury.py
   - GetAllowedAssetTool
   - IsAllowedAssetTool
 
 ### Payments & Invoices Tools
-- [ ] tools/dao_ext_payments_invoices.py
+- [x] tools/dao_ext_payments_invoices.py
   - GetInvoiceTool
   - GetResourceTool
   - GetResourceByNameTool
   - PayInvoiceTool
   - PayInvoiceByResourceNameTool
+
+### Bank Account Tools
+- [ ] tools/dao_ext_bank_account.py
+  - GetAccountTermsTool
+  - DepositSTXTool
+  - WithdrawSTXTool
+
+### Action Proposals Tools
+- [ ] tools/dao_ext_action_proposals.py
+  - ProposeActionAddResourceTool
+  - ProposeActionAllowAssetTool
+  - ProposeActionSendMessageTool
+  - ProposeActionSetAccountHolderTool
+  - ProposeActionSetWithdrawalAmountTool
+  - ProposeActionSetWithdrawalPeriodTool
+  - ProposeActionToggleResourceTool
+  - VoteOnActionProposalTool
+  - ConcludeActionProposalTool
+  - GetLiquidSupplyTool
+  - GetProposalTool
+  - GetTotalVotesTool
+  - GetVotingConfigurationTool
+  - GetVotingPowerTool
 
 ## Changes Needed
 
@@ -61,6 +84,8 @@ result.get("data")
 
 - [x] Base DAO tools updated
 - [x] Onchain messaging tools updated
-- [ ] Charter tools pending
-- [ ] Treasury tools pending
-- [ ] Payments & Invoices tools pending
+- [x] Charter tools updated
+- [x] Treasury tools updated
+- [x] Payments & Invoices tools updated
+- [ ] Bank Account tools pending
+- [ ] Action Proposals tools pending
