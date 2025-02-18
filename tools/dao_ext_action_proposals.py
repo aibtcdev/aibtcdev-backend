@@ -382,13 +382,13 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to add resource"),
+            result.get("data")
         )
 
     def _run(
@@ -477,13 +477,13 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to allow asset"),
+            result.get("data")
         )
 
     def _run(
@@ -572,13 +572,13 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to send message"),
+            result.get("data")
         )
 
     def _run(
@@ -687,13 +687,13 @@ class VoteOnActionProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to set account holder"),
+            result.get("data")
         )
 
     def _run(
@@ -785,13 +785,13 @@ class ConcludeActionProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to set withdrawal amount"),
+            result.get("data")
         )
 
     def _run(
@@ -877,13 +877,13 @@ class GetLiquidSupplyTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to set withdrawal period"),
+            result.get("data")
         )
 
     def _run(
@@ -965,13 +965,13 @@ class GetProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully proposed action to toggle resource"),
+            result.get("data")
         )
 
     def _run(
@@ -1059,13 +1059,13 @@ class GetTotalVotesTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully voted on proposal"),
+            result.get("data")
         )
 
     def _run(
@@ -1145,13 +1145,13 @@ class GetVotingConfigurationTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully concluded proposal"),
+            result.get("data")
         )
 
     def _run(
@@ -1235,13 +1235,13 @@ class GetVotingPowerTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved liquid supply"),
+            result.get("data")
         )
 
     def _run(
