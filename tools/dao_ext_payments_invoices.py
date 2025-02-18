@@ -114,22 +114,29 @@ class GetResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get resource details."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             payments_invoices_contract,
             str(resource_index)
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "payments-invoices",
             "get-resource.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
@@ -183,22 +190,29 @@ class GetResourceByNameTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get resource details by name."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             payments_invoices_contract,
             resource_name
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "payments-invoices",
             "get-resource-by-name.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
@@ -257,11 +271,7 @@ class PayInvoiceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to pay an invoice."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             payments_invoices_contract,
@@ -271,11 +281,22 @@ class PayInvoiceTool(BaseTool):
         if memo:
             args.append(memo)
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "payments-invoices",
             "pay-invoice.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
@@ -336,11 +357,7 @@ class PayInvoiceByResourceNameTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to pay an invoice by resource name."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             payments_invoices_contract,
@@ -350,11 +367,22 @@ class PayInvoiceByResourceNameTool(BaseTool):
         if memo:
             args.append(memo)
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "payments-invoices",
             "pay-invoice-by-resource-name.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
