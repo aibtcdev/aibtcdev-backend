@@ -17,10 +17,10 @@ class DAOToolResponse(BaseModel):
         }
 
     @classmethod
-    def error_response(cls, message: str) -> Dict[str, Any]:
-        """Create an error response"""
+    def error_response(cls, message: str, error_data: Optional[Any] = None) -> Dict[str, Any]:
+        """Create an error response with optional error data"""
         return {
             "success": False,
             "message": message,
-            "data": None
+            "data": error_data
         }

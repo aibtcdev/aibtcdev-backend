@@ -54,7 +54,8 @@ class SendMessageTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
