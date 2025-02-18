@@ -85,13 +85,13 @@ class ProposeActionAddResourceTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved current DAO charter"),
+            result.get("data")
         )
 
     def _run(
@@ -192,13 +192,13 @@ class ProposeActionAllowAssetTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved current charter version"),
+            result.get("data")
         )
 
     def _run(
@@ -287,13 +287,13 @@ class ProposeActionSendMessageTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"),
-                result.get("output", "")
+                result.get("message", "Unknown error"),
+                result.get("data")
             )
             
         return DAOToolResponse.success_response(
-            result["output"],
-            {"raw_result": result}
+            result.get("message", "Successfully retrieved DAO charter version"),
+            result.get("data")
         )
 
     def _run(
