@@ -1221,11 +1221,7 @@ class ProposeActionToggleResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
@@ -1233,7 +1229,7 @@ class ProposeActionToggleResourceTool(BaseTool):
             resource_name,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "propose-action-toggle-resource-by-name.ts",
