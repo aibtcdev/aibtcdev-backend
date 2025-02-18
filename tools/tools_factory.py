@@ -27,6 +27,28 @@ from .dao_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
+from .dao_ext_bank_account import (
+    GetAccountTermsTool,
+    DepositSTXTool,
+    WithdrawSTXTool,
+)
+from .dao_ext_charter import (
+    GetCurrentDaoCharterTool,
+    GetCurrentDaoCharterVersionTool,
+    GetDaoCharterTool,
+)
+from .dao_ext_onchain_messaging import SendMessageTool
+from .dao_ext_payments_invoices import (
+    GetInvoiceTool,
+    GetResourceTool,
+    GetResourceByNameTool,
+    PayInvoiceTool,
+    PayInvoiceByResourceNameTool,
+)
+from .dao_ext_treasury import (
+    GetAllowedAssetTool,
+    IsAllowedAssetTool,
+)
 from .dao_deployments import ContractDAODeployTool
 from .database import (
     AddScheduledTaskTool,
@@ -151,6 +173,25 @@ def initialize_tools(
         "dao_actionproposals_propose_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(wallet_id),
         "dao_actionproposals_propose_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(wallet_id),
         "dao_actionproposals_propose_toggle_resource": ProposeActionToggleResourceTool(wallet_id),
+        # Bank Account Extension
+        "dao_bank_get_account_terms": GetAccountTermsTool(wallet_id),
+        "dao_bank_deposit_stx": DepositSTXTool(wallet_id),
+        "dao_bank_withdraw_stx": WithdrawSTXTool(wallet_id),
+        # Charter Extension  
+        "dao_charter_get_current": GetCurrentDaoCharterTool(wallet_id),
+        "dao_charter_get_current_version": GetCurrentDaoCharterVersionTool(wallet_id),
+        "dao_charter_get_version": GetDaoCharterTool(wallet_id),
+        # Messaging Extension
+        "dao_messaging_send": SendMessageTool(wallet_id),
+        # Payments & Invoices Extension
+        "dao_payments_get_invoice": GetInvoiceTool(wallet_id),
+        "dao_payments_get_resource": GetResourceTool(wallet_id),
+        "dao_payments_get_resource_by_name": GetResourceByNameTool(wallet_id),
+        "dao_payments_pay_invoice": PayInvoiceTool(wallet_id),
+        "dao_payments_pay_invoice_by_resource": PayInvoiceByResourceNameTool(wallet_id),
+        # Treasury Extension
+        "dao_treasury_get_allowed_asset": GetAllowedAssetTool(wallet_id),
+        "dao_treasury_is_allowed_asset": IsAllowedAssetTool(wallet_id),
         # "dao_coreproposals_*": TBD
         "database_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
         "database_get_dao_list": GetDAOListTool(),
