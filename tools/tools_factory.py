@@ -11,7 +11,7 @@ from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
 from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
-from .dao_action_proposals import (
+from .dao_ext_action_proposals import (
     ConcludeActionProposalTool,
     GetLiquidSupplyTool,
     GetProposalTool,
