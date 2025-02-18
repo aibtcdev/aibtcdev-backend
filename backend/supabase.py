@@ -1,8 +1,9 @@
 import time
 import uuid
-from .abstract import AbstractBackend
-from .models import (
+from backend.abstract import AbstractBackend
+from backend.models import (
     DAO,
+    UUID,
     Agent,
     AgentBase,
     AgentCreate,
@@ -18,6 +19,10 @@ from .models import (
     JobBase,
     JobCreate,
     JobFilter,
+    Key,
+    KeyBase,
+    KeyCreate,
+    KeyFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -71,7 +76,6 @@ from .models import (
     XUserCreate,
     XUserFilter,
 )
-from backend.models import UUID
 from lib.logger import configure_logger
 from sqlalchemy import Column, DateTime, Engine, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -642,6 +646,57 @@ class SupabaseBackend(AbstractBackend):
 
     def delete_job(self, job_id: UUID) -> bool:
         response = self.client.table("jobs").delete().eq("id", str(job_id)).execute()
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 7.5 KEYS
+    # ----------------------------------------------------------------
+    def create_key(self, new_key: "KeyCreate") -> "Key":
+        payload = new_key.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("keys").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from key insert.")
+        return Key(**data[0])
+
+    def get_key(self, key_id: UUID) -> Optional["Key"]:
+        response = (
+            self.client.table("keys")
+            .select("*")
+            .eq("id", str(key_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Key(**response.data)
+
+    def list_keys(self, filters: Optional["KeyFilter"] = None) -> List["Key"]:
+        query = self.client.table("keys").select("*")
+        if filters:
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+            if filters.is_enabled is not None:
+                query = query.eq("is_enabled", filters.is_enabled)
+        response = query.execute()
+        data = response.data or []
+        return [Key(**row) for row in data]
+
+    def update_key(self, key_id: UUID, update_data: "KeyBase") -> Optional["Key"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_key(key_id)
+        response = (
+            self.client.table("keys").update(payload).eq("id", str(key_id)).execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Key(**updated[0])
+
+    def delete_key(self, key_id: UUID) -> bool:
+        response = self.client.table("keys").delete().eq("id", str(key_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 

@@ -12,9 +12,8 @@ from backend.models import (
 )
 from config import config
 from langchain.tools import BaseTool
-from lib.hiro import HiroApi
+from lib.hiro import HiroApi, PlatformApi, WebhookConfig
 from lib.logger import configure_logger
-from lib.platform import PlatformApi
 from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
@@ -229,9 +228,9 @@ class ContractDAODeployTool(BaseTool):
                     platform = PlatformApi()
                     chainhook = platform.create_contract_deployment_hook(
                         txid=contract_data.get("transactionId"),
-                        network=network,
                         name=f"{dao_record.id}",
                         start_block=current_block_height,
+                        network=network,
                         expire_after_occurrence=1,
                     )
                     logger.debug(f"Created chainhook: {chainhook}")
@@ -240,9 +239,9 @@ class ContractDAODeployTool(BaseTool):
                         chainhook = platform.create_dao_x_linkage_hook(
                             contract_identifier=contract_data["contractPrincipal"],
                             method="send",
-                            network=network,
                             name=f"{dao_record.id}",
                             start_block=current_block_height,
+                            network=network,
                         )
 
                     if (

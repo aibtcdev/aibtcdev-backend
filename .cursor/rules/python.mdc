@@ -1,0 +1,10 @@
+---
+description: Dealing with python files and code.
+globs: *.py
+---
+
+Always use types using typing library when doing python code. Make sure to avoid creating new code that might already exist. 
+Make sure to add logging using the configure_logger. 
+Always look for any code that would reference code that gets modified so that it doesn't break any existing code.
+Make sure to remove any unused imports. 
+Also make sure to always create or update unit tests for anything you create.

@@ -1,13 +1,18 @@
 import asyncio
 import uuid
-from api.verify_profile import verify_profile_from_token
 from backend.factory import backend
-from backend.models import UUID, JobCreate, JobFilter, Profile, StepFilter
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from backend.models import UUID, JobCreate, Profile
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from lib.logger import configure_logger
+from lib.verify_profile import verify_profile_from_token
 from lib.websocket_manager import manager
-from services.chat import process_chat_message, running_jobs
-from typing import List
+from services.chat import (
+    get_job_history,
+    get_thread_history,
+    process_chat_message,
+    running_jobs,
+)
+from typing import Any, Dict, Literal, Optional, TypedDict
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -16,72 +21,119 @@ logger = configure_logger(__name__)
 router = APIRouter(prefix="/chat")
 
 
-def get_job_history(thread_id: UUID, profile_id: UUID) -> List:
-    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id))
-    formatted_history = []
-    for job in jobs:
-        if job.profile_id == profile_id:
-            formatted_history.append(
-                {
-                    "role": "user",
-                    "content": job.input,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread_id),
-                }
-            )
-            formatted_history.append(
-                {
-                    "role": "assistant",
-                    "content": job.result,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread_id),
-                }
-            )
-    return formatted_history
+class WebSocketBaseMessage(TypedDict):
+    type: str
 
 
-def get_thread_history(thread_id: UUID, profile_id: UUID) -> List:
-    thread = backend.get_thread(thread_id=thread_id)
-    if thread.profile_id != profile_id:
-        return []
-    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread.id))
-    formatted_history = []
-    if jobs:
-        for job in jobs:
-            logger.info(f"Processing job {job}")
-            # Add user input message
-            formatted_history.append(
-                {
-                    "role": "user",
-                    "content": job.input,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread.id),
-                    "type": "user",
-                }
-            )
+class WebSocketHistoryMessage(WebSocketBaseMessage):
+    type: Literal["history"]
+    thread_id: str
 
-            steps = backend.list_steps(filters=StepFilter(job_id=job.id))
-            if not steps:
-                continue
-            for step in steps:
-                type = "tool" if step.tool else "step"
-                formatted_msg = {
-                    "role": step.role,
-                    "content": step.content,
-                    "created_at": step.created_at.isoformat(),
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                    "tool_output": step.tool_output,
-                    "agent_id": str(step.agent_id),
-                    "thread_id": str(thread.id),
-                    "type": type,
-                }
-                print(formatted_msg)
-                formatted_history.append(formatted_msg)
 
-        # Sort messages by timestamp
-        formatted_history.sort(key=lambda x: x["created_at"])
-    return formatted_history
+class WebSocketChatMessage(WebSocketBaseMessage):
+    type: Literal["message"]
+    thread_id: str
+    agent_id: Optional[str]
+    content: str
+
+
+class WebSocketErrorMessage(TypedDict):
+    type: Literal["error"]
+    message: str
+
+
+class JobInfo(TypedDict):
+    queue: asyncio.Queue
+    thread_id: UUID
+    agent_id: Optional[UUID]
+    task: Optional[asyncio.Task]
+
+
+WebSocketMessage = WebSocketHistoryMessage | WebSocketChatMessage
+WebSocketResponse = Dict[str, Any]  # Type for response messages
+
+
+async def handle_history_message(
+    message: WebSocketHistoryMessage, profile_id: UUID, session: str
+) -> None:
+    """Handle history type messages.
+
+    Args:
+        message: The history request message
+        profile_id: The ID of the requesting profile
+        session: The WebSocket session ID
+    """
+    formatted_history = get_thread_history(UUID(message["thread_id"]), profile_id)
+    for history_msg in formatted_history:
+        await manager.send_session_message(history_msg, session)
+
+
+async def handle_chat_message(
+    message: WebSocketChatMessage,
+    profile: Profile,
+    session: str,
+) -> None:
+    """Handle chat type messages.
+
+    Args:
+        message: The chat message
+        profile: The user's profile
+        session: The WebSocket session ID
+
+    Raises:
+        HTTPException: If thread_id is invalid
+    """
+    thread_id = UUID(message["thread_id"])
+    if not thread_id:
+        raise HTTPException(status_code=400, detail="Thread ID is required")
+
+    agent_id = UUID(message["agent_id"]) if message.get("agent_id") else None
+    formatted_history = get_job_history(thread_id, profile.id)
+
+    # Create and setup job
+    job = backend.create_job(
+        new_job=JobCreate(
+            thread_id=thread_id,
+            profile_id=profile.id,
+            agent_id=agent_id,
+            input=message["content"],
+        )
+    )
+
+    output_queue: asyncio.Queue[Optional[WebSocketResponse]] = asyncio.Queue()
+
+    # Store job info
+    running_jobs[str(job.id)] = JobInfo(
+        queue=output_queue,
+        thread_id=thread_id,
+        agent_id=agent_id,
+        task=None,
+    )
+
+    # Create and store task
+    task = asyncio.create_task(
+        process_chat_message(
+            job_id=job.id,
+            thread_id=thread_id,
+            profile=profile,
+            agent_id=agent_id,
+            input_str=message["content"],
+            history=formatted_history,
+            output_queue=output_queue,
+        )
+    )
+    running_jobs[str(job.id)]["task"] = task
+
+    # Process results
+    try:
+        while True:
+            result = await output_queue.get()
+            if result is None:
+                break
+            await manager.send_session_message(result, session)
+    except Exception as e:
+        logger.error(f"Error processing chat message: {str(e)}")
+        await manager.broadcast_session_error(str(e), session)
 
 
 @router.websocket("/ws")
@@ -93,109 +145,45 @@ async def websocket_endpoint(
 
     Args:
         websocket (WebSocket): The WebSocket connection
-        thread_id (str): The ID of the thread
         profile (Profile): The user's profile information
 
     Raises:
         WebSocketDisconnect: When client disconnects
     """
+    generated_session = str(uuid.uuid4())
+
     try:
-        generated_session = str(uuid.uuid4())
         await manager.connect_session(websocket, generated_session)
         logger.debug(f"Starting WebSocket connection for session {generated_session}")
 
-        # Keep connection open and handle incoming messages
-        try:
-            while True:
-                # Wait for messages from the client
-                data = await websocket.receive_json()
+        while True:
+            try:
+                data: WebSocketMessage = await websocket.receive_json()
 
-                if data.get("type") == "history":
-                    formatted_history = get_thread_history(
-                        UUID(data.get("thread_id", None)), profile.id
+                if data["type"] == "history":
+                    await handle_history_message(data, profile.id, generated_session)
+                elif data["type"] == "message":
+                    await handle_chat_message(data, profile, generated_session)
+                else:
+                    raise HTTPException(
+                        status_code=400, detail=f"Unknown message type: {data['type']}"
                     )
-                    for message in formatted_history:
-                        await manager.send_session_message(message, generated_session)
-                elif data.get("type") == "message":
-                    thread_id = UUID(data.get("thread_id", None))
-                    agent_id = None
-                    if data.get("agent_id"):
-                        agent_id = UUID(data.get("agent_id"))
 
-                    if thread_id == None:
-                        await websocket.accept()
-                        await websocket.send_json(
-                            {"type": "error", "message": "Thread ID is required"}
-                        )
-                        await websocket.close()
-                        return
-                    formatted_history = get_job_history(thread_id, profile.id)
-                    content = data.get("content", "")
-                    # Create a new job for this message
-                    job = backend.create_job(
-                        new_job=JobCreate(
-                            thread_id=thread_id,
-                            profile_id=profile.id,
-                            agent_id=agent_id,
-                            input=content,
-                        )
-                    )
-                    job_id = job.id
-                    output_queue = asyncio.Queue()
+            except WebSocketDisconnect:
+                break
+            except HTTPException as he:
+                await manager.send_session_message(
+                    WebSocketErrorMessage(type="error", message=he.detail),
+                    generated_session,
+                )
+            except Exception as e:
+                logger.error(f"Error processing message: {str(e)}")
+                await manager.broadcast_session_error(str(e), generated_session)
 
-                    # Store job info
-                    running_jobs[str(job_id)] = {
-                        "queue": output_queue,
-                        "thread_id": thread_id,
-                        "agent_id": agent_id,
-                        "task": None,
-                    }
-
-                    # Create task
-                    task = asyncio.create_task(
-                        process_chat_message(
-                            job_id=job_id,
-                            thread_id=thread_id,
-                            profile=profile,
-                            agent_id=agent_id,
-                            input_str=content,
-                            history=formatted_history,
-                            output_queue=output_queue,
-                        )
-                    )
-                    running_jobs[str(job_id)]["task"] = task
-
-                    # Start streaming results
-                    try:
-                        while True:
-                            result = await output_queue.get()
-                            if result is None:
-                                break
-                            # Add job_started_at if it's a stream message
-                            logger.debug(result)
-                            await manager.send_session_message(
-                                result, generated_session
-                            )
-                    except Exception as e:
-                        logger.error(f"Error processing chat message: {str(e)}")
-                        await manager.broadcast_session_error(str(e), generated_session)
-
-        except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected for session {generated_session}")
-        except Exception as e:
-            logger.error(
-                f"Error in WebSocket connection for session {generated_session}: {str(e)}"
-            )
-            await manager.broadcast_session_error(str(e), generated_session)
-        finally:
-            await manager.disconnect_session(websocket, generated_session)
-            logger.debug(
-                f"Cleaned up WebSocket connection for session {generated_session}"
-            )
-
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for session {generated_session}")
     except Exception as e:
-        logger.error(
-            f"Error setting up WebSocket for session {generated_session}: {str(e)}"
-        )
-        if not websocket.client_state.disconnected:
-            await websocket.close()
+        logger.error(f"WebSocket error for session {generated_session}: {str(e)}")
+    finally:
+        await manager.disconnect_session(websocket, generated_session)
+        logger.debug(f"Cleaned up WebSocket connection for session {generated_session}")

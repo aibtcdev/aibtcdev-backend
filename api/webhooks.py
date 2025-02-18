@@ -1,6 +1,3 @@
-"""Webhook API endpoints."""
-
-import os
 from fastapi import APIRouter, Body, HTTPException
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookResponse
