@@ -2,6 +2,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from langchain.tools import BaseTool
 from tools.bun import BunScriptRunner
+from tools.dao_base import DAOToolResponse
 from typing import Dict, Optional, Type, Any
 
 class IsExtensionInput(BaseModel):
@@ -37,22 +38,29 @@ class IsExtensionTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check extension status."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             base_dao_contract,
             extension_contract,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "base-dao",
             "is-extension.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
@@ -114,22 +122,29 @@ class ExecutedAtTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check proposal execution block."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             base_dao_contract,
             proposal_contract,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "base-dao",
             "executed-at.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
