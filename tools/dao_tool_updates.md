@@ -32,13 +32,13 @@ export type ToolResponse<T> = {
   - PayInvoiceByResourceNameTool
 
 ### Bank Account Tools
-- [ ] tools/dao_ext_bank_account.py
+- [x] tools/dao_ext_bank_account.py
   - GetAccountTermsTool
   - DepositSTXTool
   - WithdrawSTXTool
 
 ### Action Proposals Tools
-- [ ] tools/dao_ext_action_proposals.py
+- [x] tools/dao_ext_action_proposals.py
   - ProposeActionAddResourceTool
   - ProposeActionAllowAssetTool
   - ProposeActionSendMessageTool
@@ -54,27 +54,17 @@ export type ToolResponse<T> = {
   - GetVotingConfigurationTool
   - GetVotingPowerTool
 
-## Changes Needed
+## Changes Made
 
-For each tool's _deploy method, update:
+All tools have been updated to use the DAOToolResponse format:
 
-1. Error responses from:
-```python
-result.get("error", "Unknown error"),
-result.get("output", "")
-```
-to:
+1. Error responses now use:
 ```python
 result.get("message", "Unknown error"),
 result.get("data")
 ```
 
-2. Success responses from:
-```python
-result["output"],
-{"raw_result": result}
-```
-to:
+2. Success responses now use:
 ```python
 result.get("message", "Operation successful"),
 result.get("data")
@@ -87,5 +77,7 @@ result.get("data")
 - [x] Charter tools updated
 - [x] Treasury tools updated
 - [x] Payments & Invoices tools updated
-- [ ] Bank Account tools pending
-- [ ] Action Proposals tools pending
+- [x] Bank Account tools updated
+- [x] Action Proposals tools updated
+
+✅ All tools have been updated to use the new DAOToolResponse format
