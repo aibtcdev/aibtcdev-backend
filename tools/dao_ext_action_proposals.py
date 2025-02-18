@@ -666,11 +666,7 @@ class VoteOnActionProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
