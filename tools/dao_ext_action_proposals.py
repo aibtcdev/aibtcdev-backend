@@ -678,11 +678,22 @@ class VoteOnActionProposalTool(BaseTool):
             str(vote).lower(),
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "vote-on-proposal.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
