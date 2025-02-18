@@ -111,11 +111,22 @@ class DepositSTXTool(BaseTool):
             str(amount),
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "bank-account",
             "deposit-stx.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
