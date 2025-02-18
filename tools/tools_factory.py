@@ -89,6 +89,7 @@ from .wallet import (
     WalletSendSTX,
     WalletSIP10SendTool,
 )
+from .x_credentials import CollectXCredentialsTool
 
 logger = configure_logger(__name__)
 

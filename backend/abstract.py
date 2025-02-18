@@ -17,6 +17,10 @@ from backend.models import (
     JobBase,
     JobCreate,
     JobFilter,
+    Key,
+    KeyBase,
+    KeyCreate,
+    KeyFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -264,6 +268,27 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_job(self, job_id: UUID) -> bool:
+        pass
+
+    # ----------- KEYS -----------
+    @abstractmethod
+    def create_key(self, new_key: KeyCreate) -> Key:
+        pass
+
+    @abstractmethod
+    def get_key(self, key_id: UUID) -> Optional[Key]:
+        pass
+
+    @abstractmethod
+    def list_keys(self, filters: Optional[KeyFilter] = None) -> List[Key]:
+        pass
+
+    @abstractmethod
+    def update_key(self, key_id: UUID, update_data: KeyBase) -> Optional[Key]:
+        pass
+
+    @abstractmethod
+    def delete_key(self, key_id: UUID) -> bool:
         pass
 
     # ----------- PROFILES -----------
