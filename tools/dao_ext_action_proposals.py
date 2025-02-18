@@ -175,11 +175,7 @@ class ProposeActionAllowAssetTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
@@ -187,11 +183,22 @@ class ProposeActionAllowAssetTool(BaseTool):
             token_contract,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "propose-action-allow-asset.ts",
             *args
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", "Unknown error"),
+                result.get("output", "")
+            )
+            
+        return DAOToolResponse.success_response(
+            result["output"],
+            {"raw_result": result}
         )
 
     def _run(
