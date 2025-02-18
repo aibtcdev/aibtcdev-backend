@@ -228,6 +228,7 @@ def initialize_tools(
         "wallet_send_stx": WalletSendSTX(wallet_id),
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
+        "x_credentials": CollectXCredentialsTool(profile_id),
     }
 
     return tools
