@@ -226,6 +226,28 @@ class Job(JobBase):
 
 
 #
+# KEYS
+#
+class KeyBase(CustomBaseModel):
+    profile_id: Optional[UUID] = None
+    is_enabled: Optional[bool] = True
+
+
+class KeyCreate(KeyBase):
+    pass
+
+
+class Key(KeyBase):
+    id: UUID
+    created_at: datetime
+
+
+class KeyFilter(CustomBaseModel):
+    profile_id: Optional[UUID] = None
+    is_enabled: Optional[bool] = None
+
+
+#
 # PROFILES
 #
 class ProfileBase(CustomBaseModel):

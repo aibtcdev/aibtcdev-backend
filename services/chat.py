@@ -1,14 +1,14 @@
 import asyncio
 import datetime
 from backend.factory import backend
-from backend.models import JobBase, Profile, StepCreate
+from backend.models import JobBase, JobFilter, Profile, StepCreate, StepFilter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from lib.logger import configure_logger
 from lib.persona import generate_persona, generate_static_persona
 from services.workflows import execute_langgraph_stream
 from tools.tools_factory import initialize_tools
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 logger = configure_logger(__name__)
@@ -294,3 +294,99 @@ async def process_chat_message(
         output_queue=output_queue,
     )
     await processor.process_stream()
+
+
+def get_job_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
+    """Get the chat history for a specific job.
+
+    Args:
+        thread_id (UUID): The ID of the thread
+        profile_id (UUID): The ID of the profile
+
+    Returns:
+        List[Dict[str, Any]]: List of formatted chat messages
+    """
+    logger.debug(
+        f"Fetching job history for thread {thread_id} and profile {profile_id}"
+    )
+    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id))
+    formatted_history = []
+    for job in jobs:
+        if job.profile_id == profile_id:
+            formatted_history.append(
+                {
+                    "role": "user",
+                    "content": job.input,
+                    "created_at": job.created_at.isoformat(),
+                    "thread_id": str(thread_id),
+                }
+            )
+            formatted_history.append(
+                {
+                    "role": "assistant",
+                    "content": job.result,
+                    "created_at": job.created_at.isoformat(),
+                    "thread_id": str(thread_id),
+                }
+            )
+    logger.debug(f"Found {len(formatted_history)} messages in job history")
+    return formatted_history
+
+
+def get_thread_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
+    """Get the complete thread history including all steps.
+
+    Args:
+        thread_id (UUID): The ID of the thread
+        profile_id (UUID): The ID of the profile
+
+    Returns:
+        List[Dict[str, Any]]: List of formatted chat messages and steps
+    """
+    logger.debug(
+        f"Fetching thread history for thread {thread_id} and profile {profile_id}"
+    )
+    thread = backend.get_thread(thread_id=thread_id)
+    if thread.profile_id != profile_id:
+        logger.warning(f"Profile {profile_id} not authorized for thread {thread_id}")
+        return []
+
+    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread.id))
+    formatted_history = []
+    if jobs:
+        for job in jobs:
+            logger.debug(f"Processing job {job}")
+            # Add user input message
+            formatted_history.append(
+                {
+                    "role": "user",
+                    "content": job.input,
+                    "created_at": job.created_at.isoformat(),
+                    "thread_id": str(thread.id),
+                    "type": "user",
+                }
+            )
+
+            steps = backend.list_steps(filters=StepFilter(job_id=job.id))
+            if not steps:
+                continue
+            for step in steps:
+                type = "tool" if step.tool else "step"
+                formatted_msg = {
+                    "role": step.role,
+                    "content": step.content,
+                    "created_at": step.created_at.isoformat(),
+                    "tool": step.tool,
+                    "tool_input": step.tool_input,
+                    "tool_output": step.tool_output,
+                    "agent_id": str(step.agent_id),
+                    "thread_id": str(thread.id),
+                    "type": type,
+                }
+                formatted_history.append(formatted_msg)
+
+        # Sort messages by timestamp
+        formatted_history.sort(key=lambda x: x["created_at"])
+
+    logger.debug(f"Found {len(formatted_history)} messages in thread history")
+    return formatted_history

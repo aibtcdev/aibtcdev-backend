@@ -1,5 +1,4 @@
 import openai
-import os
 import requests
 from config import config
 

@@ -1,5 +1,5 @@
-from .supabase import SupabaseBackend
 from backend.abstract import AbstractBackend
+from backend.supabase import SupabaseBackend
 from config import config
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
