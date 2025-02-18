@@ -27,7 +27,6 @@ from .dao_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
-# from .dao_core_proposals import ( TBD )
 from .dao_deployments import ContractDAODeployTool
 from .database import (
     AddScheduledTaskTool,

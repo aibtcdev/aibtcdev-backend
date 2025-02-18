@@ -36,7 +36,7 @@ class DAOTask(BaseTask[DAOProcessingResult]):
             agent_id=self.config.twitter_agent_id,
         )
         self.tools_map = filter_tools_by_names(
-            ["contract_dao_deploy"], self.tools_map_all
+            ["contract_deploy_dao"], self.tools_map_all
         )
         logger.debug(f"Initialized tools_map with {len(self.tools_map)} tools")
 
