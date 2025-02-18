@@ -164,15 +164,11 @@ class WithdrawSTXTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to withdraw STX."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [bank_account_contract]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "bank-account",
             "withdraw-stx.ts",

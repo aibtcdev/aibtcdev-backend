@@ -270,11 +270,7 @@ class ProposeActionSendMessageTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
@@ -282,7 +278,7 @@ class ProposeActionSendMessageTool(BaseTool):
             message,
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "propose-action-send-message.ts",
