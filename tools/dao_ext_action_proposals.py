@@ -555,11 +555,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal period."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [
             action_proposals_contract,
@@ -567,7 +563,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             str(withdrawal_period),
         ]
 
-        return BunScriptRunner.bun_run(
+        result = BunScriptRunner.bun_run(
             self.wallet_id,
             "action-proposals",
             "propose-action-set-withdrawal-period.ts",
