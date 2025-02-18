@@ -2,6 +2,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from langchain.tools import BaseTool
 from tools.bun import BunScriptRunner
+from tools.dao_base import DAOToolResponse
 from typing import Dict, Optional, Type, Any
 
 class GetAccountTermsInput(BaseModel):
@@ -32,11 +33,7 @@ class GetAccountTermsTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get account terms."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return DAOToolResponse.error_response("Wallet ID is required")
 
         args = [bank_account_contract]
 

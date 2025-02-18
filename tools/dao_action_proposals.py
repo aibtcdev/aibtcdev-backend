@@ -583,6 +583,7 @@ class ProposeActionToggleResourceInput(BaseModel):
         description="Name of the resource to toggle"
     )
 
+
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
     action_proposals_contract: str = Field(
