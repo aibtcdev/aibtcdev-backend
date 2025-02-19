@@ -8,7 +8,7 @@ from langgraph.graph import END, Graph, StateGraph
 from lib.logger import configure_logger
 from pydantic import BaseModel, Field
 from services.workflows.base import BaseWorkflow
-from tools.daos import ContractDAODeployInput
+from tools.dao_deployments import ContractDAODeployInput
 from typing import Dict, Optional, TypedDict
 
 logger = configure_logger(__name__)
@@ -16,7 +16,7 @@ logger = configure_logger(__name__)
 
 class ToolRequest(BaseModel):
     tool_name: str = Field(
-        description="The name of the tool to be executed its always contract_dao_deploy"
+        description="The name of the tool to be executed its always contract_deploy_dao"
     )
     parameters: ContractDAODeployInput = Field(
         description="The parameters for the tool"
@@ -90,14 +90,14 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
 
             Exclude tweets that are purely promotional and lack actionable parameters. If the tweet includes both praise and actionable details describing deploying a DAO, proceed with DAO deployment.
 
-            Only craft the parameters for the tool contract_dao_deploy.
+            Only craft the parameters for the tool contract_deploy_dao.
                             
             Requirements:
             1. Expand upon any missing details in the request for a dao to be deployed to meet the needs of the tool parameters
             2. If the tweet is a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
-            3. Don't execute the tool contract_dao_deploy as your sole purpose is to generate the parameters for the tool.
+            3. Don't execute the tool contract_deploy_dao as your sole purpose is to generate the parameters for the tool.
             4. Make sure the DAO symbol is not already taken. If it is already taken, choose a new symbol for the parameters.
-            5. Only craft the parameters for the tool contract_dao_deploy if Worthiness determination is True.
+            5. Only craft the parameters for the tool contract_deploy_dao if Worthiness determination is True.
             
             Worthiness criteria:
             - We welcome creativity—funny or edgy ideas are always welcome
@@ -114,7 +114,7 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
                 "reason": str,
                 "tweet_type": "tool_request" | "thread" | "invalid",
                 "tool_request": {{
-                    "tool_name": "contract_dao_deploy",
+                    "tool_name": "contract_deploy_dao",
                     "parameters": {{
                         "token_symbol": str,
                         "token_name": str,

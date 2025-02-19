@@ -62,7 +62,7 @@ class ContractDAODeployInput(BaseModel):
 
 
 class ContractDAODeployTool(BaseTool):
-    name: str = "contract_dao_deploy"
+    name: str = "contract_deploy_dao"
     description: str = (
         "Deploy a new DAO with a token and a bonding curve for Stacks blockchain. "
         "Example usage: 'deploy a community DAO named 'GreenEarth' with a token named 'Green Token' and a purpose statement "
