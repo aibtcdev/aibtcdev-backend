@@ -194,11 +194,12 @@ class ContractDAODeployTool(BaseTool):
                 deployment_data = json.loads(result["output"])
                 logger.debug(f"Parsed deployment data: {deployment_data}")
                 if not deployment_data["success"]:
-                    error_msg = deployment_data.get("error", "Unknown deployment error")
-                    logger.error(f"Deployment unsuccessful: {error_msg}")
+                    error_msg = deployment_data.get("message", "Unknown deployment error")
+                    error_data = deployment_data.get("data", "No error data")
+                    logger.error(f"Deployment unsuccessful: {error_msg} {error_data}")
                     return {
                         "output": result["output"],
-                        "error": error_msg,
+                        "error": error_msg + error_data,
                         "success": False,
                     }
 
