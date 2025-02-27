@@ -839,9 +839,9 @@ class HiroApi(BaseHiroApi):
         logger.info("Retrieving current block height")
         # endpoint = self.ENDPOINTS["blocks"]
         endpoint = "/extended/v1/block/v2"  # trying direct
-        logger.debug(f"Current block height endpoint: {endpoint}/v2")
+        logger.debug(f"Current block height endpoint: {endpoint}")
         response = self._make_request(
-            method="GET", endpoint=f"{endpoint}/v2", params={"limit": 1, "offset": 0}
+            method="GET", endpoint=f"{endpoint}", params={"limit": 1, "offset": 0}
         )
         logger.debug(f"Response: {response}")
         return response["results"][0]["height"]
