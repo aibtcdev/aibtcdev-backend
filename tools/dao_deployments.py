@@ -194,11 +194,14 @@ class ContractDAODeployTool(BaseTool):
                 deployment_data = json.loads(result["output"])
                 logger.debug(f"Parsed deployment data: {deployment_data}")
                 if not deployment_data["success"]:
-                    error_msg = deployment_data.get("error", "Unknown deployment error")
-                    logger.error(f"Deployment unsuccessful: {error_msg}")
+                    error_msg = deployment_data.get(
+                        "message", "Unknown deployment error"
+                    )
+                    error_data = deployment_data.get("data", "No error data")
+                    logger.error(f"Deployment unsuccessful: {error_msg} {error_data}")
                     return {
                         "output": result["output"],
-                        "error": error_msg,
+                        "error": error_msg + error_data,
                         "success": False,
                     }
 
@@ -207,10 +210,29 @@ class ContractDAODeployTool(BaseTool):
                 )
                 # Update token record with contract information
                 logger.debug("Step 7: Updating token with contract information...")
-                contracts = deployment_data["contracts"]
+                contracts = deployment_data["data"]  # main key in ToolResponse
+                token_contract = next(
+                    (
+                        contract
+                        for contract in contracts
+                        if (
+                            contract["category"] == "TOKEN"
+                            and contract["subcategory"] == "DAO"
+                        )
+                    ),
+                    None,
+                )
+                if not token_contract:
+                    logger.error("Token contract not found in deployment results")
+                    return {
+                        "output": "",
+                        "error": "Token contract not found in deployment results",
+                        "success": False,
+                    }
+
                 token_updates = TokenBase(
-                    contract_principal=contracts["token"]["contractPrincipal"],
-                    tx_id=contracts["token"]["transactionId"],
+                    contract_principal=token_contract["address"],
+                    tx_id=token_contract["txId"],
                     status=ContractStatus.PENDING,
                 )
                 logger.debug(f"Token updates: {token_updates}")
@@ -224,37 +246,44 @@ class ContractDAODeployTool(BaseTool):
 
                 # Create extensions
                 logger.debug("Step 8: Creating extensions...")
-                for contract_name, contract_data in contracts.items():
+                for contract in contracts:
+                    # set values based on DeployedContractRegistryEntry in TS
+                    contract_name = contract["name"]
+                    contract_address = contract["address"]
+                    contract_type = contract["type"]
+                    contract_subtype = contract["subtype"]
+                    contract_txid = contract["txId"]
+                    # setup platform and create deploy hook
                     platform = PlatformApi()
                     chainhook = platform.create_contract_deployment_hook(
-                        txid=contract_data.get("transactionId"),
+                        txid=contract_txid,
                         name=f"{dao_record.id}",
                         start_block=current_block_height,
                         network=network,
                         expire_after_occurrence=1,
                     )
                     logger.debug(f"Created chainhook: {chainhook}")
-
-                    if contract_name == "aibtc-ext004-messaging":
+                    # create xlinkage hook for messaging contract
+                    if (
+                        contract_type == "EXTENSIONS"
+                        and contract_subtype == "MESSAGING"
+                    ):
                         chainhook = platform.create_dao_x_linkage_hook(
-                            contract_identifier=contract_data["contractPrincipal"],
+                            contract_identifier=contract_address,
                             method="send",
                             name=f"{dao_record.id}",
                             start_block=current_block_height,
                             network=network,
                         )
-
-                    if (
-                        contract_name != "token"
-                        and contract_name != "aibtc-base-bootstrap-initialization"
-                    ):
+                    # if its an extension, add to db
+                    if contract_type == "EXTENSIONS":
                         logger.debug(f"Creating extension for {contract_name}")
                         extension_result = backend.create_extension(
                             ExtensionCreate(
                                 dao_id=dao_record.id,
                                 type=contract_name,
-                                contract_principal=contract_data["contractPrincipal"],
-                                tx_id=contract_data["transactionId"],
+                                contract_principal=contract_address,
+                                tx_id=contract_txid,
                                 status="PENDING",
                             )
                         )
@@ -268,6 +297,29 @@ class ContractDAODeployTool(BaseTool):
                         logger.debug(
                             f"Successfully created extension for {contract_name}"
                         )
+                        # if its a bootstrap contract, create proposal
+                        if (
+                            contract_subtype == "BOOTSTRAP_INIT"
+                        ):  # Use subcategory instead of name
+                            logger.debug(f"Creating proposal for {contract_name}")
+                            proposal_result = backend.create_proposal(
+                                ProposalCreate(
+                                    dao_id=dao_record.id,
+                                    status=ContractStatus.PENDING,
+                                    tx_id=contract_txid,
+                                    contract_principal=contract_address,
+                                    title="Initialize DAO",
+                                    description="Initialize the DAO",
+                                )
+                            )
+                            # Add error handling
+                            if not proposal_result:
+                                logger.error(f"Failed to create bootstrap proposal")
+                                return {
+                                    "output": "",
+                                    "error": "Failed to create bootstrap proposal",
+                                    "success": False,
+                                }
                     if contract_name == "aibtc-base-bootstrap-initialization":
                         logger.debug(
                             f"Successfully created extension for {contract_name}"
@@ -276,12 +328,112 @@ class ContractDAODeployTool(BaseTool):
                             ProposalCreate(
                                 dao_id=dao_record.id,
                                 status=ContractStatus.PENDING,
-                                tx_id=contract_data["transactionId"],
-                                contract_principal=contract_data["contractPrincipal"],
+                                tx_id=contract_txid,
+                                contract_principal=contract_address,
                                 title="Initialize DAO",
                                 description="Initialize the DAO",
                             )
                         )
+
+                    # construct the dao with bootstrap proposal
+                    logger.debug("Step 9: Constructing dao...")
+
+                    # find required contracts
+                    base_dao_contract = next(
+                        (
+                            contract
+                            for contract in contracts
+                            if contract["category"] == "BASE"
+                            and contract["subcategory"] == "DAO"
+                        ),
+                        None,
+                    )
+                    bootstrap_proposal_contract = next(
+                        (
+                            contract
+                            for contract in contracts
+                            if contract["subcategory"] == "BOOTSTRAP_INIT"
+                        ),
+                        None,
+                    )
+                    # make sure they're found
+                    if not base_dao_contract or not bootstrap_proposal_contract:
+                        logger.error(
+                            "Could not find base DAO or bootstrap proposal contracts"
+                        )
+                        logger.error(f"Base DAO found: {base_dao_contract is not None}")
+                        logger.error(
+                            f"Bootstrap proposal found: {bootstrap_proposal_contract is not None}"
+                        )
+                        return {
+                            "output": "",
+                            "error": "Missing required contracts for DAO construction",
+                            "success": False,
+                        }
+                    # call tool to construct dao
+                    logger.debug(f"Base DAO contract: {base_dao_contract["address"]}")
+                    logger.debug(f"Bootstrap proposal contract: {bootstrap_proposal_contract["address"]}")
+                    construct_result = BunScriptRunner.bun_run(
+                        self.wallet_id,
+                        "stacks-contracts",
+                        "construct-dao.ts",
+                        base_dao_contract["address"],
+                        bootstrap_proposal_contract["address"],
+                    )
+                    logger.debug(f"DAO construction result type: {type(construct_result)}")
+                    logger.debug(f"DAO construction result content: {construct_result}")    
+                    if not construct_result["success"]:
+                        logger.error(f"DAO construction failed: {construct_result.get('error', 'Unknown error')}")
+                        logger.error(f"Construction output: {construct_result.get('output', 'No output')}")
+                        return {
+                            "output": construct_result["output"],
+                            "error": construct_result["error"],
+                            "success": False,
+                        }
+                    # Parse construction output
+                    try:
+                        construction_data = json.loads(construct_result["output"])
+                        logger.debug(f"Parsed construction data: {construction_data}")
+                        
+                        if not construction_data["success"]:
+                            error_msg = construction_data.get("message", "Unknown construction error")
+                            error_data = construction_data.get("data", "No error data")
+                            logger.error(f"DAO construction unsuccessful: {error_msg} {error_data}")
+                            return {
+                                "output": construct_result["output"],
+                                "error": error_msg + error_data,
+                                "success": False,
+                            }
+                        
+                        # Update the DAO status to indicate construction is complete
+                        backend.update_dao(
+                            dao_record.id, 
+                            update_data=DAOBase(
+                                is_constructed=True,
+                                construction_tx_id=construction_data.get("data", {}).get("txid")
+                            )
+                        )
+                        
+                        logger.info(f"DAO successfully constructed with txid: {construction_data.get('data', {}).get('txid')}")
+                        
+                        # Return success with all the relevant information
+                        return {
+                            "output": construct_result["output"],
+                            "dao_id": dao_record.id,
+                            "image_url": token_record.image_url,
+                            "txid": construction_data.get("data", {}).get("txid"),
+                            "error": None,
+                            "success": True,
+                        }
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse construction output: {str(e)}")
+                        logger.error(f"Raw output: {construct_result['output']}")
+                        return {
+                            "output": construct_result["output"],
+                            "error": f"Failed to parse construction output: {str(e)}",
+                            "success": False,
+                        }
 
                 logger.debug("Deployment completed successfully")
                 return {
