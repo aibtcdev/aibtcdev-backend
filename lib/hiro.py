@@ -1,7 +1,7 @@
 import aiohttp
 import requests
 import time
-from cachetools import TTLCache, cached, cachedmethod
+from cachetools import TTLCache, cached
 from config import config
 from dataclasses import dataclass
 from enum import Enum
@@ -833,7 +833,7 @@ class HiroApi(BaseHiroApi):
         response.raise_for_status()
         return response.json()["price"]
 
-    @cachedmethod(lambda self: self._cache)
+    @cached(lambda self: self._cache)
     def get_current_block_height(self) -> int:
         """Get the current block height with caching."""
         logger.info("Retrieving current block height")
