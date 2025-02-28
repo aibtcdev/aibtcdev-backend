@@ -23,7 +23,7 @@ def configure_logger(name: Optional[str] = None) -> logging.Logger:
         logging.Logger: Configured logger instance
     """
     # Get the logger
-    logger = logging.getLogger(name if name else "uvicorn.error")
+    logger = logging.getLogger("uvicorn.error")
 
     # Set log level from environment variable, default to INFO if not set
     log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
