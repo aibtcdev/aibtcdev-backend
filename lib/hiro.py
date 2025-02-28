@@ -833,13 +833,17 @@ class HiroApi(BaseHiroApi):
         response.raise_for_status()
         return response.json()["price"]
 
-    @cached(lambda self: self._cache)
+    # @cached(lambda self: self._cache)
     def get_current_block_height(self) -> int:
-        """Get the current block height with caching."""
+        """Get the current block height"""
         logger.info("Retrieving current block height")
+        logger.debug(f"Endpoint: {self.ENDPOINTS['blocks']}")
         response = self._make_request(
-            "GET", f"{self.ENDPOINTS['blocks']}/v2", params={"limit": 1, "offset": 0}
+            method="GET",
+            endpoint=self.ENDPOINTS["blocks"],
+            params={"limit": 1, "offset": 0},
         )
+        logger.debug(f"Response: {response}")
         return response["results"][0]["height"]
 
     def search(self, query_id: str) -> Dict[str, Any]:

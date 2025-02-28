@@ -5,3 +5,4 @@ __pycache__
 shell.nix
 .DS_Store
 tweets.db
+generated

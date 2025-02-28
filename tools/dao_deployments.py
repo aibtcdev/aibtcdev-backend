@@ -178,13 +178,16 @@ class ContractDAODeployTool(BaseTool):
             logger.debug(f"Contract deployment result content: {result}")
 
             if not result["success"]:
+                # build error message based on ToolResponse in TS
+                error_message = result.get("message", "Unknown error")
+                error_data = result.get("data", "No error data")
                 logger.error(
-                    f"Contract deployment failed: {result.get('error', 'Unknown error')}"
+                    f"Contract deployment failed: {error_message} {error_data}"
                 )
                 logger.error(f"Deployment output: {result.get('output', 'No output')}")
                 return {
                     "output": result["output"],
-                    "error": result["error"],
+                    "error": result["error"] + error_message + error_data,
                     "success": False,
                 }
 
