@@ -2,9 +2,10 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from lib.logger import configure_logger
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
+
+from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
@@ -68,6 +69,7 @@ class JobType(str, Enum):
     DAO = "dao"
     DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
+    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
     # Add new job types here
 
     def __str__(self):

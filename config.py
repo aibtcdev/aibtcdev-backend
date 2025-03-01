@@ -68,6 +68,12 @@ class SchedulerConfig:
     tweet_runner_interval_seconds: int = int(
         os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", "30")
     )
+    dao_proposal_vote_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_vote_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_INTERVAL_SECONDS", "60")
+    )
 
 
 @dataclass

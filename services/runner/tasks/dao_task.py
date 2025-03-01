@@ -1,4 +1,8 @@
-from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
 from backend.factory import backend
 from backend.models import (
     DAOFilter,
@@ -7,13 +11,11 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
 )
-from dataclasses import dataclass
-from datetime import datetime
 from lib.logger import configure_logger
 from services.workflows import execute_langgraph_stream
 from tools.tools_factory import filter_tools_by_names, initialize_tools
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+
+from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
 
@@ -210,3 +212,6 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                 )
             )
             return results
+
+
+dao_task = DAOTask()

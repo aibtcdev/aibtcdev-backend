@@ -1,4 +1,7 @@
-from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
 from backend.factory import backend
 from backend.models import (
     DAOBase,
@@ -7,11 +10,10 @@ from backend.models import (
     QueueMessageFilter,
     TokenFilter,
 )
-from dataclasses import dataclass
 from lib.logger import configure_logger
 from services.workflows import generate_dao_tweet
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+
+from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
 
@@ -134,3 +136,6 @@ class DAOTweetTask(BaseTask[DAOTweetProcessingResult]):
                 )
             )
             return results
+
+
+dao_tweet_task = DAOTweetTask()

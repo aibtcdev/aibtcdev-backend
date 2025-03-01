@@ -1,5 +1,13 @@
 import time
 import uuid
+from typing import List, Optional
+
+from sqlalchemy import Column, DateTime, Engine, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from supabase import Client
+
 from backend.abstract import AbstractBackend
 from backend.models import (
     DAO,
@@ -8,6 +16,7 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentWithWalletTokenDTO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -63,6 +72,10 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletToken,
+    WalletTokenBase,
+    WalletTokenCreate,
+    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -77,12 +90,6 @@ from backend.models import (
     XUserFilter,
 )
 from lib.logger import configure_logger
-from sqlalchemy import Column, DateTime, Engine, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from supabase import Client
-from typing import List, Optional
 
 logger = configure_logger(__name__)
 
@@ -357,6 +364,137 @@ class SupabaseBackend(AbstractBackend):
         )
         deleted = response.data or []
         return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 1. WALLET TOKENS
+    # ----------------------------------------------------------------
+    def create_wallet_token(
+        self, new_wallet_token: "WalletTokenCreate"
+    ) -> "WalletToken":
+        payload = new_wallet_token.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("wallet_tokens").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from wallet_tokens insert.")
+        return WalletToken(**data[0])
+
+    def get_wallet_token(self, wallet_token_id: UUID) -> Optional["WalletToken"]:
+        response = (
+            self.client.table("wallet_tokens")
+            .select("*")
+            .eq("id", str(wallet_token_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return WalletToken(**response.data)
+
+    def list_wallet_tokens(
+        self, filters: Optional["WalletTokenFilter"] = None
+    ) -> List["WalletToken"]:
+        query = self.client.table("wallet_tokens").select("*")
+        if filters:
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
+            if filters.token_id is not None:
+                query = query.eq("token_id", str(filters.token_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+        response = query.execute()
+        data = response.data or []
+        return [WalletToken(**row) for row in data]
+
+    def update_wallet_token(
+        self, wallet_token_id: UUID, update_data: "WalletTokenBase"
+    ) -> Optional["WalletToken"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_wallet_token(wallet_token_id)
+        response = (
+            self.client.table("wallet_tokens")
+            .update(payload)
+            .eq("id", str(wallet_token_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return WalletToken(**updated[0])
+
+    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
+        response = (
+            self.client.table("wallet_tokens")
+            .delete()
+            .eq("id", str(wallet_token_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    def get_agents_with_dao_tokens(
+        self, dao_id: UUID
+    ) -> List["AgentWithWalletTokenDTO"]:
+        """Get all agents with wallets that hold tokens for a specific DAO using models."""
+        result = []
+
+        # Step 1: Find all wallet tokens for this DAO
+        wallet_tokens = self.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
+
+        if not wallet_tokens:
+            return []
+
+        # Get the DAO information once
+        dao = self.get_dao(dao_id)
+        if not dao:
+            logger.warning(f"DAO with ID {dao_id} not found")
+            return []
+
+        # Process each wallet token
+        for wallet_token in wallet_tokens:
+            # Step 2: Get the wallet
+            wallet = self.get_wallet(wallet_token.wallet_id)
+            if not wallet:
+                logger.warning(f"Wallet with ID {wallet_token.wallet_id} not found")
+                continue
+
+            # Skip wallets not associated with agents
+            if not wallet.agent_id:
+                continue
+
+            # Step 3: Get the agent
+            agent = self.get_agent(wallet.agent_id)
+            if not agent:
+                logger.warning(f"Agent with ID {wallet.agent_id} not found")
+                continue
+
+            # Step 4: Get the token
+            token = self.get_token(wallet_token.token_id)
+            if not token:
+                logger.warning(f"Token with ID {wallet_token.token_id} not found")
+                continue
+
+            # Step 5: Create the DTO
+            wallet_address = wallet.mainnet_address or wallet.testnet_address
+            if not wallet_address:
+                logger.warning(f"Wallet {wallet.id} has no address")
+                continue
+
+            # Add to results
+            result.append(
+                AgentWithWalletTokenDTO(
+                    agent_id=agent.id,
+                    agent_name=agent.name,
+                    wallet_id=wallet.id,
+                    wallet_address=wallet_address,
+                    token_id=token.id,
+                    token_amount=wallet_token.amount,
+                    dao_id=dao_id,
+                    dao_name=dao.name,
+                )
+            )
+
+        return result
 
     # ----------------------------------------------------------------
     # 1. AGENTS

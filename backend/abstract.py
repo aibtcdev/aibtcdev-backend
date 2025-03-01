@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
+
 from backend.models import (
     DAO,
     UUID,
@@ -6,6 +8,7 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentWithWalletTokenDTO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -60,6 +63,10 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletToken,
+    WalletTokenBase,
+    WalletTokenCreate,
+    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -73,7 +80,6 @@ from backend.models import (
     XUserCreate,
     XUserFilter,
 )
-from typing import List, Optional
 
 
 class AbstractBackend(ABC):
@@ -157,6 +163,43 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_wallet(self, wallet_id: UUID) -> bool:
+        pass
+
+    # ----------- WALLET TOKENS -----------
+    @abstractmethod
+    def create_wallet_token(self, new_wallet_token: WalletTokenCreate) -> WalletToken:
+        pass
+
+    @abstractmethod
+    def get_wallet_token(self, wallet_token_id: UUID) -> Optional[WalletToken]:
+        pass
+
+    @abstractmethod
+    def list_wallet_tokens(
+        self, filters: Optional[WalletTokenFilter] = None
+    ) -> List[WalletToken]:
+        pass
+
+    @abstractmethod
+    def update_wallet_token(
+        self, wallet_token_id: UUID, update_data: WalletTokenBase
+    ) -> Optional[WalletToken]:
+        pass
+
+    @abstractmethod
+    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
+        pass
+
+    @abstractmethod
+    def get_agents_with_dao_tokens(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
+        """Get all agents with wallets that hold tokens for a specific DAO.
+
+        Args:
+            dao_id: The ID of the DAO
+
+        Returns:
+            List of agent info with wallet and token details
+        """
         pass
 
     # ----------- AGENTS -----------

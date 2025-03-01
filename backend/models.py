@@ -1,8 +1,9 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 class CustomBaseModel(BaseModel):
@@ -561,3 +562,41 @@ class XTweetFilter(CustomBaseModel):
     tweet_type: Optional[TweetType] = None
     confidence_score: Optional[float] = None
     reason: Optional[str] = None
+
+
+#
+# WALLET TOKENS
+#
+class WalletTokenBase(CustomBaseModel):
+    wallet_id: UUID
+    token_id: UUID
+    dao_id: UUID  # Direct reference to the DAO for easier queries
+    amount: str  # String to handle large numbers precisely
+    updated_at: datetime = datetime.now()
+
+
+class WalletTokenCreate(WalletTokenBase):
+    pass
+
+
+class WalletToken(WalletTokenBase):
+    id: UUID
+    created_at: datetime
+
+
+class WalletTokenFilter(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    token_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+
+
+# Add this to your backend interface class to get agents by tokens
+class AgentWithWalletTokenDTO(CustomBaseModel):
+    agent_id: UUID
+    agent_name: str
+    wallet_id: UUID
+    wallet_address: str
+    token_id: UUID
+    token_amount: str
+    dao_id: UUID
+    dao_name: str

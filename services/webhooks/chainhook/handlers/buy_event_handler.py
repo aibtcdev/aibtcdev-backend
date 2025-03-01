@@ -1,7 +1,17 @@
 """Handler for capturing buy function events from contracts."""
 
-from typing import Any, Dict
+from datetime import datetime
+from typing import Any, Dict, Optional
+from uuid import UUID
 
+from backend.factory import backend
+from backend.models import (
+    TokenFilter,
+    WalletFilter,
+    WalletTokenBase,
+    WalletTokenCreate,
+    WalletTokenFilter,
+)
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import (
@@ -63,13 +73,7 @@ class BuyEventHandler(ChainhookEventHandler):
         return tx_kind_type == "ContractCall" and is_buy_method
 
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
-        """Handle buy function call transactions.
-
-        Logs only FTTransferEvent events associated with buy function call transactions.
-
-        Args:
-            transaction: The transaction to handle
-        """
+        """Handle buy function call transactions and track token purchases by our wallets."""
         tx_data = self.extract_transaction_data(transaction)
         tx_id = tx_data["tx_id"]
         tx_data_content = tx_data["tx_data"]
@@ -85,7 +89,17 @@ class BuyEventHandler(ChainhookEventHandler):
             f"with args: {args}, tx_id: {tx_id}"
         )
 
-        # Log only FTTransferEvent events from the transaction
+        # Check if the sender is one of our wallets
+        wallets = backend.list_wallets(WalletFilter(mainnet_address=sender))
+        if not wallets:
+            self.logger.info(
+                f"Sender {sender} is not one of our wallets. Ignoring event."
+            )
+            return
+
+        wallet = wallets[0]  # Get the matching wallet
+
+        # Extract token transfer information from FTTransferEvent
         if hasattr(tx_metadata, "receipt") and hasattr(tx_metadata.receipt, "events"):
             events = tx_metadata.receipt.events
             ft_transfer_events = [
@@ -97,11 +111,66 @@ class BuyEventHandler(ChainhookEventHandler):
                     f"Found {len(ft_transfer_events)} FTTransferEvent events in transaction {tx_id}"
                 )
 
-                for i, event in enumerate(ft_transfer_events):
+                for event in ft_transfer_events:
+                    # Extract token info from event data
                     event_data = event.data
-                    self.logger.info(
-                        f"FTTransferEvent {i+1}/{len(ft_transfer_events)}: Data={event_data}"
+                    token_asset = event_data.get("asset_identifier")
+                    amount = event_data.get("amount")
+                    recipient = event_data.get("recipient")
+
+                    # Only process if our wallet is the recipient
+                    if recipient != sender:
+                        continue
+
+                    # Find the token in our database
+                    tokens = backend.list_tokens(
+                        TokenFilter(contract_principal=token_asset)
                     )
+                    if not tokens:
+                        self.logger.warning(f"Unknown token asset: {token_asset}")
+                        continue
+
+                    token = tokens[0]
+                    dao_id = token.dao_id
+
+                    # Check if we already have a record for this wallet+token
+                    existing_records = backend.list_wallet_tokens(
+                        WalletTokenFilter(wallet_id=wallet.id, token_id=token.id)
+                    )
+
+                    if existing_records:
+                        # Update existing record
+                        record = existing_records[0]
+                        # Convert string to decimal for addition, then back to string
+                        new_amount = str(float(record.amount) + float(amount))
+
+                        # Create a WalletTokenBase instance instead of using a dictionary
+                        update_data = WalletTokenBase(
+                            wallet_id=record.wallet_id,
+                            token_id=record.token_id,
+                            dao_id=record.dao_id,
+                            amount=new_amount,
+                            updated_at=datetime.now(),
+                        )
+
+                        backend.update_wallet_token(record.id, update_data)
+                        self.logger.info(
+                            f"Updated token balance for wallet {wallet.id}: "
+                            f"token {token.id} (DAO {dao_id}), new amount: {new_amount}"
+                        )
+                    else:
+                        # Create new record
+                        new_record = WalletTokenCreate(
+                            wallet_id=wallet.id,
+                            token_id=token.id,
+                            dao_id=dao_id,
+                            amount=amount,
+                        )
+                        backend.create_wallet_token(new_record)
+                        self.logger.info(
+                            f"Added new token to wallet {wallet.id}: "
+                            f"token {token.id} (DAO {dao_id}), amount: {amount}"
+                        )
             else:
                 self.logger.info(
                     f"No FTTransferEvent events found in transaction {tx_id}"

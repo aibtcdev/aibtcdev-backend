@@ -1,13 +1,16 @@
 import asyncio
+from typing import Any, Optional
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from config import config
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
 from services.bot import start_application
 from services.runner import execute_runner_job
+from services.runner.job_manager import JobManager
 from services.schedule import sync_schedules
 from services.twitter import execute_twitter_job
-from typing import Any, Optional
 
 logger = configure_logger(__name__)
 
@@ -43,78 +46,11 @@ class StartupService:
 
     def init_scheduler(self) -> None:
         """Initialize and start the scheduler with configured jobs."""
-        if config.twitter.enabled:
-            self.scheduler.add_job(
-                execute_twitter_job, "interval", seconds=config.twitter.interval_seconds
-            )
-            logger.info(
-                f"Twitter service started with interval of {config.twitter.interval_seconds} seconds"
-            )
-        else:
-            logger.info("Twitter service disabled")
+        # Use the JobManager to schedule all enabled jobs
+        any_enabled = JobManager.schedule_jobs(self.scheduler)
 
-        if config.scheduler.sync_enabled:
-            self.scheduler.add_job(
-                sync_schedules,
-                "interval",
-                args=[self.scheduler],
-                seconds=config.scheduler.sync_interval_seconds,
-            )
-            logger.info(
-                f"Schedule sync service started with interval of {config.scheduler.sync_interval_seconds} seconds"
-            )
-        else:
-            logger.info("Schedule sync service is disabled")
-
-        if config.scheduler.dao_runner_enabled:
-            self.scheduler.add_job(
-                execute_runner_job,
-                "interval",
-                seconds=config.scheduler.dao_runner_interval_seconds,
-                args=["dao"],
-            )
-            logger.info(
-                f"DAO runner service started with interval of {config.scheduler.dao_runner_interval_seconds} seconds"
-            )
-        else:
-            logger.info("DAO runner service is disabled")
-
-        if config.scheduler.dao_tweet_runner_enabled:
-            self.scheduler.add_job(
-                execute_runner_job,
-                "interval",
-                seconds=config.scheduler.dao_tweet_runner_interval_seconds,
-                args=["dao_tweet"],
-            )
-            logger.info(
-                f"DAO tweet runner service started with interval of {config.scheduler.dao_tweet_runner_interval_seconds} seconds"
-            )
-        else:
-            logger.info("DAO tweet runner service is disabled")
-
-        if config.scheduler.tweet_runner_enabled:
-            # Add tweet posting task
-            self.scheduler.add_job(
-                execute_runner_job,
-                "interval",
-                seconds=config.scheduler.tweet_runner_interval_seconds,
-                args=["tweet"],
-            )
-            logger.info(
-                f"Tweet posting service started with interval of {config.scheduler.tweet_runner_interval_seconds} seconds"
-            )
-        else:
-            logger.info("Tweet runner service is disabled")
-
-        if any(
-            [
-                config.twitter.enabled,
-                config.scheduler.sync_enabled,
-                config.scheduler.dao_runner_enabled,
-                config.scheduler.dao_tweet_runner_enabled,
-                config.scheduler.tweet_runner_enabled,
-            ]
-        ):
+        # Start the scheduler if any jobs are enabled
+        if any_enabled:
             logger.info("Starting scheduler")
             self.scheduler.start()
             logger.info("Scheduler started")

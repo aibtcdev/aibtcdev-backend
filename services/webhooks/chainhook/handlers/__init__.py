@@ -8,6 +8,7 @@ from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandl
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,
 )
+from services.webhooks.chainhook.handlers.dao_proposal_handler import DAOProposalHandler
 from services.webhooks.chainhook.handlers.transaction_status_handler import (
     TransactionStatusHandler,
 )
@@ -17,4 +18,5 @@ __all__ = [
     "TransactionStatusHandler",
     "ContractMessageHandler",
     "BuyEventHandler",
+    "DAOProposalHandler",
 ]

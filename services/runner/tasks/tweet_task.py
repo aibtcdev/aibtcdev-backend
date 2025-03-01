@@ -1,11 +1,13 @@
-from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
-from backend.factory import backend
-from backend.models import QueueMessageBase, QueueMessageFilter, XCredsFilter
 from dataclasses import dataclass
-from lib.logger import configure_logger
-from lib.twitter import TwitterService
 from typing import Any, List, Optional
 from uuid import UUID
+
+from backend.factory import backend
+from backend.models import QueueMessageBase, QueueMessageFilter, XCredsFilter
+from lib.logger import configure_logger
+from lib.twitter import TwitterService
+
+from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
 
@@ -154,3 +156,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
             )
             return results
+
+
+tweet_task = TweetTask()
