@@ -1,11 +1,14 @@
 import uuid
-from backend.factory import backend
-from backend.models import KeyFilter, Profile, ProfileFilter
-from fastapi import Header, HTTPException, Query
-from lib.logger import configure_logger
 from typing import Optional
 
-# Configure module logger
+from fastapi import Depends, Header, HTTPException, Query
+
+from backend.factory import backend
+from backend.models import KeyFilter, Profile, ProfileFilter
+from config import config
+from lib.logger import configure_logger
+
+# Configure logger
 logger = configure_logger(__name__)
 
 
@@ -51,14 +54,24 @@ async def get_profile_from_api_key(api_key: str) -> Optional[Profile]:
 
 
 async def verify_profile(
-    authorization: str = Header(None),
-    x_api_key: str = Header(None, alias="X-API-Key"),
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ) -> Profile:
     """
     Verify profile from either authorization header or X-API-Key header.
 
     Authorization header supports Bearer token format: "Bearer <token>"
     X-API-Key header supports direct API key format
+
+    Args:
+        authorization: The Authorization header value
+        x_api_key: The X-API-Key header value
+
+    Returns:
+        Profile: The verified user profile
+
+    Raises:
+        HTTPException: If authentication fails
     """
     # Check for API Key authentication first
     if x_api_key:
@@ -101,8 +114,8 @@ async def verify_profile(
 
 
 async def verify_profile_from_token(
-    token: str = Query(None, description="Bearer token for authentication"),
-    key: str = Query(None, description="API key for authentication"),
+    token: Optional[str] = Query(None, description="Bearer token for authentication"),
+    key: Optional[str] = Query(None, description="API key for authentication"),
 ) -> Profile:
     """
     Get and verify the profile of the requesting user using either a token or key parameter.
@@ -151,3 +164,35 @@ async def verify_profile_from_token(
     except Exception as e:
         logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=401, detail="Authorization failed")
+
+
+async def verify_webhook_auth(authorization: Optional[str] = Header(None)) -> None:
+    """
+    Verify webhook authentication using Bearer token.
+
+    Args:
+        authorization: The Authorization header value
+
+    Raises:
+        HTTPException: If authentication fails
+    """
+    if not authorization:
+        logger.error("Missing Authorization header for webhook")
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if not authorization.startswith("Bearer "):
+        logger.error("Invalid Authorization header format for webhook")
+        raise HTTPException(
+            status_code=401, detail="Invalid Authorization format. Use 'Bearer <token>'"
+        )
+
+    token = authorization.split(" ")[1]
+    expected_token = (
+        config.api.webhook_auth.split(" ")[1]
+        if config.api.webhook_auth.startswith("Bearer ")
+        else config.api.webhook_auth
+    )
+
+    if token != expected_token:
+        logger.error("Invalid webhook authentication token")
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
