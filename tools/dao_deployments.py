@@ -1,6 +1,9 @@
 import json
-import os
-from .bun import BunScriptRunner
+from typing import Dict, Optional, Type, Union
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from backend.factory import backend
 from backend.models import (
     UUID,
@@ -10,18 +13,15 @@ from backend.models import (
     ProposalCreate,
     TokenBase,
 )
-from config import config
-from langchain.tools import BaseTool
-from lib.hiro import HiroApi, PlatformApi, WebhookConfig
 from lib.logger import configure_logger
-from pydantic import BaseModel, Field
 from services.daos import (
     TokenServiceError,
     bind_token_to_dao,
     generate_dao_dependencies,
     generate_token_dependencies,
 )
-from typing import Dict, Optional, Type, Union
+
+from .bun import BunScriptRunner
 
 logger = configure_logger(__name__)
 
@@ -98,11 +98,6 @@ class ContractDAODeployTool(BaseTool):
                 }
 
             # get the address for the wallet based on network from config
-            network = config.network.network
-
-            hiro = HiroApi()
-            current_block_height = hiro.get_current_block_height()
-            logger.debug(f"Current block height: {current_block_height}")
 
             logger.debug(
                 f"Starting deployment with token_symbol={token_symbol}, "
@@ -256,28 +251,7 @@ class ContractDAODeployTool(BaseTool):
                     contract_type = contract["type"]
                     contract_subtype = contract["subtype"]
                     contract_txid = contract["txId"]
-                    # setup platform and create deploy hook
-                    platform = PlatformApi()
-                    chainhook = platform.create_contract_deployment_hook(
-                        txid=contract_txid,
-                        name=f"{dao_record.id}",
-                        start_block=current_block_height,
-                        network=network,
-                        expire_after_occurrence=1,
-                    )
-                    logger.debug(f"Created chainhook: {chainhook}")
-                    # create xlinkage hook for messaging contract
-                    if (
-                        contract_type == "EXTENSIONS"
-                        and contract_subtype == "MESSAGING"
-                    ):
-                        chainhook = platform.create_dao_x_linkage_hook(
-                            contract_identifier=contract_address,
-                            method="send",
-                            name=f"{dao_record.id}",
-                            start_block=current_block_height,
-                            network=network,
-                        )
+
                     # if its an extension, add to db
                     if contract_type == "EXTENSIONS":
                         logger.debug(f"Creating extension for {contract_name}")
@@ -317,7 +291,7 @@ class ContractDAODeployTool(BaseTool):
                             )
                             # Add error handling
                             if not proposal_result:
-                                logger.error(f"Failed to create bootstrap proposal")
+                                logger.error("Failed to create bootstrap proposal")
                                 return {
                                     "output": "",
                                     "error": "Failed to create bootstrap proposal",
@@ -375,7 +349,9 @@ class ContractDAODeployTool(BaseTool):
                         }
                     # call tool to construct dao
                     logger.debug(f"Base DAO contract: {base_dao_contract["address"]}")
-                    logger.debug(f"Bootstrap proposal contract: {bootstrap_proposal_contract["address"]}")
+                    logger.debug(
+                        f"Bootstrap proposal contract: {bootstrap_proposal_contract["address"]}"
+                    )
                     construct_result = BunScriptRunner.bun_run(
                         self.wallet_id,
                         "stacks-contracts",
@@ -383,11 +359,17 @@ class ContractDAODeployTool(BaseTool):
                         base_dao_contract["address"],
                         bootstrap_proposal_contract["address"],
                     )
-                    logger.debug(f"DAO construction result type: {type(construct_result)}")
-                    logger.debug(f"DAO construction result content: {construct_result}")    
+                    logger.debug(
+                        f"DAO construction result type: {type(construct_result)}"
+                    )
+                    logger.debug(f"DAO construction result content: {construct_result}")
                     if not construct_result["success"]:
-                        logger.error(f"DAO construction failed: {construct_result.get('error', 'Unknown error')}")
-                        logger.error(f"Construction output: {construct_result.get('output', 'No output')}")
+                        logger.error(
+                            f"DAO construction failed: {construct_result.get('error', 'Unknown error')}"
+                        )
+                        logger.error(
+                            f"Construction output: {construct_result.get('output', 'No output')}"
+                        )
                         return {
                             "output": construct_result["output"],
                             "error": construct_result["error"],
@@ -397,28 +379,36 @@ class ContractDAODeployTool(BaseTool):
                     try:
                         construction_data = json.loads(construct_result["output"])
                         logger.debug(f"Parsed construction data: {construction_data}")
-                        
+
                         if not construction_data["success"]:
-                            error_msg = construction_data.get("message", "Unknown construction error")
+                            error_msg = construction_data.get(
+                                "message", "Unknown construction error"
+                            )
                             error_data = construction_data.get("data", "No error data")
-                            logger.error(f"DAO construction unsuccessful: {error_msg} {error_data}")
+                            logger.error(
+                                f"DAO construction unsuccessful: {error_msg} {error_data}"
+                            )
                             return {
                                 "output": construct_result["output"],
                                 "error": error_msg + error_data,
                                 "success": False,
                             }
-                        
+
                         # Update the DAO status to indicate construction is complete
                         backend.update_dao(
-                            dao_record.id, 
+                            dao_record.id,
                             update_data=DAOBase(
                                 is_constructed=True,
-                                construction_tx_id=construction_data.get("data", {}).get("txid")
-                            )
+                                construction_tx_id=construction_data.get(
+                                    "data", {}
+                                ).get("txid"),
+                            ),
                         )
-                        
-                        logger.info(f"DAO successfully constructed with txid: {construction_data.get('data', {}).get('txid')}")
-                        
+
+                        logger.info(
+                            f"DAO successfully constructed with txid: {construction_data.get('data', {}).get('txid')}"
+                        )
+
                         # Return success with all the relevant information
                         return {
                             "output": construct_result["output"],
@@ -428,7 +418,7 @@ class ContractDAODeployTool(BaseTool):
                             "error": None,
                             "success": True,
                         }
-                        
+
                     except json.JSONDecodeError as e:
                         logger.error(f"Failed to parse construction output: {str(e)}")
                         logger.error(f"Raw output: {construct_result['output']}")
