@@ -1,7 +1,8 @@
 import os
 from dataclasses import dataclass, field
-from lib.logger import configure_logger
 from typing import List
+
+from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
@@ -84,7 +85,7 @@ class APIConfig:
     )
     hiro_api_key: str = os.getenv("HIRO_API_KEY", "")
     webhook_url: str = os.getenv("AIBTC_WEBHOOK_URL", "")
-    webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH", "Bearer 1234567890")
+    webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH_TOKEN", "Bearer 1234567890")
     lunarcrush_api_key: str = os.getenv("AIBTC_LUNARCRUSH_API_KEY", "")
     cmc_api_key: str = os.getenv("AIBTC_CMC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

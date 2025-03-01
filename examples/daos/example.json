@@ -1,0 +1,26 @@
+{
+  "name": "My DAO",
+  "mission": "Our mission statement",
+  "description": "Detailed description of the DAO",
+  "extensions": [
+    {
+      "type": "extension_type",
+      "contract_principal": "optional_contract_principal",
+      "tx_id": "optional_transaction_id"
+    }
+  ],
+  "token": {
+    "name": "My Token",
+    "symbol": "MTK",
+    "decimals": 6,
+    "description": "Token description",
+    "max_supply": "1000000",
+    "uri": "https://example.com/token.json",
+    "tx_id": "optional_transaction_id",
+    "contract_principal": "optional_contract_principal",
+    "image_url": "https://example.com/image.png",
+    "x_url": "https://x.com/mydao",
+    "telegram_url": "https://t.me/mydao",
+    "website_url": "https://mydao.com"
+  }
+}
