@@ -17,3 +17,6 @@ langgraph==0.2.66
 python-telegram-bot==21.9
 python-dotenv==1.0.1
 cachetools==5.5.1
+pgvector==0.3.6
+vecs==0.4.5
+langchain_text_splitters==0.2.1

@@ -1,11 +1,13 @@
 """Base workflow functionality."""
 
 import json
+from typing import Any, Dict, Generic, TypeVar
+
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import Graph
+
 from lib.logger import configure_logger
-from typing import Any, Dict, Generic, TypeVar
 
 logger = configure_logger(__name__)
 

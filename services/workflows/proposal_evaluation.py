@@ -1,13 +1,11 @@
 """Proposal evaluation workflow."""
 
-import os
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
-from backend.factory import backend
 from backend.models import UUID, Profile
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow

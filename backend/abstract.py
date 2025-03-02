@@ -92,6 +92,81 @@ class AbstractBackend(ABC):
     def upload_file(self, file_path: str, file: bytes) -> str:
         pass
 
+    # ----------- VECTOR STORE -----------
+    @abstractmethod
+    def get_vector_collection(self, collection_name: str) -> Any:
+        """Get a vector collection by name.
+
+        Args:
+            collection_name: The name of the vector collection
+
+        Returns:
+            The vector collection object
+        """
+        pass
+
+    @abstractmethod
+    async def add_vectors(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+        metadata: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[str]:
+        """Add vectors to a collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            documents: List of documents containing text (page_content) to embed
+            metadata: Optional list of metadata dictionaries for each document
+
+        Returns:
+            List of IDs for the added vectors
+        """
+        pass
+
+    @abstractmethod
+    async def query_vectors(
+        self, collection_name: str, query_text: str, limit: int = 4
+    ) -> List[Dict[str, Any]]:
+        """Query vectors in a collection by similarity.
+
+        Args:
+            collection_name: The name of the vector collection
+            query_text: The text to find similar vectors for
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents with their metadata
+        """
+        pass
+
+    @abstractmethod
+    def create_vector_collection(
+        self, collection_name: str, dimensions: int = 1536
+    ) -> Any:
+        """Create a new vector collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            dimensions: The dimensions of the vectors to store
+
+        Returns:
+            The created vector collection object
+        """
+        pass
+
+    @abstractmethod
+    def delete_vector_collection(self, collection_name: str) -> bool:
+        """Delete a vector collection.
+
+        Args:
+            collection_name: The name of the vector collection
+
+        Returns:
+            True if successfully deleted, False otherwise
+        """
+        pass
+
     # ----------- SECRETS -----------
     # @abstractmethod
     # def create_secret(self, new_secret: SecretBase) -> Secret:

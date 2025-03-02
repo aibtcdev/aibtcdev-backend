@@ -1,15 +1,16 @@
 """Tweet analysis workflow."""
 
-import os
-from backend.factory import backend
-from backend.models import QueueMessageCreate, QueueMessageFilter, TweetType, XTweetBase
+from typing import Dict, Optional, TypedDict
+
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
-from lib.logger import configure_logger
 from pydantic import BaseModel, Field
+
+from backend.factory import backend
+from backend.models import QueueMessageFilter, TweetType
+from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
 from tools.dao_deployments import ContractDAODeployInput
-from typing import Dict, Optional, TypedDict
 
 logger = configure_logger(__name__)
 

@@ -1,7 +1,8 @@
 import time
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+import vecs
 from sqlalchemy import Column, DateTime, Engine, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.declarative import declarative_base
@@ -149,11 +150,219 @@ class SupabaseBackend(AbstractBackend):
         self.bucket_name = kwargs.get("bucket_name")
         self.Session = sessionmaker(bind=self.sqlalchemy_engine)
 
+        # Initialize vecs client for vector operations
+        db_connection_string = kwargs.get("db_connection_string")
+        self.vecs_client = (
+            vecs.create_client(db_connection_string) if db_connection_string else None
+        )
+        self._vector_collections = {}
+
         try:
             with self.sqlalchemy_engine.connect() as connection:
                 logger.info("SQLAlchemy connection successful!")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
+
+    # ---------------------------------------------------------------
+    # VECTOR STORE OPERATIONS
+    # ---------------------------------------------------------------
+    def get_vector_collection(self, collection_name: str) -> Any:
+        """Get a vector collection by name."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        if collection_name not in self._vector_collections:
+            self._vector_collections[collection_name] = self.vecs_client.get_collection(
+                name=collection_name
+            )
+        return self._vector_collections[collection_name]
+
+    async def add_vectors(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+        metadata: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[str]:
+        """Add vectors to a collection."""
+        collection = self.get_vector_collection(collection_name)
+
+        if metadata is None:
+            metadata = [{} for _ in documents]
+
+        # Extract embeddings and texts
+        texts = [doc.get("page_content", "") for doc in documents]
+        embeddings = [doc.get("embedding") for doc in documents]
+
+        # Ensure all documents have embeddings
+        if not all(embeddings):
+            raise ValueError(
+                "All documents must have embeddings to be added to the vector store"
+            )
+
+        # Create record IDs - using UUIDs
+        record_ids = [str(uuid.uuid4()) for _ in documents]
+
+        # Prepare records for upsert - use embeddings instead of text
+        # Also include the original text in the metadata for retrieval
+        records = []
+        for i in range(len(texts)):
+            # Add the original text to the metadata
+            enhanced_metadata = metadata[i].copy()
+            enhanced_metadata["text"] = texts[i]  # Store the original text in metadata
+
+            # Create the record tuple (id, embedding, metadata)
+            records.append((record_ids[i], embeddings[i], enhanced_metadata))
+
+        try:
+            # Upsert records
+            collection.upsert(records=records)
+            logger.info(f"Added {len(records)} vectors to collection {collection_name}")
+            return record_ids
+        except Exception as e:
+            logger.error(
+                f"Failed to add vectors to collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    async def query_vectors(
+        self, collection_name: str, query_text: str, limit: int = 4, embeddings=None
+    ) -> List[Dict[str, Any]]:
+        """Query vectors in a collection by similarity.
+
+        Args:
+            collection_name: Name of the collection to query
+            query_text: Text to search for
+            limit: Maximum number of results to return
+            embeddings: Embeddings model to use for encoding the query
+
+        Returns:
+            List of matching documents with metadata
+        """
+        if embeddings is None:
+            raise ValueError("Embeddings model must be provided to query vector store")
+
+        collection = self.get_vector_collection(collection_name)
+
+        try:
+            # Generate embedding for the query text
+            query_embedding = embeddings.embed_query(query_text)
+
+            # Query similar vectors using the embedding
+            results = collection.query(
+                data=query_embedding,
+                limit=limit,
+                include_metadata=True,
+                include_value=True,
+                measure="cosine_distance",
+            )
+
+            # Format results
+            documents = []
+            for result in results:
+                # The structure depends on what was included in the query
+                if len(result) >= 2:  # We have at least ID and metadata
+                    # Get the metadata (last element in the tuple)
+                    metadata = result[-1] if isinstance(result[-1], dict) else {}
+
+                    # Extract the original text from metadata if available
+                    page_content = metadata.get("text", "")
+
+                    # Remove the text from metadata to avoid duplication
+                    metadata_copy = metadata.copy()
+                    if "text" in metadata_copy:
+                        del metadata_copy["text"]
+
+                    doc = {
+                        "id": result[0],
+                        "page_content": page_content,
+                        "metadata": metadata_copy,
+                    }
+                else:
+                    # Fallback if we only have the ID
+                    doc = {
+                        "id": result[0],
+                        "page_content": "",
+                        "metadata": {},
+                    }
+
+                documents.append(doc)
+
+            logger.info(
+                f"Found {len(documents)} relevant documents for query in {collection_name}"
+            )
+            return documents
+        except Exception as e:
+            logger.error(
+                f"Failed to query vectors in collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    def create_vector_collection(
+        self, collection_name: str, dimensions: int = 1536
+    ) -> Any:
+        """Create a new vector collection."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            collection = self.vecs_client.create_collection(
+                name=collection_name, dimension=dimensions
+            )
+            self._vector_collections[collection_name] = collection
+            logger.info(f"Created vector collection: {collection_name}")
+            return collection
+        except Exception as e:
+            logger.error(
+                f"Failed to create vector collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    def create_vector_index(
+        self,
+        collection_name: str,
+        method: str = "hnsw",
+        measure: str = "cosine_distance",
+    ) -> bool:
+        """Create an index on a vector collection for faster queries.
+
+        Args:
+            collection_name: Name of the collection to index
+            method: Index method ('auto', 'hnsw', or 'ivfflat')
+            measure: Distance measure ('cosine_distance', 'l2_distance', 'max_inner_product')
+
+        Returns:
+            bool: True if index was created successfully
+        """
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            collection = self.get_vector_collection(collection_name)
+            collection.create_index(method=method, measure=measure)
+            logger.info(f"Created index on vector collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to create index on vector collection {collection_name}: {str(e)}"
+            )
+            return False
+
+    def delete_vector_collection(self, collection_name: str) -> bool:
+        """Delete a vector collection."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            self.vecs_client.delete_collection(name=collection_name)
+            if collection_name in self._vector_collections:
+                del self._vector_collections[collection_name]
+            logger.info(f"Deleted vector collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to delete vector collection {collection_name}: {str(e)}"
+            )
+            return False
 
     # ---------------------------------------------------------------
     # HELPER FUNCTIONS
