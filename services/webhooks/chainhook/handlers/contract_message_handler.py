@@ -58,15 +58,10 @@ class ContractMessageHandler(ChainhookEventHandler):
         if len(args) > 1 and isinstance(args[1], str):
             should_process = args[1].lower().strip('"').replace('\\"', "") == "true"
 
-        if not should_process:
-            self.logger.info(
-                f"Skipping transaction as args[1] is not 'true': {args[1] if len(args) > 1 else 'missing'}"
-            )
-
         return (
             tx_kind_type == "ContractCall"
             and tx_method == "send"
-            and tx_success is False
+            and tx_success is True
             and should_process
         )
 
