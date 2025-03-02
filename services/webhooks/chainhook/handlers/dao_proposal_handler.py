@@ -4,7 +4,15 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import DAOFilter, QueueMessageCreate, WalletTokenFilter
+from backend.models import (
+    ContractStatus,
+    DAOFilter,
+    ExtensionFilter,
+    ProposalCreate,
+    ProposalFilter,
+    QueueMessageCreate,
+    WalletTokenFilter,
+)
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
@@ -77,19 +85,33 @@ class DAOProposalHandler(ChainhookEventHandler):
         Returns:
             Optional[Dict]: The DAO data if found, None otherwise
         """
-        # Try to find the DAO with this contract as its action proposal contract
-        daos = backend.list_daos(
-            filters=DAOFilter(action_proposals_contract=contract_identifier)
+        # Find extensions with this contract principal
+        extensions = backend.list_extensions(
+            filters=ExtensionFilter(
+                contract_principal=contract_identifier,
+                type="action_proposals",  # Assuming this is the type for action proposal extensions
+            )
         )
 
-        if daos:
-            self.logger.info(
-                f"Found DAO for contract {contract_identifier}: {daos[0].name}"
+        if not extensions:
+            self.logger.warning(
+                f"No extensions found for contract {contract_identifier}"
             )
-            return daos[0].model_dump()
+            return None
 
-        self.logger.warning(f"No DAO found for contract {contract_identifier}")
-        return None
+        # Get the DAO for the first matching extension
+        dao_id = extensions[0].dao_id
+        if not dao_id:
+            self.logger.warning(f"Extension found but no DAO ID associated with it")
+            return None
+
+        dao = backend.get_dao(dao_id)
+        if not dao:
+            self.logger.warning(f"No DAO found with ID {dao_id}")
+            return None
+
+        self.logger.info(f"Found DAO for contract {contract_identifier}: {dao.name}")
+        return dao.model_dump()
 
     def _get_proposal_id_from_events(self, events: List[Event]) -> Optional[int]:
         """Extract the proposal ID from transaction events.
@@ -186,6 +208,35 @@ class DAOProposalHandler(ChainhookEventHandler):
             f"Processing new proposal {proposal_id} for DAO {dao_data['name']} "
             f"(contract: {contract_identifier})"
         )
+
+        # Check if the proposal already exists in the database
+        existing_proposals = backend.list_proposals(
+            filters=ProposalFilter(
+                dao_id=dao_data["id"],
+                contract_principal=contract_identifier,
+                proposal_id=proposal_id,
+            )
+        )
+
+        if not existing_proposals:
+            # Create a new proposal record in the database
+            proposal_title = f"Proposal #{proposal_id}"
+            proposal = backend.create_proposal(
+                ProposalCreate(
+                    dao_id=dao_data["id"],
+                    title=proposal_title,
+                    description=f"On-chain proposal {proposal_id} for {dao_data['name']}",
+                    contract_principal=contract_identifier,
+                    tx_id=tx_id,
+                    proposal_id=proposal_id,
+                    status=ContractStatus.DEPLOYED,  # Since it's already on-chain
+                )
+            )
+            self.logger.info(f"Created new proposal record in database: {proposal.id}")
+        else:
+            self.logger.info(
+                f"Proposal already exists in database: {existing_proposals[0].id}"
+            )
 
         # Get agents holding governance tokens for this DAO
         agents = self._get_agent_token_holders(dao_data["id"])

@@ -110,11 +110,11 @@ class BuyEventHandler(ChainhookEventHandler):
                 self.logger.info(
                     f"Found {len(ft_transfer_events)} FTTransferEvent events in transaction {tx_id}"
                 )
-
+                self.logger.info(f"FTTransferEvent events: {ft_transfer_events}")
                 for event in ft_transfer_events:
                     # Extract token info from event data
                     event_data = event.data
-                    token_asset = event_data.get("asset_identifier")
+                    token_asset = event_data.get("asset_identifier").split("::")[0]
                     amount = event_data.get("amount")
                     recipient = event_data.get("recipient")
 

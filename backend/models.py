@@ -282,6 +282,7 @@ class ProposalBase(CustomBaseModel):
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
+    proposal_id: Optional[int] = None  # On-chain proposal ID
 
 
 class ProposalCreate(ProposalBase):
@@ -502,6 +503,8 @@ class ProfileFilter(CustomBaseModel):
 class ProposalFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
+    proposal_id: Optional[int] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -530,6 +533,7 @@ class TokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+    contract_principal: Optional[str] = None
     status: Optional[ContractStatus] = None
 
 

@@ -1141,6 +1141,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", filters.proposal_id)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -1372,6 +1376,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("symbol", filters.symbol)
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
         response = query.execute()
         data = response.data or []
         return [Token(**row) for row in data]

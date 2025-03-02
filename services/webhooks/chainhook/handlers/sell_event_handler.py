@@ -109,7 +109,7 @@ class SellEventHandler(ChainhookEventHandler):
                 for event in ft_transfer_events:
                     # Extract token info from event data
                     event_data = event.data
-                    token_asset = event_data.get("asset_identifier")
+                    token_asset = event_data.get("asset_identifier").split("::")[0]
                     amount = event_data.get("amount")
                     sender_address = event_data.get("sender")
 
