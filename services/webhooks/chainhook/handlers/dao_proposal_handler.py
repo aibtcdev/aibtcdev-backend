@@ -1,12 +1,11 @@
 """Handler for capturing new DAO action proposals."""
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
 from backend.models import (
     ContractStatus,
-    DAOFilter,
     ExtensionFilter,
     ProposalCreate,
     ProposalFilter,
@@ -102,7 +101,7 @@ class DAOProposalHandler(ChainhookEventHandler):
         # Get the DAO for the first matching extension
         dao_id = extensions[0].dao_id
         if not dao_id:
-            self.logger.warning(f"Extension found but no DAO ID associated with it")
+            self.logger.warning("Extension found but no DAO ID associated with it")
             return None
 
         dao = backend.get_dao(dao_id)

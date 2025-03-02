@@ -1,6 +1,6 @@
 """Chainhook webhook handler implementation."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
@@ -8,9 +8,8 @@ from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandl
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,
 )
-from services.webhooks.chainhook.handlers.transaction_status_handler import (
-    TransactionStatusHandler,
-)
+from services.webhooks.chainhook.handlers.dao_proposal_handler import DAOProposalHandler
+from services.webhooks.chainhook.handlers.sell_event_handler import SellEventHandler
 from services.webhooks.chainhook.models import ChainHookData
 
 
@@ -26,11 +25,10 @@ class ChainhookHandler(WebhookHandler):
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
         self.handlers = [
-            # Add specialized handlers here
             ContractMessageHandler(),
-            TransactionStatusHandler(),
             BuyEventHandler(),
-            # Add more handlers as needed for different event types
+            SellEventHandler(),
+            DAOProposalHandler(),
         ]
 
     async def handle(self, parsed_data: ChainHookData) -> Dict[str, Any]:

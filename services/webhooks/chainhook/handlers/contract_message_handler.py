@@ -1,14 +1,9 @@
 """Handler for capturing messages from contracts."""
 
-from typing import Any, Dict
-
 from backend.factory import backend
 from backend.models import ExtensionFilter, QueueMessageCreate
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
-from services.webhooks.chainhook.models import (
-    TransactionMetadata,
-    TransactionWithReceipt,
-)
+from services.webhooks.chainhook.models import TransactionWithReceipt
 
 
 class ContractMessageHandler(ChainhookEventHandler):

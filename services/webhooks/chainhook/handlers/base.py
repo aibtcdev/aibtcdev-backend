@@ -1,14 +1,10 @@
 """Base class for Chainhook event handlers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from lib.logger import configure_logger
-from services.webhooks.chainhook.models import (
-    ChainHookData,
-    TransactionMetadata,
-    TransactionWithReceipt,
-)
+from services.webhooks.chainhook.models import TransactionWithReceipt
 
 
 class ChainhookEventHandler(ABC):

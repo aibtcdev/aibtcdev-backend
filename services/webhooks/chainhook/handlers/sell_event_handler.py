@@ -1,18 +1,12 @@
 """Handler for capturing sell function events from contracts."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
-from uuid import UUID
 
 from backend.factory import backend
 from backend.models import TokenFilter, WalletFilter, WalletTokenBase, WalletTokenFilter
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
-from services.webhooks.chainhook.models import (
-    Event,
-    TransactionMetadata,
-    TransactionWithReceipt,
-)
+from services.webhooks.chainhook.models import TransactionWithReceipt
 
 
 class SellEventHandler(ChainhookEventHandler):

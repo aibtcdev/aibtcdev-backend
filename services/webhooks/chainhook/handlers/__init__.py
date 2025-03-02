@@ -10,15 +10,11 @@ from services.webhooks.chainhook.handlers.contract_message_handler import (
 )
 from services.webhooks.chainhook.handlers.dao_proposal_handler import DAOProposalHandler
 from services.webhooks.chainhook.handlers.sell_event_handler import SellEventHandler
-from services.webhooks.chainhook.handlers.transaction_status_handler import (
-    TransactionStatusHandler,
-)
 
 __all__ = [
     "ChainhookEventHandler",
-    "TransactionStatusHandler",
     "ContractMessageHandler",
     "BuyEventHandler",
-    "DAOProposalHandler",
     "SellEventHandler",
+    "DAOProposalHandler",
 ]
