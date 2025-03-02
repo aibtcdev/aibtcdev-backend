@@ -1,6 +1,6 @@
 """Handler for DAO webhook payloads."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
@@ -56,10 +56,18 @@ class DAOHandler(WebhookHandler):
                 for ext_data in parsed_data.extensions:
                     extension_create = ExtensionCreate(
                         dao_id=dao.id,
-                        type=ext_data.type,
+                        type=(
+                            f"{ext_data.type}_{ext_data.subtype}"
+                            if ext_data.subtype
+                            else ext_data.type
+                        ),
                         contract_principal=ext_data.contract_principal,
                         tx_id=ext_data.tx_id,
-                        status=ContractStatus.DEPLOYED,
+                        status=(
+                            ContractStatus.DEPLOYED
+                            if ext_data.success
+                            else ContractStatus.FAILED
+                        ),
                     )
 
                     extension = self.db.create_extension(extension_create)
