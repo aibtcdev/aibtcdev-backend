@@ -69,7 +69,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             # Parse the message body
             try:
-                tweet_text = message.message.get("body")
+                tweet_text = message.message.get("message")
                 if not tweet_text:
                     return TweetProcessingResult(
                         success=False,
