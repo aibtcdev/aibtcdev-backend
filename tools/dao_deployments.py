@@ -214,8 +214,7 @@ class ContractDAODeployTool(BaseTool):
                         contract
                         for contract in contracts
                         if (
-                            contract["category"] == "TOKEN"
-                            and contract["subcategory"] == "DAO"
+                            contract["type"] == "TOKEN" and contract["subtype"] == "DAO"
                         )
                     ),
                     None,
@@ -320,8 +319,8 @@ class ContractDAODeployTool(BaseTool):
                         (
                             contract
                             for contract in contracts
-                            if contract["category"] == "BASE"
-                            and contract["subcategory"] == "DAO"
+                            if contract["type"] == "BASE"
+                            and contract["subtype"] == "DAO"
                         ),
                         None,
                     )
@@ -329,7 +328,7 @@ class ContractDAODeployTool(BaseTool):
                         (
                             contract
                             for contract in contracts
-                            if contract["subcategory"] == "BOOTSTRAP_INIT"
+                            if contract["subtype"] == "BOOTSTRAP_INIT"
                         ),
                         None,
                     )
