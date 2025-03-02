@@ -1436,6 +1436,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("agent_id", str(filters.agent_id))
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
         response = query.execute()
         data = response.data or []
         return [XCreds(**row) for row in data]
