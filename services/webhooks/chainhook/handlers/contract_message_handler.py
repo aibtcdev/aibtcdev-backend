@@ -52,10 +52,22 @@ class ContractMessageHandler(ChainhookEventHandler):
         # Access success directly from TransactionMetadata
         tx_success = tx_metadata.success
 
+        # Check if args[1] is "true"
+        args = tx_data_content.get("args", [0, "false"])
+        should_process = False
+        if len(args) > 1 and isinstance(args[1], str):
+            should_process = args[1].lower().strip('"').replace('\\"', "") == "true"
+
+        if not should_process:
+            self.logger.info(
+                f"Skipping transaction as args[1] is not 'true': {args[1] if len(args) > 1 else 'missing'}"
+            )
+
         return (
             tx_kind_type == "ContractCall"
             and tx_method == "send"
             and tx_success is False
+            and should_process
         )
 
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
@@ -81,7 +93,7 @@ class ContractMessageHandler(ChainhookEventHandler):
             )
             return
 
-        args = tx_data_content.get("args", [0])
+        args = tx_data_content.get("args", [0, "false"])
         contract_identifier = tx_data_content.get("contract_identifier")
 
         self.logger.info(f"Processing message from sender {sender} with args: {args}")
@@ -92,11 +104,19 @@ class ContractMessageHandler(ChainhookEventHandler):
         )
 
         if extension:
+            # Strip quotes from the message if it's a string
+            message = args[0]
+            if isinstance(message, str):
+                # Handle both regular quotes and escaped quotes
+                message = message.strip('"')
+                # Remove escaped quotes (\") if present
+                message = message.replace('\\"', "")
+
             # Create a new queue message for the DAO
             new_message = backend.create_queue_message(
                 QueueMessageCreate(
                     type="tweet",
-                    message={"message": args[0]},
+                    message={"message": message},
                     dao_id=extension[0].dao_id,
                 )
             )
