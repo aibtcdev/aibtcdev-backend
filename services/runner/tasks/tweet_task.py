@@ -36,6 +36,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.error(f"No Twitter credentials found for DAO {dao_id}")
                 return False
 
+            logger.info(f"Initializing Twitter service with credentials: {creds}")
             # Initialize Twitter service with the credentials
             self.twitter_service = TwitterService(
                 consumer_key=creds[0].consumer_key,
@@ -51,7 +52,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.error(f"Error initializing Twitter service: {str(e)}", exc_info=True)
             return False
 
-    async def _process_tweet_message(self, message: Any) -> TweetProcessingResult:
+    async def _process_tweet_message(
+        self, message: QueueMessageBase
+    ) -> TweetProcessingResult:
         """Process a single tweet message."""
         try:
             if not message.dao_id:
