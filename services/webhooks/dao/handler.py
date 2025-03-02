@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import DAOCreate, ExtensionCreate, TokenCreate
+from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCreate
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import DAOWebhookPayload, DAOWebhookResponse
@@ -43,6 +43,8 @@ class DAOHandler(WebhookHandler):
                 name=parsed_data.name,
                 mission=parsed_data.mission,
                 description=parsed_data.description,
+                is_deployed=True,
+                is_broadcasted=True,
             )
 
             dao = self.db.create_dao(dao_create)
@@ -57,6 +59,7 @@ class DAOHandler(WebhookHandler):
                         type=ext_data.type,
                         contract_principal=ext_data.contract_principal,
                         tx_id=ext_data.tx_id,
+                        status=ContractStatus.DEPLOYED,
                     )
 
                     extension = self.db.create_extension(extension_create)
@@ -80,6 +83,7 @@ class DAOHandler(WebhookHandler):
                     x_url=parsed_data.token.x_url,
                     telegram_url=parsed_data.token.telegram_url,
                     website_url=parsed_data.token.website_url,
+                    status=ContractStatus.DEPLOYED,
                 )
 
                 token = self.db.create_token(token_create)
