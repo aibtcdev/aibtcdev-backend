@@ -1,15 +1,16 @@
 import asyncio
 import datetime
-from backend.factory import backend
-from backend.models import JobBase, JobFilter, Profile, StepCreate, StepFilter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from lib.logger import configure_logger
-from lib.persona import generate_persona, generate_static_persona
-from services.workflows import execute_langgraph_stream
-from tools.tools_factory import initialize_tools
 from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from backend.factory import backend
+from backend.models import JobBase, JobFilter, Profile, StepCreate, StepFilter
+from lib.logger import configure_logger
+from lib.persona import generate_persona, generate_static_persona
+from services.workflows import execute_preplan_react_stream
+from tools.tools_factory import initialize_tools
 
 logger = configure_logger(__name__)
 
@@ -152,13 +153,23 @@ class ChatProcessor:
             tools_map = initialize_tools(self.profile, agent_id=self.agent_id)
             first_end = True
 
-            async for result in execute_langgraph_stream(
+            logger.info(
+                f"Starting preplan_react_stream with input: {self.input_str[:50]}..."
+            )
+            result_count = 0
+
+            async for result in execute_preplan_react_stream(
                 self.history, self.input_str, persona, tools_map
             ):
+                result_count += 1
+                logger.debug(
+                    f"Received result #{result_count} of type: {result.get('type')}"
+                )
                 await self._process_stream_result(result, first_end)
                 if result.get("type") == "end" and first_end:
                     first_end = False
 
+            logger.info(f"Processed {result_count} results from preplan_react_stream")
             await self._finalize_processing()
 
         except Exception as e:
@@ -172,6 +183,8 @@ class ChatProcessor:
         self, result: Dict[str, Any], first_end: bool
     ) -> None:
         """Process a single stream result."""
+        logger.debug(f"Processing stream result type: {result.get('type')}")
+
         if result.get("type") == "end":
             if not first_end:
                 await self.output_queue.put(
@@ -211,7 +224,13 @@ class ChatProcessor:
                 )
                 await self.output_queue.put(stream_message)
             elif result.get("type") == "result":
+                logger.info(
+                    f"Received result message with content length: {len(result.get('content', ''))}"
+                )
                 self.current_message["content"] = result.get("content", "")
+
+                # Create step in the database
+                logger.info(f"Creating step in database for job {self.job_id}")
                 backend.create_step(
                     new_step=StepCreate(
                         profile_id=self.profile.id,
@@ -225,6 +244,8 @@ class ChatProcessor:
                         tool_output=None,
                     )
                 )
+
+                # Add to results
                 self.results.append(
                     {
                         **self.current_message,
@@ -234,6 +255,9 @@ class ChatProcessor:
 
     async def _finalize_processing(self) -> None:
         """Finalize the chat processing and update the job."""
+        logger.info(f"Finalizing processing for job {self.job_id}")
+        logger.debug(f"Results count: {len(self.results)}")
+
         final_result = None
         for result in reversed(self.results):
             if result.get("content"):
@@ -241,7 +265,9 @@ class ChatProcessor:
                 break
 
         final_result_content = final_result.get("content", "") if final_result else ""
+        logger.info(f"Final result content length: {len(final_result_content)}")
 
+        logger.info(f"Updating job {self.job_id} in database")
         backend.update_job(
             job_id=self.job_id,
             update_data=JobBase(

@@ -1,3 +1,8 @@
+from typing import Any, Dict, Optional, Type
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from backend.factory import backend
 from backend.models import (
     UUID,
@@ -7,9 +12,6 @@ from backend.models import (
     TaskFilter,
     TokenFilter,
 )
-from langchain.tools import BaseTool
-from pydantic import BaseModel, Field
-from typing import Any, Dict, Optional, Type
 
 
 class AddScheduledTaskInput(BaseModel):
@@ -131,14 +133,8 @@ class GetDAOListTool(BaseTool):
                 tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
                 token = tokens[0] if tokens else None
 
-                # Get the single DEX extension for this DAO
-                extensions = backend.list_extensions(
-                    filters=ExtensionFilter(dao_id=dao.id)
-                )
-                dex = next((ext for ext in extensions if ext.type == "dex"), None)
-
-                # Combine data for this DAO
-                dao_info = {"dao": dao, "token": token, "dex": dex}
+                # Combine data for this DAO (without DEX extension)
+                dao_info = {"dao": dao, "token": token}
                 dao_data.append(dao_info)
 
             return {"dao_data": dao_data}

@@ -7,6 +7,11 @@ from services.workflows.base import (
     StateType,
     StreamingError,
 )
+from services.workflows.preplan_react import (
+    PreplanLangGraphService,
+    PreplanReactWorkflow,
+    execute_preplan_react_stream,
+)
 from services.workflows.react import (
     LangGraphService,
     MessageContent,
@@ -41,4 +46,7 @@ __all__ = [
     "VectorLangGraphService",
     "VectorReactWorkflow",
     "execute_vector_langgraph_stream",
+    "PreplanLangGraphService",
+    "PreplanReactWorkflow",
+    "execute_preplan_react_stream",
 ]
