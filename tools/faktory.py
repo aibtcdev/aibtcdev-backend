@@ -427,3 +427,43 @@ class FaktoryGetTokenTool(BaseTool):
     ) -> str:
         """Execute the tool to get token information (async)."""
         return self._deploy(dex_contract_id)
+
+
+class FaktoryGetSbtcBaseInput(BaseModel):
+    """Base input schema for Faktory sBTC faucet that doesn't require parameters."""
+
+    pass
+
+
+class FaktoryGetSbtcTool(BaseTool):
+    name: str = "faktory_get_sbtc"
+    description: str = "Request testnet sBTC from the Faktory faucet"
+    args_schema: Type[BaseModel] = FaktoryGetSbtcBaseInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(self, **kwargs) -> str:
+        """Execute the tool to request testnet sBTC from the faucet."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "get-faktory-sbtc.ts",
+        )
+
+    def _run(self, **kwargs) -> str:
+        """Execute the tool to request testnet sBTC from the faucet."""
+        return self._deploy()
+
+    async def _arun(self, **kwargs) -> str:
+        """Execute the tool to request testnet sBTC from the faucet (async)."""
+        return self._deploy()

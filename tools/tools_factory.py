@@ -54,6 +54,7 @@ from .database import (
     UpdateScheduledTaskTool,
 )
 from .faktory import (
+    FaktoryGetSbtcTool,
     FaktoryExecuteBuyTool,
     FaktoryExecuteSellTool,
     FaktoryGetBuyQuoteTool,
@@ -205,6 +206,7 @@ def initialize_tools(
         "database_list_scheduled_tasks": ListScheduledTasksTool(profile_id, agent_id),
         "database_update_scheduled_task": UpdateScheduledTaskTool(profile_id, agent_id),
         "database_delete_scheduled_task": DeleteScheduledTaskTool(profile_id, agent_id),
+        "faktory_get_sbtc": FaktoryGetSbtcTool(),
         "faktory_exec_buy": FaktoryExecuteBuyTool(wallet_id),
         "faktory_exec_sell": FaktoryExecuteSellTool(wallet_id),
         # "faktory_get_buy_quote": FaktoryGetBuyQuoteTool(wallet_id),
