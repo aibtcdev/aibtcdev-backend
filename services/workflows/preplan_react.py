@@ -5,34 +5,17 @@ the ReAct workflow to complete the task according to the plan.
 """
 
 import asyncio
-import re
-from dataclasses import dataclass
-from typing import (
-    Annotated,
-    Any,
-    AsyncGenerator,
-    Dict,
-    List,
-    Optional,
-    TypedDict,
-    Union,
-)
+from typing import Annotated, Any, AsyncGenerator, Dict, List, Optional, TypedDict
 
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.outputs import LLMResult
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
-from services.workflows.react import (
-    MessageContent,
-    MessageProcessor,
-    StreamingCallbackHandler,
-)
+from services.workflows.base import BaseWorkflow, ExecutionError
+from services.workflows.react import MessageProcessor, StreamingCallbackHandler
 
 logger = configure_logger(__name__)
 
