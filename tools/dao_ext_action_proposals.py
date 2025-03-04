@@ -85,7 +85,7 @@ class ProposeActionAddResourceTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -192,7 +192,7 @@ class ProposeActionAllowAssetTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -287,7 +287,7 @@ class ProposeActionSendMessageTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -382,7 +382,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -477,7 +477,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -572,7 +572,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -683,7 +683,7 @@ class VoteOnActionProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -777,7 +777,7 @@ class ConcludeActionProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -869,7 +869,7 @@ class GetLiquidSupplyTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -957,7 +957,7 @@ class GetProposalTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -1051,7 +1051,7 @@ class GetTotalVotesTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -1137,7 +1137,7 @@ class GetVotingConfigurationTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
@@ -1227,7 +1227,7 @@ class GetVotingPowerTool(BaseTool):
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
+                result.get("message", f"Unknown error at bun_run: {result}"),
                 result.get("data")
             )
             
