@@ -17,14 +17,14 @@ class BunScriptRunner:
 
     @staticmethod
     def bun_run(
-        wallet_id: UUID, contract_name: str, script_name: str, *args: str
+        wallet_id: UUID, script_path: str, script_name: str, *args: str
     ) -> Dict[str, Union[str, bool, None]]:
         """
         Run a TypeScript script using Bun with specified parameters.
 
         Args:
             wallet_id: The wallet id to use for script execution
-            contract_name: Name of the contract directory containing the script
+            script_path: Path of the directory containing the script
             script_name: Name of the TypeScript script to run
             *args: Additional arguments to pass to the script
 
@@ -42,11 +42,14 @@ class BunScriptRunner:
         env = os.environ.copy()
         env["ACCOUNT_INDEX"] = "0"
         env["MNEMONIC"] = mnemonic
+
+        # Construct the full script path, handling both direct paths and nested paths
+        script_path = f"{BunScriptRunner.SCRIPT_DIR}/{script_path}/{script_name}"
         # Construct command with script path
         command: List[str] = [
             "bun",
             "run",
-            f"{BunScriptRunner.SCRIPT_DIR}/{contract_name}/{script_name}",
+            script_path,
         ]
         command.extend(args)
 
@@ -59,6 +62,7 @@ class BunScriptRunner:
                 cwd=BunScriptRunner.WORKING_DIR,
                 env=env,
             )
+            # return successful output
             return {"output": result.stdout.strip(), "error": None, "success": True}
         except subprocess.CalledProcessError as e:
             return {
