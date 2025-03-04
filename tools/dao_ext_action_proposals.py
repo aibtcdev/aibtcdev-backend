@@ -78,7 +78,7 @@ class ProposeActionAddResourceTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-add-resource.ts",
             *args
         )
@@ -185,7 +185,7 @@ class ProposeActionAllowAssetTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-allow-asset.ts",
             *args
         )
@@ -280,7 +280,7 @@ class ProposeActionSendMessageTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-send-message.ts",
             *args
         )
@@ -375,7 +375,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-account-holder.ts",
             *args
         )
@@ -470,7 +470,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-amount.ts",
             *args
         )
@@ -565,7 +565,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-period.ts",
             *args
         )
@@ -676,7 +676,7 @@ class VoteOnActionProposalTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "vote-on-proposal.ts",
             *args
         )
@@ -770,7 +770,7 @@ class ConcludeActionProposalTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "conclude-proposal.ts",
             *args
         )
@@ -862,7 +862,7 @@ class GetLiquidSupplyTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/read-only",
             "get-liquid-supply.ts",
             *args
         )
@@ -950,7 +950,7 @@ class GetProposalTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/read-only",
             "get-proposal.ts",
             *args
         )
@@ -1044,7 +1044,7 @@ class GetTotalVotesTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/read-only",
             "get-total-votes.ts",
             *args
         )
@@ -1130,7 +1130,7 @@ class GetVotingConfigurationTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-configuration.ts",
             *args
         )
@@ -1220,7 +1220,7 @@ class GetVotingPowerTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-power.ts",
             *args
         )
@@ -1300,7 +1300,7 @@ class ProposeActionToggleResourceTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals",
+            "aibtc-dao/extensions/action-proposals/public",
             "propose-action-toggle-resource-by-name.ts",
             *args
         )
