@@ -283,6 +283,15 @@ class ProposalBase(CustomBaseModel):
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     proposal_id: Optional[int] = None  # On-chain proposal ID
+    # New fields from payload
+    action: Optional[str] = None
+    caller: Optional[str] = None
+    creator: Optional[str] = None
+    created_at_block: Optional[int] = None
+    end_block: Optional[int] = None
+    start_block: Optional[int] = None
+    liquid_tokens: Optional[str] = None  # Using string to handle large numbers
+    parameters: Optional[str] = None  # Hex encoded parameters
 
 
 class ProposalCreate(ProposalBase):

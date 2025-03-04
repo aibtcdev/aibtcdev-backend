@@ -59,11 +59,9 @@ class DAOProposalHandler(ChainhookEventHandler):
             )
             return False
 
-        # Check if the method name is related to proposing actions
+        # Check if the method name is exactly "propose-action"
         tx_method = tx_data_content.get("method", "")
-        is_proposal_method = (
-            "propose" in tx_method.lower() and "action" in tx_method.lower()
-        )
+        is_proposal_method = tx_method == "propose-action"
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
@@ -88,7 +86,6 @@ class DAOProposalHandler(ChainhookEventHandler):
         extensions = backend.list_extensions(
             filters=ExtensionFilter(
                 contract_principal=contract_identifier,
-                type="action_proposals",  # Assuming this is the type for action proposal extensions
             )
         )
 
@@ -112,28 +109,46 @@ class DAOProposalHandler(ChainhookEventHandler):
         self.logger.info(f"Found DAO for contract {contract_identifier}: {dao.name}")
         return dao.model_dump()
 
-    def _get_proposal_id_from_events(self, events: List[Event]) -> Optional[int]:
-        """Extract the proposal ID from transaction events.
+    def _get_proposal_id_from_events(self, events: List[Event]) -> Optional[Dict]:
+        """Extract the proposal information from transaction events.
 
         Args:
             events: List of events from the transaction
 
         Returns:
-            Optional[int]: The proposal ID if found, None otherwise
+            Optional[Dict]: Dictionary containing proposal information if found, None otherwise
         """
         for event in events:
-            # Find events related to proposal creation
-            if "proposal" in event.type.lower() and hasattr(event, "data"):
+            # Find print events with proposal information
+            if (
+                event.type == "SmartContractEvent"
+                and hasattr(event, "data")
+                and event.data.get("topic") == "print"
+            ):
                 event_data = event.data
-                # Look for fields that might contain the proposal ID
-                for field_name, value in event_data.items():
-                    if "id" in field_name.lower() or "proposal" in field_name.lower():
-                        try:
-                            return int(value)
-                        except (ValueError, TypeError):
-                            continue
+                value = event_data.get("value", {})
 
-        self.logger.warning("Could not find proposal ID in transaction events")
+                if value.get("notification") == "propose-action":
+                    payload = value.get("payload", {})
+                    if not payload:
+                        self.logger.warning("Empty payload in proposal event")
+                        return None
+
+                    return {
+                        "proposal_id": payload.get("proposalId"),
+                        "action": payload.get("action"),
+                        "caller": payload.get("caller"),
+                        "creator": payload.get("creator"),
+                        "created_at_block": payload.get("createdAt"),
+                        "end_block": payload.get("endBlock"),
+                        "start_block": payload.get("startBlock"),
+                        "liquid_tokens": str(
+                            payload.get("liquidTokens")
+                        ),  # Convert to string to handle large numbers
+                        "parameters": payload.get("parameters"),
+                    }
+
+        self.logger.warning("Could not find proposal information in transaction events")
         return None
 
     def _get_agent_token_holders(self, dao_id: UUID) -> List[Dict]:
@@ -198,13 +213,15 @@ class DAOProposalHandler(ChainhookEventHandler):
 
         # Get the proposal ID from the transaction events
         events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
-        proposal_id = self._get_proposal_id_from_events(events)
-        if proposal_id is None:
-            self.logger.warning("Could not determine proposal ID from transaction")
+        proposal_info = self._get_proposal_id_from_events(events)
+        if proposal_info is None:
+            self.logger.warning(
+                "Could not determine proposal information from transaction"
+            )
             return
 
         self.logger.info(
-            f"Processing new proposal {proposal_id} for DAO {dao_data['name']} "
+            f"Processing new proposal {proposal_info['proposal_id']} for DAO {dao_data['name']} "
             f"(contract: {contract_identifier})"
         )
 
@@ -213,22 +230,31 @@ class DAOProposalHandler(ChainhookEventHandler):
             filters=ProposalFilter(
                 dao_id=dao_data["id"],
                 contract_principal=contract_identifier,
-                proposal_id=proposal_id,
+                proposal_id=proposal_info["proposal_id"],
             )
         )
 
         if not existing_proposals:
             # Create a new proposal record in the database
-            proposal_title = f"Proposal #{proposal_id}"
+            proposal_title = f"Proposal #{proposal_info['proposal_id']}"
             proposal = backend.create_proposal(
                 ProposalCreate(
                     dao_id=dao_data["id"],
                     title=proposal_title,
-                    description=f"On-chain proposal {proposal_id} for {dao_data['name']}",
+                    description=f"On-chain proposal {proposal_info['proposal_id']} for {dao_data['name']}",
                     contract_principal=contract_identifier,
                     tx_id=tx_id,
-                    proposal_id=proposal_id,
+                    proposal_id=proposal_info["proposal_id"],
                     status=ContractStatus.DEPLOYED,  # Since it's already on-chain
+                    # Add new fields from payload
+                    action=proposal_info["action"],
+                    caller=proposal_info["caller"],
+                    creator=proposal_info["creator"],
+                    created_at_block=proposal_info["created_at_block"],
+                    end_block=proposal_info["end_block"],
+                    start_block=proposal_info["start_block"],
+                    liquid_tokens=proposal_info["liquid_tokens"],
+                    parameters=proposal_info["parameters"],
                 )
             )
             self.logger.info(f"Created new proposal record in database: {proposal.id}")
@@ -252,7 +278,7 @@ class DAOProposalHandler(ChainhookEventHandler):
                     type="dao_proposal_vote",
                     message={
                         "action_proposals_contract": contract_identifier,
-                        "proposal_id": proposal_id,
+                        "proposal_id": proposal_info["proposal_id"],
                         "dao_name": dao_data["name"],
                         "tx_id": tx_id,
                     },
@@ -262,5 +288,5 @@ class DAOProposalHandler(ChainhookEventHandler):
             )
             self.logger.info(
                 f"Created queue message for agent {agent['agent_id']} "
-                f"to evaluate proposal {proposal_id}: {new_message.id}"
+                f"to evaluate proposal {proposal_info['proposal_id']}: {new_message.id}"
             )
