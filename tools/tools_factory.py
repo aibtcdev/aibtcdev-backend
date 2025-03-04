@@ -54,11 +54,11 @@ from .database import (
     UpdateScheduledTaskTool,
 )
 from .faktory import (
-    FaktoryGetSbtcTool,
     FaktoryExecuteBuyTool,
     FaktoryExecuteSellTool,
     FaktoryGetBuyQuoteTool,
     FaktoryGetDaoTokensTool,
+    FaktoryGetSbtcTool,
     FaktoryGetSellQuoteTool,
     FaktoryGetTokenTool,
 )
@@ -234,8 +234,8 @@ def initialize_tools(
         "stacks_get_address_balance": STXGetPrincipalAddressBalanceTool(),
         "telegram_send_nofication_to_user": SendTelegramNotificationTool(profile_id),
         "twitter_post_tweet": TwitterPostTweetTool(agent_id),
-        "velar_get_token_price_history": VelarGetPriceHistory(),
-        "velar_get_tokens": VelarGetTokens(),
+        # "velar_get_token_price_history": VelarGetPriceHistory(),
+        # "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(wallet_id),
         "wallet_get_my_address": WalletGetMyAddress(wallet_id),
         "wallet_fund_my_wallet_faucet": WalletFundMyWalletFaucet(wallet_id),
