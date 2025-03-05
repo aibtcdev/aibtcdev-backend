@@ -92,28 +92,58 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         Returns:
             List[Dict]: List of agents with their wallet IDs
         """
-        # Get wallet-token pairs for this DAO
-        wallet_tokens = backend.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
+        # Use the specialized backend method for getting agents with DAO tokens
+        agents_with_tokens_dto = backend.get_agents_with_dao_tokens(dao_id)
 
-        if not wallet_tokens:
-            self.logger.info(f"No wallet tokens found for DAO {dao_id}")
-            return []
+        if not agents_with_tokens_dto:
+            self.logger.info(
+                f"No agents with tokens found for DAO {dao_id} using specialized method"
+            )
 
-        # Get unique wallet IDs
-        wallet_ids = list(set(wt.wallet_id for wt in wallet_tokens))
+            # Fallback to the original implementation for debugging
+            # Get wallet-token pairs for this DAO
+            wallet_tokens = backend.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
 
-        # Get agents that own these wallets
-        agents_with_tokens = []
-        for wallet_id in wallet_ids:
-            wallet = backend.get_wallet(wallet_id)
-            if wallet and wallet.agent_id:
-                agents_with_tokens.append(
-                    {"agent_id": wallet.agent_id, "wallet_id": wallet_id}
-                )
+            if not wallet_tokens:
+                self.logger.info(f"No wallet tokens found for DAO {dao_id}")
+                return []
+
+            # Get unique wallet IDs
+            wallet_ids = list(set(wt.wallet_id for wt in wallet_tokens))
+            self.logger.info(
+                f"Found {len(wallet_ids)} unique wallet IDs for DAO {dao_id}"
+            )
+
+            # Get agents that own these wallets
+            agents_with_tokens = []
+            for wallet_id in wallet_ids:
+                wallet = backend.get_wallet(wallet_id)
+                if wallet:
+                    self.logger.info(
+                        f"Found wallet {wallet_id}, agent_id: {wallet.agent_id}"
+                    )
+                    if wallet.agent_id:
+                        agents_with_tokens.append(
+                            {"agent_id": wallet.agent_id, "wallet_id": wallet_id}
+                        )
+                else:
+                    self.logger.warning(f"Wallet {wallet_id} not found in database")
+
+            if not agents_with_tokens:
+                self.logger.warning(f"No agents found holding tokens for DAO {dao_id}")
+
+            return agents_with_tokens
+
+        # Convert DTOs to the expected format
+        agents_with_tokens = [
+            {"agent_id": dto.agent_id, "wallet_id": dto.wallet_id}
+            for dto in agents_with_tokens_dto
+        ]
 
         self.logger.info(
-            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id}"
+            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id} using specialized method"
         )
+
         return agents_with_tokens
 
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
