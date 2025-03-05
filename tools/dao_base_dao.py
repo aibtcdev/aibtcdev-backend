@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class IsExtensionInput(BaseModel):
@@ -45,24 +44,15 @@ class IsExtensionTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check extension status."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             base_dao_contract,
             extension_contract,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id, "aibtc-dao/base-dao/read-only", "is-extension.ts", *args
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully checked extension status", result.get("output")
         )
 
     def _run(
@@ -121,24 +111,15 @@ class ExecutedAtTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check proposal execution block."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             base_dao_contract,
             proposal_contract,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id, "aibtc-dao/base-dao/read-only", "executed-at.ts", *args
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully retrieved execution block", result.get("output")
         )
 
     def _run(

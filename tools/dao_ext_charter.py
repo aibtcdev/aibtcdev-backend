@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class GetCurrentDaoCharterInput(BaseModel):
@@ -39,24 +38,15 @@ class GetCurrentDaoCharterTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get current charter."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [dao_charter_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/dao-charter/read-only",
             "get-current-dao-charter.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully retrieved charter", result.get("output")
         )
 
     def _run(
@@ -107,24 +97,15 @@ class GetCurrentDaoCharterVersionTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get current charter version."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [dao_charter_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/dao-charter/read-only",
             "get-current-dao-charter-version.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully retrieved charter version", result.get("output")
         )
 
     def _run(
@@ -177,24 +158,15 @@ class GetDaoCharterTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get specific charter version."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [dao_charter_contract, str(version)]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/dao-charter/read-only",
             "get-dao-charter.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully retrieved DAO charter version", result.get("output")
         )
 
     def _run(

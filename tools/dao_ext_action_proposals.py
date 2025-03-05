@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class DaoBaseInput(BaseModel):
@@ -64,7 +63,7 @@ class ProposeActionAddResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose adding a resource."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -77,20 +76,11 @@ class ProposeActionAddResourceTool(BaseTool):
         if resource_url:
             args.append(resource_url)
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-add-resource.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -180,7 +170,7 @@ class ProposeActionAllowAssetTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -188,20 +178,11 @@ class ProposeActionAllowAssetTool(BaseTool):
             token_contract,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-allow-asset.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -282,7 +263,7 @@ class ProposeActionSendMessageTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -290,20 +271,11 @@ class ProposeActionSendMessageTool(BaseTool):
             message,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-send-message.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -375,7 +347,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new account holder."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -383,20 +355,11 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             account_holder,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-account-holder.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -474,7 +437,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal amount."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -482,20 +445,11 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             str(withdrawal_amount),
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-amount.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -573,7 +527,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal period."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -581,20 +535,11 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             str(withdrawal_period),
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-period.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -684,7 +629,7 @@ class VoteOnActionProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -692,20 +637,11 @@ class VoteOnActionProposalTool(BaseTool):
             str(vote).lower(),
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "vote-on-proposal.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -768,7 +704,7 @@ class ConcludeActionProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to conclude an action proposal."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -776,20 +712,11 @@ class ConcludeActionProposalTool(BaseTool):
             action_proposal_contract,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "conclude-proposal.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -852,31 +779,18 @@ class GetLiquidSupplyTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get the liquid supply."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
             str(stacks_block_height),
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-liquid-supply.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -931,33 +845,18 @@ class GetProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get proposal data."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
             str(proposal_id),
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-proposal.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", f"Unknown error at bun_run: {result}"),
-                result.get("output"),
-            )
-
-        return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to toggle resource"),
-            result.get("output"),
         )
 
     def _run(
@@ -1014,11 +913,7 @@ class GetTotalVotesTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get total votes."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -1026,22 +921,11 @@ class GetTotalVotesTool(BaseTool):
             voter_address,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-total-votes.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", f"Unknown error at bun_run: {result}"),
-                result.get("output"),
-            )
-
-        return DAOToolResponse.success_response(
-            result.get("message", "Successfully voted on proposal"),
-            result.get("output"),
         )
 
     def _run(
@@ -1100,32 +984,17 @@ class GetVotingConfigurationTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get voting configuration."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-configuration.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", f"Unknown error at bun_run: {result}"),
-                result.get("output"),
-            )
-
-        return DAOToolResponse.success_response(
-            result.get("message", "Successfully concluded proposal"),
-            result.get("output"),
         )
 
     def _run(
@@ -1184,11 +1053,7 @@ class GetVotingPowerTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get voting power."""
         if self.wallet_id is None:
-            return {
-                "success": False,
-                "error": "Wallet ID is required",
-                "output": "",
-            }
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -1196,22 +1061,11 @@ class GetVotingPowerTool(BaseTool):
             voter_address,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-power.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", f"Unknown error at bun_run: {result}"),
-                result.get("output"),
-            )
-
-        return DAOToolResponse.success_response(
-            result.get("message", "Successfully retrieved liquid supply"),
-            result.get("output"),
         )
 
     def _run(
@@ -1263,7 +1117,7 @@ class ProposeActionToggleResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             action_proposals_contract,
@@ -1271,22 +1125,11 @@ class ProposeActionToggleResourceTool(BaseTool):
             resource_name,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-toggle-resource-by-name.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", f"Unknown error at bun_run: {result}"),
-                result.get("output"),
-            )
-
-        return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to toggle resource"),
-            result.get("output"),
         )
 
     def _run(

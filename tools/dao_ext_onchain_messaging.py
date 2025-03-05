@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class SendMessageInput(BaseModel):
@@ -41,27 +40,18 @@ class SendMessageTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to send a message."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
             messaging_contract,
             message,
         ]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/onchain-messaging/public",
-            "send.ts",
+            "send-message.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Message sent successfully", result.get("output")
         )
 
     def _run(

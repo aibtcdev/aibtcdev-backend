@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class GetAccountTermsInput(BaseModel):
@@ -39,24 +38,15 @@ class GetAccountTermsTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get account terms."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [bank_account_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/bank-account/read-only",
             "get-account-terms.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully retrieved account terms", result.get("output")
         )
 
     def _run(
@@ -109,27 +99,15 @@ class DepositSTXTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to deposit STX."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
-        args = [
-            bank_account_contract,
-            str(amount),
-        ]
+        args = [bank_account_contract, str(amount)]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/bank-account/public",
             "deposit-stx.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully deposited STX", result.get("output")
         )
 
     def _run(
@@ -182,24 +160,15 @@ class WithdrawSTXTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to withdraw STX."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [bank_account_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/bank-account/public",
             "withdraw-stx.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully withdrew STX", result.get("output")
         )
 
     def _run(

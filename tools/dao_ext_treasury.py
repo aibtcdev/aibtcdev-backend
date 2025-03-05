@@ -5,7 +5,6 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.bun import BunScriptRunner
-from tools.dao_base import DAOToolResponse
 
 
 class GetAllowedAssetInput(BaseModel):
@@ -45,24 +44,15 @@ class GetAllowedAssetTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check if asset is allowed."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [treasury_contract, asset_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/treasury/read-only",
             "get-allowed-asset.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed treasury operation", result.get("output")
         )
 
     def _run(
@@ -121,24 +111,15 @@ class IsAllowedAssetTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to check if asset is allowed."""
         if self.wallet_id is None:
-            return DAOToolResponse.error_response("Wallet ID is required")
+            return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [treasury_contract, asset_contract]
 
-        result = BunScriptRunner.bun_run(
+        return BunScriptRunner.bun_run(
             self.wallet_id,
             "aibtc-dao/extensions/treasury/read-only",
             "is-allowed-asset.ts",
             *args,
-        )
-
-        if not result["success"]:
-            return DAOToolResponse.error_response(
-                result.get("error", "Unknown error"), result.get("output")
-            )
-
-        return DAOToolResponse.success_response(
-            "Successfully processed treasury operation", result.get("output")
         )
 
     def _run(
