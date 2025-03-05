@@ -42,7 +42,10 @@ class GetAllowedAssetTool(BaseTool):
         args = [treasury_contract, asset_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "treasury", "get-allowed-asset.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/treasury/read-only",
+            "get-allowed-asset.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -107,7 +110,10 @@ class IsAllowedAssetTool(BaseTool):
         args = [treasury_contract, asset_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "treasury", "is-allowed-asset.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/treasury/read-only",
+            "is-allowed-asset.ts",
+            *args,
         )
 
         if not result["success"]:

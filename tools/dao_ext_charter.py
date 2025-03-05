@@ -40,7 +40,10 @@ class GetCurrentDaoCharterTool(BaseTool):
         args = [dao_charter_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "dao-charter", "get-current-dao-charter.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/dao-charter/read-only",
+            "get-current-dao-charter.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -101,7 +104,10 @@ class GetCurrentDaoCharterVersionTool(BaseTool):
         args = [dao_charter_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "dao-charter", "get-current-dao-charter-version.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/dao-charter/read-only",
+            "get-current-dao-charter-version.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -164,7 +170,10 @@ class GetDaoCharterTool(BaseTool):
         args = [dao_charter_contract, str(version)]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "dao-charter", "get-dao-charter.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/dao-charter/read-only",
+            "get-dao-charter.ts",
+            *args,
         )
 
         if not result["success"]:

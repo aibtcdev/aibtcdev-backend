@@ -47,7 +47,10 @@ class SendMessageTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "onchain-messaging", "send.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/onchain-messaging/public",
+            "send.ts",
+            *args,
         )
 
         if not result["success"]:

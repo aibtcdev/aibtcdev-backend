@@ -44,7 +44,10 @@ class GetInvoiceTool(BaseTool):
         args = [payments_invoices_contract, str(invoice_index)]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "payments-invoices", "get-invoice.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/payments-invoices/read-only",
+            "get-invoice.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -111,7 +114,10 @@ class GetResourceTool(BaseTool):
         args = [payments_invoices_contract, str(resource_index)]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "payments-invoices", "get-resource.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/payments-invoices/read-only",
+            "get-resource.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -178,7 +184,10 @@ class GetResourceByNameTool(BaseTool):
         args = [payments_invoices_contract, resource_name]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "payments-invoices", "get-resource-by-name.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/payments-invoices/read-only",
+            "get-resource-by-name.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -252,7 +261,10 @@ class PayInvoiceTool(BaseTool):
             args.append(memo)
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "payments-invoices", "pay-invoice.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/payments-invoices/public",
+            "pay-invoice.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -329,7 +341,7 @@ class PayInvoiceByResourceNameTool(BaseTool):
 
         result = BunScriptRunner.bun_run(
             self.wallet_id,
-            "payments-invoices",
+            "aibtc-dao/extensions/payments-invoices/public",
             "pay-invoice-by-resource-name.ts",
             *args,
         )

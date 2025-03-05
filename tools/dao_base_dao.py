@@ -47,7 +47,7 @@ class IsExtensionTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "base-dao", "is-extension.ts", *args
+            self.wallet_id, "aibtc-dao/base-dao/read-only", "is-extension.ts", *args
         )
 
         if not result["success"]:
@@ -117,7 +117,7 @@ class ExecutedAtTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "base-dao", "executed-at.ts", *args
+            self.wallet_id, "aibtc-dao/base-dao/read-only", "executed-at.ts", *args
         )
 
         if not result["success"]:

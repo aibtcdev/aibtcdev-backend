@@ -42,7 +42,10 @@ class GetAccountTermsTool(BaseTool):
         args = [bank_account_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "bank-account", "get-account-terms.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/bank-account/read-only",
+            "get-account-terms.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -110,7 +113,10 @@ class DepositSTXTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "bank-account", "deposit-stx.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/bank-account/public",
+            "deposit-stx.ts",
+            *args,
         )
 
         if not result["success"]:
@@ -175,7 +181,10 @@ class WithdrawSTXTool(BaseTool):
         args = [bank_account_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id, "bank-account", "withdraw-stx.ts", *args
+            self.wallet_id,
+            "aibtc-dao/extensions/bank-account/public",
+            "withdraw-stx.ts",
+            *args,
         )
 
         if not result["success"]:
