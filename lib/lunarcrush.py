@@ -6,7 +6,7 @@ class LunarCrushApi:
 
     def __init__(self):
         """Initialize the LunarCrush API client."""
-        self.base_url = "https://lunarcrush.com/api/v2"
+        self.base_url = config.api.lunarcrush_base_url
         self.api_key = config.api.lunarcrush_api_key
 
     def _get(self, endpoint: str, params: dict = None) -> dict:

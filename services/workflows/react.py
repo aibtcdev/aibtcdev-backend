@@ -2,15 +2,6 @@
 
 import asyncio
 from dataclasses import dataclass
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.outputs import LLMResult
-from langchain_openai import ChatOpenAI
-from langgraph.graph import END, START, StateGraph
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
 from typing import (
     Annotated,
     Any,
@@ -21,6 +12,17 @@ from typing import (
     TypedDict,
     Union,
 )
+
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import LLMResult
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+
+from lib.logger import configure_logger
+from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
 
 logger = configure_logger(__name__)
 
@@ -73,9 +75,18 @@ class MessageProcessor:
         """Convert filtered content to LangChain message format."""
         messages = []
 
+        # Add decisiveness instruction
+        decisiveness_instruction = "Be decisive and action-oriented. When the user requests something, execute it immediately without asking for confirmation."
+
         if persona:
-            logger.debug(f"Adding persona message: {persona[:100]}...")
-            messages.append(SystemMessage(content=persona))
+            logger.debug(f"Adding persona message with decisiveness instruction")
+            # Add the decisiveness instruction to the persona
+            enhanced_persona = f"{persona}\n\n{decisiveness_instruction}"
+            messages.append(SystemMessage(content=enhanced_persona))
+        else:
+            # If no persona, add the decisiveness instruction as a system message
+            logger.debug("Adding decisiveness instruction as system message")
+            messages.append(SystemMessage(content=decisiveness_instruction))
 
         for msg in filtered_content:
             if msg["role"] == "user":

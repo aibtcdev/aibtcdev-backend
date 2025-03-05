@@ -1,11 +1,13 @@
 """Tweet generator workflow."""
 
+from typing import Dict, TypedDict
+
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
-from lib.logger import configure_logger
 from pydantic import BaseModel, Field
+
+from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
-from typing import Dict, TypedDict
 
 logger = configure_logger(__name__)
 

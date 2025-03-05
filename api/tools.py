@@ -1,85 +1,134 @@
-import datetime
-import json
-from backend.models import Profile
-from fastapi import APIRouter, HTTPException
-from lib.logger import configure_logger
+from typing import Dict, List, Optional, Union
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.responses import JSONResponse
-from tools.tools_factory import initialize_tools
-from typing import Dict, List
+
+from lib.logger import configure_logger
+from lib.tools import Tool, get_available_tools
 
 # Configure logger
 logger = configure_logger(__name__)
 
 # Create the router
-router = APIRouter(prefix="/tools")
+router = APIRouter(prefix="/tools", tags=["tools"])
 
-# Initialize tools for tool endpoint
+# Initialize tools once at startup
+available_tools = get_available_tools()
 
 
-def get_avaliable_tools() -> List[Dict[str, str]]:
+@router.get("/available", response_model=List[Tool])
+async def get_tools(
+    request: Request,
+    category: Optional[str] = Query(None, description="Filter tools by category"),
+) -> JSONResponse:
     """Get a list of available tools and their descriptions.
 
-    Returns:
-        List[Dict[str, str]]: List of dictionaries containing tool information
+    This endpoint returns all available tools in the system. Tools can be optionally
+    filtered by category.
 
-    Raises:
-        HTTPException: If there's an error initializing or fetching tools
-    """
-    logger.debug("Fetching available tools")
-    try:
-        tools_map = initialize_tools(None, None)
-
-        tools_array = []
-        for tool_name, tool_instance in tools_map.items():
-            schema = tool_instance.args_schema
-            if schema:
-                # Extract category from tool name (part before first underscore)
-                category = tool_name.split("_")[0].upper()
-
-                # Extract tool name from tool instance
-                tool_name_parts = tool_instance.name.split("_")[1:]
-                tool_name = " ".join(tool_name_parts).title()
-
-                # Create a tool object with required fields
-                tool = {
-                    "id": tool_instance.name,  # Using tool_name as id for now
-                    "name": tool_name,
-                    "description": tool_instance.description or "",
-                    "category": category,
-                    "parameters": json.dumps(
-                        {
-                            name: {
-                                "description": field.description,
-                                "type": str(field.annotation),
-                            }
-                            for name, field in schema.model_fields.items()
-                        }
-                    ),
-                }
-                tools_array.append(tool)
-
-        return tools_array
-    except Exception as e:
-        logger.error(f"Error fetching available tools: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
-
-
-avaliable_tools = get_avaliable_tools()
-
-
-@router.get("/available")
-async def get_tools() -> List[Dict[str, str]]:
-    """Get a list of available tools and their descriptions.
+    Args:
+        request: The FastAPI request object
+        category: Optional category to filter tools by
 
     Returns:
-        List[Dict[str, str]]: List of dictionaries containing tool information
+        JSONResponse: List of available tools matching the criteria
 
     Raises:
-        HTTPException: If there's an error initializing or fetching tools
+        HTTPException: If there's an error serving the tools
     """
-    logger.debug("Fetching available tools")
     try:
-        return JSONResponse(content=avaliable_tools)
+        # Log the request
+        logger.info(
+            f"Tools request received from {request.client.host if request.client else 'unknown'}"
+        )
+
+        # Filter by category if provided
+        if category:
+            filtered_tools = [
+                tool
+                for tool in available_tools
+                if tool.category.upper() == category.upper()
+            ]
+            logger.debug(
+                f"Filtered tools by category '{category}', found {len(filtered_tools)} tools"
+            )
+            return JSONResponse(content=[tool.model_dump() for tool in filtered_tools])
+
+        # Return all tools
+        logger.debug(f"Returning all {len(available_tools)} available tools")
+        return JSONResponse(content=[tool.model_dump() for tool in available_tools])
     except Exception as e:
-        logger.error(f"Error fetching available tools: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+        logger.error("Failed to serve available tools", exc_info=e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to serve available tools: {str(e)}"
+        )
+
+
+@router.get("/categories", response_model=List[str])
+async def get_tool_categories() -> JSONResponse:
+    """Get a list of all available tool categories.
+
+    Returns:
+        JSONResponse: List of unique tool categories
+
+    Raises:
+        HTTPException: If there's an error serving the categories
+    """
+    try:
+        # Extract unique categories
+        categories = sorted(list(set(tool.category for tool in available_tools)))
+        logger.debug(f"Returning {len(categories)} tool categories")
+        return JSONResponse(content=categories)
+    except Exception as e:
+        logger.error("Failed to serve tool categories", exc_info=e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to serve tool categories: {str(e)}"
+        )
+
+
+@router.get("/search", response_model=List[Tool])
+async def search_tools(
+    query: str = Query(..., description="Search query for tool name or description"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+) -> JSONResponse:
+    """Search for tools by name or description.
+
+    This endpoint allows searching for tools based on a text query that matches
+    against tool names and descriptions. Results can be optionally filtered by category.
+
+    Args:
+        query: Search query to match against tool names and descriptions
+        category: Optional category to filter results by
+
+    Returns:
+        JSONResponse: List of tools matching the search criteria
+
+    Raises:
+        HTTPException: If there's an error processing the search
+    """
+    try:
+        # Convert query to lowercase for case-insensitive matching
+        query = query.lower()
+        logger.debug(f"Searching tools with query: '{query}', category: '{category}'")
+
+        # Filter tools by query and category
+        filtered_tools = []
+        for tool in available_tools:
+            # Check if tool matches the query
+            if (
+                query in tool.name.lower()
+                or query in tool.description.lower()
+                or query in tool.id.lower()
+            ):
+
+                # If category is specified, check if tool belongs to that category
+                if category and tool.category.upper() != category.upper():
+                    continue
+
+                filtered_tools.append(tool)
+
+        logger.debug(f"Found {len(filtered_tools)} tools matching search criteria")
+        return JSONResponse(content=[tool.model_dump() for tool in filtered_tools])
+    except Exception as e:
+        logger.error(f"Failed to search tools with query '{query}'", exc_info=e)
+        raise HTTPException(status_code=500, detail=f"Failed to search tools: {str(e)}")

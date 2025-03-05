@@ -1,12 +1,23 @@
 import time
 import uuid
-from .abstract import AbstractBackend
-from .models import (
+from typing import Any, Dict, List, Optional
+
+import vecs
+from sqlalchemy import Column, DateTime, Engine, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from supabase import Client
+
+from backend.abstract import AbstractBackend
+from backend.models import (
     DAO,
+    UUID,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentWithWalletTokenDTO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -18,6 +29,10 @@ from .models import (
     JobBase,
     JobCreate,
     JobFilter,
+    Key,
+    KeyBase,
+    KeyCreate,
+    KeyFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -58,6 +73,10 @@ from .models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletToken,
+    WalletTokenBase,
+    WalletTokenCreate,
+    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -71,14 +90,7 @@ from .models import (
     XUserCreate,
     XUserFilter,
 )
-from backend.models import UUID
 from lib.logger import configure_logger
-from sqlalchemy import Column, DateTime, Engine, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from supabase import Client
-from typing import List, Optional
 
 logger = configure_logger(__name__)
 
@@ -138,11 +150,219 @@ class SupabaseBackend(AbstractBackend):
         self.bucket_name = kwargs.get("bucket_name")
         self.Session = sessionmaker(bind=self.sqlalchemy_engine)
 
+        # Initialize vecs client for vector operations
+        db_connection_string = kwargs.get("db_connection_string")
+        self.vecs_client = (
+            vecs.create_client(db_connection_string) if db_connection_string else None
+        )
+        self._vector_collections = {}
+
         try:
             with self.sqlalchemy_engine.connect() as connection:
                 logger.info("SQLAlchemy connection successful!")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
+
+    # ---------------------------------------------------------------
+    # VECTOR STORE OPERATIONS
+    # ---------------------------------------------------------------
+    def get_vector_collection(self, collection_name: str) -> Any:
+        """Get a vector collection by name."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        if collection_name not in self._vector_collections:
+            self._vector_collections[collection_name] = self.vecs_client.get_collection(
+                name=collection_name
+            )
+        return self._vector_collections[collection_name]
+
+    async def add_vectors(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+        metadata: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[str]:
+        """Add vectors to a collection."""
+        collection = self.get_vector_collection(collection_name)
+
+        if metadata is None:
+            metadata = [{} for _ in documents]
+
+        # Extract embeddings and texts
+        texts = [doc.get("page_content", "") for doc in documents]
+        embeddings = [doc.get("embedding") for doc in documents]
+
+        # Ensure all documents have embeddings
+        if not all(embeddings):
+            raise ValueError(
+                "All documents must have embeddings to be added to the vector store"
+            )
+
+        # Create record IDs - using UUIDs
+        record_ids = [str(uuid.uuid4()) for _ in documents]
+
+        # Prepare records for upsert - use embeddings instead of text
+        # Also include the original text in the metadata for retrieval
+        records = []
+        for i in range(len(texts)):
+            # Add the original text to the metadata
+            enhanced_metadata = metadata[i].copy()
+            enhanced_metadata["text"] = texts[i]  # Store the original text in metadata
+
+            # Create the record tuple (id, embedding, metadata)
+            records.append((record_ids[i], embeddings[i], enhanced_metadata))
+
+        try:
+            # Upsert records
+            collection.upsert(records=records)
+            logger.info(f"Added {len(records)} vectors to collection {collection_name}")
+            return record_ids
+        except Exception as e:
+            logger.error(
+                f"Failed to add vectors to collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    async def query_vectors(
+        self, collection_name: str, query_text: str, limit: int = 4, embeddings=None
+    ) -> List[Dict[str, Any]]:
+        """Query vectors in a collection by similarity.
+
+        Args:
+            collection_name: Name of the collection to query
+            query_text: Text to search for
+            limit: Maximum number of results to return
+            embeddings: Embeddings model to use for encoding the query
+
+        Returns:
+            List of matching documents with metadata
+        """
+        if embeddings is None:
+            raise ValueError("Embeddings model must be provided to query vector store")
+
+        collection = self.get_vector_collection(collection_name)
+
+        try:
+            # Generate embedding for the query text
+            query_embedding = embeddings.embed_query(query_text)
+
+            # Query similar vectors using the embedding
+            results = collection.query(
+                data=query_embedding,
+                limit=limit,
+                include_metadata=True,
+                include_value=True,
+                measure="cosine_distance",
+            )
+
+            # Format results
+            documents = []
+            for result in results:
+                # The structure depends on what was included in the query
+                if len(result) >= 2:  # We have at least ID and metadata
+                    # Get the metadata (last element in the tuple)
+                    metadata = result[-1] if isinstance(result[-1], dict) else {}
+
+                    # Extract the original text from metadata if available
+                    page_content = metadata.get("text", "")
+
+                    # Remove the text from metadata to avoid duplication
+                    metadata_copy = metadata.copy()
+                    if "text" in metadata_copy:
+                        del metadata_copy["text"]
+
+                    doc = {
+                        "id": result[0],
+                        "page_content": page_content,
+                        "metadata": metadata_copy,
+                    }
+                else:
+                    # Fallback if we only have the ID
+                    doc = {
+                        "id": result[0],
+                        "page_content": "",
+                        "metadata": {},
+                    }
+
+                documents.append(doc)
+
+            logger.info(
+                f"Found {len(documents)} relevant documents for query in {collection_name}"
+            )
+            return documents
+        except Exception as e:
+            logger.error(
+                f"Failed to query vectors in collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    def create_vector_collection(
+        self, collection_name: str, dimensions: int = 1536
+    ) -> Any:
+        """Create a new vector collection."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            collection = self.vecs_client.create_collection(
+                name=collection_name, dimension=dimensions
+            )
+            self._vector_collections[collection_name] = collection
+            logger.info(f"Created vector collection: {collection_name}")
+            return collection
+        except Exception as e:
+            logger.error(
+                f"Failed to create vector collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    def create_vector_index(
+        self,
+        collection_name: str,
+        method: str = "hnsw",
+        measure: str = "cosine_distance",
+    ) -> bool:
+        """Create an index on a vector collection for faster queries.
+
+        Args:
+            collection_name: Name of the collection to index
+            method: Index method ('auto', 'hnsw', or 'ivfflat')
+            measure: Distance measure ('cosine_distance', 'l2_distance', 'max_inner_product')
+
+        Returns:
+            bool: True if index was created successfully
+        """
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            collection = self.get_vector_collection(collection_name)
+            collection.create_index(method=method, measure=measure)
+            logger.info(f"Created index on vector collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to create index on vector collection {collection_name}: {str(e)}"
+            )
+            return False
+
+    def delete_vector_collection(self, collection_name: str) -> bool:
+        """Delete a vector collection."""
+        if not self.vecs_client:
+            raise ValueError("Vecs client not initialized")
+
+        try:
+            self.vecs_client.delete_collection(name=collection_name)
+            if collection_name in self._vector_collections:
+                del self._vector_collections[collection_name]
+            logger.info(f"Deleted vector collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to delete vector collection {collection_name}: {str(e)}"
+            )
+            return False
 
     # ---------------------------------------------------------------
     # HELPER FUNCTIONS
@@ -355,6 +575,137 @@ class SupabaseBackend(AbstractBackend):
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
+    # 1. WALLET TOKENS
+    # ----------------------------------------------------------------
+    def create_wallet_token(
+        self, new_wallet_token: "WalletTokenCreate"
+    ) -> "WalletToken":
+        payload = new_wallet_token.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("wallet_tokens").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from wallet_tokens insert.")
+        return WalletToken(**data[0])
+
+    def get_wallet_token(self, wallet_token_id: UUID) -> Optional["WalletToken"]:
+        response = (
+            self.client.table("wallet_tokens")
+            .select("*")
+            .eq("id", str(wallet_token_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return WalletToken(**response.data)
+
+    def list_wallet_tokens(
+        self, filters: Optional["WalletTokenFilter"] = None
+    ) -> List["WalletToken"]:
+        query = self.client.table("wallet_tokens").select("*")
+        if filters:
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
+            if filters.token_id is not None:
+                query = query.eq("token_id", str(filters.token_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+        response = query.execute()
+        data = response.data or []
+        return [WalletToken(**row) for row in data]
+
+    def update_wallet_token(
+        self, wallet_token_id: UUID, update_data: "WalletTokenBase"
+    ) -> Optional["WalletToken"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_wallet_token(wallet_token_id)
+        response = (
+            self.client.table("wallet_tokens")
+            .update(payload)
+            .eq("id", str(wallet_token_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return WalletToken(**updated[0])
+
+    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
+        response = (
+            self.client.table("wallet_tokens")
+            .delete()
+            .eq("id", str(wallet_token_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    def get_agents_with_dao_tokens(
+        self, dao_id: UUID
+    ) -> List["AgentWithWalletTokenDTO"]:
+        """Get all agents with wallets that hold tokens for a specific DAO using models."""
+        result = []
+
+        # Step 1: Find all wallet tokens for this DAO
+        wallet_tokens = self.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
+
+        if not wallet_tokens:
+            return []
+
+        # Get the DAO information once
+        dao = self.get_dao(dao_id)
+        if not dao:
+            logger.warning(f"DAO with ID {dao_id} not found")
+            return []
+
+        # Process each wallet token
+        for wallet_token in wallet_tokens:
+            # Step 2: Get the wallet
+            wallet = self.get_wallet(wallet_token.wallet_id)
+            if not wallet:
+                logger.warning(f"Wallet with ID {wallet_token.wallet_id} not found")
+                continue
+
+            # Skip wallets not associated with agents
+            if not wallet.agent_id:
+                continue
+
+            # Step 3: Get the agent
+            agent = self.get_agent(wallet.agent_id)
+            if not agent:
+                logger.warning(f"Agent with ID {wallet.agent_id} not found")
+                continue
+
+            # Step 4: Get the token
+            token = self.get_token(wallet_token.token_id)
+            if not token:
+                logger.warning(f"Token with ID {wallet_token.token_id} not found")
+                continue
+
+            # Step 5: Create the DTO
+            wallet_address = wallet.mainnet_address or wallet.testnet_address
+            if not wallet_address:
+                logger.warning(f"Wallet {wallet.id} has no address")
+                continue
+
+            # Add to results
+            result.append(
+                AgentWithWalletTokenDTO(
+                    agent_id=agent.id,
+                    agent_name=agent.name,
+                    wallet_id=wallet.id,
+                    wallet_address=wallet_address,
+                    token_id=token.id,
+                    token_amount=wallet_token.amount,
+                    dao_id=dao_id,
+                    dao_name=dao.name,
+                )
+            )
+
+        return result
+
+    # ----------------------------------------------------------------
     # 1. AGENTS
     # ----------------------------------------------------------------
     def create_agent(self, new_agent: "AgentCreate") -> "Agent":
@@ -451,6 +802,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("type", filters.type)
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
         response = query.execute()
         data = response.data or []
         return [Extension(**row) for row in data]
@@ -644,6 +997,57 @@ class SupabaseBackend(AbstractBackend):
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
+    # 7.5 KEYS
+    # ----------------------------------------------------------------
+    def create_key(self, new_key: "KeyCreate") -> "Key":
+        payload = new_key.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("keys").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from key insert.")
+        return Key(**data[0])
+
+    def get_key(self, key_id: UUID) -> Optional["Key"]:
+        response = (
+            self.client.table("keys")
+            .select("*")
+            .eq("id", str(key_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Key(**response.data)
+
+    def list_keys(self, filters: Optional["KeyFilter"] = None) -> List["Key"]:
+        query = self.client.table("keys").select("*")
+        if filters:
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+            if filters.is_enabled is not None:
+                query = query.eq("is_enabled", filters.is_enabled)
+        response = query.execute()
+        data = response.data or []
+        return [Key(**row) for row in data]
+
+    def update_key(self, key_id: UUID, update_data: "KeyBase") -> Optional["Key"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_key(key_id)
+        response = (
+            self.client.table("keys").update(payload).eq("id", str(key_id)).execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Key(**updated[0])
+
+    def delete_key(self, key_id: UUID) -> bool:
+        response = self.client.table("keys").delete().eq("id", str(key_id)).execute()
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
     # 8. PROFILES
     # ----------------------------------------------------------------
     def create_profile(self, new_profile: "ProfileCreate") -> "Profile":
@@ -673,10 +1077,10 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.email is not None:
                 query = query.eq("email", filters.email)
-            if filters.username is not None:
-                query = query.eq("username", filters.username)
-            if filters.discord_username is not None:
-                query = query.eq("discord_username", filters.discord_username)
+            if filters.has_dao_agent is not None:
+                query = query.eq("has_dao_agent", filters.has_dao_agent)
+            if filters.has_completed_guide is not None:
+                query = query.eq("has_completed_guide", filters.has_completed_guide)
         response = query.execute()
         data = response.data or []
         return [Profile(**row) for row in data]
@@ -737,6 +1141,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", filters.proposal_id)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -968,6 +1376,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("symbol", filters.symbol)
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
         response = query.execute()
         data = response.data or []
         return [Token(**row) for row in data]
@@ -1026,6 +1436,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("agent_id", str(filters.agent_id))
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
         response = query.execute()
         data = response.data or []
         return [XCreds(**row) for row in data]

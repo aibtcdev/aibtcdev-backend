@@ -1,8 +1,9 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 class CustomBaseModel(BaseModel):
@@ -26,6 +27,16 @@ class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
     CONVERSATION = "thread"
     INVALID = "invalid"
+
+    def __str__(self):
+        return self.value
+
+
+class QueueMessageType(str, Enum):
+    TWEET = "tweet"
+    DAO = "dao"
+    DAO_TWEET = "dao_tweet"
+    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
 
     def __str__(self):
         return self.value
@@ -57,7 +68,7 @@ class Secret(SecretBase):
 #  QUEUE MESSAGES
 #
 class QueueMessageBase(CustomBaseModel):
-    type: Optional[str] = None
+    type: Optional[QueueMessageType] = None
     message: Optional[dict] = None
     is_processed: Optional[bool] = False
     tweet_id: Optional[str] = None
@@ -108,6 +119,8 @@ class XCredsBase(CustomBaseModel):
     access_secret: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
+    username: Optional[str] = None
+    dao_id: Optional[UUID] = None
 
 
 class XCredsCreate(XCredsBase):
@@ -224,14 +237,34 @@ class Job(JobBase):
 
 
 #
+# KEYS
+#
+class KeyBase(CustomBaseModel):
+    profile_id: Optional[UUID] = None
+    is_enabled: Optional[bool] = True
+
+
+class KeyCreate(KeyBase):
+    pass
+
+
+class Key(KeyBase):
+    id: UUID
+    created_at: datetime
+
+
+class KeyFilter(CustomBaseModel):
+    profile_id: Optional[UUID] = None
+    is_enabled: Optional[bool] = None
+
+
+#
 # PROFILES
 #
 class ProfileBase(CustomBaseModel):
-    role: Optional[str] = None
     email: Optional[str] = None
-    assigned_agent_address: Optional[str] = None
-    username: Optional[str] = None
-    discord_username: Optional[str] = None
+    has_dao_agent: Optional[bool] = False
+    has_completed_guide: Optional[bool] = False
 
 
 class ProfileCreate(ProfileBase):
@@ -251,12 +284,18 @@ class ProposalBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     title: Optional[str] = None
     description: Optional[str] = None
-    code: Optional[str] = None
-    link: Optional[str] = None
-    monetary_ask: Optional[float] = None
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
+    proposal_id: Optional[int] = None  # On-chain proposal ID
+    action: Optional[str] = None
+    caller: Optional[str] = None
+    creator: Optional[str] = None
+    created_at_block: Optional[int] = None
+    end_block: Optional[int] = None
+    start_block: Optional[int] = None
+    liquid_tokens: Optional[str] = None  # Using string to handle large numbers
+    parameters: Optional[str] = None  # Hex encoded parameters
 
 
 class ProposalCreate(ProposalBase):
@@ -430,7 +469,7 @@ class WalletFilter(CustomBaseModel):
 
 
 class QueueMessageFilter(CustomBaseModel):
-    type: Optional[str] = None
+    type: Optional[QueueMessageType] = None
     is_processed: Optional[bool] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
@@ -448,6 +487,7 @@ class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
     status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
 
 
 class DAOFilter(CustomBaseModel):
@@ -469,13 +509,15 @@ class JobFilter(CustomBaseModel):
 
 class ProfileFilter(CustomBaseModel):
     email: Optional[str] = None
-    username: Optional[str] = None
-    discord_username: Optional[str] = None
+    has_dao_agent: Optional[bool] = None
+    has_completed_guide: Optional[bool] = None
 
 
 class ProposalFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
+    proposal_id: Optional[int] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -504,10 +546,12 @@ class TokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+    contract_principal: Optional[str] = None
     status: Optional[ContractStatus] = None
 
 
 class XCredsFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
 
@@ -535,3 +579,41 @@ class XTweetFilter(CustomBaseModel):
     tweet_type: Optional[TweetType] = None
     confidence_score: Optional[float] = None
     reason: Optional[str] = None
+
+
+#
+# WALLET TOKENS
+#
+class WalletTokenBase(CustomBaseModel):
+    wallet_id: UUID
+    token_id: UUID
+    dao_id: UUID  # Direct reference to the DAO for easier queries
+    amount: str  # String to handle large numbers precisely
+    updated_at: datetime = datetime.now()
+
+
+class WalletTokenCreate(WalletTokenBase):
+    pass
+
+
+class WalletToken(WalletTokenBase):
+    id: UUID
+    created_at: datetime
+
+
+class WalletTokenFilter(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    token_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+
+
+# Add this to your backend interface class to get agents by tokens
+class AgentWithWalletTokenDTO(CustomBaseModel):
+    agent_id: UUID
+    agent_name: str
+    wallet_id: UUID
+    wallet_address: str
+    token_id: UUID
+    token_amount: str
+    dao_id: UUID
+    dao_name: str

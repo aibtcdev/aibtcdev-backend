@@ -1,7 +1,8 @@
 import os
 from dataclasses import dataclass, field
-from lib.logger import configure_logger
 from typing import List
+
+from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
@@ -55,11 +56,23 @@ class SchedulerConfig:
     dao_runner_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", "30")
     )
+    dao_tweet_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_TWEET_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    dao_tweet_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_TWEET_RUNNER_INTERVAL_SECONDS", "30")
+    )
     tweet_runner_enabled: bool = (
         os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "false").lower() == "true"
     )
     tweet_runner_interval_seconds: int = int(
         os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", "30")
+    )
+    dao_proposal_vote_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_vote_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_INTERVAL_SECONDS", "60")
     )
 
 
@@ -67,9 +80,18 @@ class SchedulerConfig:
 class APIConfig:
     alex_base_url: str = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
     hiro_api_url: str = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
+    platform_base_url: str = os.getenv(
+        "AIBTC_PLATFORM_API_URL", "https://api.platform.hiro.so"
+    )
+    velar_base_url: str = os.getenv(
+        "AIBTC_VELAR_BASE_URL", "https://gateway.velar.network/"
+    )
+    lunarcrush_base_url: str = os.getenv(
+        "AIBTC_LUNARCRUSH_BASE_URL", "https://lunarcrush.com/api/v2"
+    )
     hiro_api_key: str = os.getenv("HIRO_API_KEY", "")
     webhook_url: str = os.getenv("AIBTC_WEBHOOK_URL", "")
-    webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH", "Bearer 1234567890")
+    webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH_TOKEN", "Bearer 1234567890")
     lunarcrush_api_key: str = os.getenv("AIBTC_LUNARCRUSH_API_KEY", "")
     cmc_api_key: str = os.getenv("AIBTC_CMC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

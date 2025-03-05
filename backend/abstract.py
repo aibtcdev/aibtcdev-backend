@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
+
 from backend.models import (
     DAO,
     UUID,
@@ -6,6 +8,7 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentWithWalletTokenDTO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -17,6 +20,10 @@ from backend.models import (
     JobBase,
     JobCreate,
     JobFilter,
+    Key,
+    KeyBase,
+    KeyCreate,
+    KeyFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -56,6 +63,10 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletToken,
+    WalletTokenBase,
+    WalletTokenCreate,
+    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -69,7 +80,6 @@ from backend.models import (
     XUserCreate,
     XUserFilter,
 )
-from typing import List, Optional
 
 
 class AbstractBackend(ABC):
@@ -80,6 +90,81 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def upload_file(self, file_path: str, file: bytes) -> str:
+        pass
+
+    # ----------- VECTOR STORE -----------
+    @abstractmethod
+    def get_vector_collection(self, collection_name: str) -> Any:
+        """Get a vector collection by name.
+
+        Args:
+            collection_name: The name of the vector collection
+
+        Returns:
+            The vector collection object
+        """
+        pass
+
+    @abstractmethod
+    async def add_vectors(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+        metadata: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[str]:
+        """Add vectors to a collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            documents: List of documents containing text (page_content) to embed
+            metadata: Optional list of metadata dictionaries for each document
+
+        Returns:
+            List of IDs for the added vectors
+        """
+        pass
+
+    @abstractmethod
+    async def query_vectors(
+        self, collection_name: str, query_text: str, limit: int = 4
+    ) -> List[Dict[str, Any]]:
+        """Query vectors in a collection by similarity.
+
+        Args:
+            collection_name: The name of the vector collection
+            query_text: The text to find similar vectors for
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents with their metadata
+        """
+        pass
+
+    @abstractmethod
+    def create_vector_collection(
+        self, collection_name: str, dimensions: int = 1536
+    ) -> Any:
+        """Create a new vector collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            dimensions: The dimensions of the vectors to store
+
+        Returns:
+            The created vector collection object
+        """
+        pass
+
+    @abstractmethod
+    def delete_vector_collection(self, collection_name: str) -> bool:
+        """Delete a vector collection.
+
+        Args:
+            collection_name: The name of the vector collection
+
+        Returns:
+            True if successfully deleted, False otherwise
+        """
         pass
 
     # ----------- SECRETS -----------
@@ -153,6 +238,43 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_wallet(self, wallet_id: UUID) -> bool:
+        pass
+
+    # ----------- WALLET TOKENS -----------
+    @abstractmethod
+    def create_wallet_token(self, new_wallet_token: WalletTokenCreate) -> WalletToken:
+        pass
+
+    @abstractmethod
+    def get_wallet_token(self, wallet_token_id: UUID) -> Optional[WalletToken]:
+        pass
+
+    @abstractmethod
+    def list_wallet_tokens(
+        self, filters: Optional[WalletTokenFilter] = None
+    ) -> List[WalletToken]:
+        pass
+
+    @abstractmethod
+    def update_wallet_token(
+        self, wallet_token_id: UUID, update_data: WalletTokenBase
+    ) -> Optional[WalletToken]:
+        pass
+
+    @abstractmethod
+    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
+        pass
+
+    @abstractmethod
+    def get_agents_with_dao_tokens(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
+        """Get all agents with wallets that hold tokens for a specific DAO.
+
+        Args:
+            dao_id: The ID of the DAO
+
+        Returns:
+            List of agent info with wallet and token details
+        """
         pass
 
     # ----------- AGENTS -----------
@@ -264,6 +386,27 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_job(self, job_id: UUID) -> bool:
+        pass
+
+    # ----------- KEYS -----------
+    @abstractmethod
+    def create_key(self, new_key: KeyCreate) -> Key:
+        pass
+
+    @abstractmethod
+    def get_key(self, key_id: UUID) -> Optional[Key]:
+        pass
+
+    @abstractmethod
+    def list_keys(self, filters: Optional[KeyFilter] = None) -> List[Key]:
+        pass
+
+    @abstractmethod
+    def update_key(self, key_id: UUID, update_data: KeyBase) -> Optional[Key]:
+        pass
+
+    @abstractmethod
+    def delete_key(self, key_id: UUID) -> bool:
         pass
 
     # ----------- PROFILES -----------
