@@ -221,13 +221,13 @@ class ProposeActionSendMessageInput(BaseModel):
 
     action_proposals_contract: str = Field(
         ...,
-        description="Contract ID of the DAO action proposals, e.g., 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2'",
+        description="Contract ID of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
         ...,
-        description="Contract ID of the action proposal for messaging, e.g., 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging'",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging",
+        description="Contract ID of the action proposal for messaging",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message",
     )
     message: str = Field(
         ...,
