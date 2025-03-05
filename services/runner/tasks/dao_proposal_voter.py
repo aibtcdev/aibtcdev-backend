@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from backend.factory import backend
 from backend.models import QueueMessage, QueueMessageFilter, QueueMessageType
 from lib.logger import configure_logger
-from services.runner.base import BaseTask
+from services.runner.base import BaseTask, JobContext
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
 
 logger = configure_logger(__name__)
@@ -19,20 +19,34 @@ class DAOProposalVoterTask(BaseTask):
     DEFAULT_CONFIDENCE_THRESHOLD = 0.7
     DEFAULT_AUTO_VOTE = True
 
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate task-specific conditions."""
+        try:
+            pending_messages = await self.get_pending_messages()
+            message_count = len(pending_messages)
+
+            if message_count > 0:
+                logger.debug(f"Found {message_count} pending proposal voting messages")
+                return True
+            else:
+                logger.debug("No pending proposal voting messages")
+                return False
+
+        except Exception as e:
+            logger.error(
+                f"Error validating proposal voter task: {str(e)}", exc_info=True
+            )
+            return False
+
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single DAO proposal voting message.
-
-        Args:
-            message: The queue message to process
-
-        Returns:
-            Dict[str, Any]: Result of processing the message
-        """
+        """Process a single DAO proposal voting message."""
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
 
-        logger.info(f"Processing DAO proposal voting message: {message_id}")
+        logger.debug(
+            f"Processing proposal voting message {message_id} for wallet {wallet_id}"
+        )
 
         # Extract required parameters from the message
         action_proposals_contract = message_data.get("action_proposals_contract")
@@ -51,8 +65,8 @@ class DAOProposalVoterTask(BaseTask):
 
             # Execute the proposal evaluation workflow
             logger.info(
-                f"Evaluating proposal {proposal_id} for contract "
-                f"{action_proposals_contract}, DAO: {dao_name}"
+                f"Evaluating proposal {proposal_id} for DAO {dao_name} "
+                f"(contract: {action_proposals_contract})"
             )
 
             result = await evaluate_and_vote_on_proposal(
@@ -70,22 +84,18 @@ class DAOProposalVoterTask(BaseTask):
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
 
-            logger.info(
-                f"Proposal {proposal_id} evaluation complete: "
-                f"Approve: {approval}, Confidence: {confidence:.2f}"
-            )
-            logger.debug(f"Reasoning: {reasoning}")
-
             if result.get("auto_voted", False):
                 logger.info(
-                    f"Automatically voted {'FOR' if approval else 'AGAINST'} "
-                    f"proposal {proposal_id} with confidence {confidence:.2f}"
+                    f"Proposal {proposal_id} ({dao_name}): Voted {'FOR' if approval else 'AGAINST'} "
+                    f"with confidence {confidence:.2f}"
                 )
             else:
                 logger.info(
-                    f"Did not auto-vote on proposal {proposal_id} "
-                    f"(confidence {confidence:.2f} < threshold)"
+                    f"Proposal {proposal_id} ({dao_name}): No auto-vote - "
+                    f"confidence {confidence:.2f} below threshold"
                 )
+
+            logger.debug(f"Proposal {proposal_id} reasoning: {reasoning}")
 
             # Mark the message as processed
             backend.update_queue_message(message_id, {"is_processed": True})
@@ -98,32 +108,19 @@ class DAOProposalVoterTask(BaseTask):
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
             return {"success": False, "error": error_msg}
 
     async def get_pending_messages(self) -> List[QueueMessage]:
-        """Get all unprocessed messages from the queue.
-
-        Returns:
-            List[QueueMessage]: List of pending messages
-        """
+        """Get all unprocessed messages from the queue."""
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
         return backend.list_queue_messages(filters=filters)
 
-    async def execute(self, context) -> List[Dict[str, Any]]:
-        """Run the DAO proposal voter task.
-
-        Args:
-            context: The job context
-
-        Returns:
-            List[Dict[str, Any]]: Results of task execution
-        """
-        start_time = datetime.now()
-        logger.info(f"Starting DAO proposal voter task at {start_time}")
-
+    async def _execute_impl(self, context: JobContext) -> List[Dict[str, Any]]:
+        """Run the DAO proposal voter task."""
         pending_messages = await self.get_pending_messages()
-        logger.info(f"Found {len(pending_messages)} pending messages")
+        message_count = len(pending_messages)
+        logger.debug(f"Found {message_count} pending proposal voting messages")
 
         if not pending_messages:
             return [
@@ -151,12 +148,9 @@ class DAOProposalVoterTask(BaseTask):
             else:
                 errors.append(result.get("error", "Unknown error"))
 
-        end_time = datetime.now()
-        execution_time = (end_time - start_time).total_seconds()
-
-        logger.info(
-            f"DAO proposal voter task completed in {execution_time:.2f}s. "
-            f"Processed: {processed_count}, Voted: {voted_count}, Errors: {len(errors)}"
+        logger.debug(
+            f"Task metrics - Processed: {processed_count}, "
+            f"Voted: {voted_count}, Errors: {len(errors)}"
         )
 
         return [
@@ -166,9 +160,6 @@ class DAOProposalVoterTask(BaseTask):
                 "proposals_processed": processed_count,
                 "proposals_voted": voted_count,
                 "errors": errors,
-                "start_time": start_time,
-                "end_time": end_time,
-                "execution_time": execution_time,
             }
         ]
 

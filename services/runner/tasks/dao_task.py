@@ -41,22 +41,19 @@ class DAOTask(BaseTask[DAOProcessingResult]):
         self.tools_map = filter_tools_by_names(
             ["contract_deploy_dao"], self.tools_map_all
         )
-        logger.debug(f"Initialized tools_map with {len(self.tools_map)} tools")
+        logger.debug(f"Initialized {len(self.tools_map)} DAO deployment tools")
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate DAO task configuration."""
         try:
-            logger.debug("Checking DAO deployment tools availability")
             if not self.tools_map:
                 logger.error("No DAO deployment tools available")
                 return False
 
-            logger.debug("Checking tools initialization")
             if not self.tools_map_all:
                 logger.error("Tools not properly initialized")
                 return False
 
-            logger.debug("DAO task configuration validation successful")
             return True
         except Exception as e:
             logger.error(f"Error validating DAO config: {str(e)}", exc_info=True)
@@ -65,7 +62,6 @@ class DAOTask(BaseTask[DAOProcessingResult]):
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate DAO task prerequisites."""
         try:
-            logger.debug("Checking for pending DAO deployments")
             pending_daos = backend.list_daos(
                 filters=DAOFilter(
                     is_deployed=False,
@@ -79,7 +75,6 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                 )
                 return False
 
-            logger.debug("DAO task prerequisites validation successful")
             return True
         except Exception as e:
             logger.error(f"Error validating DAO prerequisites: {str(e)}", exc_info=True)
@@ -88,22 +83,22 @@ class DAOTask(BaseTask[DAOProcessingResult]):
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate DAO task specific conditions."""
         try:
-            logger.debug("Checking for unprocessed DAO messages")
             queue_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
                     type=QueueMessageType.DAO, is_processed=False
                 )
             )
-            has_messages = bool(queue_messages)
-            if not has_messages:
-                logger.info("No unprocessed DAO messages found in queue")
+            message_count = len(queue_messages)
+
+            if message_count > 0:
+                logger.debug(f"Found {message_count} unprocessed DAO messages")
+                return True
             else:
-                logger.debug(f"Found {len(queue_messages)} unprocessed DAO messages")
-            return has_messages
+                logger.debug("No unprocessed DAO messages found")
+                return False
+
         except Exception as e:
-            logger.error(
-                f"Error in DAO task-specific validation: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error in DAO task validation: {str(e)}", exc_info=True)
             return False
 
     def _get_dao_parameters(self, message: QueueMessage) -> Optional[str]:
@@ -135,15 +130,19 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                     message="Failed to extract DAO parameters from message",
                 )
 
+            logger.info(f"Processing DAO deployment for message {message.id}")
+            logger.debug(f"DAO deployment parameters: {tool_input}")
+
             deployment_data = {}
             async for chunk in execute_langgraph_stream(
                 history=[], input_str=tool_input, tools_map=self.tools_map
             ):
                 if chunk["type"] == "result":
                     deployment_data = chunk["content"]
-                    logger.info(f"DAO deployment completed: {deployment_data}")
+                    logger.info(f"DAO deployment completed successfully")
+                    logger.debug(f"Deployment data: {deployment_data}")
                 elif chunk["type"] == "tool":
-                    logger.debug(f"Tool execution: {chunk}")
+                    logger.debug(f"Executing tool: {chunk}")
 
             return DAOProcessingResult(
                 success=True,
@@ -157,48 +156,22 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                 success=False, message=f"Error processing DAO: {str(e)}", error=e
             )
 
-    async def validate(self, context: JobContext) -> bool:
-        """Validate DAO deployment prerequisites."""
-        try:
-            # Check for pending DAOs
-            pending_daos = backend.list_daos(
-                filters=DAOFilter(
-                    is_deployed=False,
-                    is_broadcasted=True,
-                    wallet_id=self.config.twitter_wallet_id,
-                )
-            )
-            if pending_daos:
-                logger.debug("Found pending Twitter DAO, skipping queue processing")
-                return False
-
-            # Check queue
-            queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(
-                    type=QueueMessageType.DAO, is_processed=False
-                )
-            )
-            return bool(queue_messages)
-        except Exception as e:
-            logger.error(f"Error validating DAO task: {str(e)}", exc_info=True)
-            return False
-
-    async def execute(self, context: JobContext) -> List[DAOProcessingResult]:
+    async def _execute_impl(self, context: JobContext) -> List[DAOProcessingResult]:
         """Execute DAO deployment task."""
         results: List[DAOProcessingResult] = []
         try:
-            # Process queue
             queue_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
                     type=QueueMessageType.DAO, is_processed=False
                 )
             )
+
             if not queue_messages:
                 logger.debug("No messages in queue")
                 return results
 
-            message = queue_messages[0]
-            logger.info(f"Processing DAO deployment message: {message}")
+            message = queue_messages[0]  # Process one message at a time
+            logger.debug(f"Processing DAO deployment message: {message.id}")
 
             result = await self._process_dao_message(message)
             results.append(result)
@@ -208,6 +181,7 @@ class DAOTask(BaseTask[DAOProcessingResult]):
                     queue_message_id=message.id,
                     update_data=QueueMessageBase(is_processed=True),
                 )
+                logger.debug(f"Marked message {message.id} as processed")
 
             return results
 

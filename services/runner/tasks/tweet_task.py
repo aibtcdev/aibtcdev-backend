@@ -33,6 +33,28 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self.twitter_service = None
         self._pending_messages = None
 
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate tweet processing prerequisites."""
+        try:
+            self._pending_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.TWEET, is_processed=False
+                )
+            )
+            message_count = len(self._pending_messages)
+
+            if message_count > 0:
+                logger.debug(f"Found {message_count} pending tweet messages")
+                return True
+            else:
+                logger.debug("No pending tweet messages found")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error validating tweet task: {str(e)}", exc_info=True)
+            self._pending_messages = None
+            return False
+
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
         """Initialize Twitter service with credentials for the given DAO."""
         try:
@@ -52,6 +74,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 access_secret=creds[0].access_secret,
             )
             await self.twitter_service._ainitialize()
+            logger.debug(f"Initialized Twitter service for DAO {dao_id}")
             return True
         except Exception as e:
             logger.error(f"Error initializing Twitter service: {str(e)}", exc_info=True)
@@ -92,6 +115,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
+            logger.info(f"Posting tweet for DAO {message.dao_id}")
+            logger.debug(f"Tweet text: {tweet_text[:100]}...")
+
             # Post the tweet
             tweet_response = await self.twitter_service._apost_tweet(
                 text=tweet_text, reply_in_reply_to_tweet_id=message.tweet_id
@@ -101,6 +127,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return TweetProcessingResult(
                     success=False, message="Failed to post tweet", dao_id=message.dao_id
                 )
+
+            logger.info(f"Successfully posted tweet {tweet_response.id}")
 
             return TweetProcessingResult(
                 success=True,
@@ -120,41 +148,35 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
-    async def validate(self, context: JobContext) -> bool:
-        """Validate tweet processing prerequisites."""
-        try:
-            # Check if we have unprocessed messages
-            self._pending_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(
-                    type=QueueMessageType.TWEET, is_processed=False
-                )
-            )
-            # Only return False on exceptions, not on empty queue
-            return True
-        except Exception as e:
-            logger.error(f"Error validating tweet task: {str(e)}", exc_info=True)
-            self._pending_messages = None
-            return False
-
-    async def execute(self, context: JobContext) -> List[TweetProcessingResult]:
+    async def _execute_impl(self, context: JobContext) -> List[TweetProcessingResult]:
         """Execute tweet processing task."""
         results: List[TweetProcessingResult] = []
         try:
-            # Use the messages we already fetched in validate()
             if not self._pending_messages:
-                logger.info("No tweet messages in queue to process")
+                logger.debug("No tweet messages to process")
                 return results
 
+            processed_count = 0
+            success_count = 0
+
             for message in self._pending_messages:
-                logger.info(f"Processing tweet message: {message}")
+                logger.debug(f"Processing tweet message: {message.id}")
                 result = await self._process_tweet_message(message)
                 results.append(result)
+                processed_count += 1
 
                 if result.success:
+                    success_count += 1
                     backend.update_queue_message(
                         queue_message_id=message.id,
                         update_data=QueueMessageBase(is_processed=True),
                     )
+                    logger.debug(f"Marked message {message.id} as processed")
+
+            logger.debug(
+                f"Task metrics - Processed: {processed_count}, "
+                f"Successful: {success_count}"
+            )
 
             return results
         except Exception as e:
