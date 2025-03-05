@@ -1,9 +1,7 @@
 """DAO proposal voter task implementation."""
 
-import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+from typing import Any, Dict, List
 
 from backend.factory import backend
 from backend.models import QueueMessage, QueueMessageFilter

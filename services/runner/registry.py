@@ -1,6 +1,8 @@
-from .base import BaseTask, JobType
-from lib.logger import configure_logger
 from typing import Any, Dict, List, Optional, Type
+
+from lib.logger import configure_logger
+
+from .base import BaseTask, JobType
 
 logger = configure_logger(__name__)
 

@@ -1077,10 +1077,10 @@ class SupabaseBackend(AbstractBackend):
         if filters:
             if filters.email is not None:
                 query = query.eq("email", filters.email)
-            if filters.username is not None:
-                query = query.eq("username", filters.username)
-            if filters.discord_username is not None:
-                query = query.eq("discord_username", filters.discord_username)
+            if filters.has_dao_agent is not None:
+                query = query.eq("has_dao_agent", filters.has_dao_agent)
+            if filters.has_completed_guide is not None:
+                query = query.eq("has_completed_guide", filters.has_completed_guide)
         response = query.execute()
         data = response.data or []
         return [Profile(**row) for row in data]

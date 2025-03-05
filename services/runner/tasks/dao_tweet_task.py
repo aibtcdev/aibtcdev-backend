@@ -1,19 +1,13 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import (
-    DAOBase,
-    QueueMessageBase,
-    QueueMessageCreate,
-    QueueMessageFilter,
-    TokenFilter,
-)
+from backend.models import QueueMessageCreate, QueueMessageFilter, TokenFilter
 from lib.logger import configure_logger
 from services.workflows import generate_dao_tweet
 
-from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from ..base import BaseTask, JobContext, RunnerResult
 
 logger = configure_logger(__name__)
 

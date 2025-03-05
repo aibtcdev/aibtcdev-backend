@@ -252,11 +252,9 @@ class KeyFilter(CustomBaseModel):
 # PROFILES
 #
 class ProfileBase(CustomBaseModel):
-    role: Optional[str] = None
     email: Optional[str] = None
-    assigned_agent_address: Optional[str] = None
-    username: Optional[str] = None
-    discord_username: Optional[str] = None
+    has_dao_agent: Optional[bool] = False
+    has_completed_guide: Optional[bool] = False
 
 
 class ProfileCreate(ProfileBase):
@@ -501,8 +499,8 @@ class JobFilter(CustomBaseModel):
 
 class ProfileFilter(CustomBaseModel):
     email: Optional[str] = None
-    username: Optional[str] = None
-    discord_username: Optional[str] = None
+    has_dao_agent: Optional[bool] = None
+    has_completed_guide: Optional[bool] = None
 
 
 class ProposalFilter(CustomBaseModel):
