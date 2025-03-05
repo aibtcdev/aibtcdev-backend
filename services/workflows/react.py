@@ -106,7 +106,7 @@ class MessageProcessor:
 
 
 class StreamingCallbackHandler(BaseCallbackHandler):
-    """Callback handler for streaming tokens."""
+    """Handle callbacks from LangChain and stream results to a queue."""
 
     def __init__(
         self,
@@ -114,42 +114,36 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         on_llm_new_token: Optional[callable] = None,
         on_llm_end: Optional[callable] = None,
     ):
-        """Initialize the callback handler."""
-        super().__init__()
+        """Initialize the callback handler with a queue."""
         self.queue = queue
-        self._on_llm_new_token = on_llm_new_token
-        self._on_llm_end = on_llm_end
-        self.tokens: List[str] = []
-        self.current_tool: Optional[str] = None
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        logger.debug("Initialized StreamingCallbackHandler")
+        self.current_tool = None
+        self.tool_inputs = {}  # Store tool inputs by tool name
+        self.custom_on_llm_new_token = on_llm_new_token
+        self.custom_on_llm_end = on_llm_end
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
-        """Ensure we have a valid event loop."""
-        if not self._loop:
-            try:
-                self._loop = asyncio.get_event_loop()
-            except RuntimeError:
-                logger.warning("No event loop found, creating new one")
-                self._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(self._loop)
-        return self._loop
+        """Get the current event loop or create a new one if necessary."""
+        try:
+            loop = asyncio.get_running_loop()
+            return loop
+        except RuntimeError:
+            logger.warning("No running event loop found. Creating a new one.")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
 
     async def _async_put_to_queue(self, item: Dict) -> None:
-        """Asynchronously put items in queue."""
+        """Put an item in the queue asynchronously."""
         try:
             await self.queue.put(item)
-            logger.debug(
-                f"Successfully queued item of type: {item.get('type', 'unknown')}"
-            )
         except Exception as e:
             logger.error(f"Failed to put item in queue: {str(e)}")
             raise StreamingError(f"Queue operation failed: {str(e)}")
 
     def _put_to_queue(self, item: Dict) -> None:
-        """Helper method to put items in queue."""
-        loop = self._ensure_loop()
+        """Put an item in the queue, handling event loop considerations."""
         try:
+            loop = self._ensure_loop()
             if loop.is_running():
                 future = asyncio.run_coroutine_threadsafe(
                     self._async_put_to_queue(item), loop
@@ -164,6 +158,11 @@ class StreamingCallbackHandler(BaseCallbackHandler):
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs) -> None:
         """Run when tool starts running."""
         self.current_tool = serialized.get("name")
+
+        # Store the input for this tool
+        if self.current_tool:
+            self.tool_inputs[self.current_tool] = input_str
+
         self._put_to_queue(
             {
                 "type": "tool",
@@ -182,11 +181,14 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             if hasattr(output, "content"):
                 output = output.content
 
+            # Retrieve the stored input for this tool
+            tool_input = self.tool_inputs.get(self.current_tool, "")
+
             self._put_to_queue(
                 {
                     "type": "tool",
                     "tool": self.current_tool,
-                    "input": None,
+                    "input": tool_input,  # Use the stored input instead of None
                     "output": str(output),
                     "status": "end",
                 }
@@ -202,16 +204,15 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Run on new token."""
-        if self._on_llm_new_token:
-            self._on_llm_new_token(token, **kwargs)
-        self.tokens.append(token)
+        if self.custom_on_llm_new_token:
+            self.custom_on_llm_new_token(token, **kwargs)
         logger.debug(f"Received new token (length: {len(token)})")
 
     def on_llm_end(self, response: LLMResult, **kwargs) -> None:
         """Run when LLM ends running."""
         logger.info("LLM processing completed")
-        if self._on_llm_end:
-            self._on_llm_end(response, **kwargs)
+        if self.custom_on_llm_end:
+            self.custom_on_llm_end(response, **kwargs)
 
     def on_llm_error(self, error: Exception, **kwargs) -> None:
         """Run when LLM errors."""
