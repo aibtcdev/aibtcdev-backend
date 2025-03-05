@@ -150,7 +150,7 @@ class ProposeActionAllowAssetInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
         ],
     )
-    dao_token_contract_address_address: str = Field(
+    dao_token_contract_address: str = Field(
         ...,
         description="Contract principal of the token to allow",
         examples=[
@@ -178,7 +178,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
-        dao_token_contract_address_address: str,
+        dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -188,7 +188,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
-            dao_token_contract_address_address,
+            dao_token_contract_address,
         ]
 
         return BunScriptRunner.bun_run(
