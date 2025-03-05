@@ -16,14 +16,14 @@ class DaoBaseInput(BaseModel):
 class ProposeActionAddResourceInput(BaseModel):
     """Input schema for proposing to add a resource action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
-        description="Contract principal of the DAO action proposals",
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
-        description="Contract principal of the action proposal",
+        description="Contract principal of the action proposal to run when the proposal is approved",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-add-resource",
     )
     resource_name: str = Field(..., description="Name of the resource to add")
@@ -53,8 +53,8 @@ class ProposeActionAddResourceTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -66,8 +66,8 @@ class ProposeActionAddResourceTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             resource_name,
             resource_description,
             str(resource_price),
@@ -85,8 +85,8 @@ class ProposeActionAddResourceTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -95,8 +95,8 @@ class ProposeActionAddResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose adding a resource."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             resource_name,
             resource_description,
             resource_price,
@@ -106,8 +106,8 @@ class ProposeActionAddResourceTool(BaseTool):
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -116,8 +116,8 @@ class ProposeActionAddResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             resource_name,
             resource_description,
             resource_price,
@@ -129,17 +129,17 @@ class ProposeActionAddResourceTool(BaseTool):
 class ProposeActionAllowAssetInput(BaseModel):
     """Input schema for proposing to allow an asset action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal for allowing an asset",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-allow-asset",
     )
-    token_contract: str = Field(
+    dao_dao_token_contract_address_address: str = Field(
         ...,
         description="Contract principal of the token to allow",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-token",
@@ -163,9 +163,9 @@ class ProposeActionAllowAssetTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
-        token_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_dao_token_contract_address_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -173,9 +173,9 @@ class ProposeActionAllowAssetTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
-            token_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_dao_token_contract_address_address,
         ]
 
         return BunScriptRunner.bun_run(
@@ -187,31 +187,31 @@ class ProposeActionAllowAssetTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
-        token_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            token_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_token_contract_address,
             **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
-        token_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            token_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_token_contract_address,
             **kwargs,
         )
 
@@ -219,12 +219,12 @@ class ProposeActionAllowAssetTool(BaseTool):
 class ProposeActionSendMessageInput(BaseModel):
     """Input schema for proposing to send a message action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract ID of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract ID of the action proposal for messaging",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message",
@@ -242,8 +242,8 @@ class ProposeActionSendMessageTool(BaseTool):
         "Propose an action to send a message through the DAO. "
         "This creates a proposal that DAO members can vote on to send "
         "a specific message. "
-        "Use with action_proposals_contract like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2' "
-        "and action_proposal_contract like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging'. "
+        "Use with action_proposals_voting_extension like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2' "
+        "and action_proposal_contract_to_execute like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging'. "
         "The message will be stored on-chain after successful proposal approval."
     )
     args_schema: Type[BaseModel] = ProposeActionSendMessageInput
@@ -256,8 +256,8 @@ class ProposeActionSendMessageTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -266,8 +266,8 @@ class ProposeActionSendMessageTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             message,
         ]
 
@@ -280,38 +280,44 @@ class ProposeActionSendMessageTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
         return self._deploy(
-            action_proposals_contract, action_proposal_contract, message, **kwargs
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            message,
+            **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract, action_proposal_contract, message, **kwargs
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            message,
+            **kwargs,
         )
 
 
 class ProposeActionSetAccountHolderInput(BaseModel):
     """Input schema for proposing to set account holder action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
@@ -340,8 +346,8 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -350,8 +356,8 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             account_holder,
         ]
 
@@ -364,30 +370,30 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new account holder."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             account_holder,
             **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             account_holder,
             **kwargs,
         )
@@ -396,12 +402,12 @@ class ProposeActionSetAccountHolderTool(BaseTool):
 class ProposeActionSetWithdrawalAmountInput(BaseModel):
     """Input schema for proposing to set withdrawal amount action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
@@ -430,8 +436,8 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -440,8 +446,8 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             str(withdrawal_amount),
         ]
 
@@ -454,30 +460,30 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal amount."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             withdrawal_amount,
             **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             withdrawal_amount,
             **kwargs,
         )
@@ -486,12 +492,12 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
 class ProposeActionSetWithdrawalPeriodInput(BaseModel):
     """Input schema for proposing to set withdrawal period action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
@@ -520,8 +526,8 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -530,8 +536,8 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             str(withdrawal_period),
         ]
 
@@ -544,30 +550,30 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal period."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             withdrawal_period,
             **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             withdrawal_period,
             **kwargs,
         )
@@ -576,12 +582,12 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 class ProposeActionToggleResourceInput(BaseModel):
     """Input schema for proposing to toggle a resource action."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
@@ -596,7 +602,7 @@ class ProposeActionToggleResourceInput(BaseModel):
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -622,7 +628,7 @@ class VoteOnActionProposalTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
@@ -632,7 +638,7 @@ class VoteOnActionProposalTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(proposal_id),
             str(vote).lower(),
         ]
@@ -646,35 +652,39 @@ class VoteOnActionProposalTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
-        return self._deploy(action_proposals_contract, proposal_id, vote, **kwargs)
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, vote, **kwargs
+        )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(action_proposals_contract, proposal_id, vote, **kwargs)
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, vote, **kwargs
+        )
 
 
 class ConcludeActionProposalInput(BaseModel):
     """Input schema for concluding an action proposal."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to conclude")
-    action_proposal_contract: str = Field(
+    action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
@@ -697,9 +707,9 @@ class ConcludeActionProposalTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
-        action_proposal_contract: str,
+        action_proposal_contract_to_execute: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to conclude an action proposal."""
@@ -707,9 +717,9 @@ class ConcludeActionProposalTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(proposal_id),
-            action_proposal_contract,
+            action_proposal_contract_to_execute,
         ]
 
         return BunScriptRunner.bun_run(
@@ -721,33 +731,39 @@ class ConcludeActionProposalTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
-        action_proposal_contract: str,
+        action_proposal_contract_to_execute: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to conclude an action proposal."""
         return self._deploy(
-            action_proposals_contract, proposal_id, action_proposal_contract, **kwargs
+            action_proposals_voting_extension,
+            proposal_id,
+            action_proposal_contract_to_execute,
+            **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
-        action_proposal_contract: str,
+        action_proposal_contract_to_execute: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract, proposal_id, action_proposal_contract, **kwargs
+            action_proposals_voting_extension,
+            proposal_id,
+            action_proposal_contract_to_execute,
+            **kwargs,
         )
 
 
 class GetLiquidSupplyInput(BaseModel):
     """Input schema for getting the liquid supply."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -773,7 +789,7 @@ class GetLiquidSupplyTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         stacks_block_height: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -782,7 +798,7 @@ class GetLiquidSupplyTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(stacks_block_height),
         ]
 
@@ -795,27 +811,31 @@ class GetLiquidSupplyTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         stacks_block_height: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get the liquid supply."""
-        return self._deploy(action_proposals_contract, stacks_block_height, **kwargs)
+        return self._deploy(
+            action_proposals_voting_extension, stacks_block_height, **kwargs
+        )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         stacks_block_height: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(action_proposals_contract, stacks_block_height, **kwargs)
+        return self._deploy(
+            action_proposals_voting_extension, stacks_block_height, **kwargs
+        )
 
 
 class GetProposalInput(BaseModel):
     """Input schema for getting proposal data."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -839,7 +859,7 @@ class GetProposalTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -848,7 +868,7 @@ class GetProposalTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(proposal_id),
         ]
 
@@ -861,27 +881,27 @@ class GetProposalTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get proposal data."""
-        return self._deploy(action_proposals_contract, proposal_id, **kwargs)
+        return self._deploy(action_proposals_voting_extension, proposal_id, **kwargs)
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(action_proposals_contract, proposal_id, **kwargs)
+        return self._deploy(action_proposals_voting_extension, proposal_id, **kwargs)
 
 
 class GetTotalVotesInput(BaseModel):
     """Input schema for getting total votes for a voter."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -906,7 +926,7 @@ class GetTotalVotesTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
@@ -916,7 +936,7 @@ class GetTotalVotesTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(proposal_id),
             voter_address,
         ]
@@ -930,33 +950,33 @@ class GetTotalVotesTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get total votes."""
         return self._deploy(
-            action_proposals_contract, proposal_id, voter_address, **kwargs
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract, proposal_id, voter_address, **kwargs
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
 
 
 class GetVotingConfigurationInput(BaseModel):
     """Input schema for getting voting configuration."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -979,7 +999,7 @@ class GetVotingConfigurationTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get voting configuration."""
@@ -987,7 +1007,7 @@ class GetVotingConfigurationTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
         ]
 
         return BunScriptRunner.bun_run(
@@ -999,25 +1019,25 @@ class GetVotingConfigurationTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get voting configuration."""
-        return self._deploy(action_proposals_contract, **kwargs)
+        return self._deploy(action_proposals_voting_extension, **kwargs)
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(action_proposals_contract, **kwargs)
+        return self._deploy(action_proposals_voting_extension, **kwargs)
 
 
 class GetVotingPowerInput(BaseModel):
     """Input schema for getting voting power."""
 
-    action_proposals_contract: str = Field(
+    action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
         example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
@@ -1046,7 +1066,7 @@ class GetVotingPowerTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
@@ -1056,7 +1076,7 @@ class GetVotingPowerTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
+            action_proposals_voting_extension,
             str(proposal_id),
             voter_address,
         ]
@@ -1070,26 +1090,26 @@ class GetVotingPowerTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get voting power."""
         return self._deploy(
-            action_proposals_contract, proposal_id, voter_address, **kwargs
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
+        action_proposals_voting_extension: str,
         proposal_id: int,
         voter_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract, proposal_id, voter_address, **kwargs
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
 
 
@@ -1110,8 +1130,8 @@ class ProposeActionToggleResourceTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -1120,8 +1140,8 @@ class ProposeActionToggleResourceTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_contract,
-            action_proposal_contract,
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
             resource_name,
         ]
 
@@ -1134,24 +1154,30 @@ class ProposeActionToggleResourceTool(BaseTool):
 
     def _run(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
         return self._deploy(
-            action_proposals_contract, action_proposal_contract, resource_name, **kwargs
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            resource_name,
+            **kwargs,
         )
 
     async def _arun(
         self,
-        action_proposals_contract: str,
-        action_proposal_contract: str,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
         resource_name: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract, action_proposal_contract, resource_name, **kwargs
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            resource_name,
+            **kwargs,
         )
