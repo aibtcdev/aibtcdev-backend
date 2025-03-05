@@ -11,8 +11,16 @@ from tools.dao_base import DAOToolResponse
 class GetAllowedAssetInput(BaseModel):
     """Input schema for checking if an asset is allowed."""
 
-    treasury_contract: str = Field(..., description="Contract ID of the treasury")
-    asset_contract: str = Field(..., description="Contract ID of the asset to check")
+    treasury_contract: str = Field(
+        ...,
+        description="Contract principal of the treasury",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury",
+    )
+    asset_contract: str = Field(
+        ...,
+        description="Contract principal of the asset to check",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset",
+    )
 
 
 class GetAllowedAssetTool(BaseTool):
@@ -79,8 +87,16 @@ class GetAllowedAssetTool(BaseTool):
 class IsAllowedAssetInput(BaseModel):
     """Input schema for checking if an asset is allowed."""
 
-    treasury_contract: str = Field(..., description="Contract ID of the treasury")
-    asset_contract: str = Field(..., description="Contract ID of the asset to check")
+    treasury_contract: str = Field(
+        ...,
+        description="Contract principal of the treasury",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury",
+    )
+    asset_contract: str = Field(
+        ...,
+        description="Contract principal of the asset to check",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset",
+    )
 
 
 class IsAllowedAssetTool(BaseTool):

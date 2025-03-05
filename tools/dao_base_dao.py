@@ -11,9 +11,15 @@ from tools.dao_base import DAOToolResponse
 class IsExtensionInput(BaseModel):
     """Input schema for checking if a contract is an extension."""
 
-    base_dao_contract: str = Field(..., description="Contract ID of the base DAO")
+    base_dao_contract: str = Field(
+        ...,
+        description="Contract principal of the base DAO",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao",
+    )
     extension_contract: str = Field(
-        ..., description="Contract ID to check if it's an extension"
+        ...,
+        description="Contract principal of the extension to check",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter",
     )
 
 
@@ -81,9 +87,15 @@ class IsExtensionTool(BaseTool):
 class ExecutedAtInput(BaseModel):
     """Input schema for checking when a proposal was executed."""
 
-    base_dao_contract: str = Field(..., description="Contract ID of the base DAO")
+    base_dao_contract: str = Field(
+        ...,
+        description="Contract principal of the base DAO",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao",
+    )
     proposal_contract: str = Field(
-        ..., description="Contract ID of the proposal to check"
+        ...,
+        description="Contract principal of the proposal to check",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-proposal",
     )
 
 

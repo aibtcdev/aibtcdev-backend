@@ -12,7 +12,9 @@ class GetInvoiceInput(BaseModel):
     """Input schema for getting invoice details."""
 
     payments_invoices_contract: str = Field(
-        ..., description="Contract ID of the payments and invoices contract"
+        ...,
+        description="Contract principal of the payments and invoices contract",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-payments-invoices",
     )
     invoice_index: int = Field(..., description="Index of the invoice to retrieve")
 
@@ -82,7 +84,9 @@ class GetResourceInput(BaseModel):
     """Input schema for getting resource details."""
 
     payments_invoices_contract: str = Field(
-        ..., description="Contract ID of the payments and invoices contract"
+        ...,
+        description="Contract principal of the payments and invoices contract",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-payments-invoices",
     )
     resource_index: int = Field(..., description="Index of the resource to retrieve")
 
@@ -152,7 +156,9 @@ class GetResourceByNameInput(BaseModel):
     """Input schema for getting resource details by name."""
 
     payments_invoices_contract: str = Field(
-        ..., description="Contract ID of the payments and invoices contract"
+        ...,
+        description="Contract principal of the payments and invoices contract",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-payments-invoices",
     )
     resource_name: str = Field(..., description="Name of the resource to retrieve")
 
@@ -222,7 +228,9 @@ class PayInvoiceInput(BaseModel):
     """Input schema for paying an invoice."""
 
     payments_invoices_contract: str = Field(
-        ..., description="Contract ID of the payments and invoices contract"
+        ...,
+        description="Contract principal of the payments and invoices contract",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-payments-invoices",
     )
     resource_index: int = Field(..., description="Index of the resource to pay for")
     memo: Optional[str] = Field(
@@ -301,7 +309,9 @@ class PayInvoiceByResourceNameInput(BaseModel):
     """Input schema for paying an invoice by resource name."""
 
     payments_invoices_contract: str = Field(
-        ..., description="Contract ID of the payments and invoices contract"
+        ...,
+        description="Contract principal of the payments and invoices contract",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-payments-invoices",
     )
     resource_name: str = Field(..., description="Name of the resource to pay for")
     memo: Optional[str] = Field(

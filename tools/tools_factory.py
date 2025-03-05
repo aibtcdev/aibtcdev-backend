@@ -192,7 +192,7 @@ def initialize_tools(
         "dao_charter_get_current": GetCurrentDaoCharterTool(wallet_id),
         "dao_charter_get_current_version": GetCurrentDaoCharterVersionTool(wallet_id),
         "dao_charter_get_version": GetDaoCharterTool(wallet_id),
-        "dao_messaging_send": SendMessageTool(wallet_id),
+        # "dao_messaging_send": SendMessageTool(wallet_id),
         "dao_payments_get_invoice": GetInvoiceTool(wallet_id),
         "dao_payments_get_resource": GetResourceTool(wallet_id),
         "dao_payments_get_resource_by_name": GetResourceByNameTool(wallet_id),

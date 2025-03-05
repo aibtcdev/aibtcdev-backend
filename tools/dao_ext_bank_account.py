@@ -12,7 +12,9 @@ class GetAccountTermsInput(BaseModel):
     """Input schema for getting bank account terms."""
 
     bank_account_contract: str = Field(
-        ..., description="Contract ID of the bank account"
+        ...,
+        description="Contract principal of the bank account",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
     )
 
 
@@ -78,7 +80,9 @@ class DepositSTXInput(BaseModel):
     """Input schema for depositing STX."""
 
     bank_account_contract: str = Field(
-        ..., description="Contract ID of the bank account"
+        ...,
+        description="Contract principal of the bank account",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
     )
     amount: int = Field(..., description="Amount of STX to deposit in microstacks")
 
@@ -151,7 +155,9 @@ class WithdrawSTXInput(BaseModel):
     """Input schema for withdrawing STX."""
 
     bank_account_contract: str = Field(
-        ..., description="Contract ID of the bank account"
+        ...,
+        description="Contract principal of the bank account",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
     )
 
 

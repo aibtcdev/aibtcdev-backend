@@ -18,16 +18,22 @@ class ProposeActionAddResourceInput(BaseModel):
     """Input schema for proposing to add a resource action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-add-resource",
     )
     resource_name: str = Field(..., description="Name of the resource to add")
     resource_description: str = Field(..., description="Description of the resource")
     resource_price: int = Field(..., description="Price of the resource in microstacks")
     resource_url: Optional[str] = Field(
-        None, description="Optional URL associated with the resource"
+        None,
+        description="Optional URL associated with the resource",
+        example="https://www.example.com/resource",
     )
 
 
@@ -134,12 +140,20 @@ class ProposeActionAllowAssetInput(BaseModel):
     """Input schema for proposing to allow an asset action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal for allowing an asset",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-allow-asset",
     )
-    token_contract: str = Field(..., description="Contract ID of the token to allow")
+    token_contract: str = Field(
+        ...,
+        description="Contract principal of the token to allow",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-token",
+    )
 
 
 class ProposeActionAllowAssetTool(BaseTool):
@@ -225,12 +239,20 @@ class ProposeActionSendMessageInput(BaseModel):
     """Input schema for proposing to send a message action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract ID of the DAO action proposals, e.g., 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2'",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract ID of the action proposal for messaging, e.g., 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging'",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging",
     )
-    message: str = Field(..., description="Message to be sent")
+    message: str = Field(
+        ...,
+        description="Message to be sent through the DAO proposal system",
+        example="Proposal to update the community guidelines",
+    )
 
 
 class ProposeActionSendMessageTool(BaseTool):
@@ -238,7 +260,10 @@ class ProposeActionSendMessageTool(BaseTool):
     description: str = (
         "Propose an action to send a message through the DAO. "
         "This creates a proposal that DAO members can vote on to send "
-        "a specific message."
+        "a specific message. "
+        "Use with action_proposals_contract like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2' "
+        "and action_proposal_contract like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging'. "
+        "The message will be stored on-chain after successful proposal approval."
     )
     args_schema: Type[BaseModel] = ProposeActionSendMessageInput
     return_direct: bool = False
@@ -310,12 +335,20 @@ class ProposeActionSetAccountHolderInput(BaseModel):
     """Input schema for proposing to set account holder action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
     )
-    account_holder: str = Field(..., description="Address of the new account holder")
+    account_holder: str = Field(
+        ...,
+        description="Address of the new account holder",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+    )
 
 
 class ProposeActionSetAccountHolderTool(BaseTool):
@@ -401,12 +434,20 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
     """Input schema for proposing to set withdrawal amount action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
     )
-    withdrawal_amount: int = Field(..., description="New withdrawal amount to set")
+    withdrawal_amount: int = Field(
+        ...,
+        description="New withdrawal amount to set",
+        example="1000000000000000000",
+    )
 
 
 class ProposeActionSetWithdrawalAmountTool(BaseTool):
@@ -492,12 +533,20 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
     """Input schema for proposing to set withdrawal period action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
     )
-    withdrawal_period: int = Field(..., description="New withdrawal period to set")
+    withdrawal_period: int = Field(
+        ...,
+        description="New withdrawal period to set",
+        example="1000000000000000000",
+    )
 
 
 class ProposeActionSetWithdrawalPeriodTool(BaseTool):
@@ -583,19 +632,29 @@ class ProposeActionToggleResourceInput(BaseModel):
     """Input schema for proposing to toggle a resource action."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
     )
-    resource_name: str = Field(..., description="Name of the resource to toggle")
+    resource_name: str = Field(
+        ...,
+        description="Name of the resource to toggle",
+        example="bitcoin",
+    )
 
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to vote on")
     vote: bool = Field(..., description="True for yes/for, False for no/against")
@@ -674,11 +733,15 @@ class ConcludeActionProposalInput(BaseModel):
     """Input schema for concluding an action proposal."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to conclude")
     action_proposal_contract: str = Field(
-        ..., description="Contract ID of the action proposal"
+        ...,
+        description="Contract principal of the action proposal",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
     )
 
 
@@ -758,7 +821,9 @@ class GetLiquidSupplyInput(BaseModel):
     """Input schema for getting the liquid supply."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     stacks_block_height: int = Field(
         ..., description="Stacks block height to query the liquid supply at"
@@ -837,7 +902,9 @@ class GetProposalInput(BaseModel):
     """Input schema for getting proposal data."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to retrieve")
 
@@ -916,7 +983,9 @@ class GetTotalVotesInput(BaseModel):
     """Input schema for getting total votes for a voter."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to check")
     voter_address: str = Field(..., description="Address of the voter to check")
@@ -1004,7 +1073,9 @@ class GetVotingConfigurationInput(BaseModel):
     """Input schema for getting voting configuration."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
 
 
@@ -1078,11 +1149,15 @@ class GetVotingPowerInput(BaseModel):
     """Input schema for getting voting power."""
 
     action_proposals_contract: str = Field(
-        ..., description="Contract ID of the DAO action proposals"
+        ...,
+        description="Contract principal of the DAO action proposals",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
     )
     proposal_id: int = Field(..., description="ID of the proposal to check")
     voter_address: str = Field(
-        ..., description="Address of the voter to check voting power for"
+        ...,
+        description="Address of the voter to check voting power for",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
     )
 
 
