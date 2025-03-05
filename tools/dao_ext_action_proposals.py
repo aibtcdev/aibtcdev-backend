@@ -19,12 +19,16 @@ class ProposeActionAddResourceInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal to run when the proposal is approved",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-add-resource",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-add-resource"
+        ],
     )
     resource_name: str = Field(..., description="Name of the resource to add")
     resource_description: str = Field(..., description="Description of the resource")
@@ -32,7 +36,7 @@ class ProposeActionAddResourceInput(BaseModel):
     resource_url: Optional[str] = Field(
         None,
         description="Optional URL associated with the resource",
-        example="https://www.example.com/resource",
+        examples=["https://www.example.com/resource"],
     )
 
 
@@ -132,17 +136,19 @@ class ProposeActionAllowAssetInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal for allowing an asset",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-allow-asset",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-allow-asset"],
     )
     dao_dao_token_contract_address_address: str = Field(
         ...,
         description="Contract principal of the token to allow",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-token",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-token"],
     )
 
 
@@ -222,17 +228,21 @@ class ProposeActionSendMessageInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract ID of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract ID of the action proposal for messaging",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message"
+        ],
     )
     message: str = Field(
         ...,
         description="Message to be sent through the DAO proposal system",
-        example="Proposal to update the community guidelines",
+        examples=["Proposal to update the community guidelines"],
     )
 
 
@@ -315,17 +325,21 @@ class ProposeActionSetAccountHolderInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder"
+        ],
     )
     account_holder: str = Field(
         ...,
         description="Address of the new account holder",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
     )
 
 
@@ -405,17 +419,21 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount"
+        ],
     )
     withdrawal_amount: int = Field(
         ...,
         description="New withdrawal amount to set",
-        example="1000000000000000000",
+        examples=["1000000000000000000"],
     )
 
 
@@ -495,17 +513,21 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period"
+        ],
     )
     withdrawal_period: int = Field(
         ...,
         description="New withdrawal period to set",
-        example="1000000000000000000",
+        examples=["1000000000000000000"],
     )
 
 
@@ -585,17 +607,21 @@ class ProposeActionToggleResourceInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource"
+        ],
     )
     resource_name: str = Field(
         ...,
         description="Name of the resource to toggle",
-        example="bitcoin",
+        examples=["bitcoin"],
     )
 
 
@@ -605,7 +631,9 @@ class VoteOnActionProposalInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to vote on")
     vote: bool = Field(..., description="True for yes/for, False for no/against")
@@ -681,13 +709,17 @@ class ConcludeActionProposalInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to conclude")
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource"
+        ],
     )
 
 
@@ -766,7 +798,9 @@ class GetLiquidSupplyInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     stacks_block_height: int = Field(
         ..., description="Stacks block height to query the liquid supply at"
@@ -838,7 +872,9 @@ class GetProposalInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to retrieve")
 
@@ -904,7 +940,9 @@ class GetTotalVotesInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to check")
     voter_address: str = Field(..., description="Address of the voter to check")
@@ -979,7 +1017,9 @@ class GetVotingConfigurationInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
 
 
@@ -1040,13 +1080,15 @@ class GetVotingPowerInput(BaseModel):
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal of the DAO action proposals",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
+        ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to check")
     voter_address: str = Field(
         ...,
         description="Address of the voter to check voting power for",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
     )
 
 
