@@ -45,9 +45,8 @@ class ProposeActionAddResourceInput(BaseModel):
 class ProposeActionAddResourceTool(BaseTool):
     name: str = "dao_propose_action_add_resource"
     description: str = (
-        "Propose an action to add a new resource to the DAO. "
-        "This creates a proposal that DAO members can vote on to add a new resource "
-        "to the payment processor with specified name, description, price, and optional URL."
+        "This creates a proposal that DAO members can vote on to add the new resource to the "
+        " DAO resource contract with specified name, description, price, and optional URL."
     )
     args_schema: Type[BaseModel] = ProposeActionAddResourceInput
     return_direct: bool = False
@@ -164,9 +163,8 @@ class ProposeActionAllowAssetInput(BaseModel):
 class ProposeActionAllowAssetTool(BaseTool):
     name: str = "dao_propose_action_allow_asset"
     description: str = (
-        "Propose an action to allow a new asset/token in the DAO. "
-        "This creates a proposal that DAO members can vote on to allow "
-        "a specific token contract to be used within the DAO."
+        "This creates a proposal that DAO members can vote on to allow a specific "
+        " token contract to be used within the DAO treasury contract."
     )
     args_schema: Type[BaseModel] = ProposeActionAllowAssetInput
     return_direct: bool = False
@@ -260,11 +258,8 @@ class ProposeActionSendMessageInput(BaseModel):
 class ProposeActionSendMessageTool(BaseTool):
     name: str = "dao_propose_action_send_message"
     description: str = (
-        "Propose an action to send a message through the DAO. "
-        "This creates a proposal that DAO members can vote on to send a specific message. "
-        "Use with action_proposals_voting_extension like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2' "
-        "and action_proposal_contract_to_execute like 'ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-onchain-messaging'. "
-        "The message will be stored on-chain and posted to Twitter/X after successful proposal approval."
+        "This creates a proposal that DAO members can vote on to send a specific message that gets "
+        "stored on-chain and automatically posted to the DAO Twitter/X account."
     )
     args_schema: Type[BaseModel] = ProposeActionSendMessageInput
     return_direct: bool = False
@@ -362,9 +357,8 @@ class ProposeActionSetAccountHolderInput(BaseModel):
 class ProposeActionSetAccountHolderTool(BaseTool):
     name: str = "dao_propose_action_set_account_holder"
     description: str = (
-        "Propose an action to set a new account holder for the DAO. "
-        "This creates a proposal that DAO members can vote on to change "
-        "the account holder to a specified address."
+        "This creates a proposal that DAO members can vote on to change the account holder "
+        "in a DAO bank account to a specified standard or contract address."
     )
     args_schema: Type[BaseModel] = ProposeActionSetAccountHolderInput
     return_direct: bool = False
@@ -458,9 +452,8 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
 class ProposeActionSetWithdrawalAmountTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_amount"
     description: str = (
-        "Propose an action to set a new withdrawal amount for the DAO's bank account. "
-        "This creates a proposal that DAO members can vote on to change "
-        "the withdrawal amount to a specified value."
+        "This creates a proposal that DAO members can vote on to change the withdrawal amount "
+        " to a specified number of microSTX in a DAO bank account."
     )
     args_schema: Type[BaseModel] = ProposeActionSetWithdrawalAmountInput
     return_direct: bool = False
@@ -554,9 +547,8 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
 class ProposeActionSetWithdrawalPeriodTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_period"
     description: str = (
-        "Propose an action to set a new withdrawal period for the DAO's bank account. "
-        "This creates a proposal that DAO members can vote on to change "
-        "the withdrawal period to a specified value."
+        "This creates a proposal that DAO members can vote on to change the withdrawal period "
+        " to a specified number of Bitcoin blocks in a DAO bank account."
     )
     args_schema: Type[BaseModel] = ProposeActionSetWithdrawalPeriodInput
     return_direct: bool = False
@@ -667,7 +659,7 @@ class VoteOnActionProposalTool(BaseTool):
     description: str = (
         "Vote on an existing action proposal in the DAO. "
         "Allows casting a vote (true/false) on a specific proposal ID "
-        "in the action proposals contract."
+        "in the provided action proposals contract."
     )
     args_schema: Type[BaseModel] = VoteOnActionProposalInput
     return_direct: bool = False
@@ -838,7 +830,7 @@ class GetLiquidSupplyTool(BaseTool):
     name: str = "dao_action_get_liquid_supply"
     description: str = (
         "Get the liquid supply of the DAO token at a specific Stacks block height. "
-        "Returns the total amount of tokens that are liquid/transferable at that block."
+        "Returns the total amount of tokens that are liquid at that block."
     )
     args_schema: Type[BaseModel] = GetLiquidSupplyInput
     return_direct: bool = False
@@ -1189,9 +1181,8 @@ class GetVotingPowerTool(BaseTool):
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
     description: str = (
-        "Propose an action to toggle a resource's status in the payments and invoices contract. "
         "This creates a proposal that DAO members can vote on to enable or disable "
-        "whether a specific resource can be paid for."
+        "whether a specific resource can be paid for in the DAO resource contract."
     )
     args_schema: Type[BaseModel] = ProposeActionToggleResourceInput
     return_direct: bool = False
