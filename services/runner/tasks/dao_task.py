@@ -10,6 +10,7 @@ from backend.models import (
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
+    QueueMessageType,
 )
 from lib.logger import configure_logger
 from services.workflows import execute_langgraph_stream
@@ -89,7 +90,9 @@ class DAOTask(BaseTask[DAOProcessingResult]):
         try:
             logger.debug("Checking for unprocessed DAO messages")
             queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="daos", is_processed=False)
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.DAO, is_processed=False
+                )
             )
             has_messages = bool(queue_messages)
             if not has_messages:
@@ -171,7 +174,9 @@ class DAOTask(BaseTask[DAOProcessingResult]):
 
             # Check queue
             queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="daos", is_processed=False)
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.DAO, is_processed=False
+                )
             )
             return bool(queue_messages)
         except Exception as e:
@@ -184,7 +189,9 @@ class DAOTask(BaseTask[DAOProcessingResult]):
         try:
             # Process queue
             queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="daos", is_processed=False)
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.DAO, is_processed=False
+                )
             )
             if not queue_messages:
                 logger.debug("No messages in queue")

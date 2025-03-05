@@ -3,7 +3,12 @@ from typing import Any, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import QueueMessageCreate, QueueMessageFilter, TokenFilter
+from backend.models import (
+    QueueMessageCreate,
+    QueueMessageFilter,
+    QueueMessageType,
+    TokenFilter,
+)
 from lib.logger import configure_logger
 from services.workflows import generate_dao_tweet
 
@@ -97,7 +102,9 @@ class DAOTweetTask(BaseTask[DAOTweetProcessingResult]):
         try:
             # Check if we have completed DAO messages
             queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="dao_tweet", is_processed=False)
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.DAO_TWEET, is_processed=False
+                )
             )
             return bool(queue_messages)
         except Exception as e:
@@ -110,7 +117,9 @@ class DAOTweetTask(BaseTask[DAOTweetProcessingResult]):
         try:
             # Get completed DAO messages
             queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="dao_tweet", is_processed=False)
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.DAO_TWEET, is_processed=False
+                )
             )
             if not queue_messages:
                 logger.debug("No completed DAO messages found")

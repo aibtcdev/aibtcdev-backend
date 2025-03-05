@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from backend.factory import backend
-from backend.models import QueueMessage, QueueMessageFilter
+from backend.models import QueueMessage, QueueMessageFilter, QueueMessageType
 from lib.logger import configure_logger
 from services.runner.base import BaseTask
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
@@ -15,7 +15,7 @@ logger = configure_logger(__name__)
 class DAOProposalVoterTask(BaseTask):
     """Task runner for processing and voting on DAO proposals."""
 
-    QUEUE_TYPE = "dao_proposal_vote"
+    QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_VOTE
     DEFAULT_CONFIDENCE_THRESHOLD = 0.7
     DEFAULT_AUTO_VOTE = True
 

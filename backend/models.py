@@ -32,6 +32,16 @@ class TweetType(str, Enum):
         return self.value
 
 
+class QueueMessageType(str, Enum):
+    TWEET = "tweet"
+    DAO = "dao"
+    DAO_TWEET = "dao_tweet"
+    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
+
+    def __str__(self):
+        return self.value
+
+
 #
 #  SECRETS
 #
@@ -58,7 +68,7 @@ class Secret(SecretBase):
 #  QUEUE MESSAGES
 #
 class QueueMessageBase(CustomBaseModel):
-    type: Optional[str] = None
+    type: Optional[QueueMessageType] = None
     message: Optional[dict] = None
     is_processed: Optional[bool] = False
     tweet_id: Optional[str] = None
@@ -459,7 +469,7 @@ class WalletFilter(CustomBaseModel):
 
 
 class QueueMessageFilter(CustomBaseModel):
-    type: Optional[str] = None
+    type: Optional[QueueMessageType] = None
     is_processed: Optional[bool] = None
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None

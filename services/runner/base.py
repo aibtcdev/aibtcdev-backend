@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
 
+from backend.models import QueueMessageType
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -66,10 +67,10 @@ class RunnerConfig:
 class JobType(str, Enum):
     """Enum for different types of jobs."""
 
-    DAO = "dao"
-    DAO_TWEET = "dao_tweet"
-    TWEET = "tweet"
-    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
+    DAO = QueueMessageType.DAO
+    DAO_TWEET = QueueMessageType.DAO_TWEET
+    TWEET = QueueMessageType.TWEET
+    DAO_PROPOSAL_VOTE = QueueMessageType.DAO_PROPOSAL_VOTE
     # Add new job types here
 
     def __str__(self):

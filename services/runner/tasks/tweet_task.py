@@ -3,7 +3,12 @@ from typing import List, Optional
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import QueueMessageBase, QueueMessageFilter, XCredsFilter
+from backend.models import (
+    QueueMessageBase,
+    QueueMessageFilter,
+    QueueMessageType,
+    XCredsFilter,
+)
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 
@@ -26,6 +31,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
         self.twitter_service = None
+        self._pending_messages = None
 
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
         """Initialize Twitter service with credentials for the given DAO."""
@@ -118,27 +124,28 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         """Validate tweet processing prerequisites."""
         try:
             # Check if we have unprocessed messages
-            queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="tweet", is_processed=False)
+            self._pending_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.TWEET, is_processed=False
+                )
             )
-            return bool(queue_messages)
+            # Only return False on exceptions, not on empty queue
+            return True
         except Exception as e:
             logger.error(f"Error validating tweet task: {str(e)}", exc_info=True)
+            self._pending_messages = None
             return False
 
     async def execute(self, context: JobContext) -> List[TweetProcessingResult]:
         """Execute tweet processing task."""
         results: List[TweetProcessingResult] = []
         try:
-            # Get unprocessed tweet messages
-            queue_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(type="tweet", is_processed=False)
-            )
-            if not queue_messages:
-                logger.debug("No tweet messages in queue")
+            # Use the messages we already fetched in validate()
+            if not self._pending_messages:
+                logger.info("No tweet messages in queue to process")
                 return results
 
-            for message in queue_messages:
+            for message in self._pending_messages:
                 logger.info(f"Processing tweet message: {message}")
                 result = await self._process_tweet_message(message)
                 results.append(result)
