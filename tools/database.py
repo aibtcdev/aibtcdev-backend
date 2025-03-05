@@ -157,20 +157,41 @@ class GetDAOListTool(BaseTool):
 
 
 class GetDAOByNameInput(BaseModel):
-    """Input schema for GetDAOByName tool."""
+    """Input schema for SearchDAO tool."""
 
-    name: str = Field(
-        ...,
+    name: Optional[str] = Field(
+        None,
         description="Name or partial name of the DAO to search for",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Description text to search for in DAO descriptions",
+    )
+    token_name: Optional[str] = Field(
+        None,
+        description="Name or partial name of the token associated with the DAO",
+    )
+    token_symbol: Optional[str] = Field(
+        None,
+        description="Symbol or partial symbol of the token associated with the DAO",
+    )
+    contract_id: Optional[str] = Field(
+        None,
+        description="Contract ID or partial contract ID to search for",
     )
 
 
 class GetDAOByNameTool(BaseTool):
-    name: str = "dao_get_by_name"
+    name: str = "dao_search"
     description: str = (
-        "This tool is used to search for DAOs by name, supporting partial matches. "
-        "It returns details for all DAOs that have similar names to the search term. "
-        "Example usage: 'find daos related to bitcoin' or 'search for eth daos'"
+        "This tool is used to search for DAOs using multiple criteria including name, description, token name, "
+        "token symbol, and contract ID. All search parameters are optional, but at least one must be provided. "
+        "The search supports partial matches and is case-insensitive. "
+        "It returns comprehensive DAO details including contract principals for the DAO and its associated token. "
+        "The returned data includes DAO name, description, contract addresses/principals, token information (symbol, "
+        "name, contract principal), and DEX extension details if available. "
+        "Example usage: 'find daos related to bitcoin', 'search for daos with ETH in their token symbol', "
+        "or 'find daos that mention governance in their description'"
     )
     args_schema: Type[BaseModel] = GetDAOByNameInput
     return_direct: bool = False
@@ -180,46 +201,124 @@ class GetDAOByNameTool(BaseTool):
 
     def _deploy(
         self,
-        name: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        token_name: Optional[str] = None,
+        token_symbol: Optional[str] = None,
+        contract_id: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to search for DAOs by name."""
+        """Execute the tool to search for DAOs by multiple criteria."""
         try:
-            daos = backend.list_daos()
-            # Search for DAOs with names containing the search term (case-insensitive)
-            matching_daos = [dao for dao in daos if name.lower() in dao.name.lower()]
+            # Ensure at least one search parameter is provided
+            if not any([name, description, token_name, token_symbol, contract_id]):
+                return {"error": "At least one search parameter must be provided"}
 
-            if matching_daos:
-                results = []
-                for dao in matching_daos:
-                    extensions = backend.list_extensions(
-                        filters=ExtensionFilter(dao_id=dao.id)
+            daos = backend.list_daos()
+            matching_daos = []
+
+            for dao in daos:
+                # Get tokens and extensions for this DAO
+                tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
+                extensions = backend.list_extensions(
+                    filters=ExtensionFilter(dao_id=dao.id)
+                )
+
+                # Check matches based on name
+                name_match = name and name.lower() in dao.name.lower()
+
+                # Check matches based on description
+                desc_match = (
+                    description and description.lower() in dao.description.lower()
+                )
+
+                # Check matches based on contract ID
+                contract_match = contract_id and any(
+                    contract_id.lower() in str(dao.contract_id).lower()
+                )
+
+                # Check matches based on token name or symbol
+                token_name_match = False
+                token_symbol_match = False
+
+                if tokens:
+                    token_name_match = token_name and any(
+                        token_name.lower() in token.name.lower() for token in tokens
                     )
-                    tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
-                    results.append(
+                    token_symbol_match = token_symbol and any(
+                        token_symbol.lower() in token.symbol.lower() for token in tokens
+                    )
+
+                # Add to matching results if any criteria match
+                if any(
+                    [
+                        name_match,
+                        desc_match,
+                        contract_match,
+                        token_name_match,
+                        token_symbol_match,
+                    ]
+                ):
+                    matching_daos.append(
                         {"dao": dao, "extensions": extensions, "tokens": tokens}
                     )
-                return {"matches": results}
+
+            if matching_daos:
+                return {"matches": matching_daos}
             else:
-                return {"error": f"No DAOs found matching '{name}'"}
+                search_terms = []
+                if name:
+                    search_terms.append(f"name: '{name}'")
+                if description:
+                    search_terms.append(f"description: '{description}'")
+                if token_name:
+                    search_terms.append(f"token name: '{token_name}'")
+                if token_symbol:
+                    search_terms.append(f"token symbol: '{token_symbol}'")
+                if contract_id:
+                    search_terms.append(f"contract ID: '{contract_id}'")
+
+                return {"error": f"No DAOs found matching {', '.join(search_terms)}"}
         except Exception as e:
             return {"error": str(e)}
 
     async def _run(
         self,
-        name: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        token_name: Optional[str] = None,
+        token_symbol: Optional[str] = None,
+        contract_id: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Sync version of the tool."""
-        return self._deploy(name=name, **kwargs)
+        return self._deploy(
+            name=name,
+            description=description,
+            token_name=token_name,
+            token_symbol=token_symbol,
+            contract_id=contract_id,
+            **kwargs,
+        )
 
     async def _arun(
         self,
-        name: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        token_name: Optional[str] = None,
+        token_symbol: Optional[str] = None,
+        contract_id: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(name=name, **kwargs)
+        return self._deploy(
+            name=name,
+            description=description,
+            token_name=token_name,
+            token_symbol=token_symbol,
+            contract_id=contract_id,
+            **kwargs,
+        )
 
 
 class UpdateScheduledTaskInput(BaseModel):
