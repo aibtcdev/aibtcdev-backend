@@ -42,8 +42,8 @@ class FaktoryExecuteBuyTool(BaseTool):
 
     def _deploy(
         self,
-        stx_amount: str,
-        dex_contract_id: str,
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
@@ -58,30 +58,30 @@ class FaktoryExecuteBuyTool(BaseTool):
             self.wallet_id,
             "stacks-faktory",
             "exec-buy.ts",
-            stx_amount,
-            dex_contract_id,
+            btc_amount,
+            dao_token_dex_contract_address,
             slippage,
         )
 
     def _run(
         self,
-        stx_amount: str,
-        dex_contract_id: str,
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(btc_amount, dao_token_dex_contract_address, slippage)
 
     async def _arun(
         self,
-        stx_amount: str,
-        dex_contract_id: str,
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order (async)."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(btc_amount, dao_token_dex_contract_address, slippage)
 
 
 class FaktoryExecuteBuyStxInput(BaseModel):
@@ -116,7 +116,7 @@ class FaktoryExecuteBuyStxTool(BaseTool):
     def _deploy(
         self,
         stx_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
@@ -139,22 +139,22 @@ class FaktoryExecuteBuyStxTool(BaseTool):
     def _run(
         self,
         stx_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(stx_amount, dao_token_dex_contract_address, slippage)
 
     async def _arun(
         self,
         stx_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order (async)."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(stx_amount, dao_token_dex_contract_address, slippage)
 
 
 class FaktoryExecuteSellInput(BaseModel):
