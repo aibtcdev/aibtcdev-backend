@@ -55,6 +55,7 @@ from .database import (
 )
 from .faktory import (
     FaktoryExecuteBuyTool,
+    FaktoryExecuteBuyStxTool,
     FaktoryExecuteSellTool,
     FaktoryGetBuyQuoteTool,
     FaktoryGetDaoTokensTool,
@@ -208,6 +209,7 @@ def initialize_tools(
         "database_delete_scheduled_task": DeleteScheduledTaskTool(profile_id, agent_id),
         "faktory_get_sbtc": FaktoryGetSbtcTool(wallet_id),
         "faktory_exec_buy": FaktoryExecuteBuyTool(wallet_id),
+        "faktory_exec_buy_stx": FaktoryExecuteBuyStxTool(wallet_id),
         "faktory_exec_sell": FaktoryExecuteSellTool(wallet_id),
         # "faktory_get_buy_quote": FaktoryGetBuyQuoteTool(wallet_id),
         # "faktory_get_dao_tokens": FaktoryGetDaoTokensTool(wallet_id),
