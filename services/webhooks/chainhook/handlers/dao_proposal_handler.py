@@ -21,8 +21,8 @@ class DAOProposalHandler(ChainhookEventHandler):
     """Handler for capturing and processing new DAO action proposals.
 
     This handler identifies contract calls related to proposing actions in DAO contracts,
-    finds relevant agents holding governance tokens for the DAO, and
-    creates queue messages for those agents to evaluate and vote on the proposal.
+    creates proposal records in the database, and triggers the burn height handler
+    to manage voting queue messages.
     """
 
     def __init__(self):
@@ -151,45 +151,11 @@ class DAOProposalHandler(ChainhookEventHandler):
         self.logger.warning("Could not find proposal information in transaction events")
         return None
 
-    def _get_agent_token_holders(self, dao_id: UUID) -> List[Dict]:
-        """Get agents that hold tokens for the given DAO.
-
-        Args:
-            dao_id: The ID of the DAO
-
-        Returns:
-            List[Dict]: List of agents with their wallet IDs
-        """
-        # Get wallet-token pairs for this DAO
-        wallet_tokens = backend.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
-
-        if not wallet_tokens:
-            self.logger.info(f"No wallet tokens found for DAO {dao_id}")
-            return []
-
-        # Get unique wallet IDs
-        wallet_ids = list(set(wt.wallet_id for wt in wallet_tokens))
-
-        # Get agents that own these wallets
-        agents_with_tokens = []
-        for wallet_id in wallet_ids:
-            wallet = backend.get_wallet(wallet_id)
-            if wallet and wallet.agent_id:
-                agents_with_tokens.append(
-                    {"agent_id": wallet.agent_id, "wallet_id": wallet_id}
-                )
-
-        self.logger.info(
-            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id}"
-        )
-        return agents_with_tokens
-
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle DAO proposal transactions.
 
-        Processes new action proposal transactions, identifies agents holding
-        governance tokens for the associated DAO, and creates queue messages
-        for them to evaluate and vote on the proposal.
+        Processes new action proposal transactions and creates proposal records in the database.
+        The burn height handler will manage the creation of voting queue messages.
 
         Args:
             transaction: The transaction to handle
@@ -261,32 +227,4 @@ class DAOProposalHandler(ChainhookEventHandler):
         else:
             self.logger.info(
                 f"Proposal already exists in database: {existing_proposals[0].id}"
-            )
-
-        # Get agents holding governance tokens for this DAO
-        agents = self._get_agent_token_holders(dao_data["id"])
-        if not agents:
-            self.logger.warning(
-                f"No agents found holding tokens for DAO {dao_data['id']}"
-            )
-            return
-
-        # Create queue messages for each agent to evaluate and vote on the proposal
-        for agent in agents:
-            new_message = backend.create_queue_message(
-                QueueMessageCreate(
-                    type="dao_proposal_vote",
-                    message={
-                        "action_proposals_contract": contract_identifier,
-                        "proposal_id": proposal_info["proposal_id"],
-                        "dao_name": dao_data["name"],
-                        "tx_id": tx_id,
-                    },
-                    dao_id=dao_data["id"],
-                    wallet_id=agent["wallet_id"],
-                )
-            )
-            self.logger.info(
-                f"Created queue message for agent {agent['agent_id']} "
-                f"to evaluate proposal {proposal_info['proposal_id']}: {new_message.id}"
             )
