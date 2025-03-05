@@ -50,7 +50,7 @@ class ChainhookParser(WebhookParser):
             ChainHookData object with structured data
         """
         self.logger.debug("Parsing chainhook payload")
-
+        self.logger.debug(f"payload: {json.dumps(payload, indent=4)}")
         # Parse predicate
         predicate = Predicate(
             scope=payload.get("chainhook", {}).get("predicate", {}).get("scope", ""),
@@ -72,7 +72,7 @@ class ChainhookParser(WebhookParser):
         apply_blocks = []
         for apply_data in payload.get("apply", []):
             # i need it pretty print json apply_data
-            self.logger.debug(f"apply_data: {json.dumps(apply_data, indent=4)}")
+            # self.logger.debug(f"apply_data: {json.dumps(apply_data, indent=4)}")
             # Parse block identifier
             block_id = BlockIdentifier(
                 hash=apply_data.get("block_identifier", {}).get("hash", ""),

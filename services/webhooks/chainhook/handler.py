@@ -4,9 +4,13 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
+from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,
+)
+from services.webhooks.chainhook.handlers.dao_proposal_burn_height_handler import (
+    DAOProposalBurnHeightHandler,
 )
 from services.webhooks.chainhook.handlers.dao_proposal_handler import DAOProposalHandler
 from services.webhooks.chainhook.handlers.sell_event_handler import SellEventHandler
@@ -29,6 +33,7 @@ class ChainhookHandler(WebhookHandler):
             BuyEventHandler(),
             SellEventHandler(),
             DAOProposalHandler(),
+            DAOProposalBurnHeightHandler(),
         ]
 
     async def handle(self, parsed_data: ChainHookData) -> Dict[str, Any]:
@@ -44,6 +49,10 @@ class ChainhookHandler(WebhookHandler):
             self.logger.info(
                 f"Processing chainhook webhook with {len(parsed_data.apply)} apply blocks"
             )
+
+            # Set chainhook data for all handlers
+            for handler in self.handlers:
+                handler.set_chainhook_data(parsed_data)
 
             for apply in parsed_data.apply:
                 for transaction in apply.transactions:

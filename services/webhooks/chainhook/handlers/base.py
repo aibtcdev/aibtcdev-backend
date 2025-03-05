@@ -1,10 +1,10 @@
 """Base class for Chainhook event handlers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from lib.logger import configure_logger
-from services.webhooks.chainhook.models import TransactionWithReceipt
+from services.webhooks.chainhook.models import ChainHookData, TransactionWithReceipt
 
 
 class ChainhookEventHandler(ABC):
@@ -17,6 +17,15 @@ class ChainhookEventHandler(ABC):
     def __init__(self):
         """Initialize the handler with a logger."""
         self.logger = configure_logger(self.__class__.__name__)
+        self.chainhook_data: Optional[ChainHookData] = None
+
+    def set_chainhook_data(self, data: ChainHookData) -> None:
+        """Set the chainhook data for this handler.
+
+        Args:
+            data: The chainhook data to set
+        """
+        self.chainhook_data = data
 
     @abstractmethod
     def can_handle(self, transaction: TransactionWithReceipt) -> bool:

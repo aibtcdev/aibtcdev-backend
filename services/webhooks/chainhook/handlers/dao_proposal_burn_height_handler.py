@@ -12,7 +12,12 @@ from backend.models import (
 )
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
-from services.webhooks.chainhook.models import Event, TransactionWithReceipt
+from services.webhooks.chainhook.models import (
+    Apply,
+    ChainHookData,
+    Event,
+    TransactionWithReceipt,
+)
 
 
 class DAOProposalBurnHeightHandler(ChainhookEventHandler):
@@ -28,54 +33,54 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         """Initialize the handler with a logger."""
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
+        self.chainhook_data: Optional[ChainHookData] = None
+
+    def set_chainhook_data(self, data: ChainHookData) -> None:
+        """Set the chainhook data for this handler.
+
+        Args:
+            data: The chainhook data to set
+        """
+        self.chainhook_data = data
 
     def can_handle(self, transaction: TransactionWithReceipt) -> bool:
         """Check if this handler can handle the given transaction.
 
-        This handler looks for burn block height events.
+        This handler processes blocks with Coinbase transactions since they indicate
+        a new block has been mined.
 
         Args:
             transaction: The transaction to check
 
         Returns:
-            bool: True if this handler can handle the transaction, False otherwise
+            bool: True if this is a Coinbase transaction, False otherwise
         """
-        tx_data = self.extract_transaction_data(transaction)
-        tx_metadata = tx_data["tx_metadata"]
+        if isinstance(transaction.metadata, dict):
+            kind = transaction.metadata.get("kind", {})
+        else:
+            kind = transaction.metadata.kind
 
-        # Check if this is a burn block height event
-        events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
+        if isinstance(kind, dict):
+            return kind.get("type") == "Coinbase"
+        return getattr(kind, "type", None) == "Coinbase"
 
-        for event in events:
-            if (
-                event.type == "SmartContractEvent"
-                and hasattr(event, "data")
-                and event.data.get("topic") == "print"
-            ):
-                value = event.data.get("value", {})
-                if value.get("notification") == "burn-block-height":
-                    return True
-
-        return False
-
-    def _get_burn_height_from_events(self, events: List[Event]) -> Optional[int]:
-        """Extract the burn block height from transaction events.
+    def _get_burn_height(self, tx_data: Dict) -> Optional[int]:
+        """Extract the burn block height from transaction data.
 
         Args:
-            events: List of events from the transaction
+            tx_data: Transaction data (unused)
 
         Returns:
-            Optional[int]: The burn block height if found, None otherwise
+            Optional[int]: The burn block height from bitcoin anchor block identifier
         """
-        for event in events:
+        # Get burn height from the apply block data
+        if self.chainhook_data and self.chainhook_data.apply:
+            apply_block = self.chainhook_data.apply[0]  # Get first apply block
             if (
-                event.type == "SmartContractEvent"
-                and hasattr(event, "data")
-                and event.data.get("topic") == "print"
+                apply_block.metadata
+                and apply_block.metadata.bitcoin_anchor_block_identifier
             ):
-                value = event.data.get("value", {})
-                if value.get("notification") == "burn-block-height":
-                    return value.get("height")
+                return apply_block.metadata.bitcoin_anchor_block_identifier.index
         return None
 
     def _get_agent_token_holders(self, dao_id: UUID) -> List[Dict]:
@@ -121,11 +126,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             transaction: The transaction to handle
         """
         tx_data = self.extract_transaction_data(transaction)
-        tx_metadata = tx_data["tx_metadata"]
-
-        # Get burn height from events
-        events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
-        burn_height = self._get_burn_height_from_events(events)
+        # Get burn height from the apply block data
+        burn_height = self._get_burn_height(tx_data)
 
         if burn_height is None:
             self.logger.warning("Could not determine burn height from transaction")
@@ -144,7 +146,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         eligible_proposals = [
             p
             for p in proposals
-            if p.start_block is not None and p.start_block <= burn_height
+            if p.start_block is not None
+            and p.end_block is not None
+            and p.start_block <= burn_height < p.end_block
         ]
 
         if not eligible_proposals:
