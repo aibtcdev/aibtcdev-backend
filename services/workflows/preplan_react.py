@@ -124,6 +124,16 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
             logger.info("Thought process notes created successfully")
             logger.debug(f"Notes content length: {len(plan)}")
 
+            # Emit the plan through the callback system so it can be saved as a step
+            await self.callback_handler.queue.put(
+                {
+                    "type": "step",
+                    "content": plan,
+                    "role": "assistant",
+                    "thought": "Planning Phase",
+                }
+            )
+
             return plan
         except Exception as e:
             logger.error(f"Failed to create plan: {str(e)}", exc_info=True)

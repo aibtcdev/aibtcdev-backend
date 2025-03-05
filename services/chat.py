@@ -213,6 +213,32 @@ class ChatProcessor:
             self.current_message = self._create_empty_message()
             return
 
+        if result.get("type") == "step":
+            # Handle planning step
+            logger.info("Processing planning step")
+            backend.create_step(
+                new_step=StepCreate(
+                    profile_id=self.profile.id,
+                    job_id=self.job_id,
+                    agent_id=self.agent_id,
+                    role="assistant",
+                    content=result.get("content", ""),
+                    thought=result.get("thought"),
+                    tool=None,
+                    tool_input=None,
+                    tool_output=None,
+                )
+            )
+            self.results.append(
+                {
+                    **result,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "thread_id": str(self.thread_id),
+                    "agent_id": str(self.agent_id) if self.agent_id else None,
+                }
+            )
+            return
+
         if result.get("content"):
             if result.get("type") == "token":
                 stream_message = self.message_handler.process_token_message(
