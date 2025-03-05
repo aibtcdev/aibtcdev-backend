@@ -1,20 +1,21 @@
+from typing import Any, Dict, Optional, Type
 from uuid import UUID
-from pydantic import BaseModel, Field
+
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from tools.bun import BunScriptRunner
 from tools.dao_base import DAOToolResponse
-from typing import Dict, Optional, Type, Any
+
 
 class SendMessageInput(BaseModel):
     """Input schema for sending an onchain message."""
+
     messaging_contract: str = Field(
-        ..., 
-        description="Contract ID of the messaging contract"
+        ..., description="Contract ID of the messaging contract"
     )
-    message: str = Field(
-        ...,
-        description="Message to send"
-    )
+    message: str = Field(..., description="Message to send")
+
 
 class SendMessageTool(BaseTool):
     name: str = "dao_messaging_send"
@@ -46,21 +47,16 @@ class SendMessageTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "onchain-messaging",
-            "send.ts",
-            *args
+            self.wallet_id, "onchain-messaging", "send.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Operation successful"),
-            result.get("data")
+            "Message sent successfully", result.get("output")
         )
 
     def _run(

@@ -1,20 +1,21 @@
+from typing import Any, Dict, Optional, Type
 from uuid import UUID
-from pydantic import BaseModel, Field
+
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from tools.bun import BunScriptRunner
 from tools.dao_base import DAOToolResponse
-from typing import Dict, Optional, Type, Any
+
 
 class IsExtensionInput(BaseModel):
     """Input schema for checking if a contract is an extension."""
-    base_dao_contract: str = Field(
-        ..., 
-        description="Contract ID of the base DAO"
-    )
+
+    base_dao_contract: str = Field(..., description="Contract ID of the base DAO")
     extension_contract: str = Field(
-        ..., 
-        description="Contract ID to check if it's an extension"
+        ..., description="Contract ID to check if it's an extension"
     )
+
 
 class IsExtensionTool(BaseTool):
     name: str = "dao_is_extension"
@@ -46,21 +47,16 @@ class IsExtensionTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "base-dao",
-            "is-extension.ts",
-            *args
+            self.wallet_id, "base-dao", "is-extension.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Operation successful"),
-            result.get("data")
+            "Successfully checked extension status", result.get("output")
         )
 
     def _run(
@@ -70,11 +66,7 @@ class IsExtensionTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to check extension status."""
-        return self._deploy(
-            base_dao_contract,
-            extension_contract,
-            **kwargs
-        )
+        return self._deploy(base_dao_contract, extension_contract, **kwargs)
 
     async def _arun(
         self,
@@ -83,22 +75,17 @@ class IsExtensionTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            base_dao_contract,
-            extension_contract,
-            **kwargs
-        )
+        return self._deploy(base_dao_contract, extension_contract, **kwargs)
+
 
 class ExecutedAtInput(BaseModel):
     """Input schema for checking when a proposal was executed."""
-    base_dao_contract: str = Field(
-        ..., 
-        description="Contract ID of the base DAO"
-    )
+
+    base_dao_contract: str = Field(..., description="Contract ID of the base DAO")
     proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the proposal to check"
+        ..., description="Contract ID of the proposal to check"
     )
+
 
 class ExecutedAtTool(BaseTool):
     name: str = "dao_executed_at"
@@ -130,21 +117,16 @@ class ExecutedAtTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "base-dao",
-            "executed-at.ts",
-            *args
+            self.wallet_id, "base-dao", "executed-at.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Operation successful"),
-            result.get("data")
+            "Successfully retrieved execution block", result.get("output")
         )
 
     def _run(
@@ -154,11 +136,7 @@ class ExecutedAtTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to check proposal execution block."""
-        return self._deploy(
-            base_dao_contract,
-            proposal_contract,
-            **kwargs
-        )
+        return self._deploy(base_dao_contract, proposal_contract, **kwargs)
 
     async def _arun(
         self,
@@ -167,8 +145,4 @@ class ExecutedAtTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            base_dao_contract,
-            proposal_contract,
-            **kwargs
-        )
+        return self._deploy(base_dao_contract, proposal_contract, **kwargs)

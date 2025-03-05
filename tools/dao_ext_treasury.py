@@ -1,20 +1,19 @@
+from typing import Any, Dict, Optional, Type
 from uuid import UUID
-from pydantic import BaseModel, Field
+
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from tools.bun import BunScriptRunner
 from tools.dao_base import DAOToolResponse
-from typing import Dict, Optional, Type, Any
+
 
 class GetAllowedAssetInput(BaseModel):
     """Input schema for checking if an asset is allowed."""
-    treasury_contract: str = Field(
-        ..., 
-        description="Contract ID of the treasury"
-    )
-    asset_contract: str = Field(
-        ...,
-        description="Contract ID of the asset to check"
-    )
+
+    treasury_contract: str = Field(..., description="Contract ID of the treasury")
+    asset_contract: str = Field(..., description="Contract ID of the asset to check")
+
 
 class GetAllowedAssetTool(BaseTool):
     name: str = "dao_treasury_get_allowed_asset"
@@ -40,27 +39,19 @@ class GetAllowedAssetTool(BaseTool):
         if self.wallet_id is None:
             return DAOToolResponse.error_response("Wallet ID is required")
 
-        args = [
-            treasury_contract,
-            asset_contract
-        ]
+        args = [treasury_contract, asset_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "treasury",
-            "get-allowed-asset.ts",
-            *args
+            self.wallet_id, "treasury", "get-allowed-asset.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully checked allowed asset status"),
-            result.get("data")
+            "Successfully processed treasury operation", result.get("output")
         )
 
     def _run(
@@ -81,16 +72,13 @@ class GetAllowedAssetTool(BaseTool):
         """Async version of the tool."""
         return self._deploy(treasury_contract, asset_contract, **kwargs)
 
+
 class IsAllowedAssetInput(BaseModel):
     """Input schema for checking if an asset is allowed."""
-    treasury_contract: str = Field(
-        ..., 
-        description="Contract ID of the treasury"
-    )
-    asset_contract: str = Field(
-        ...,
-        description="Contract ID of the asset to check"
-    )
+
+    treasury_contract: str = Field(..., description="Contract ID of the treasury")
+    asset_contract: str = Field(..., description="Contract ID of the asset to check")
+
 
 class IsAllowedAssetTool(BaseTool):
     name: str = "dao_treasury_is_allowed_asset"
@@ -116,27 +104,19 @@ class IsAllowedAssetTool(BaseTool):
         if self.wallet_id is None:
             return DAOToolResponse.error_response("Wallet ID is required")
 
-        args = [
-            treasury_contract,
-            asset_contract
-        ]
+        args = [treasury_contract, asset_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "treasury",
-            "is-allowed-asset.ts",
-            *args
+            self.wallet_id, "treasury", "is-allowed-asset.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully verified asset allowance status"),
-            result.get("data")
+            "Successfully processed treasury operation", result.get("output")
         )
 
     def _run(

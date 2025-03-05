@@ -1,40 +1,35 @@
+from typing import Any, Dict, Optional, Type
 from uuid import UUID
-from pydantic import BaseModel, Field
+
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from tools.bun import BunScriptRunner
 from tools.dao_base import DAOToolResponse
-from typing import Dict, Optional, Type, Any
+
 
 class DaoBaseInput(BaseModel):
     """Base input schema for dao tools that do not require parameters."""
+
     pass
+
 
 class ProposeActionAddResourceInput(BaseModel):
     """Input schema for proposing to add a resource action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    resource_name: str = Field(
-        ..., 
-        description="Name of the resource to add"
-    )
-    resource_description: str = Field(
-        ..., 
-        description="Description of the resource"
-    )
-    resource_price: int = Field(
-        ..., 
-        description="Price of the resource in microstacks"
-    )
+    resource_name: str = Field(..., description="Name of the resource to add")
+    resource_description: str = Field(..., description="Description of the resource")
+    resource_price: int = Field(..., description="Price of the resource in microstacks")
     resource_url: Optional[str] = Field(
-        None,
-        description="Optional URL associated with the resource"
+        None, description="Optional URL associated with the resource"
     )
+
 
 class ProposeActionAddResourceTool(BaseTool):
     name: str = "dao_propose_action_add_resource"
@@ -72,7 +67,7 @@ class ProposeActionAddResourceTool(BaseTool):
             resource_description,
             str(resource_price),
         ]
-        
+
         if resource_url:
             args.append(resource_url)
 
@@ -80,18 +75,16 @@ class ProposeActionAddResourceTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-add-resource.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully retrieved current DAO charter"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -112,7 +105,7 @@ class ProposeActionAddResourceTool(BaseTool):
             resource_description,
             resource_price,
             resource_url,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -133,23 +126,21 @@ class ProposeActionAddResourceTool(BaseTool):
             resource_description,
             resource_price,
             resource_url,
-            **kwargs
+            **kwargs,
         )
+
 
 class ProposeActionAllowAssetInput(BaseModel):
     """Input schema for proposing to allow an asset action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    token_contract: str = Field(
-        ..., 
-        description="Contract ID of the token to allow"
-    )
+    token_contract: str = Field(..., description="Contract ID of the token to allow")
+
 
 class ProposeActionAllowAssetTool(BaseTool):
     name: str = "dao_propose_action_allow_asset"
@@ -187,18 +178,16 @@ class ProposeActionAllowAssetTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-allow-asset.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully retrieved current charter version"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -213,7 +202,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             token_contract,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -228,23 +217,21 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             token_contract,
-            **kwargs
+            **kwargs,
         )
+
 
 class ProposeActionSendMessageInput(BaseModel):
     """Input schema for proposing to send a message action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    message: str = Field(
-        ..., 
-        description="Message to be sent"
-    )
+    message: str = Field(..., description="Message to be sent")
+
 
 class ProposeActionSendMessageTool(BaseTool):
     name: str = "dao_propose_action_send_message"
@@ -282,18 +269,16 @@ class ProposeActionSendMessageTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-send-message.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully retrieved DAO charter version"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -305,10 +290,7 @@ class ProposeActionSendMessageTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            message,
-            **kwargs
+            action_proposals_contract, action_proposal_contract, message, **kwargs
         )
 
     async def _arun(
@@ -320,26 +302,21 @@ class ProposeActionSendMessageTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            message,
-            **kwargs
+            action_proposals_contract, action_proposal_contract, message, **kwargs
         )
+
 
 class ProposeActionSetAccountHolderInput(BaseModel):
     """Input schema for proposing to set account holder action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    account_holder: str = Field(
-        ..., 
-        description="Address of the new account holder"
-    )
+    account_holder: str = Field(..., description="Address of the new account holder")
+
 
 class ProposeActionSetAccountHolderTool(BaseTool):
     name: str = "dao_propose_action_set_account_holder"
@@ -377,18 +354,16 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-account-holder.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to add resource"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -403,7 +378,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             account_holder,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -418,23 +393,21 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             account_holder,
-            **kwargs
+            **kwargs,
         )
+
 
 class ProposeActionSetWithdrawalAmountInput(BaseModel):
     """Input schema for proposing to set withdrawal amount action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    withdrawal_amount: int = Field(
-        ..., 
-        description="New withdrawal amount to set"
-    )
+    withdrawal_amount: int = Field(..., description="New withdrawal amount to set")
+
 
 class ProposeActionSetWithdrawalAmountTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_amount"
@@ -472,18 +445,16 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-amount.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to allow asset"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -498,7 +469,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             withdrawal_amount,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -513,23 +484,21 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             withdrawal_amount,
-            **kwargs
+            **kwargs,
         )
+
 
 class ProposeActionSetWithdrawalPeriodInput(BaseModel):
     """Input schema for proposing to set withdrawal period action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    withdrawal_period: int = Field(
-        ..., 
-        description="New withdrawal period to set"
-    )
+    withdrawal_period: int = Field(..., description="New withdrawal period to set")
+
 
 class ProposeActionSetWithdrawalPeriodTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_period"
@@ -567,18 +536,16 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-set-withdrawal-period.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to send message"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -593,7 +560,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             withdrawal_period,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -608,39 +575,31 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             action_proposals_contract,
             action_proposal_contract,
             withdrawal_period,
-            **kwargs
+            **kwargs,
         )
+
 
 class ProposeActionToggleResourceInput(BaseModel):
     """Input schema for proposing to toggle a resource action."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     action_proposal_contract: str = Field(
-        ..., 
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
-    resource_name: str = Field(
-        ..., 
-        description="Name of the resource to toggle"
-    )
+    resource_name: str = Field(..., description="Name of the resource to toggle")
 
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
-    proposal_id: int = Field(
-        ...,
-        description="ID of the proposal to vote on"
-    )
-    vote: bool = Field(
-        ...,
-        description="True for yes/for, False for no/against"
-    )
+    proposal_id: int = Field(..., description="ID of the proposal to vote on")
+    vote: bool = Field(..., description="True for yes/for, False for no/against")
+
 
 class VoteOnActionProposalTool(BaseTool):
     name: str = "dao_action_vote_on_proposal"
@@ -678,18 +637,16 @@ class VoteOnActionProposalTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "vote-on-proposal.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to set account holder"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -700,12 +657,7 @@ class VoteOnActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
-        return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            vote,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, proposal_id, vote, **kwargs)
 
     async def _arun(
         self,
@@ -715,27 +667,20 @@ class VoteOnActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            vote,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, proposal_id, vote, **kwargs)
+
 
 class ConcludeActionProposalInput(BaseModel):
     """Input schema for concluding an action proposal."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
-    proposal_id: int = Field(
-        ...,
-        description="ID of the proposal to conclude"
-    )
+    proposal_id: int = Field(..., description="ID of the proposal to conclude")
     action_proposal_contract: str = Field(
-        ...,
-        description="Contract ID of the action proposal"
+        ..., description="Contract ID of the action proposal"
     )
+
 
 class ConcludeActionProposalTool(BaseTool):
     name: str = "dao_action_conclude_proposal"
@@ -772,18 +717,16 @@ class ConcludeActionProposalTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "conclude-proposal.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to set withdrawal amount"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -795,10 +738,7 @@ class ConcludeActionProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to conclude an action proposal."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            action_proposal_contract,
-            **kwargs
+            action_proposals_contract, proposal_id, action_proposal_contract, **kwargs
         )
 
     async def _arun(
@@ -810,22 +750,20 @@ class ConcludeActionProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            action_proposal_contract,
-            **kwargs
+            action_proposals_contract, proposal_id, action_proposal_contract, **kwargs
         )
+
 
 class GetLiquidSupplyInput(BaseModel):
     """Input schema for getting the liquid supply."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
     stacks_block_height: int = Field(
-        ...,
-        description="Stacks block height to query the liquid supply at"
+        ..., description="Stacks block height to query the liquid supply at"
     )
+
 
 class GetLiquidSupplyTool(BaseTool):
     name: str = "dao_action_get_liquid_supply"
@@ -864,18 +802,16 @@ class GetLiquidSupplyTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-liquid-supply.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully proposed action to set withdrawal period"),
-            result.get("data")
+            "Successfully processed action proposal", result.get("output")
         )
 
     def _run(
@@ -885,11 +821,7 @@ class GetLiquidSupplyTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get the liquid supply."""
-        return self._deploy(
-            action_proposals_contract,
-            stacks_block_height,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, stacks_block_height, **kwargs)
 
     async def _arun(
         self,
@@ -898,22 +830,17 @@ class GetLiquidSupplyTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            action_proposals_contract,
-            stacks_block_height,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, stacks_block_height, **kwargs)
+
 
 class GetProposalInput(BaseModel):
     """Input schema for getting proposal data."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
-    proposal_id: int = Field(
-        ...,
-        description="ID of the proposal to retrieve"
-    )
+    proposal_id: int = Field(..., description="ID of the proposal to retrieve")
+
 
 class GetProposalTool(BaseTool):
     name: str = "dao_action_get_proposal"
@@ -952,18 +879,18 @@ class GetProposalTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-proposal.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", f"Unknown error at bun_run: {result}"),
+                result.get("output"),
             )
-            
+
         return DAOToolResponse.success_response(
             result.get("message", "Successfully proposed action to toggle resource"),
-            result.get("data")
+            result.get("output"),
         )
 
     def _run(
@@ -973,11 +900,7 @@ class GetProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get proposal data."""
-        return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, proposal_id, **kwargs)
 
     async def _arun(
         self,
@@ -986,26 +909,18 @@ class GetProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, proposal_id, **kwargs)
+
 
 class GetTotalVotesInput(BaseModel):
     """Input schema for getting total votes for a voter."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
-    proposal_id: int = Field(
-        ...,
-        description="ID of the proposal to check"
-    )
-    voter_address: str = Field(
-        ...,
-        description="Address of the voter to check"
-    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(..., description="Address of the voter to check")
+
 
 class GetTotalVotesTool(BaseTool):
     name: str = "dao_action_get_total_votes"
@@ -1046,18 +961,18 @@ class GetTotalVotesTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-total-votes.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", f"Unknown error at bun_run: {result}"),
+                result.get("output"),
             )
-            
+
         return DAOToolResponse.success_response(
             result.get("message", "Successfully voted on proposal"),
-            result.get("data")
+            result.get("output"),
         )
 
     def _run(
@@ -1069,10 +984,7 @@ class GetTotalVotesTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get total votes."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            voter_address,
-            **kwargs
+            action_proposals_contract, proposal_id, voter_address, **kwargs
         )
 
     async def _arun(
@@ -1084,18 +996,17 @@ class GetTotalVotesTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            voter_address,
-            **kwargs
+            action_proposals_contract, proposal_id, voter_address, **kwargs
         )
+
 
 class GetVotingConfigurationInput(BaseModel):
     """Input schema for getting voting configuration."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
+
 
 class GetVotingConfigurationTool(BaseTool):
     name: str = "dao_action_get_voting_configuration"
@@ -1132,18 +1043,18 @@ class GetVotingConfigurationTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-configuration.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", f"Unknown error at bun_run: {result}"),
+                result.get("output"),
             )
-            
+
         return DAOToolResponse.success_response(
             result.get("message", "Successfully concluded proposal"),
-            result.get("data")
+            result.get("output"),
         )
 
     def _run(
@@ -1152,10 +1063,7 @@ class GetVotingConfigurationTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get voting configuration."""
-        return self._deploy(
-            action_proposals_contract,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, **kwargs)
 
     async def _arun(
         self,
@@ -1163,25 +1071,20 @@ class GetVotingConfigurationTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            action_proposals_contract,
-            **kwargs
-        )
+        return self._deploy(action_proposals_contract, **kwargs)
+
 
 class GetVotingPowerInput(BaseModel):
     """Input schema for getting voting power."""
+
     action_proposals_contract: str = Field(
-        ..., 
-        description="Contract ID of the DAO action proposals"
+        ..., description="Contract ID of the DAO action proposals"
     )
-    proposal_id: int = Field(
-        ...,
-        description="ID of the proposal to check"
-    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
     voter_address: str = Field(
-        ...,
-        description="Address of the voter to check voting power for"
+        ..., description="Address of the voter to check voting power for"
     )
+
 
 class GetVotingPowerTool(BaseTool):
     name: str = "dao_action_get_voting_power"
@@ -1222,18 +1125,18 @@ class GetVotingPowerTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/read-only",
             "get-voting-power.ts",
-            *args
+            *args,
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", f"Unknown error at bun_run: {result}"),
-                result.get("data")
+                result.get("error", f"Unknown error at bun_run: {result}"),
+                result.get("output"),
             )
-            
+
         return DAOToolResponse.success_response(
             result.get("message", "Successfully retrieved liquid supply"),
-            result.get("data")
+            result.get("output"),
         )
 
     def _run(
@@ -1245,10 +1148,7 @@ class GetVotingPowerTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to get voting power."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            voter_address,
-            **kwargs
+            action_proposals_contract, proposal_id, voter_address, **kwargs
         )
 
     async def _arun(
@@ -1260,11 +1160,9 @@ class GetVotingPowerTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            proposal_id,
-            voter_address,
-            **kwargs
+            action_proposals_contract, proposal_id, voter_address, **kwargs
         )
+
 
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
@@ -1302,7 +1200,18 @@ class ProposeActionToggleResourceTool(BaseTool):
             self.wallet_id,
             "aibtc-dao/extensions/action-proposals/public",
             "propose-action-toggle-resource-by-name.ts",
-            *args
+            *args,
+        )
+
+        if not result["success"]:
+            return DAOToolResponse.error_response(
+                result.get("error", f"Unknown error at bun_run: {result}"),
+                result.get("output"),
+            )
+
+        return DAOToolResponse.success_response(
+            result.get("message", "Successfully proposed action to toggle resource"),
+            result.get("output"),
         )
 
     def _run(
@@ -1314,10 +1223,7 @@ class ProposeActionToggleResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            resource_name,
-            **kwargs
+            action_proposals_contract, action_proposal_contract, resource_name, **kwargs
         )
 
     async def _arun(
@@ -1329,9 +1235,5 @@ class ProposeActionToggleResourceTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_contract,
-            action_proposal_contract,
-            resource_name,
-            **kwargs
+            action_proposals_contract, action_proposal_contract, resource_name, **kwargs
         )
-

@@ -1,16 +1,20 @@
+from typing import Any, Dict, Optional, Type
 from uuid import UUID
-from pydantic import BaseModel, Field
+
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from tools.bun import BunScriptRunner
 from tools.dao_base import DAOToolResponse
-from typing import Dict, Optional, Type, Any
+
 
 class GetAccountTermsInput(BaseModel):
     """Input schema for getting bank account terms."""
+
     bank_account_contract: str = Field(
-        ..., 
-        description="Contract ID of the bank account"
+        ..., description="Contract ID of the bank account"
     )
+
 
 class GetAccountTermsTool(BaseTool):
     name: str = "dao_bank_get_account_terms"
@@ -38,21 +42,16 @@ class GetAccountTermsTool(BaseTool):
         args = [bank_account_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "bank-account",
-            "get-account-terms.ts",
-            *args
+            self.wallet_id, "bank-account", "get-account-terms.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully retrieved account terms"),
-            result.get("data")
+            "Successfully retrieved account terms", result.get("output")
         )
 
     def _run(
@@ -71,16 +70,15 @@ class GetAccountTermsTool(BaseTool):
         """Async version of the tool."""
         return self._deploy(bank_account_contract, **kwargs)
 
+
 class DepositSTXInput(BaseModel):
     """Input schema for depositing STX."""
+
     bank_account_contract: str = Field(
-        ..., 
-        description="Contract ID of the bank account"
+        ..., description="Contract ID of the bank account"
     )
-    amount: int = Field(
-        ...,
-        description="Amount of STX to deposit in microstacks"
-    )
+    amount: int = Field(..., description="Amount of STX to deposit in microstacks")
+
 
 class DepositSTXTool(BaseTool):
     name: str = "dao_bank_deposit_stx"
@@ -112,21 +110,16 @@ class DepositSTXTool(BaseTool):
         ]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "bank-account",
-            "deposit-stx.ts",
-            *args
+            self.wallet_id, "bank-account", "deposit-stx.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully deposited STX"),
-            result.get("data")
+            "Successfully deposited STX", result.get("output")
         )
 
     def _run(
@@ -147,12 +140,14 @@ class DepositSTXTool(BaseTool):
         """Async version of the tool."""
         return self._deploy(bank_account_contract, amount, **kwargs)
 
+
 class WithdrawSTXInput(BaseModel):
     """Input schema for withdrawing STX."""
+
     bank_account_contract: str = Field(
-        ..., 
-        description="Contract ID of the bank account"
+        ..., description="Contract ID of the bank account"
     )
+
 
 class WithdrawSTXTool(BaseTool):
     name: str = "dao_bank_withdraw_stx"
@@ -180,21 +175,16 @@ class WithdrawSTXTool(BaseTool):
         args = [bank_account_contract]
 
         result = BunScriptRunner.bun_run(
-            self.wallet_id,
-            "bank-account",
-            "withdraw-stx.ts",
-            *args
+            self.wallet_id, "bank-account", "withdraw-stx.ts", *args
         )
 
         if not result["success"]:
             return DAOToolResponse.error_response(
-                result.get("message", "Unknown error"),
-                result.get("data")
+                result.get("error", "Unknown error"), result.get("output")
             )
-            
+
         return DAOToolResponse.success_response(
-            result.get("message", "Successfully withdrew STX"),
-            result.get("data")
+            "Successfully withdrew STX", result.get("output")
         )
 
     def _run(
