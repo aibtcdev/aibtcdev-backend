@@ -43,6 +43,9 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
         super().__init__(**kwargs)
         self.callback_handler = callback_handler
         self.tools = tools
+        # Set decisive behavior flag
+        self.decisive_behavior = True
+
         # Create a new LLM instance with the callback handler
         self.llm = ChatOpenAI(
             model=self.llm.model_name,
@@ -72,17 +75,18 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
 
     async def create_plan(self, query: str) -> str:
         """Create a simple thought process plan based on the user's query."""
-        # Create a simpler planning prompt
+        # Create a more decisive planning prompt
         planning_prompt = f"""
-        You are an AI assistant jotting down brief thoughts about how to respond to a user's query.
+        You are an AI assistant planning a decisive response to the user's query.
         
         Write a few short sentences as if you're taking notes in a notebook about:
         - What the user is asking for
-        - What information or tools you might need
-        - How you'll approach answering the query
+        - What information or tools you'll use to complete the task
+        - The exact actions you'll take to fulfill the request
         
-        Keep your notes concise, informal, and in a natural flow of thoughts. Don't use numbers, bullets, or formal structure.
-        Just write as if you're quickly jotting down ideas to yourself that will help you respond to the user's query effectively.
+        Be decisive and action-oriented. Don't include phrases like "I would," "I could," or "I might." 
+        Instead, use phrases like "I will," "I am going to," and "I'll execute."
+        Don't ask for confirmation before taking actions - assume the user wants you to proceed.
         
         User Query: {query}
         """
@@ -151,17 +155,29 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
                 logger.info("Adding thought notes to messages as system message")
                 plan_message = SystemMessage(
                     content=f"""
-                    Here are some thoughts to consider when responding to this query:
+                    Follow these decisive actions to address the user's query:
                     
                     {state['plan']}
                     
-                    Follow this thought process to address the user's query effectively.
-                    Remember to maintain a friendly, professional tone in your responses to the user.
+                    Execute these steps directly without asking for confirmation.
+                    Be decisive and action-oriented in your responses.
                     """
                 )
                 messages = [plan_message] + messages
             else:
                 logger.debug("No thought notes to add or notes already added")
+
+            # If decisive behavior is enabled and there's no plan-related system message,
+            # add a decisive behavior system message
+            if getattr(self, "decisive_behavior", False) and not any(
+                isinstance(msg, SystemMessage) for msg in messages
+            ):
+                logger.info("Adding decisive behavior instruction as system message")
+                decisive_message = SystemMessage(
+                    content="Be decisive and take action without asking for confirmation. "
+                    "When the user requests something, proceed directly with executing it."
+                )
+                messages = [decisive_message] + messages
 
             logger.debug(f"Invoking LLM with {len(messages)} messages")
             response = self.llm.invoke(messages)
@@ -234,7 +250,9 @@ class PreplanLangGraphService:
 
             # Store persona and tool information for planning
             if persona:
-                workflow.persona = persona
+                # Append decisiveness guidance to the persona
+                decisive_guidance = "\n\nBe decisive and take action without asking for confirmation. When the user requests something, proceed directly with executing it rather than asking if they want you to do it."
+                workflow.persona = persona + decisive_guidance
 
             # Store available tool names for planning
             if tools_map:
