@@ -1,18 +1,30 @@
 """DAO proposal voter task implementation."""
 
-from datetime import datetime
-from typing import Any, Dict, List
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
 from backend.models import QueueMessage, QueueMessageFilter, QueueMessageType
 from lib.logger import configure_logger
-from services.runner.base import BaseTask, JobContext
+from services.runner.base import BaseTask, JobContext, RunnerResult
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
 
 logger = configure_logger(__name__)
 
 
-class DAOProposalVoterTask(BaseTask):
+@dataclass
+class DAOProposalVoteResult(RunnerResult):
+    """Result of DAO proposal voting operation."""
+
+    proposals_processed: int = 0
+    proposals_voted: int = 0
+    errors: List[str] = None
+
+    def __post_init__(self):
+        self.errors = self.errors or []
+
+
+class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     """Task runner for processing and voting on DAO proposals."""
 
     QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_VOTE
@@ -116,7 +128,7 @@ class DAOProposalVoterTask(BaseTask):
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
         return backend.list_queue_messages(filters=filters)
 
-    async def _execute_impl(self, context: JobContext) -> List[Dict[str, Any]]:
+    async def _execute_impl(self, context: JobContext) -> List[DAOProposalVoteResult]:
         """Run the DAO proposal voter task."""
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
@@ -124,13 +136,12 @@ class DAOProposalVoterTask(BaseTask):
 
         if not pending_messages:
             return [
-                {
-                    "success": True,
-                    "message": "No pending messages found",
-                    "proposals_processed": 0,
-                    "proposals_voted": 0,
-                    "errors": [],
-                }
+                DAOProposalVoteResult(
+                    success=True,
+                    message="No pending messages found",
+                    proposals_processed=0,
+                    proposals_voted=0,
+                )
             ]
 
         # Process each message
@@ -154,13 +165,13 @@ class DAOProposalVoterTask(BaseTask):
         )
 
         return [
-            {
-                "success": True,
-                "message": f"Processed {processed_count} proposal(s), voted on {voted_count} proposal(s)",
-                "proposals_processed": processed_count,
-                "proposals_voted": voted_count,
-                "errors": errors,
-            }
+            DAOProposalVoteResult(
+                success=True,
+                message=f"Processed {processed_count} proposal(s), voted on {voted_count} proposal(s)",
+                proposals_processed=processed_count,
+                proposals_voted=voted_count,
+                errors=errors,
+            )
         ]
 
 

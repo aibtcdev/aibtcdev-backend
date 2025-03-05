@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
@@ -11,8 +11,7 @@ from backend.models import (
 )
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
-
-from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
 
@@ -26,34 +25,12 @@ class TweetProcessingResult(RunnerResult):
 
 
 class TweetTask(BaseTask[TweetProcessingResult]):
-    """Task for processing tweets from queue and posting them to Twitter."""
+    """Task for sending tweets."""
 
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
-        self.twitter_service = None
         self._pending_messages = None
-
-    async def _validate_task_specific(self, context: JobContext) -> bool:
-        """Validate tweet processing prerequisites."""
-        try:
-            self._pending_messages = backend.list_queue_messages(
-                filters=QueueMessageFilter(
-                    type=QueueMessageType.TWEET, is_processed=False
-                )
-            )
-            message_count = len(self._pending_messages)
-
-            if message_count > 0:
-                logger.debug(f"Found {message_count} pending tweet messages")
-                return True
-            else:
-                logger.debug("No pending tweet messages found")
-                return False
-
-        except Exception as e:
-            logger.error(f"Error validating tweet task: {str(e)}", exc_info=True)
-            self._pending_messages = None
-            return False
+        self.twitter_service = None
 
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
         """Initialize Twitter service with credentials for the given DAO."""
@@ -76,19 +53,104 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             await self.twitter_service._ainitialize()
             logger.debug(f"Initialized Twitter service for DAO {dao_id}")
             return True
+
         except Exception as e:
             logger.error(f"Error initializing Twitter service: {str(e)}", exc_info=True)
             return False
 
-    async def _process_tweet_message(
-        self, message: QueueMessageBase
-    ) -> TweetProcessingResult:
-        """Process a single tweet message."""
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate task configuration."""
         try:
+            # No specific config validation needed as credentials are per-DAO
+            return True
+        except Exception as e:
+            logger.error(f"Error validating tweet task config: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_prerequisites(self, context: JobContext) -> bool:
+        """Validate task prerequisites."""
+        try:
+            # Cache pending messages for later use
+            self._pending_messages = backend.list_queue_messages(
+                filters=QueueMessageFilter(
+                    type=QueueMessageType.TWEET, is_processed=False
+                )
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating tweet prerequisites: {str(e)}", exc_info=True
+            )
+            self._pending_messages = None
+            return False
+
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate task-specific conditions."""
+        try:
+            if not self._pending_messages:
+                logger.debug("No pending tweet messages found")
+                return False
+
+            message_count = len(self._pending_messages)
+            if message_count > 0:
+                logger.debug(f"Found {message_count} pending tweet messages")
+                return True
+
+            logger.debug("No pending tweet messages to process")
+            return False
+
+        except Exception as e:
+            logger.error(f"Error in tweet task validation: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_message(self, message: Any) -> Optional[TweetProcessingResult]:
+        """Validate a single message before processing."""
+        try:
+            if not message.message or not message.message.get("body"):
+                return TweetProcessingResult(
+                    success=False,
+                    message="Tweet message has no body",
+                    tweet_id=message.tweet_id,
+                )
+
             if not message.dao_id:
                 return TweetProcessingResult(
-                    success=False, message="Tweet message has no dao_id", dao_id=None
+                    success=False,
+                    message="Tweet message has no dao_id",
+                    dao_id=None,
                 )
+
+            # Check tweet length
+            tweet_text = message.message["body"]
+            if len(tweet_text) > 280:  # Twitter's character limit
+                return TweetProcessingResult(
+                    success=False,
+                    message=f"Tweet exceeds character limit: {len(tweet_text)} chars",
+                    tweet_id=message.tweet_id,
+                    dao_id=message.dao_id,
+                )
+
+            return None  # Validation passed
+
+        except Exception as e:
+            logger.error(
+                f"Error validating message {message.id}: {str(e)}", exc_info=True
+            )
+            return TweetProcessingResult(
+                success=False,
+                message=f"Error validating message: {str(e)}",
+                error=e,
+                tweet_id=message.tweet_id if hasattr(message, "tweet_id") else None,
+                dao_id=message.dao_id if hasattr(message, "dao_id") else None,
+            )
+
+    async def _process_tweet_message(self, message: Any) -> TweetProcessingResult:
+        """Process a single tweet message."""
+        try:
+            # Validate message first
+            validation_result = await self._validate_message(message)
+            if validation_result:
+                return validation_result
 
             # Initialize Twitter service for this DAO
             if not await self._initialize_twitter_service(message.dao_id):
@@ -98,41 +160,31 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            # Parse the message body
-            try:
-                tweet_text = message.message.get("message")
-                if not tweet_text:
-                    return TweetProcessingResult(
-                        success=False,
-                        message="No tweet text found in message body",
-                        dao_id=message.dao_id,
-                    )
-            except Exception as e:
-                logger.error(f"Error parsing message body: {str(e)}", exc_info=True)
-                return TweetProcessingResult(
-                    success=False,
-                    message=f"Error parsing message body: {str(e)}",
-                    dao_id=message.dao_id,
-                )
+            tweet_text = message.message["body"]
+            logger.info(f"Sending tweet for DAO {message.dao_id}")
+            logger.debug(f"Tweet content: {tweet_text}")
 
-            logger.info(f"Posting tweet for DAO {message.dao_id}")
-            logger.debug(f"Tweet text: {tweet_text[:100]}...")
-
-            # Post the tweet
+            # Send tweet using Twitter service
             tweet_response = await self.twitter_service._apost_tweet(
-                text=tweet_text, reply_in_reply_to_tweet_id=message.tweet_id
+                text=tweet_text,
+                reply_in_reply_to_tweet_id=message.tweet_id,
+                conversation_id=message.conversation_id,
             )
 
             if not tweet_response:
                 return TweetProcessingResult(
-                    success=False, message="Failed to post tweet", dao_id=message.dao_id
+                    success=False,
+                    message="Failed to send tweet",
+                    dao_id=message.dao_id,
+                    tweet_id=message.tweet_id,
                 )
 
             logger.info(f"Successfully posted tweet {tweet_response.id}")
+            logger.debug(f"Tweet ID: {tweet_response.id}")
 
             return TweetProcessingResult(
                 success=True,
-                message="Successfully posted tweet",
+                message="Successfully sent tweet",
                 tweet_id=tweet_response.id,
                 dao_id=message.dao_id,
             )
@@ -143,17 +195,17 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             )
             return TweetProcessingResult(
                 success=False,
-                message=f"Error processing tweet: {str(e)}",
+                message=f"Error sending tweet: {str(e)}",
                 error=e,
+                tweet_id=message.tweet_id if hasattr(message, "tweet_id") else None,
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
     async def _execute_impl(self, context: JobContext) -> List[TweetProcessingResult]:
-        """Execute tweet processing task."""
+        """Execute tweet sending task."""
         results: List[TweetProcessingResult] = []
         try:
             if not self._pending_messages:
-                logger.debug("No tweet messages to process")
                 return results
 
             processed_count = 0
@@ -179,11 +231,14 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             )
 
             return results
+
         except Exception as e:
             logger.error(f"Error in tweet task: {str(e)}", exc_info=True)
             results.append(
                 TweetProcessingResult(
-                    success=False, message=f"Error in tweet task: {str(e)}", error=e
+                    success=False,
+                    message=f"Error in tweet task: {str(e)}",
+                    error=e,
                 )
             )
             return results
