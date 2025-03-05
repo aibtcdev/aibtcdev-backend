@@ -276,14 +276,10 @@ class ProposalBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     title: Optional[str] = None
     description: Optional[str] = None
-    code: Optional[str] = None
-    link: Optional[str] = None
-    monetary_ask: Optional[float] = None
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     proposal_id: Optional[int] = None  # On-chain proposal ID
-    # New fields from payload
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
