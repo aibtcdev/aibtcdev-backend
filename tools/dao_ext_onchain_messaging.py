@@ -13,7 +13,7 @@ class SendMessageInput(BaseModel):
 
     messaging_contract: str = Field(
         ...,
-        description="Contract principal of the messaging contract (e.g. ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-onchain-messaging)",
+        description="Contract principal of the messaging contract (e.g. but not real: ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.dao-onchain-messaging)",
     )
     message: str = Field(..., description="Message to send")
 
