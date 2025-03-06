@@ -222,9 +222,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         workflow.add_node("vote", vote_on_proposal)
         workflow.add_node("skip_vote", skip_voting)
 
-        # Add edges
+        # Set up the conditional branching
         workflow.set_entry_point("evaluate")
-        workflow.add_branch(
+        workflow.add_conditional_edges(
             "evaluate",
             should_vote,
             {
