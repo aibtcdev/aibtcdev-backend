@@ -6,9 +6,10 @@ from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
+from backend.factory import backend
 from backend.models import UUID, Profile
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow
+from services.workflows.base import BaseWorkflow, ExecutionError
 from tools.dao_ext_action_proposals import GetProposalTool, VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -52,7 +53,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         return PromptTemplate(
             input_variables=["proposal_data", "dao_info"],
             template="""
-            You are a DAO proposal evaluator. Your task is to analyze the following proposal and determine whether to vote FOR or AGAINST it.
+            You are a DAO proposal evaluator. Your task is to analyze the following message proposal parameters and determine whether to vote FOR or AGAINST posting this message.
             
             DAO Information:
             {dao_info}
@@ -60,56 +61,22 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             Proposal Data:
             {proposal_data}
             
-            Evaluation Guidelines:
-            1. Assess if the proposal aligns with the DAO's mission and values
-            2. Evaluate the technical feasibility and risks
-            3. Consider the potential impact on the DAO and its members
-            4. Analyze the cost-benefit ratio
-            5. Check for any security or governance concerns
+            Focus on the "parameters" field in the proposal data, which is a hexadecimal string starting with "0x". This contains the encoded message content that will be posted if approved.
             
-            Evaluation Criteria by Proposal Type:
+            Your task is to:
+            1. Evaluate the message parameters in hexadecimal format
+            2. Determine if the message is appropriate for the DAO to post
+            3. Decide whether to vote FOR or AGAINST posting this message
             
-            For Resource Addition Proposals:
-            - Assess if the resource provides value to the DAO community
-            - Check if the pricing is reasonable for the value provided
-            - Verify that the resource description is clear and accurate
-            - Consider if the resource aligns with the DAO's mission
-            
-            For Asset Allowance Proposals:
-            - Evaluate the token's reputation, utility, and security
-            - Consider potential risks of allowing this asset
-            - Assess if the token aligns with the DAO's investment strategy
-            - Check for any regulatory concerns
-            
-            For Message Sending Proposals:
-            - Evaluate the content and tone of the message
-            - Ensure the message represents the DAO appropriately
-            - Check for any potential reputational risks
-            
-            For Account Holder Changes:
-            - Verify the reputation and trustworthiness of the proposed account holder
-            - Consider the security implications of the change
-            - Assess if proper governance procedures were followed for nomination
-            
-            For Withdrawal Parameter Changes:
-            - Evaluate if the proposed changes maintain appropriate security controls
-            - Consider if the changes could lead to potential abuse
-            - Assess if the changes align with the DAO's financial strategy
-            
-            For Resource Toggle Proposals:
-            - Consider the reasons for enabling/disabling the resource
-            - Evaluate the impact on users who may be using the resource
-            - Assess if the change aligns with the DAO's current priorities
-            
-            General Decision Criteria:
-            - Proposals that enhance the DAO's functionality, security, or user experience should generally be approved
-            - Proposals that introduce unnecessary risks, high costs with low benefits, or governance issues should be rejected
-            - Proposals that modify core parameters should be carefully scrutinized for unintended consequences
-            - Proposals that add new resources or assets should be evaluated for their utility and value to the DAO
+            Guidelines for evaluation:
+            - Messages that align with the DAO's mission and values should be approved
+            - Messages with inappropriate content should be rejected
+            - When in doubt, evaluate the proposal ID and other available data
+            - Technical governance messages with encoded parameters are generally safe to approve unless there are clear concerns
             
             Output format:
             {{
-                "approve": bool,  # true to vote FOR, false to vote AGAINST
+                "approve": bool,  # true to vote FOR, false to vote AGAINST posting the message
                 "confidence_score": float,  # between 0.0 and 1.0
                 "reasoning": str  # detailed explanation of your decision
             }}
@@ -123,67 +90,129 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         # Create evaluation node
         async def evaluate_proposal(state: EvaluationState) -> EvaluationState:
             """Evaluate the proposal and determine how to vote."""
-            # Format prompt with state
-            formatted_prompt = prompt.format(
-                proposal_data=state["proposal_data"],
-                dao_info=state.get(
-                    "dao_info", "No additional DAO information available."
-                ),
-            )
+            try:
+                # Get proposal data from state
+                proposal_data = state["proposal_data"]
 
-            # Get evaluation from LLM
-            structured_output = self.llm.with_structured_output(
-                ProposalEvaluationOutput,
-            )
-            result = structured_output.invoke(formatted_prompt)
+                # Ensure we have parameters
+                if not proposal_data.get("parameters"):
+                    raise ValueError("No parameters found in proposal data")
 
-            # Update state
-            state["approve"] = result.approve
-            state["confidence_score"] = result.confidence_score
-            state["reasoning"] = result.reasoning
+                # Format prompt with state
+                self.logger.debug("Formatting evaluation prompt...")
+                formatted_prompt = prompt.format(
+                    proposal_data=proposal_data,
+                    dao_info=state.get(
+                        "dao_info", "No additional DAO information available."
+                    ),
+                )
 
-            return state
+                # Get evaluation from LLM
+                self.logger.debug("Invoking LLM for evaluation...")
+                structured_output = self.llm.with_structured_output(
+                    ProposalEvaluationOutput,
+                )
+                result = structured_output.invoke(formatted_prompt)
+                self.logger.debug(f"LLM evaluation result: {result}")
+
+                # Update state
+                state["approve"] = result.approve
+                state["confidence_score"] = result.confidence_score
+                state["reasoning"] = result.reasoning
+                self.logger.info(
+                    f"Evaluation complete: approve={result.approve}, confidence={result.confidence_score}"
+                )
+
+                return state
+            except Exception as e:
+                self.logger.error(
+                    f"Error in evaluate_proposal: {str(e)}", exc_info=True
+                )
+                state["approve"] = False
+                state["confidence_score"] = 0.0
+                state["reasoning"] = f"Error during evaluation: {str(e)}"
+                return state
 
         # Create decision node
-        def should_vote(state: EvaluationState) -> str:
+        async def should_vote(state: EvaluationState) -> str:
             """Decide whether to vote based on confidence threshold."""
-            if not state["auto_vote"]:
-                return "skip_vote"
+            try:
+                self.logger.debug(
+                    f"Deciding whether to vote: auto_vote={state['auto_vote']}, confidence={state['confidence_score']}, threshold={state['confidence_threshold']}"
+                )
 
-            if state["confidence_score"] >= state["confidence_threshold"]:
-                return "vote"
-            else:
+                if not state["auto_vote"]:
+                    self.logger.info("Auto-vote is disabled, skipping vote")
+                    return "skip_vote"
+
+                if state["confidence_score"] >= state["confidence_threshold"]:
+                    self.logger.info(
+                        f"Confidence score {state['confidence_score']} meets threshold {state['confidence_threshold']}, proceeding to vote"
+                    )
+                    return "vote"
+                else:
+                    self.logger.info(
+                        f"Confidence score {state['confidence_score']} below threshold {state['confidence_threshold']}, skipping vote"
+                    )
+                    return "skip_vote"
+            except Exception as e:
+                self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
                 return "skip_vote"
 
         # Create voting node
         async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
             """Vote on the proposal based on the evaluation."""
-            # Initialize the VoteOnActionProposalTool
-            vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
+            try:
+                # Initialize the VoteOnActionProposalTool
+                self.logger.debug(
+                    f"Preparing to vote on proposal {state['proposal_id']}, vote={state['approve']}"
+                )
+                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
-            # Execute the vote
-            vote_result = await vote_tool._arun(
-                action_proposals_voting_extension=state[
-                    "action_proposals_voting_extension"
-                ],
-                proposal_id=state["proposal_id"],
-                vote=state["approve"],
-            )
+                # Execute the vote
+                self.logger.debug("Executing vote...")
+                vote_result = await vote_tool._arun(
+                    action_proposals_voting_extension=state[
+                        "action_proposals_voting_extension"
+                    ],
+                    proposal_id=state["proposal_id"],
+                    vote=state["approve"],
+                )
+                self.logger.debug(f"Vote result: {vote_result}")
 
-            # Update state with vote result
-            state["vote_result"] = vote_result
+                # Update state with vote result
+                state["vote_result"] = vote_result
+                self.logger.info(f"Vote complete: {vote_result.get('success', False)}")
 
-            return state
+                return state
+            except Exception as e:
+                self.logger.error(f"Error in vote_on_proposal: {str(e)}", exc_info=True)
+                state["vote_result"] = {
+                    "success": False,
+                    "error": f"Error during voting: {str(e)}",
+                }
+                return state
 
         # Create skip voting node
         async def skip_voting(state: EvaluationState) -> EvaluationState:
             """Skip voting and just return the evaluation."""
-            state["vote_result"] = {
-                "success": True,
-                "message": "Voting skipped due to confidence threshold or auto_vote setting",
-                "data": None,
-            }
-            return state
+            try:
+                self.logger.debug("Skipping voting step")
+                state["vote_result"] = {
+                    "success": True,
+                    "message": "Voting skipped due to confidence threshold or auto_vote setting",
+                    "data": None,
+                }
+                self.logger.info("Vote skipped as requested")
+                return state
+            except Exception as e:
+                self.logger.error(f"Error in skip_voting: {str(e)}", exc_info=True)
+                state["vote_result"] = {
+                    "success": True,
+                    "message": f"Voting skipped (with error: {str(e)})",
+                    "data": None,
+                }
+                return state
 
         # Create the graph
         workflow = StateGraph(EvaluationState)
@@ -195,7 +224,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
         # Add edges
         workflow.set_entry_point("evaluate")
-        workflow.add_conditional_edges(
+        workflow.add_branch(
             "evaluate",
             should_vote,
             {
@@ -211,7 +240,25 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
     def _validate_state(self, state: EvaluationState) -> bool:
         """Validate the workflow state."""
         required_fields = ["action_proposals_contract", "proposal_id", "proposal_data"]
-        return all(field in state and state[field] for field in required_fields)
+
+        # Log the state for debugging
+        self.logger.debug(f"Validating state: {state}")
+
+        # Check all fields and log problems
+        for field in required_fields:
+            if field not in state:
+                self.logger.error(f"Missing required field: {field}")
+                return False
+            elif not state[field]:
+                self.logger.error(f"Empty required field: {field}")
+                return False
+
+        # Ensure proposal_data has parameters
+        if not state["proposal_data"].get("parameters"):
+            self.logger.error("No parameters field in proposal_data")
+            return False
+
+        return True
 
 
 def get_proposal_evaluation_tools(
@@ -229,16 +276,23 @@ def get_proposal_evaluation_tools(
     # Initialize all tools
     all_tools = initialize_tools(profile=profile, agent_id=agent_id)
 
+    # Log all available tools for debugging
+    logger.debug(f"All available tools: {', '.join(all_tools.keys())}")
+
     # Filter to only include the tools we need
     required_tools = [
         "dao_action_get_proposal",
         "dao_action_vote_on_proposal",
         "dao_action_get_voting_power",
         "dao_action_get_voting_configuration",
-        "database_get_dao_get_by_name",
+        "database_get_dao_get_by_name",  # Try old name
+        "dao_search",  # Try new name
     ]
 
-    return filter_tools_by_names(required_tools, all_tools)
+    filtered_tools = filter_tools_by_names(required_tools, all_tools)
+    logger.debug(f"Filtered tools: {', '.join(filtered_tools.keys())}")
+
+    return filtered_tools
 
 
 async def evaluate_and_vote_on_proposal(
@@ -264,64 +318,106 @@ async def evaluate_and_vote_on_proposal(
     Returns:
         Dictionary containing the evaluation results and voting outcome
     """
-    # First, get the proposal data
-    get_proposal_tool = GetProposalTool(wallet_id=wallet_id)
-    proposal_data = await get_proposal_tool._arun(
-        action_proposals_voting_extension=action_proposals_voting_extension,
-        proposal_id=proposal_id,
-    )
+    logger.info(f"Starting proposal evaluation for proposal {proposal_id}")
 
-    if not proposal_data.get("success", False):
-        return {
-            "success": False,
-            "error": f"Failed to retrieve proposal data: {proposal_data.get('error', 'Unknown error')}",
+    try:
+        # Get proposal data from the chain
+        logger.debug("Getting proposal data from chain...")
+        get_proposal_tool = GetProposalTool(wallet_id=wallet_id)
+        proposal_data = await get_proposal_tool._arun(
+            action_proposals_voting_extension=action_proposals_voting_extension,
+            proposal_id=proposal_id,
+        )
+
+        if not proposal_data.get("success", False):
+            error_msg = f"Failed to retrieve proposal data: {proposal_data.get('error', 'Unknown error')}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        # Extract the actual proposal data
+        proposal_data_content = proposal_data.get("data", {})
+        if not proposal_data_content or not proposal_data_content.get("parameters"):
+            error_msg = "No parameters found in proposal data"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        # Get DAO information if available
+        dao_info = None
+        if dao_name:
+            try:
+                # Get DAO information from the database
+                logger.debug(f"Getting DAO information for {dao_name}...")
+                dao_tools = get_proposal_evaluation_tools()
+                dao_info_tool = dao_tools.get(
+                    "database_get_dao_get_by_name"
+                ) or dao_tools.get("dao_search")
+
+                if dao_info_tool:
+                    try:
+                        if "database_get_dao_get_by_name" in dao_tools:
+                            dao_info_result = await dao_info_tool._arun(name=dao_name)
+                        else:
+                            dao_info_result = await dao_info_tool._arun(
+                                name=dao_name,
+                                description=None,
+                                token_name=None,
+                                token_symbol=None,
+                                contract_id=None,
+                            )
+
+                        if dao_info_result.get("success", False):
+                            dao_info = dao_info_result.get("data", {})
+                    except Exception as e:
+                        logger.warning(
+                            f"Error getting DAO info: {str(e)}", exc_info=True
+                        )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to get DAO information: {str(e)}", exc_info=True
+                )
+
+        # Initialize state
+        state = {
+            "action_proposals_contract": action_proposals_contract,
+            "action_proposals_voting_extension": action_proposals_voting_extension,
+            "proposal_id": proposal_id,
+            "proposal_data": proposal_data_content,
+            "dao_info": dao_info or {},
+            "approve": False,
+            "confidence_score": 0.0,
+            "reasoning": "",
+            "vote_result": None,
+            "wallet_id": wallet_id,
+            "confidence_threshold": confidence_threshold,
+            "auto_vote": auto_vote,
         }
 
-    # Get DAO information if available
-    dao_info = None
-    if dao_name:
-        try:
-            # Get DAO information from the database
-            dao_info_tool = get_proposal_evaluation_tools().get(
-                "database_get_dao_get_by_name"
-            )
-            if dao_info_tool:
-                dao_info_result = await dao_info_tool._arun(name=dao_name)
-                if dao_info_result.get("success", False):
-                    dao_info = dao_info_result.get("data", {})
-        except Exception as e:
-            logger.warning(f"Failed to retrieve DAO information: {str(e)}")
+        # Create and run workflow
+        workflow = ProposalEvaluationWorkflow()
+        if not workflow._validate_state(state):
+            return {
+                "success": False,
+                "error": "Invalid workflow state",
+            }
 
-    # Initialize state
-    state = {
-        "action_proposals_contract": action_proposals_contract,
-        "action_proposals_voting_extension": action_proposals_voting_extension,
-        "proposal_id": proposal_id,
-        "proposal_data": proposal_data.get("data", {}),
-        "dao_info": dao_info,
-        "approve": False,
-        "confidence_score": 0.0,
-        "reasoning": "",
-        "vote_result": None,
-        "wallet_id": wallet_id,
-        "confidence_threshold": confidence_threshold,
-        "auto_vote": auto_vote,
-    }
-
-    # Create and run workflow
-    workflow = ProposalEvaluationWorkflow()
-    result = await workflow.execute(state)
-
-    return {
-        "success": True,
-        "evaluation": {
-            "approve": result["approve"],
-            "confidence_score": result["confidence_score"],
-            "reasoning": result["reasoning"],
-        },
-        "vote_result": result["vote_result"],
-        "auto_voted": auto_vote and result["confidence_score"] >= confidence_threshold,
-    }
+        result = await workflow.execute(state)
+        return {
+            "success": True,
+            "evaluation": {
+                "approve": result["approve"],
+                "confidence_score": result["confidence_score"],
+                "reasoning": result["reasoning"],
+            },
+            "vote_result": result["vote_result"],
+            "auto_voted": auto_vote
+            and result["confidence_score"] >= confidence_threshold,
+        }
+    except Exception as e:
+        logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Unexpected error: {str(e)}",
+        }
 
 
 async def evaluate_proposal_only(
@@ -359,3 +455,39 @@ async def evaluate_proposal_only(
         del result["auto_voted"]
 
     return result
+
+
+async def debug_proposal_evaluation_workflow():
+    """Debug function to test the workflow with a mock state."""
+    logger.setLevel("DEBUG")
+
+    # Create a mock state with valid required fields
+    mock_state = {
+        "action_proposals_contract": "test-contract",
+        "action_proposals_voting_extension": "test-voting-extension",
+        "proposal_id": 1,
+        "proposal_data": {"title": "Test Proposal", "description": "Test Description"},
+        "dao_info": {"name": "Test DAO"},
+        "approve": False,
+        "confidence_score": 0.0,
+        "reasoning": "",
+        "vote_result": None,
+        "wallet_id": None,
+        "confidence_threshold": 0.7,
+        "auto_vote": False,
+    }
+
+    # Create the workflow and validate the state
+    workflow = ProposalEvaluationWorkflow()
+    is_valid = workflow._validate_state(mock_state)
+    logger.info(f"Mock state validation result: {is_valid}")
+
+    # Try to execute with the mock state
+    if is_valid:
+        try:
+            result = await workflow.execute(mock_state)
+            logger.info(f"Workflow execution result: {result}")
+        except Exception as e:
+            logger.error(f"Workflow execution failed: {str(e)}", exc_info=True)
+
+    return is_valid

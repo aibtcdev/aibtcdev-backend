@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
-from backend.models import QueueMessage, QueueMessageFilter, QueueMessageType
+from backend.models import (
+    ProposalFilter,
+    QueueMessage,
+    QueueMessageFilter,
+    QueueMessageType,
+)
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
@@ -55,43 +60,44 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
+        dao_id = message.dao_id
 
         logger.debug(
             f"Processing proposal voting message {message_id} for wallet {wallet_id}"
         )
 
-        # Extract required parameters from the message
-        action_proposals_contract = message_data.get("action_proposals_contract")
+        # Get the proposal ID from the message
         proposal_id = message_data.get("proposal_id")
-        dao_name = message_data.get("dao_name")
-
-        # Get the action_proposals_voting_extension, which may be the same as action_proposals_contract
-        # If not explicitly provided in the message, use the action_proposals_contract
-        action_proposals_voting_extension = message_data.get(
-            "action_proposals_voting_extension", action_proposals_contract
-        )
-
-        if not action_proposals_contract or proposal_id is None:
-            error_msg = f"Missing required parameters in message {message_id}"
+        if not proposal_id:
+            error_msg = f"Missing proposal_id in message {message_id}"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
         try:
-            # Convert proposal_id to int if it's a string
-            if isinstance(proposal_id, str):
-                proposal_id = int(proposal_id)
+            # Get the proposal details from the database
+            proposal = backend.get_proposal(proposal_id)
+            if not proposal:
+                error_msg = f"Proposal {proposal_id} not found in database"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+
+            # Get the DAO information
+            dao = backend.get_dao(dao_id) if dao_id else None
+            if not dao:
+                error_msg = f"DAO not found for proposal {proposal_id}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
 
             # Execute the proposal evaluation workflow
             logger.info(
-                f"Evaluating proposal {proposal_id} for DAO {dao_name} "
-                f"(contract: {action_proposals_contract})"
+                f"Evaluating proposal {proposal.proposal_id} for DAO {dao.name}"
             )
 
             result = await evaluate_and_vote_on_proposal(
-                action_proposals_contract=action_proposals_contract,
-                action_proposals_voting_extension=action_proposals_voting_extension,
-                proposal_id=proposal_id,
-                dao_name=dao_name,
+                action_proposals_contract=proposal.contract_principal,
+                action_proposals_voting_extension=proposal.contract_principal,
+                proposal_id=proposal.proposal_id,
+                dao_name=dao.name,
                 wallet_id=wallet_id,
                 auto_vote=self.DEFAULT_AUTO_VOTE,
                 confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
@@ -105,16 +111,16 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             if result.get("auto_voted", False):
                 logger.info(
-                    f"Proposal {proposal_id} ({dao_name}): Voted {'FOR' if approval else 'AGAINST'} "
+                    f"Proposal {proposal.proposal_id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
                     f"with confidence {confidence:.2f}"
                 )
             else:
                 logger.info(
-                    f"Proposal {proposal_id} ({dao_name}): No auto-vote - "
+                    f"Proposal {proposal.proposal_id} ({dao.name}): No auto-vote - "
                     f"confidence {confidence:.2f} below threshold"
                 )
 
-            logger.debug(f"Proposal {proposal_id} reasoning: {reasoning}")
+            logger.debug(f"Proposal {proposal.proposal_id} reasoning: {reasoning}")
 
             # Mark the message as processed
             backend.update_queue_message(message_id, {"is_processed": True})
