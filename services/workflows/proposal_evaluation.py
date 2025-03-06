@@ -415,7 +415,7 @@ async def evaluate_proposal_only(
         proposal_id=proposal_id,
         dao_name=dao_name,
         wallet_id=wallet_id,
-        auto_vote=False,
+        auto_vote=True,
     )
 
     # Remove vote_result from the response
