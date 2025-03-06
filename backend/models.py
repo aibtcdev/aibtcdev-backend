@@ -466,6 +466,8 @@ class XTweet(XTweetBase):
 class WalletFilter(CustomBaseModel):
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
 
 
 class QueueMessageFilter(CustomBaseModel):

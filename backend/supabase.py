@@ -545,6 +545,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("profile_id", str(filters.profile_id))
             if filters.agent_id:
                 query = query.eq("agent_id", str(filters.agent_id))
+            if filters.mainnet_address:
+                query = query.eq("mainnet_address", filters.mainnet_address)
+            if filters.testnet_address:
+                query = query.eq("testnet_address", filters.testnet_address)
         response = query.execute()
         data = response.data or []
         return [Wallet(**row) for row in data]
