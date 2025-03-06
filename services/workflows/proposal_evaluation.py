@@ -10,7 +10,7 @@ from backend.factory import backend
 from backend.models import UUID, Profile
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow, ExecutionError
-from tools.dao_ext_action_proposals import GetProposalTool, VoteOnActionProposalTool
+from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
 logger = configure_logger(__name__)
@@ -321,22 +321,27 @@ async def evaluate_and_vote_on_proposal(
     logger.info(f"Starting proposal evaluation for proposal {proposal_id}")
 
     try:
-        # Get proposal data from the chain
-        logger.debug("Getting proposal data from chain...")
-        get_proposal_tool = GetProposalTool(wallet_id=wallet_id)
-        proposal_data = await get_proposal_tool._arun(
-            action_proposals_voting_extension=action_proposals_voting_extension,
-            proposal_id=proposal_id,
-        )
-
-        if not proposal_data.get("success", False):
-            error_msg = f"Failed to retrieve proposal data: {proposal_data.get('error', 'Unknown error')}"
+        # Get proposal data directly from the database
+        proposal_data = backend.get_proposal(proposal_id)
+        if not proposal_data:
+            error_msg = f"Proposal {proposal_id} not found in database"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        # Extract the actual proposal data
-        proposal_data_content = proposal_data.get("data", {})
-        if not proposal_data_content or not proposal_data_content.get("parameters"):
+        # Convert proposal data to dictionary and ensure parameters exist
+        proposal_dict = {
+            "proposal_id": proposal_data.proposal_id,
+            "parameters": proposal_data.parameters,
+            "action": proposal_data.action,
+            "caller": proposal_data.caller,
+            "creator": proposal_data.creator,
+            "created_at_block": proposal_data.created_at_block,
+            "end_block": proposal_data.end_block,
+            "start_block": proposal_data.start_block,
+            "liquid_tokens": proposal_data.liquid_tokens,
+        }
+
+        if not proposal_dict.get("parameters"):
             error_msg = "No parameters found in proposal data"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -381,7 +386,7 @@ async def evaluate_and_vote_on_proposal(
             "action_proposals_contract": action_proposals_contract,
             "action_proposals_voting_extension": action_proposals_voting_extension,
             "proposal_id": proposal_id,
-            "proposal_data": proposal_data_content,
+            "proposal_data": proposal_dict,
             "dao_info": dao_info or {},
             "approve": False,
             "confidence_score": 0.0,

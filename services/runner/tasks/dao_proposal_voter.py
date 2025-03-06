@@ -7,6 +7,7 @@ from backend.factory import backend
 from backend.models import (
     ProposalFilter,
     QueueMessage,
+    QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
 )
@@ -122,8 +123,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             logger.debug(f"Proposal {proposal.proposal_id} reasoning: {reasoning}")
 
-            # Mark the message as processed
-            backend.update_queue_message(message_id, {"is_processed": True})
+            # Mark the message as processed using QueueMessageBase
+            update_data = QueueMessageBase(is_processed=True)
+            backend.update_queue_message(message_id, update_data)
 
             return {
                 "success": True,
