@@ -209,7 +209,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                     QueueMessageCreate(
                         type="dao_proposal_vote",
                         message={
+                            "proposal_uuid": proposal.id,
                             "action_proposals_contract": proposal.contract_principal,
+                            "action_proposals_voting_extension": proposal.contract_principal,
                             "proposal_id": proposal.proposal_id,
                             "dao_name": dao.name,
                             "burn_height": burn_height,

@@ -31,6 +31,7 @@ class EvaluationState(TypedDict):
     """State for the proposal evaluation flow."""
 
     action_proposals_contract: str
+    action_proposals_voting_extension: str
     proposal_id: int
     proposal_data: Dict
     dao_info: Optional[Dict]
@@ -162,7 +163,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
             # Execute the vote
             vote_result = vote_tool._run(
-                action_proposals_contract=state["action_proposals_contract"],
+                action_proposals_voting_extension=state[
+                    "action_proposals_voting_extension"
+                ],
                 proposal_id=state["proposal_id"],
                 vote=state["approve"],
             )
@@ -240,6 +243,7 @@ def get_proposal_evaluation_tools(
 
 async def evaluate_and_vote_on_proposal(
     action_proposals_contract: str,
+    action_proposals_voting_extension: str,
     proposal_id: int,
     dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
@@ -250,6 +254,7 @@ async def evaluate_and_vote_on_proposal(
 
     Args:
         action_proposals_contract: The contract ID of the DAO action proposals
+        action_proposals_voting_extension: The contract ID of the DAO action proposals voting extension
         proposal_id: The ID of the proposal to evaluate and vote on
         dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for voting
@@ -262,7 +267,7 @@ async def evaluate_and_vote_on_proposal(
     # First, get the proposal data
     get_proposal_tool = GetProposalTool(wallet_id=wallet_id)
     proposal_data = get_proposal_tool._run(
-        action_proposals_contract=action_proposals_contract,
+        action_proposals_voting_extension=action_proposals_voting_extension,
         proposal_id=proposal_id,
     )
 
@@ -290,6 +295,7 @@ async def evaluate_and_vote_on_proposal(
     # Initialize state
     state = {
         "action_proposals_contract": action_proposals_contract,
+        "action_proposals_voting_extension": action_proposals_voting_extension,
         "proposal_id": proposal_id,
         "proposal_data": proposal_data.get("data", {}),
         "dao_info": dao_info,
@@ -320,6 +326,7 @@ async def evaluate_and_vote_on_proposal(
 
 async def evaluate_proposal_only(
     action_proposals_contract: str,
+    action_proposals_voting_extension: str,
     proposal_id: int,
     dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
@@ -328,6 +335,7 @@ async def evaluate_proposal_only(
 
     Args:
         action_proposals_contract: The contract ID of the DAO action proposals
+        action_proposals_voting_extension: The contract ID of the DAO action proposals voting extension
         proposal_id: The ID of the proposal to evaluate
         dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for retrieving proposal data
@@ -337,6 +345,7 @@ async def evaluate_proposal_only(
     """
     result = await evaluate_and_vote_on_proposal(
         action_proposals_contract=action_proposals_contract,
+        action_proposals_voting_extension=action_proposals_voting_extension,
         proposal_id=proposal_id,
         dao_name=dao_name,
         wallet_id=wallet_id,

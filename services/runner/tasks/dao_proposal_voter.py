@@ -65,6 +65,12 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         proposal_id = message_data.get("proposal_id")
         dao_name = message_data.get("dao_name")
 
+        # Get the action_proposals_voting_extension, which may be the same as action_proposals_contract
+        # If not explicitly provided in the message, use the action_proposals_contract
+        action_proposals_voting_extension = message_data.get(
+            "action_proposals_voting_extension", action_proposals_contract
+        )
+
         if not action_proposals_contract or proposal_id is None:
             error_msg = f"Missing required parameters in message {message_id}"
             logger.error(error_msg)
@@ -83,6 +89,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             result = await evaluate_and_vote_on_proposal(
                 action_proposals_contract=action_proposals_contract,
+                action_proposals_voting_extension=action_proposals_voting_extension,
                 proposal_id=proposal_id,
                 dao_name=dao_name,
                 wallet_id=wallet_id,
