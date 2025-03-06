@@ -296,9 +296,7 @@ def get_proposal_evaluation_tools(
 
 
 async def evaluate_and_vote_on_proposal(
-    action_proposals_contract: str,
-    action_proposals_voting_extension: str,
-    proposal_id: int,
+    proposal_id: UUID,
     dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
     auto_vote: bool = True,
@@ -307,8 +305,6 @@ async def evaluate_and_vote_on_proposal(
     """Evaluate a proposal and automatically vote based on the evaluation.
 
     Args:
-        action_proposals_contract: The contract ID of the DAO action proposals
-        action_proposals_voting_extension: The contract ID of the DAO action proposals voting extension
         proposal_id: The ID of the proposal to evaluate and vote on
         dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for voting
@@ -426,9 +422,7 @@ async def evaluate_and_vote_on_proposal(
 
 
 async def evaluate_proposal_only(
-    action_proposals_contract: str,
-    action_proposals_voting_extension: str,
-    proposal_id: int,
+    proposal_id: UUID,
     dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
 ) -> Dict:
@@ -445,8 +439,6 @@ async def evaluate_proposal_only(
         Dictionary containing the evaluation results
     """
     result = await evaluate_and_vote_on_proposal(
-        action_proposals_contract=action_proposals_contract,
-        action_proposals_voting_extension=action_proposals_voting_extension,
         proposal_id=proposal_id,
         dao_name=dao_name,
         wallet_id=wallet_id,

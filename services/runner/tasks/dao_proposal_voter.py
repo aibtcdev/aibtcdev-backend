@@ -90,14 +90,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 return {"success": False, "error": error_msg}
 
             # Execute the proposal evaluation workflow
-            logger.info(
-                f"Evaluating proposal {proposal.proposal_id} for DAO {dao.name}"
-            )
+            logger.info(f"Evaluating proposal {proposal.id} for DAO {dao.name}")
 
             result = await evaluate_and_vote_on_proposal(
-                action_proposals_contract=proposal.contract_principal,
-                action_proposals_voting_extension=proposal.contract_principal,
-                proposal_id=proposal.proposal_id,
+                proposal_id=proposal.id,
                 dao_name=dao.name,
                 wallet_id=wallet_id,
                 auto_vote=self.DEFAULT_AUTO_VOTE,
@@ -112,16 +108,16 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             if result.get("auto_voted", False):
                 logger.info(
-                    f"Proposal {proposal.proposal_id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
+                    f"Proposal {proposal.id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
                     f"with confidence {confidence:.2f}"
                 )
             else:
                 logger.info(
-                    f"Proposal {proposal.proposal_id} ({dao.name}): No auto-vote - "
+                    f"Proposal {proposal.id} ({dao.name}): No auto-vote - "
                     f"confidence {confidence:.2f} below threshold"
                 )
 
-            logger.debug(f"Proposal {proposal.proposal_id} reasoning: {reasoning}")
+            logger.debug(f"Proposal {proposal.id} reasoning: {reasoning}")
 
             # Mark the message as processed using QueueMessageBase
             update_data = QueueMessageBase(is_processed=True)
