@@ -4,6 +4,7 @@ from uuid import UUID
 
 from backend.factory import backend
 from backend.models import (
+    QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
@@ -29,7 +30,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
-        self._pending_messages = None
+        self._pending_messages: Optional[List[QueueMessage]] = None
         self.twitter_service = None
 
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
@@ -103,13 +104,34 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.error(f"Error in tweet task validation: {str(e)}", exc_info=True)
             return False
 
-    async def _validate_message(self, message: Any) -> Optional[TweetProcessingResult]:
+    async def _validate_message(
+        self, message: QueueMessage
+    ) -> Optional[TweetProcessingResult]:
         """Validate a single message before processing."""
         try:
-            if not message.message or not message.message.get("body"):
+            # Check if message exists
+            if not message.message:
                 return TweetProcessingResult(
                     success=False,
-                    message="Tweet message has no body",
+                    message="Tweet message is empty",
+                    tweet_id=message.tweet_id,
+                )
+
+            # Extract tweet text from the message field
+            tweet_text = None
+            if isinstance(message.message, dict) and "message" in message.message:
+                tweet_text = message.message["message"]
+            else:
+                return TweetProcessingResult(
+                    success=False,
+                    message=f"Unsupported tweet message format: {message.message}",
+                    tweet_id=message.tweet_id,
+                )
+
+            if not tweet_text:
+                return TweetProcessingResult(
+                    success=False,
+                    message="Tweet message content is empty",
                     tweet_id=message.tweet_id,
                 )
 
@@ -121,7 +143,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
 
             # Check tweet length
-            tweet_text = message.message["body"]
             if len(tweet_text) > 280:  # Twitter's character limit
                 return TweetProcessingResult(
                     success=False,
@@ -130,7 +151,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            return None  # Validation passed
+            # No need to modify the message structure, keep it as is
+            return None
 
         except Exception as e:
             logger.error(
@@ -144,7 +166,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
-    async def _process_tweet_message(self, message: Any) -> TweetProcessingResult:
+    async def _process_tweet_message(
+        self, message: QueueMessage
+    ) -> TweetProcessingResult:
         """Process a single tweet message."""
         try:
             # Validate message first
@@ -160,16 +184,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            tweet_text = message.message["body"]
+            # Extract tweet text directly from the message format
+            tweet_text = message.message["message"]
             logger.info(f"Sending tweet for DAO {message.dao_id}")
             logger.debug(f"Tweet content: {tweet_text}")
 
+            # Prepare tweet parameters
+            tweet_params = {"text": tweet_text}
+            if message.tweet_id:
+                tweet_params["reply_in_reply_to_tweet_id"] = message.tweet_id
+
             # Send tweet using Twitter service
-            tweet_response = await self.twitter_service._apost_tweet(
-                text=tweet_text,
-                reply_in_reply_to_tweet_id=message.tweet_id,
-                conversation_id=message.conversation_id,
-            )
+            tweet_response = await self.twitter_service._apost_tweet(**tweet_params)
 
             if not tweet_response:
                 return TweetProcessingResult(

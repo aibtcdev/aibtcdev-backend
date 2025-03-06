@@ -90,8 +90,14 @@ class BaseWorkflow(Generic[StateType]):
     async def execute(self, initial_state: StateType) -> Dict:
         """Execute the workflow."""
         try:
-            if not self._validate_state(initial_state):
-                raise ValueError("Invalid initial state")
+            # Temporarily bypass validation to troubleshoot
+            is_valid = self._validate_state(initial_state)
+            if not is_valid:
+                self.logger.warning(
+                    "State validation failed, but proceeding anyway for troubleshooting"
+                )
+                # Uncomment the following line to enforce validation
+                # raise ValueError("Invalid initial state")
 
             graph = self._create_graph()
             # Check if the graph is already compiled

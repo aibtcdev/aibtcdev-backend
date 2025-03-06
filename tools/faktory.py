@@ -14,21 +14,23 @@ class FaktoryBaseInput(BaseModel):
 class FaktoryExecuteBuyInput(BaseModel):
     """Input schema for Faktory buy order execution."""
 
-    stx_amount: str = Field(
+    btc_amount: str = Field(
         ...,
-        description="Amount of STX to spend on the purchase in standard units (e.g. 1.5 = 1.5 STX)",
+        description="Amount of BTC to spend on the purchase in standard units (e.g. 0.0004 = 0.0004 BTC or 40000 sats)",
     )
-    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+    dao_token_dex_contract_address: str = Field(
+        ..., description="Contract principal where the DAO token is listed"
+    )
     slippage: Optional[str] = Field(
-        default="50",
-        description="Slippage tolerance in basis points (default: 50, which is 0.5%)",
+        default="15",
+        description="Slippage tolerance in basis points (default: 15, which is 0.15%)",
     )
 
 
 class FaktoryExecuteBuyTool(BaseTool):
     name: str = "faktory_execute_buy"
     description: str = (
-        "Execute a buy order on Faktory DEX with specified STX amount and token details"
+        "Execute a buy order on Faktory DEX with specified BTC amount and token details"
     )
     args_schema: Type[BaseModel] = FaktoryExecuteBuyInput
     return_direct: bool = False
@@ -40,9 +42,9 @@ class FaktoryExecuteBuyTool(BaseTool):
 
     def _deploy(
         self,
-        stx_amount: str,
-        dex_contract_id: str,
-        slippage: Optional[str] = "50",
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
@@ -56,6 +58,79 @@ class FaktoryExecuteBuyTool(BaseTool):
             self.wallet_id,
             "stacks-faktory",
             "exec-buy.ts",
+            btc_amount,
+            dao_token_dex_contract_address,
+            slippage,
+        )
+
+    def _run(
+        self,
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a buy order."""
+        return self._deploy(btc_amount, dao_token_dex_contract_address, slippage)
+
+    async def _arun(
+        self,
+        btc_amount: str,
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a buy order (async)."""
+        return self._deploy(btc_amount, dao_token_dex_contract_address, slippage)
+
+
+class FaktoryExecuteBuyStxInput(BaseModel):
+    """Input schema for Faktory buy order execution."""
+
+    stx_amount: str = Field(
+        ...,
+        description="Amount of STX to spend on the purchase in standard units (e.g. 1.5 = 1.5 STX)",
+    )
+    dao_token_dex_contract_address: str = Field(
+        ..., description="Contract principal where the DAO token is listed"
+    )
+    slippage: Optional[str] = Field(
+        default="15",
+        description="Slippage tolerance in percentage (default: 15%)",
+    )
+
+
+class FaktoryExecuteBuyStxTool(BaseTool):
+    name: str = "faktory_execute_buy_stx"
+    description: str = (
+        "Execute a buy order on Faktory DEX with specified STX amount and token details"
+    )
+    args_schema: Type[BaseModel] = FaktoryExecuteBuyStxInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        stx_amount: str,
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
+        **kwargs,
+    ) -> str:
+        """Execute the tool to place a buy order."""
+        if self.wallet_id is None:
+            return {
+                "success": False,
+                "error": "Wallet ID is required",
+                "output": "",
+            }
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "stacks-faktory",
+            "exec-buy-stx.ts",
             stx_amount,
             dex_contract_id,
             slippage,
@@ -64,22 +139,22 @@ class FaktoryExecuteBuyTool(BaseTool):
     def _run(
         self,
         stx_amount: str,
-        dex_contract_id: str,
-        slippage: Optional[str] = "50",
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(stx_amount, dao_token_dex_contract_address, slippage)
 
     async def _arun(
         self,
         stx_amount: str,
-        dex_contract_id: str,
-        slippage: Optional[str] = "50",
+        dao_token_dex_contract_address: str,
+        slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a buy order (async)."""
-        return self._deploy(stx_amount, dex_contract_id, slippage)
+        return self._deploy(stx_amount, dao_token_dex_contract_address, slippage)
 
 
 class FaktoryExecuteSellInput(BaseModel):
@@ -89,7 +164,9 @@ class FaktoryExecuteSellInput(BaseModel):
         ...,
         description="Amount of tokens to sell in standard units (e.g. 1.5 = 1.5 tokens)",
     )
-    dex_contract_id: str = Field(..., description="Contract ID of the DEX")
+    dao_token_dex_contract_address: str = Field(
+        ..., description="Contract principal where the DAO token is listed"
+    )
     slippage: Optional[str] = Field(
         default="15",
         description="Slippage tolerance in percentage (default: 15%)",

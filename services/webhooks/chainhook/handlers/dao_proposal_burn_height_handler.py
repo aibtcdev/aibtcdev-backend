@@ -96,43 +96,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         agents_with_tokens_dto = backend.get_agents_with_dao_tokens(dao_id)
 
         if not agents_with_tokens_dto:
-            self.logger.info(
-                f"No agents with tokens found for DAO {dao_id} using specialized method"
-            )
-
-            # Fallback to the original implementation for debugging
-            # Get wallet-token pairs for this DAO
-            wallet_tokens = backend.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
-
-            if not wallet_tokens:
-                self.logger.info(f"No wallet tokens found for DAO {dao_id}")
-                return []
-
-            # Get unique wallet IDs
-            wallet_ids = list(set(wt.wallet_id for wt in wallet_tokens))
-            self.logger.info(
-                f"Found {len(wallet_ids)} unique wallet IDs for DAO {dao_id}"
-            )
-
-            # Get agents that own these wallets
-            agents_with_tokens = []
-            for wallet_id in wallet_ids:
-                wallet = backend.get_wallet(wallet_id)
-                if wallet:
-                    self.logger.info(
-                        f"Found wallet {wallet_id}, agent_id: {wallet.agent_id}"
-                    )
-                    if wallet.agent_id:
-                        agents_with_tokens.append(
-                            {"agent_id": wallet.agent_id, "wallet_id": wallet_id}
-                        )
-                else:
-                    self.logger.warning(f"Wallet {wallet_id} not found in database")
-
-            if not agents_with_tokens:
-                self.logger.warning(f"No agents found holding tokens for DAO {dao_id}")
-
-            return agents_with_tokens
+            self.logger.error(f"No agents found with tokens for DAO {dao_id}")
+            return []
 
         # Convert DTOs to the expected format
         agents_with_tokens = [
@@ -141,7 +106,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         ]
 
         self.logger.info(
-            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id} using specialized method"
+            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id}"
         )
 
         return agents_with_tokens
@@ -156,7 +121,6 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             transaction: The transaction to handle
         """
         tx_data = self.extract_transaction_data(transaction)
-        # Get burn height from the apply block data
         burn_height = self._get_burn_height(tx_data)
 
         if burn_height is None:
@@ -172,13 +136,14 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             )
         )
 
-        # Filter proposals that should start at or after this burn height
+        # Filter proposals that should start at this burn height
         eligible_proposals = [
             p
             for p in proposals
             if p.start_block is not None
             and p.end_block is not None
-            and p.start_block <= burn_height < p.end_block
+            and p.start_block == burn_height
+            and p.parameters is not None  # Ensure parameters exist
         ]
 
         if not eligible_proposals:
@@ -205,20 +170,21 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Create queue messages for each agent to evaluate and vote
             for agent in agents:
-                new_message = backend.create_queue_message(
+                # Create message with only the proposal ID
+                message_data = {
+                    "proposal_id": proposal.id,  # Only pass the proposal UUID
+                }
+
+                backend.create_queue_message(
                     QueueMessageCreate(
                         type="dao_proposal_vote",
-                        message={
-                            "action_proposals_contract": proposal.contract_principal,
-                            "proposal_id": proposal.proposal_id,
-                            "dao_name": dao.name,
-                            "burn_height": burn_height,
-                        },
+                        message=message_data,
                         dao_id=dao.id,
                         wallet_id=agent["wallet_id"],
                     )
                 )
+
                 self.logger.info(
                     f"Created queue message for agent {agent['agent_id']} "
-                    f"to evaluate proposal {proposal.proposal_id}: {new_message.id}"
+                    f"to evaluate proposal {proposal.id}"
                 )

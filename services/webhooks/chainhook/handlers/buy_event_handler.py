@@ -86,10 +86,14 @@ class BuyEventHandler(ChainhookEventHandler):
         # Check if the sender is one of our wallets
         wallets = backend.list_wallets(WalletFilter(mainnet_address=sender))
         if not wallets:
-            self.logger.info(
-                f"Sender {sender} is not one of our wallets. Ignoring event."
-            )
-            return
+            # If not found in mainnet addresses, check testnet addresses
+            wallets = backend.list_wallets(WalletFilter(testnet_address=sender))
+            if not wallets:
+                self.logger.info(
+                    f"Sender {sender} is not one of our wallets (checked both mainnet and testnet). "
+                    f"Ignoring event."
+                )
+                return
 
         wallet = wallets[0]  # Get the matching wallet
 
