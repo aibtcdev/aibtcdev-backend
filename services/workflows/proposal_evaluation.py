@@ -121,7 +121,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         prompt = self._create_prompt()
 
         # Create evaluation node
-        def evaluate_proposal(state: EvaluationState) -> EvaluationState:
+        async def evaluate_proposal(state: EvaluationState) -> EvaluationState:
             """Evaluate the proposal and determine how to vote."""
             # Format prompt with state
             formatted_prompt = prompt.format(
@@ -156,13 +156,13 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 return "skip_vote"
 
         # Create voting node
-        def vote_on_proposal(state: EvaluationState) -> EvaluationState:
+        async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
             """Vote on the proposal based on the evaluation."""
             # Initialize the VoteOnActionProposalTool
             vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
             # Execute the vote
-            vote_result = vote_tool._run(
+            vote_result = await vote_tool._arun(
                 action_proposals_voting_extension=state[
                     "action_proposals_voting_extension"
                 ],
@@ -176,7 +176,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             return state
 
         # Create skip voting node
-        def skip_voting(state: EvaluationState) -> EvaluationState:
+        async def skip_voting(state: EvaluationState) -> EvaluationState:
             """Skip voting and just return the evaluation."""
             state["vote_result"] = {
                 "success": True,
@@ -266,7 +266,7 @@ async def evaluate_and_vote_on_proposal(
     """
     # First, get the proposal data
     get_proposal_tool = GetProposalTool(wallet_id=wallet_id)
-    proposal_data = get_proposal_tool._run(
+    proposal_data = await get_proposal_tool._arun(
         action_proposals_voting_extension=action_proposals_voting_extension,
         proposal_id=proposal_id,
     )
@@ -286,7 +286,7 @@ async def evaluate_and_vote_on_proposal(
                 "database_get_dao_get_by_name"
             )
             if dao_info_tool:
-                dao_info_result = dao_info_tool._run(name=dao_name)
+                dao_info_result = await dao_info_tool._arun(name=dao_name)
                 if dao_info_result.get("success", False):
                     dao_info = dao_info_result.get("data", {})
         except Exception as e:
