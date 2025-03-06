@@ -173,7 +173,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.debug("Executing vote...")
                 vote_result = await vote_tool._arun(
                     action_proposals_voting_extension=state[
-                        "action_proposals_voting_extension"
+                        "action_proposals_contract"
                     ],
                     proposal_id=state["proposal_id"],
                     vote=state["approve"],
