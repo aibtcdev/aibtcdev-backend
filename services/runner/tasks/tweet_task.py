@@ -106,10 +106,29 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_message(self, message: Any) -> Optional[TweetProcessingResult]:
         """Validate a single message before processing."""
         try:
-            if not message.message or not message.message.get("body"):
+            # Check if message exists
+            if not message.message:
                 return TweetProcessingResult(
                     success=False,
-                    message="Tweet message has no body",
+                    message="Tweet message is empty",
+                    tweet_id=message.tweet_id,
+                )
+
+            # Extract tweet text from the message field
+            tweet_text = None
+            if isinstance(message.message, dict) and "message" in message.message:
+                tweet_text = message.message["message"]
+            else:
+                return TweetProcessingResult(
+                    success=False,
+                    message=f"Unsupported tweet message format: {message.message}",
+                    tweet_id=message.tweet_id,
+                )
+
+            if not tweet_text:
+                return TweetProcessingResult(
+                    success=False,
+                    message="Tweet message content is empty",
                     tweet_id=message.tweet_id,
                 )
 
@@ -121,7 +140,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
 
             # Check tweet length
-            tweet_text = message.message["body"]
             if len(tweet_text) > 280:  # Twitter's character limit
                 return TweetProcessingResult(
                     success=False,
@@ -130,7 +148,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            return None  # Validation passed
+            # No need to modify the message structure, keep it as is
+            return None
 
         except Exception as e:
             logger.error(
@@ -160,7 +179,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            tweet_text = message.message["body"]
+            # Extract tweet text directly from the message format
+            tweet_text = message.message["message"]
             logger.info(f"Sending tweet for DAO {message.dao_id}")
             logger.debug(f"Tweet content: {tweet_text}")
 
