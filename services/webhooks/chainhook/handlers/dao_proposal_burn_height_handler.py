@@ -178,7 +178,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             for p in proposals
             if p.start_block is not None
             and p.end_block is not None
-            and p.start_block <= burn_height < p.end_block
+            and p.start_block == burn_height
         ]
 
         if not eligible_proposals:
