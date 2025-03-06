@@ -40,15 +40,34 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
         try:
+            # Get pending messages from the queue
             pending_messages = await self.get_pending_messages()
             message_count = len(pending_messages)
+            logger.debug(f"Found {message_count} pending proposal voting messages")
 
-            if message_count > 0:
-                logger.debug(f"Found {message_count} pending proposal voting messages")
-                return True
-            else:
-                logger.debug("No pending proposal voting messages")
+            if message_count == 0:
+                logger.info("No pending proposal voting messages found")
                 return False
+
+            # Validate that at least one message has a valid proposal
+            for message in pending_messages:
+                message_data = message.message or {}
+                proposal_id = message_data.get("proposal_id")
+
+                if not proposal_id:
+                    logger.warning(f"Message {message.id} missing proposal_id")
+                    continue
+
+                # Check if the proposal exists in the database
+                proposal = backend.get_proposal(proposal_id)
+                if proposal:
+                    logger.info(f"Found valid proposal {proposal_id} to process")
+                    return True
+                else:
+                    logger.warning(f"Proposal {proposal_id} not found in database")
+
+            logger.warning("No valid proposals found in pending messages")
+            return False
 
         except Exception as e:
             logger.error(

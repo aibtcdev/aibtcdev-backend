@@ -330,6 +330,7 @@ async def evaluate_and_vote_on_proposal(
             "parameters": proposal_data.parameters,
             "action": proposal_data.action,
             "caller": proposal_data.caller,
+            "contract_principal": proposal_data.contract_principal,
             "creator": proposal_data.creator,
             "created_at_block": proposal_data.created_at_block,
             "end_block": proposal_data.end_block,
@@ -342,46 +343,18 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        # Get DAO information if available
-        dao_info = None
-        if dao_name:
-            try:
-                # Get DAO information from the database
-                logger.debug(f"Getting DAO information for {dao_name}...")
-                dao_tools = get_proposal_evaluation_tools()
-                dao_info_tool = dao_tools.get(
-                    "database_get_dao_get_by_name"
-                ) or dao_tools.get("dao_search")
-
-                if dao_info_tool:
-                    try:
-                        if "database_get_dao_get_by_name" in dao_tools:
-                            dao_info_result = await dao_info_tool._arun(name=dao_name)
-                        else:
-                            dao_info_result = await dao_info_tool._arun(
-                                name=dao_name,
-                                description=None,
-                                token_name=None,
-                                token_symbol=None,
-                                contract_id=None,
-                            )
-
-                        if dao_info_result.get("success", False):
-                            dao_info = dao_info_result.get("data", {})
-                    except Exception as e:
-                        logger.warning(
-                            f"Error getting DAO info: {str(e)}", exc_info=True
-                        )
-            except Exception as e:
-                logger.warning(
-                    f"Failed to get DAO information: {str(e)}", exc_info=True
-                )
+        # Get DAO info
+        dao_info = backend.get_dao(proposal_data.dao_id)
+        if not dao_info:
+            error_msg = f"DAO with ID {proposal_data.dao_id} not found"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
 
         # Initialize state
         state = {
-            "action_proposals_contract": action_proposals_contract,
-            "action_proposals_voting_extension": action_proposals_voting_extension,
-            "proposal_id": proposal_id,
+            "action_proposals_contract": proposal_dict["contract_principal"],
+            "action_proposals_voting_extension": proposal_dict["action"],
+            "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
             "dao_info": dao_info or {},
             "approve": False,
