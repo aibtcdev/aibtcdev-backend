@@ -74,6 +74,16 @@ class SchedulerConfig:
     dao_proposal_vote_runner_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_INTERVAL_SECONDS", "60")
     )
+    dao_proposal_conclude_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_ENABLED", "false").lower()
+        == "true"
+    )
+    dao_proposal_conclude_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    dao_proposal_conclude_runner_wallet_id: str = os.getenv(
+        "AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_WALLET_ID", ""
+    )
 
 
 @dataclass

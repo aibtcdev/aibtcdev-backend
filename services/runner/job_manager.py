@@ -87,6 +87,12 @@ class JobManager:
                 config.scheduler.dao_proposal_vote_runner_interval_seconds,
                 JobType.DAO_PROPOSAL_VOTE.value,
             ),
+            (
+                "DAO Proposal Conclude Runner Service",
+                config.scheduler.dao_proposal_conclude_runner_enabled,
+                config.scheduler.dao_proposal_conclude_runner_interval_seconds,
+                JobType.DAO_PROPOSAL_CONCLUDE.value,
+            ),
         ]
 
         # Add all runner jobs with common structure
