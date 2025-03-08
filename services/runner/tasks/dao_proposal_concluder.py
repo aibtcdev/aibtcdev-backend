@@ -10,6 +10,7 @@ from backend.models import (
     QueueMessageFilter,
     QueueMessageType,
 )
+from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from tools.dao_ext_action_proposals import ConcludeActionProposalTool
@@ -105,7 +106,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             # Initialize the ConcludeActionProposalTool
             logger.debug(f"Preparing to conclude proposal {proposal.proposal_id}")
             conclude_tool = ConcludeActionProposalTool(
-                wallet_id=self.config.dao_proposal_conclude_runner_wallet_id
+                wallet_id=config.scheduler.dao_proposal_conclude_runner_wallet_id
             )
 
             # Execute the conclusion
