@@ -112,9 +112,9 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             # Execute the conclusion
             logger.debug("Executing conclusion...")
             conclusion_result = await conclude_tool._arun(
-                action_proposals_voting_extension=proposal.action,  # This is the voting extension contract
+                action_proposals_voting_extension=proposal.contract_principal,  # This is the voting extension contract
                 proposal_id=proposal.proposal_id,  # This is the on-chain proposal ID
-                action_proposal_contract_to_execute=proposal.contract_principal,  # This is the contract that will be executed
+                action_proposal_contract_to_execute=proposal.action,  # This is the contract that will be executed
             )
             logger.debug(f"Conclusion result: {conclusion_result}")
 
