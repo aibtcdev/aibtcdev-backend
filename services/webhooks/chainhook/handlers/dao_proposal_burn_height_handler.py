@@ -8,6 +8,7 @@ from backend.models import (
     ContractStatus,
     ProposalFilter,
     QueueMessageCreate,
+    QueueMessageType,
     WalletTokenFilter,
 )
 from lib.logger import configure_logger
@@ -136,8 +137,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             )
         )
 
-        # Filter proposals that should start at this burn height
-        eligible_proposals = [
+        # Filter proposals that should start or end at this burn height
+        start_proposals = [
             p
             for p in proposals
             if p.start_block is not None
@@ -146,16 +147,27 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             and p.parameters is not None  # Ensure parameters exist
         ]
 
-        if not eligible_proposals:
+        end_proposals = [
+            p
+            for p in proposals
+            if p.start_block is not None
+            and p.end_block is not None
+            and p.end_block == burn_height
+            and p.parameters is not None  # Ensure parameters exist
+        ]
+
+        if not start_proposals and not end_proposals:
             self.logger.info(
                 f"No eligible proposals found for burn height {burn_height}"
             )
             return
 
-        self.logger.info(f"Found {len(eligible_proposals)} eligible proposals")
+        self.logger.info(
+            f"Found {len(start_proposals)} proposals to start and {len(end_proposals)} proposals to conclude"
+        )
 
-        # Process each eligible proposal
-        for proposal in eligible_proposals:
+        # Process proposals that are starting
+        for proposal in start_proposals:
             # Get the DAO for this proposal
             dao = backend.get_dao(proposal.dao_id)
             if not dao:
@@ -177,7 +189,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
                 backend.create_queue_message(
                     QueueMessageCreate(
-                        type="dao_proposal_vote",
+                        type=QueueMessageType.DAO_PROPOSAL_VOTE,
                         message=message_data,
                         dao_id=dao.id,
                         wallet_id=agent["wallet_id"],
@@ -185,6 +197,31 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 )
 
                 self.logger.info(
-                    f"Created queue message for agent {agent['agent_id']} "
+                    f"Created vote queue message for agent {agent['agent_id']} "
                     f"to evaluate proposal {proposal.id}"
                 )
+
+        # Process proposals that are ending
+        for proposal in end_proposals:
+            dao = backend.get_dao(proposal.dao_id)
+            if not dao:
+                self.logger.warning(f"No DAO found for proposal {proposal.id}")
+                continue
+
+            # For conclude messages, we only need to create one message per proposal
+            message_data = {
+                "proposal_id": proposal.id,
+            }
+
+            backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.DAO_PROPOSAL_CONCLUDE,
+                    message=message_data,
+                    dao_id=dao.id,
+                    wallet_id=None,  # No specific wallet needed for conclusion
+                )
+            )
+
+            self.logger.info(
+                f"Created conclude queue message for proposal {proposal.id}"
+            )

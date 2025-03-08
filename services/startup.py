@@ -7,10 +7,7 @@ from config import config
 from lib.logger import configure_logger
 from lib.websocket_manager import manager
 from services.bot import start_application
-from services.runner import execute_runner_job
 from services.runner.job_manager import JobManager
-from services.schedule import sync_schedules
-from services.twitter import execute_twitter_job
 
 logger = configure_logger(__name__)
 
