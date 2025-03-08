@@ -43,6 +43,11 @@ class TelegramConfig:
 
 
 @dataclass
+class DiscordConfig:
+    webhook_url: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL", "")
+   
+
+@dataclass
 class SchedulerConfig:
     sync_enabled: bool = (
         os.getenv("AIBTC_SCHEDULE_SYNC_ENABLED", "false").lower() == "true"
@@ -110,6 +115,7 @@ class Config:
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     api: APIConfig = field(default_factory=APIConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
+    discord: DiscordConfig = field(default_factory=DiscordConfig)
 
     @classmethod
     def load(cls) -> "Config":
