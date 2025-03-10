@@ -210,19 +210,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.info(f"Successfully posted tweet {tweet_response.id}")
             logger.debug(f"Tweet ID: {tweet_response.id}")
 
-             # Discord Service
-        try:
-            from lib.discord_factory import create_discord_service
-            
-            discord_service = create_discord_service()
+            # Discord Service
+            try:
+                from lib.discord_factory import create_discord_service
 
-            if discord_service:
-                discord_result = discord_service.send_message(tweet_text)
-                logger.info(f"Discord message sent: {discord_result['success']}")
+                discord_service = create_discord_service()
 
-        except Exception as e:
-            logger.warning(f"Failed to send Discord message: {str(e)}")
+                if discord_service:
+                    discord_result = discord_service.send_message(tweet_text)
+                    logger.info(f"Discord message sent: {discord_result['success']}")
 
+            except Exception as e:
+                logger.warning(f"Failed to send Discord message: {str(e)}")
 
             return TweetProcessingResult(
                 success=True,
