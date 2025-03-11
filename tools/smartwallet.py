@@ -13,7 +13,7 @@ class GetBalanceSTXInput(BaseModel):
     smart_wallet_contract: str = Field(
         ...,
         description="Contract principal of the smart wallet",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-user-agent-smart-wallet",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-smart-wallet-ST3YT-S5D18",
     )
 
 
@@ -72,12 +72,12 @@ class IsApprovedAssetInput(BaseModel):
     smart_wallet_contract: str = Field(
         ...,
         description="Contract principal of the smart wallet",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-user-agent-smart-wallet",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-smart-wallet-ST3YT-S5D18",
     )
     asset_contract: str = Field(
         ...,
         description="Contract principal of the asset to check",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-faktory",
     )
 
 
@@ -139,7 +139,7 @@ class GetConfigurationInput(BaseModel):
     smart_wallet_contract: str = Field(
         ...,
         description="Contract principal of the smart wallet",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-user-agent-smart-wallet",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-smart-wallet-ST3YT-S5D18",
     )
 
 
