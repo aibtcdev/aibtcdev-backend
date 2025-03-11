@@ -38,7 +38,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to deposit STX."""
+        """Execute the tool to deposit STX to a smart wallet."""
         if self.wallet_id is None:
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
@@ -57,7 +57,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to deposit STX."""
+        """Execute the tool to deposit STX to a smart wallet."""
         return self._deploy(smart_wallet_contract, amount, **kwargs)
 
     async def _arun(
@@ -66,7 +66,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Async version of the tool."""
+        """Async version of the tool to deposit STX to a smart wallet."""
         return self._deploy(smart_wallet_contract, amount, **kwargs)
 
 
