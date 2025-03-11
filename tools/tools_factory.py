@@ -16,6 +16,7 @@ from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_deployments import ContractDAODeployTool
 from .smartwallet import (
     ApproveAssetTool,
+    DeploySmartWalletTool,
     DepositFTTool,
     DepositSTXTool as SmartWalletDepositSTXTool,
     GetBalanceSTXTool,
@@ -259,6 +260,7 @@ def initialize_tools(
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
         # Smart wallet tools
+        "smartwallet_deploy_smart_wallet": DeploySmartWalletTool(wallet_id),
         "smartwallet_deposit_stx": SmartWalletDepositSTXTool(wallet_id),
         "smartwallet_deposit_ft": DepositFTTool(wallet_id),
         "smartwallet_approve_asset": ApproveAssetTool(wallet_id),
