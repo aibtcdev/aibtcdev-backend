@@ -14,6 +14,15 @@ from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
 from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_deployments import ContractDAODeployTool
+from .smartwallet import (
+    ApproveAssetTool,
+    DepositFTTool,
+    DepositSTXTool,
+    GetBalanceSTXTool,
+    GetConfigurationTool,
+    IsApprovedAssetTool,
+    RevokeAssetTool,
+)
 from .dao_ext_action_proposals import (
     ConcludeActionProposalTool,
     GetLiquidSupplyTool,
@@ -245,6 +254,14 @@ def initialize_tools(
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
+        # Smart wallet tools
+        "smartwallet_deposit_stx": DepositSTXTool(wallet_id),
+        "smartwallet_deposit_ft": DepositFTTool(wallet_id),
+        "smartwallet_approve_asset": ApproveAssetTool(wallet_id),
+        "smartwallet_revoke_asset": RevokeAssetTool(wallet_id),
+        "smartwallet_get_balance_stx": GetBalanceSTXTool(wallet_id),
+        "smartwallet_is_approved_asset": IsApprovedAssetTool(wallet_id),
+        "smartwallet_get_configuration": GetConfigurationTool(wallet_id),
     }
 
     return tools
