@@ -38,7 +38,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to deposit STX."""
+        """Execute the tool to deposit STX to a smart wallet."""
         if self.wallet_id is None:
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
@@ -57,7 +57,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute the tool to deposit STX."""
+        """Execute the tool to deposit STX to a smart wallet."""
         return self._deploy(smart_wallet_contract, amount, **kwargs)
 
     async def _arun(
@@ -66,7 +66,7 @@ class DepositSTXTool(BaseTool):
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Async version of the tool."""
+        """Async version of the tool to deposit STX to a smart wallet."""
         return self._deploy(smart_wallet_contract, amount, **kwargs)
 
 
@@ -458,3 +458,71 @@ class GetConfigurationTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(smart_wallet_contract, **kwargs)
+
+
+class DeploySmartWalletInput(BaseModel):
+    """Input schema for deploying a smart wallet."""
+
+    owner_address: str = Field(
+        ...,
+        description="Stacks address of the wallet owner",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA",
+    )
+    dao_token_contract: str = Field(
+        ...,
+        description="Contract principal of the DAO token",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token",
+    )
+
+
+class DeploySmartWalletTool(BaseTool):
+    name: str = "smartwallet_deploy"
+    description: str = (
+        "Deploy a new smart wallet for a user. "
+        "The smart wallet will be owned by the specified address and linked to the DAO token. "
+        "Returns the deployed smart wallet contract address and transaction ID."
+    )
+    args_schema: Type[BaseModel] = DeploySmartWalletInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        owner_address: str,
+        dao_token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to deploy a smart wallet."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [owner_address, dao_token_contract]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao",
+            "deploy-smart-wallet.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        owner_address: str,
+        dao_token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to deploy a smart wallet."""
+        return self._deploy(owner_address, dao_token_contract, **kwargs)
+
+    async def _arun(
+        self,
+        owner_address: str,
+        dao_token_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(owner_address, dao_token_contract, **kwargs)
