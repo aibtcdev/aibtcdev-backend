@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 from uuid import UUID
 
+
 from backend.factory import backend
 from backend.models import (
     QueueMessage,
@@ -12,6 +13,7 @@ from backend.models import (
 )
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
+from lib.discord_factory import create_discord_service
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
@@ -207,6 +209,19 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             logger.info(f"Successfully posted tweet {tweet_response.id}")
             logger.debug(f"Tweet ID: {tweet_response.id}")
+
+            # Discord Service
+            try:
+                from lib.discord_factory import create_discord_service
+
+                discord_service = create_discord_service()
+
+                if discord_service:
+                    discord_result = discord_service.send_message(tweet_text)
+                    logger.info(f"Discord message sent: {discord_result['success']}")
+
+            except Exception as e:
+                logger.warning(f"Failed to send Discord message: {str(e)}")
 
             return TweetProcessingResult(
                 success=True,

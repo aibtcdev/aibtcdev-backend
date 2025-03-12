@@ -199,9 +199,14 @@ async def websocket_endpoint(
     generated_session = str(uuid.uuid4())
     logger.info(f"New WebSocket connection request for user {profile.id}")
 
+    # Flag to track if the WebSocket has been accepted
+    connection_accepted = False
+
     try:
         # Connect the session
+        await websocket.accept()
         await manager.connect_session(websocket, generated_session)
+        connection_accepted = True
         logger.debug(
             f"WebSocket connection established for session {generated_session}"
         )
@@ -237,13 +242,15 @@ async def websocket_endpoint(
                 break
             except HTTPException as he:
                 logger.error(f"HTTP exception in message processing: {he.detail}")
-                await manager.send_session_message(
-                    WebSocketErrorMessage(type="error", message=he.detail),
-                    generated_session,
-                )
+                if connection_accepted:
+                    await manager.send_session_message(
+                        WebSocketErrorMessage(type="error", message=he.detail),
+                        generated_session,
+                    )
             except Exception as e:
                 logger.error(f"Error processing message: {str(e)}")
-                await manager.broadcast_session_error(str(e), generated_session)
+                if connection_accepted:
+                    await manager.broadcast_session_error(str(e), generated_session)
 
     except WebSocketDisconnect:
         logger.info(
@@ -252,6 +259,9 @@ async def websocket_endpoint(
     except Exception as e:
         logger.error(f"WebSocket error for session {generated_session}: {str(e)}")
     finally:
-        # Clean up connection
-        await manager.disconnect_session(websocket, generated_session)
-        logger.debug(f"Cleaned up WebSocket connection for session {generated_session}")
+        # Clean up connection only if it was accepted
+        if connection_accepted:
+            await manager.disconnect_session(websocket, generated_session)
+            logger.debug(
+                f"Cleaned up WebSocket connection for session {generated_session}"
+            )

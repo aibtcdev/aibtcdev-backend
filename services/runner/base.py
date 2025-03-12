@@ -71,7 +71,7 @@ class JobType(str, Enum):
     DAO_TWEET = QueueMessageType.DAO_TWEET
     TWEET = QueueMessageType.TWEET
     DAO_PROPOSAL_VOTE = QueueMessageType.DAO_PROPOSAL_VOTE
-    # Add new job types here
+    DAO_PROPOSAL_CONCLUDE = QueueMessageType.DAO_PROPOSAL_CONCLUDE
 
     def __str__(self):
         return self.value

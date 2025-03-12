@@ -43,6 +43,11 @@ class TelegramConfig:
 
 
 @dataclass
+class DiscordConfig:
+    webhook_url: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL", "")
+   
+
+@dataclass
 class SchedulerConfig:
     sync_enabled: bool = (
         os.getenv("AIBTC_SCHEDULE_SYNC_ENABLED", "false").lower() == "true"
@@ -73,6 +78,16 @@ class SchedulerConfig:
     )
     dao_proposal_vote_runner_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    dao_proposal_conclude_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_ENABLED", "false").lower()
+        == "true"
+    )
+    dao_proposal_conclude_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    dao_proposal_conclude_runner_wallet_id: str = os.getenv(
+        "AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_WALLET_ID", ""
     )
 
 
@@ -110,6 +125,7 @@ class Config:
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     api: APIConfig = field(default_factory=APIConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
+    discord: DiscordConfig = field(default_factory=DiscordConfig)
 
     @classmethod
     def load(cls) -> "Config":

@@ -37,6 +37,7 @@ class QueueMessageType(str, Enum):
     DAO = "dao"
     DAO_TWEET = "dao_tweet"
     DAO_PROPOSAL_VOTE = "dao_proposal_vote"
+    DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
 
     def __str__(self):
         return self.value
