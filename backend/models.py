@@ -610,6 +610,37 @@ class WalletTokenFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
 
 
+#
+# VOTES
+#
+class VoteBase(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    answer: Optional[bool] = None
+    proposal_id: Optional[UUID] = None
+    reasoning: Optional[str] = None
+    tx_id: Optional[str] = None
+    address: Optional[str] = None
+
+
+class VoteCreate(VoteBase):
+    pass
+
+
+class Vote(VoteBase):
+    id: UUID
+    created_at: datetime
+
+
+class VoteFilter(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    answer: Optional[bool] = None
+
+
 # Add this to your backend interface class to get agents by tokens
 class AgentWithWalletTokenDTO(CustomBaseModel):
     agent_id: UUID

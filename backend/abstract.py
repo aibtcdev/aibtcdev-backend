@@ -59,6 +59,10 @@ from backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    Vote,
+    VoteBase,
+    VoteCreate,
+    VoteFilter,
     Wallet,
     WalletBase,
     WalletCreate,
@@ -543,6 +547,27 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_token(self, token_id: UUID) -> bool:
+        pass
+
+    # ----------- VOTES -----------
+    @abstractmethod
+    def create_vote(self, new_vote: VoteCreate) -> Vote:
+        pass
+
+    @abstractmethod
+    def get_vote(self, vote_id: UUID) -> Optional[Vote]:
+        pass
+
+    @abstractmethod
+    def list_votes(self, filters: Optional[VoteFilter] = None) -> List[Vote]:
+        pass
+
+    @abstractmethod
+    def update_vote(self, vote_id: UUID, update_data: VoteBase) -> Optional[Vote]:
+        pass
+
+    @abstractmethod
+    def delete_vote(self, vote_id: UUID) -> bool:
         pass
 
     # ----------- X_CREDS -----------

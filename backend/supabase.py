@@ -69,6 +69,10 @@ from backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    Vote,
+    VoteBase,
+    VoteCreate,
+    VoteFilter,
     Wallet,
     WalletBase,
     WalletCreate,
@@ -1407,6 +1411,63 @@ class SupabaseBackend(AbstractBackend):
         response = (
             self.client.table("tokens").delete().eq("id", str(token_id)).execute()
         )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 15. VOTES
+    # ----------------------------------------------------------------
+    def create_vote(self, new_vote: "VoteCreate") -> "Vote":
+        payload = new_vote.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("votes").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from votes insert.")
+        return Vote(**data[0])
+
+    def get_vote(self, vote_id: UUID) -> Optional["Vote"]:
+        response = (
+            self.client.table("votes")
+            .select("*")
+            .eq("id", str(vote_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Vote(**response.data)
+
+    def list_votes(self, filters: Optional["VoteFilter"] = None) -> List["Vote"]:
+        query = self.client.table("votes").select("*")
+        if filters:
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.agent_id is not None:
+                query = query.eq("agent_id", str(filters.agent_id))
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", str(filters.proposal_id))
+            if filters.answer is not None:
+                query = query.eq("answer", filters.answer)
+        response = query.execute()
+        data = response.data or []
+        return [Vote(**row) for row in data]
+
+    def update_vote(self, vote_id: UUID, update_data: "VoteBase") -> Optional["Vote"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_vote(vote_id)
+        response = (
+            self.client.table("votes").update(payload).eq("id", str(vote_id)).execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Vote(**updated[0])
+
+    def delete_vote(self, vote_id: UUID) -> bool:
+        response = self.client.table("votes").delete().eq("id", str(vote_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 
