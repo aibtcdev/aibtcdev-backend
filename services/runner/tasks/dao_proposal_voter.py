@@ -11,6 +11,7 @@ from backend.models import (
     QueueMessageType,
     VoteCreate,
 )
+from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
@@ -136,8 +137,21 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 # Get wallet information for the address
                 wallet = backend.get_wallet(wallet_id) if wallet_id else None
                 wallet_address = None
+
+                # Select the appropriate wallet address based on network type
                 if wallet:
-                    wallet_address = wallet.mainnet_address or wallet.testnet_address
+                    network_type = config.network.network.lower()
+                    if network_type == "mainnet":
+                        wallet_address = wallet.mainnet_address
+                        logger.debug(f"Using mainnet address: {wallet_address}")
+                    else:  # testnet or other networks
+                        wallet_address = wallet.testnet_address
+                        logger.debug(f"Using testnet address: {wallet_address}")
+
+                    if not wallet_address:
+                        logger.warning(
+                            f"No {network_type} address found for wallet {wallet_id}"
+                        )
 
                 # Get transaction ID if available
                 tx_id = result.get("tx_id")
