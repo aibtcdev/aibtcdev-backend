@@ -1,8 +1,10 @@
 import asyncio
 import time
-from fastapi import WebSocket
-from lib.logger import configure_logger
 from typing import Dict, Set, Tuple
+
+from fastapi import WebSocket
+
+from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
@@ -16,22 +18,37 @@ class ConnectionManager:
         self.ttl_seconds = ttl_seconds
 
     async def connect_job(self, websocket: WebSocket, job_id: str):
-        await websocket.accept()
-        if job_id not in self.job_connections:
-            self.job_connections[job_id] = set()
-        self.job_connections[job_id].add((websocket, time.time()))
+        try:
+            # WebSocket should already be accepted in the endpoint
+            if job_id not in self.job_connections:
+                self.job_connections[job_id] = set()
+            self.job_connections[job_id].add((websocket, time.time()))
+            logger.debug(f"Added WebSocket to job connections: {job_id}")
+        except Exception as e:
+            logger.error(f"Error connecting job WebSocket: {str(e)}")
+            raise
 
     async def connect_thread(self, websocket: WebSocket, thread_id: str):
-        await websocket.accept()
-        if thread_id not in self.thread_connections:
-            self.thread_connections[thread_id] = set()
-        self.thread_connections[thread_id].add((websocket, time.time()))
+        try:
+            # WebSocket should already be accepted in the endpoint
+            if thread_id not in self.thread_connections:
+                self.thread_connections[thread_id] = set()
+            self.thread_connections[thread_id].add((websocket, time.time()))
+            logger.debug(f"Added WebSocket to thread connections: {thread_id}")
+        except Exception as e:
+            logger.error(f"Error connecting thread WebSocket: {str(e)}")
+            raise
 
     async def connect_session(self, websocket: WebSocket, session_id: str):
-        await websocket.accept()
-        if session_id not in self.session_connections:
-            self.session_connections[session_id] = set()
-        self.session_connections[session_id].add((websocket, time.time()))
+        try:
+            # WebSocket should already be accepted in the endpoint
+            if session_id not in self.session_connections:
+                self.session_connections[session_id] = set()
+            self.session_connections[session_id].add((websocket, time.time()))
+            logger.debug(f"Added WebSocket to session connections: {session_id}")
+        except Exception as e:
+            logger.error(f"Error connecting session WebSocket: {str(e)}")
+            raise
 
     async def disconnect_job(self, websocket: WebSocket, job_id: str):
         if job_id in self.job_connections:
@@ -132,7 +149,7 @@ class ConnectionManager:
 
         # Helper function to cleanup connections
         async def cleanup_connection_type(
-            connections: Dict[str, Set[Tuple[WebSocket, float]]]
+            connections: Dict[str, Set[Tuple[WebSocket, float]]],
         ) -> None:
             ids_to_remove = []
             for id_, connections_set in connections.items():
@@ -168,17 +185,52 @@ class ConnectionManager:
             await asyncio.sleep(60)  # Run cleanup every minute
 
     async def broadcast_job_error(self, error_message: str, job_id: str):
-        await self.send_job_message({"type": "error", "message": error_message}, job_id)
+        try:
+            if job_id in self.job_connections and self.job_connections[job_id]:
+                await self.send_job_message(
+                    {"type": "error", "message": error_message}, job_id
+                )
+            else:
+                logger.warning(
+                    f"Cannot broadcast error to job {job_id}: no active connections"
+                )
+        except Exception as e:
+            logger.error(f"Error broadcasting job error: {str(e)}")
+            # Don't re-raise to prevent cascading errors
 
     async def broadcast_thread_error(self, error_message: str, thread_id: str):
-        await self.send_thread_message(
-            {"type": "error", "message": error_message}, thread_id
-        )
+        try:
+            if (
+                thread_id in self.thread_connections
+                and self.thread_connections[thread_id]
+            ):
+                await self.send_thread_message(
+                    {"type": "error", "message": error_message}, thread_id
+                )
+            else:
+                logger.warning(
+                    f"Cannot broadcast error to thread {thread_id}: no active connections"
+                )
+        except Exception as e:
+            logger.error(f"Error broadcasting thread error: {str(e)}")
+            # Don't re-raise to prevent cascading errors
 
     async def broadcast_session_error(self, error_message: str, session_id: str):
-        await self.send_session_message(
-            {"type": "error", "message": error_message}, session_id
-        )
+        try:
+            if (
+                session_id in self.session_connections
+                and self.session_connections[session_id]
+            ):
+                await self.send_session_message(
+                    {"type": "error", "message": error_message}, session_id
+                )
+            else:
+                logger.warning(
+                    f"Cannot broadcast error to session {session_id}: no active connections"
+                )
+        except Exception as e:
+            logger.error(f"Error broadcasting session error: {str(e)}")
+            # Don't re-raise to prevent cascading errors
 
 
 manager = ConnectionManager()
