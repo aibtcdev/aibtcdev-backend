@@ -1,9 +1,10 @@
 import json
-from backend.factory import backend
 from dataclasses import dataclass
+from typing import Dict, Optional
+
+from backend.factory import backend
 from lib.images import generate_token_image
 from lib.logger import configure_logger
-from typing import Dict, Optional
 
 logger = configure_logger(__name__)
 

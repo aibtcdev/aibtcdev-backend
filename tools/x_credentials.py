@@ -1,14 +1,18 @@
+from typing import Optional, Type
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
 from backend.factory import backend
 from backend.models import UUID, XCredsCreate
-from langchain.tools import BaseTool
 from lib.logger import configure_logger
-from pydantic import BaseModel, Field
-from typing import Optional, Type
 
 logger = configure_logger(__name__)
 
+
 class CollectXCredentialsInput(BaseModel):
     """Input schema for collecting X API credentials."""
+
     contract_principal: str = Field(..., description="Contract Principal")
     consumer_key: str = Field(..., description="X API Key")
     consumer_secret: str = Field(..., description="X API Secret")
@@ -18,9 +22,12 @@ class CollectXCredentialsInput(BaseModel):
     client_secret: str = Field(..., description="OAuth 2.0 Client Secret")
     username: str = Field(..., description="X Username")
 
+
 class CollectXCredentialsTool(BaseTool):
     name: str = "collect_x_credentials"
-    description: str = "Collect X (Twitter) API credentials and store them securely in the database"
+    description: str = (
+        "Collect X (Twitter) API credentials and store them securely in the database"
+    )
     args_schema: Type[BaseModel] = CollectXCredentialsInput
     return_direct: bool = True
     profile_id: Optional[UUID] = None
@@ -43,17 +50,17 @@ class CollectXCredentialsTool(BaseTool):
         client_id: str,
         client_secret: str,
         username: str,
-        **kwargs
+        **kwargs,
     ) -> str:
         """Execute the tool to store X credentials."""
-        
+
         if self.profile_id is None:
             raise ValueError("Profile ID is required")
 
         try:
             logger.info("Attempting to store credentials")
             logger.debug(f"Received Contract Principal: {contract_principal}")
-            
+
             # Create XCreds object
             x_creds = XCredsCreate(
                 profile_id=self.profile_id,
@@ -64,14 +71,16 @@ class CollectXCredentialsTool(BaseTool):
                 access_secret=access_secret,
                 client_id=client_id,
                 client_secret=client_secret,
-                username=username
+                username=username,
             )
-            
+
             # Store in database
             stored_creds = backend.create_x_creds(x_creds)
-            
+
             if stored_creds:
-                logger.info(f"Successfully stored X credentials for user {username} with Contract Principal {contract_principal}")
+                logger.info(
+                    f"Successfully stored X credentials for user {username} with Contract Principal {contract_principal}"
+                )
                 return f"Successfully stored X credentials for {username} with Contract Principal {contract_principal}"
             logger.error("Failed to store X credentials - no response from backend")
             return "Failed to store X credentials"
@@ -89,7 +98,7 @@ class CollectXCredentialsTool(BaseTool):
         client_id: str,
         client_secret: str,
         username: str,
-        **kwargs
+        **kwargs,
     ) -> str:
         """Sync version of the tool."""
         return self._deploy(
@@ -101,7 +110,7 @@ class CollectXCredentialsTool(BaseTool):
             client_id=client_id,
             client_secret=client_secret,
             username=username,
-            **kwargs
+            **kwargs,
         )
 
     async def _arun(
@@ -114,7 +123,7 @@ class CollectXCredentialsTool(BaseTool):
         client_id: str,
         client_secret: str,
         username: str,
-        **kwargs
+        **kwargs,
     ) -> str:
         """Async version of the tool."""
         return self._deploy(
@@ -126,5 +135,5 @@ class CollectXCredentialsTool(BaseTool):
             client_id=client_id,
             client_secret=client_secret,
             username=username,
-            **kwargs
+            **kwargs,
         )

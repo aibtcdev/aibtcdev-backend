@@ -1,8 +1,10 @@
 import json
-from lib.logger import configure_logger
+from typing import Any, List, Optional, Protocol
+
 from pydantic import BaseModel, Field
+
+from lib.logger import configure_logger
 from tools.tools_factory import initialize_tools
-from typing import Any, Dict, List, Optional, Protocol
 
 # Configure logger
 logger = configure_logger(__name__)

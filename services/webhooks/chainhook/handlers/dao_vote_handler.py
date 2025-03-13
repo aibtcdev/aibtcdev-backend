@@ -1,7 +1,6 @@
 """Handler for capturing DAO proposal votes."""
 
 from typing import Dict, List, Optional
-from uuid import UUID
 
 from backend.factory import backend
 from backend.models import ProposalFilter, VoteBase, VoteCreate, VoteFilter

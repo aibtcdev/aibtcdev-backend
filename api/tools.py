@@ -1,6 +1,6 @@
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import JSONResponse
 
 from lib.logger import configure_logger

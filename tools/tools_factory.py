@@ -1,29 +1,16 @@
-import inspect
-from typing import Any, Callable, Dict, List, Optional, Type
+# tool imports
+from typing import Dict, List, Optional
 
 from langchain.tools.base import BaseTool as LangChainBaseTool
-from pydantic import BaseModel, ConfigDict, create_model
 
 from backend.factory import backend
 from backend.models import UUID, Profile, WalletFilter
 from lib.logger import configure_logger
 
-# tool imports
-from .alex import AlexGetPriceHistory, AlexGetSwapInfo, AlexGetTokenPoolVolume
-from .bitflow import BitflowExecuteTradeTool, BitflowGetAvailableTokens
+from .bitflow import BitflowExecuteTradeTool
 from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_deployments import ContractDAODeployTool
-from .smartwallet import (
-    ApproveAssetTool,
-    DeploySmartWalletTool,
-    DepositFTTool,
-    DepositSTXTool as SmartWalletDepositSTXTool,
-    GetBalanceSTXTool,
-    GetConfigurationTool,
-    IsApprovedAssetTool,
-    RevokeAssetTool,
-)
 from .dao_ext_action_proposals import (
     ConcludeActionProposalTool,
     GetLiquidSupplyTool,
@@ -40,17 +27,13 @@ from .dao_ext_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
-from .dao_ext_bank_account import (
-    DepositSTXTool as BankAccountDepositSTXTool,
-    GetAccountTermsTool,
-    WithdrawSTXTool,
-)
+from .dao_ext_bank_account import DepositSTXTool as BankAccountDepositSTXTool
+from .dao_ext_bank_account import GetAccountTermsTool, WithdrawSTXTool
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
     GetCurrentDaoCharterVersionTool,
     GetDaoCharterTool,
 )
-from .dao_ext_onchain_messaging import SendMessageTool
 from .dao_ext_payments_invoices import (
     GetInvoiceTool,
     GetResourceByNameTool,
@@ -68,43 +51,27 @@ from .database import (
     UpdateScheduledTaskTool,
 )
 from .faktory import (
-    FaktoryExecuteBuyTool,
     FaktoryExecuteBuyStxTool,
+    FaktoryExecuteBuyTool,
     FaktoryExecuteSellTool,
-    FaktoryGetBuyQuoteTool,
-    FaktoryGetDaoTokensTool,
     FaktoryGetSbtcTool,
-    FaktoryGetSellQuoteTool,
-    FaktoryGetTokenTool,
 )
-from .hiro import (
-    STXGetContractInfoTool,
-    STXGetPrincipalAddressBalanceTool,
-    STXPriceTool,
-)
-from .jing import (
-    JingCancelAskTool,
-    JingCancelBidTool,
-    JingCreateBidTool,
-    JingGetAskTool,
-    JingGetBidTool,
-    JingGetMarketsTool,
-    JingGetOrderBookTool,
-    JingGetPendingOrdersTool,
-    JingSubmitAskTool,
-    JingSubmitBidTool,
-)
+from .hiro import STXGetContractInfoTool, STXGetPrincipalAddressBalanceTool
 from .lunarcrush import (
     LunarCrushTokenMetadataTool,
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
-from .stxcity import (
-    StxCityExecuteBuyTool,
-    StxCityExecuteSellTool,
-    StxCityListBondingTokensTool,
-    StxCitySearchTool,
+from .smartwallet import (
+    ApproveAssetTool,
+    DeploySmartWalletTool,
+    DepositFTTool,
+    GetBalanceSTXTool,
+    GetConfigurationTool,
+    IsApprovedAssetTool,
+    RevokeAssetTool,
 )
+from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
@@ -112,7 +79,6 @@ from .transactions import (
     StacksTransactionTool,
 )
 from .twitter import TwitterPostTweetTool
-from .velar import VelarGetPriceHistory, VelarGetTokens
 from .wallet import (
     WalletFundMyWalletFaucet,
     WalletGetMyAddress,
@@ -162,11 +128,7 @@ def initialize_tools(
                 logger.warning(f"Failed to get wallet for agent {agent_id}: {e}")
 
     tools = {
-        # "alex_get_price_history": AlexGetPriceHistory(),
-        # "alex_get_swap_info": AlexGetSwapInfo(),
-        # "alex_get_token_pool_volume": AlexGetTokenPoolVolume(),
         "coinmarketcap_get_market_data": GetBitcoinData(),
-        # "bitflow_get_available_tokens": BitflowGetAvailableTokens(wallet_id),
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
         "contracts_get_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_deploy_dao": ContractDAODeployTool(wallet_id),
@@ -207,7 +169,6 @@ def initialize_tools(
         "dao_charter_get_current": GetCurrentDaoCharterTool(wallet_id),
         "dao_charter_get_current_version": GetCurrentDaoCharterVersionTool(wallet_id),
         "dao_charter_get_version": GetDaoCharterTool(wallet_id),
-        # "dao_messaging_send": SendMessageTool(wallet_id),
         "dao_payments_get_invoice": GetInvoiceTool(wallet_id),
         "dao_payments_get_resource": GetResourceTool(wallet_id),
         "dao_payments_get_resource_by_name": GetResourceByNameTool(wallet_id),
@@ -225,33 +186,16 @@ def initialize_tools(
         "faktory_exec_buy": FaktoryExecuteBuyTool(wallet_id),
         "faktory_exec_buy_stx": FaktoryExecuteBuyStxTool(wallet_id),
         "faktory_exec_sell": FaktoryExecuteSellTool(wallet_id),
-        # "faktory_get_buy_quote": FaktoryGetBuyQuoteTool(wallet_id),
-        # "faktory_get_dao_tokens": FaktoryGetDaoTokensTool(wallet_id),
-        # "faktory_get_sell_quote": FaktoryGetSellQuoteTool(wallet_id),
-        # "faktory_get_token": FaktoryGetTokenTool(wallet_id),
-        # "jing_get_order_book": JingGetOrderBookTool(wallet_id),
-        # "jing_create_bid": JingCreateBidTool(wallet_id),
-        # "jing_cancel_ask": JingCancelAskTool(wallet_id),
-        # "jing_cancel_bid": JingCancelBidTool(wallet_id),
-        # "jing_get_ask": JingGetAskTool(wallet_id),
-        # "jing_get_bid": JingGetBidTool(wallet_id),
-        # "jing_get_markets": JingGetMarketsTool(wallet_id),
-        # "jing_get_pending_orders": JingGetPendingOrdersTool(wallet_id),
-        # "jing_submit_ask": JingSubmitAskTool(wallet_id),
-        # "jing_submit_bid": JingSubmitBidTool(wallet_id),
         "lunarcrush_get_token_metrics": LunarCrushTokenMetricsTool(),
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
         "stacks_get_transaction_status": StacksTransactionStatusTool(wallet_id),
         "stacks_get_transaction_details": StacksTransactionTool(wallet_id),
         "stacks_get_transactions_by_address": StacksTransactionByAddressTool(wallet_id),
-        # "stacks_get_stx_price": STXPriceTool(),
         "stacks_get_contract_info": STXGetContractInfoTool(),
         "stacks_get_address_balance": STXGetPrincipalAddressBalanceTool(),
         "telegram_send_nofication_to_user": SendTelegramNotificationTool(profile_id),
         "twitter_post_tweet": TwitterPostTweetTool(agent_id),
-        # "velar_get_token_price_history": VelarGetPriceHistory(),
-        # "velar_get_tokens": VelarGetTokens(),
         "wallet_get_my_balance": WalletGetMyBalance(wallet_id),
         "wallet_get_my_address": WalletGetMyAddress(wallet_id),
         "wallet_fund_my_wallet_faucet": WalletFundMyWalletFaucet(wallet_id),
@@ -259,7 +203,6 @@ def initialize_tools(
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
-        # Smart wallet tools
         "smartwallet_deploy_smart_wallet": DeploySmartWalletTool(wallet_id),
         "smartwallet_deposit_stx": SmartWalletDepositSTXTool(wallet_id),
         "smartwallet_deposit_ft": DepositFTTool(wallet_id),

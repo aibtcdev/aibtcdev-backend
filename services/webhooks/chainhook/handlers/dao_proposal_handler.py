@@ -1,7 +1,6 @@
 """Handler for capturing new DAO action proposals."""
 
 from typing import Dict, List, Optional
-from uuid import UUID
 
 from backend.factory import backend
 from backend.models import (
@@ -9,8 +8,6 @@ from backend.models import (
     ExtensionFilter,
     ProposalCreate,
     ProposalFilter,
-    QueueMessageCreate,
-    WalletTokenFilter,
 )
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler

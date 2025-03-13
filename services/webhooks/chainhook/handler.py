@@ -4,7 +4,6 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
-from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,

@@ -1,8 +1,10 @@
+from typing import Type
+
 import requests
 from langchain.tools import BaseTool
-from lib.lunarcrush import LunarCrushApi
 from pydantic import BaseModel, Field
-from typing import Type
+
+from lib.lunarcrush import LunarCrushApi
 
 
 class LunarCrushTokenMetricsInput(BaseModel):

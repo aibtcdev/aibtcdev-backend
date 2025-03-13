@@ -1,9 +1,11 @@
 """Base classes for webhook handling."""
 
 from abc import ABC, abstractmethod
-from lib.logger import configure_logger
-from pydantic import BaseModel
 from typing import Any, Dict, Optional, TypeVar
+
+from pydantic import BaseModel
+
+from lib.logger import configure_logger
 
 T = TypeVar("T")
 

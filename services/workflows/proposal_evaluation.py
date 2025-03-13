@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from backend.factory import backend
 from backend.models import UUID, Profile
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError
+from services.workflows.base import BaseWorkflow
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 

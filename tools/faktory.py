@@ -1,8 +1,10 @@
-from backend.models import UUID
+from typing import Optional, Type
+
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
+
+from backend.models import UUID
 from tools.bun import BunScriptRunner
-from typing import Any, Dict, Optional, Type
 
 
 class FaktoryBaseInput(BaseModel):
@@ -132,7 +134,7 @@ class FaktoryExecuteBuyStxTool(BaseTool):
             "stacks-faktory",
             "exec-buy-stx.ts",
             stx_amount,
-            dex_contract_id,
+            dao_token_dex_contract_address,
             slippage,
         )
 

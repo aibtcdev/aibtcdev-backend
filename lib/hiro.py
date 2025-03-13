@@ -1,13 +1,15 @@
-import aiohttp
-import requests
 import time
-from cachetools import TTLCache, cached
-from config import config
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
+from typing import Any, Dict, List, Optional, TypedDict
+
+import aiohttp
+import requests
+from cachetools import TTLCache, cached
+
+from config import config
 from lib.logger import configure_logger
-from typing import Any, Dict, List, Optional, TypedDict, Union
 
 logger = configure_logger(__name__)
 

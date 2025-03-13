@@ -1,8 +1,11 @@
-from .bun import BunScriptRunner
-from backend.models import UUID
+from typing import Dict, Optional, Type, Union
+
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from typing import Dict, Optional, Type, Union
+
+from backend.models import UUID
+
+from .bun import BunScriptRunner
 
 
 class WalletGetBalanceInput(BaseModel):

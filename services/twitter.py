@@ -1,3 +1,7 @@
+from typing import Dict, List, Optional, TypedDict
+
+from pydantic import BaseModel
+
 from backend.factory import backend
 from backend.models import (
     QueueMessageCreate,
@@ -10,9 +14,7 @@ from backend.models import (
 from config import config
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
-from pydantic import BaseModel
 from services.workflows import analyze_tweet
-from typing import Dict, List, Optional, TypedDict
 
 logger = configure_logger(__name__)
 
