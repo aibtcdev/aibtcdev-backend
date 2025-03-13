@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 from uuid import UUID
 
-
 from backend.factory import backend
 from backend.models import (
     QueueMessage,
@@ -13,7 +12,7 @@ from backend.models import (
 )
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
-from lib.discord_factory import create_discord_service
+from services.discord import create_discord_service
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
@@ -212,8 +211,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             # Discord Service
             try:
-                from lib.discord_factory import create_discord_service
-
                 discord_service = create_discord_service()
 
                 if discord_service:
