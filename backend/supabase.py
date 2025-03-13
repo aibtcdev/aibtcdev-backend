@@ -1450,6 +1450,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("proposal_id", str(filters.proposal_id))
             if filters.answer is not None:
                 query = query.eq("answer", filters.answer)
+            if filters.address is not None:
+                query = query.eq("address", filters.address)
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]

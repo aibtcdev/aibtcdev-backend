@@ -13,6 +13,7 @@ from services.webhooks.chainhook.handlers.dao_proposal_burn_height_handler impor
     DAOProposalBurnHeightHandler,
 )
 from services.webhooks.chainhook.handlers.dao_proposal_handler import DAOProposalHandler
+from services.webhooks.chainhook.handlers.dao_vote_handler import DAOVoteHandler
 from services.webhooks.chainhook.handlers.sell_event_handler import SellEventHandler
 from services.webhooks.chainhook.models import ChainHookData
 
@@ -34,6 +35,7 @@ class ChainhookHandler(WebhookHandler):
             SellEventHandler(),
             DAOProposalHandler(),
             DAOProposalBurnHeightHandler(),
+            DAOVoteHandler(),
         ]
 
     async def handle(self, parsed_data: ChainHookData) -> Dict[str, Any]:

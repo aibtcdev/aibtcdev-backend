@@ -622,6 +622,7 @@ class VoteBase(CustomBaseModel):
     reasoning: Optional[str] = None
     tx_id: Optional[str] = None
     address: Optional[str] = None
+    amount: Optional[str] = None  # String to handle large token amounts
 
 
 class VoteCreate(VoteBase):
@@ -639,6 +640,7 @@ class VoteFilter(CustomBaseModel):
     agent_id: Optional[UUID] = None
     proposal_id: Optional[UUID] = None
     answer: Optional[bool] = None
+    address: Optional[str] = None
 
 
 # Add this to your backend interface class to get agents by tokens
