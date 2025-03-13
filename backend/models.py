@@ -297,6 +297,14 @@ class ProposalBase(CustomBaseModel):
     start_block: Optional[int] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
     parameters: Optional[str] = None  # Hex encoded parameters
+    # Additional fields from blockchain data
+    concluded_by: Optional[str] = None
+    executed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
+    passed: Optional[bool] = None
+    votes_against: Optional[str] = None  # String to handle large numbers
+    votes_for: Optional[str] = None  # String to handle large numbers
 
 
 class ProposalCreate(ProposalBase):
@@ -521,6 +529,10 @@ class ProposalFilter(CustomBaseModel):
     status: Optional[ContractStatus] = None
     contract_principal: Optional[str] = None
     proposal_id: Optional[int] = None
+    executed: Optional[bool] = None
+    passed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -608,6 +620,39 @@ class WalletTokenFilter(CustomBaseModel):
     wallet_id: Optional[UUID] = None
     token_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
+
+
+#
+# VOTES
+#
+class VoteBase(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    answer: Optional[bool] = None
+    proposal_id: Optional[UUID] = None
+    reasoning: Optional[str] = None
+    tx_id: Optional[str] = None
+    address: Optional[str] = None
+    amount: Optional[str] = None  # String to handle large token amounts
+
+
+class VoteCreate(VoteBase):
+    pass
+
+
+class Vote(VoteBase):
+    id: UUID
+    created_at: datetime
+
+
+class VoteFilter(CustomBaseModel):
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    answer: Optional[bool] = None
+    address: Optional[str] = None
 
 
 # Add this to your backend interface class to get agents by tokens

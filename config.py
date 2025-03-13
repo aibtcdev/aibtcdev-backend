@@ -45,7 +45,7 @@ class TelegramConfig:
 @dataclass
 class DiscordConfig:
     webhook_url: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL", "")
-   
+
 
 @dataclass
 class SchedulerConfig:

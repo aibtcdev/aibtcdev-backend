@@ -1,7 +1,9 @@
-from lib.logger import configure_logger
+from typing import List, Optional
+
 from pytwitter import Api
 from pytwitter.models import Tweet, User
-from typing import List, Optional
+
+from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 

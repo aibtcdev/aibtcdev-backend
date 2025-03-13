@@ -1,12 +1,14 @@
 import asyncio
+from dataclasses import dataclass
+from typing import Optional, Set
+
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
 from backend.factory import backend
 from backend.models import TelegramUserBase, TelegramUserFilter
 from config import config
-from dataclasses import dataclass
 from lib.logger import configure_logger
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = configure_logger(__name__)
 

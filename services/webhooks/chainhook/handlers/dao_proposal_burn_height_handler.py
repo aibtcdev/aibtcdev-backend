@@ -9,16 +9,10 @@ from backend.models import (
     ProposalFilter,
     QueueMessageCreate,
     QueueMessageType,
-    WalletTokenFilter,
 )
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
-from services.webhooks.chainhook.models import (
-    Apply,
-    ChainHookData,
-    Event,
-    TransactionWithReceipt,
-)
+from services.webhooks.chainhook.models import ChainHookData, TransactionWithReceipt
 
 
 class DAOProposalBurnHeightHandler(ChainhookEventHandler):

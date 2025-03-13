@@ -1,9 +1,10 @@
 import os
 import subprocess
+from typing import Dict, List, Union
+
 from backend.factory import backend
 from backend.models import UUID
 from lib.logger import configure_logger
-from typing import Dict, List, Union
 
 logger = configure_logger(__name__)
 

@@ -1,7 +1,9 @@
-from langchain.tools import BaseTool
-from lib.velar import VelarApi
-from pydantic import BaseModel, Field
 from typing import Type
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
+from lib.velar import VelarApi
 
 
 class VelarPriceHistoryInput(BaseModel):

@@ -1,9 +1,10 @@
-import os
+from typing import Type
+
 import requests
-from config import config
 from langchain.tools import BaseTool
 from pydantic import BaseModel
-from typing import Type
+
+from config import config
 
 
 class GetBitcoinDataInput(BaseModel):

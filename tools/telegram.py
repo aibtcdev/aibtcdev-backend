@@ -1,8 +1,10 @@
-from backend.models import UUID
+from typing import Any, Dict, Optional, Type
+
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
+
+from backend.models import UUID
 from services.bot import _bot_service
-from typing import Any, Dict, Optional, Type
 
 
 class SendTelegramNotificationInput(BaseModel):

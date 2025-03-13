@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from backend.factory import backend
 from backend.models import UUID, Profile
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError
+from services.workflows.base import BaseWorkflow
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -375,6 +375,21 @@ async def evaluate_and_vote_on_proposal(
             }
 
         result = await workflow.execute(state)
+
+        # Extract transaction ID from vote result if available
+        tx_id = None
+        if result.get("vote_result") and result["vote_result"].get("output"):
+            # Try to extract tx_id from the output
+            output = result["vote_result"]["output"]
+            if "txid:" in output.lower():
+                # Extract the transaction ID from the output
+                for line in output.split("\n"):
+                    if "txid:" in line.lower():
+                        parts = line.split(":")
+                        if len(parts) > 1:
+                            tx_id = parts[1].strip()
+                            break
+
         return {
             "success": True,
             "evaluation": {
@@ -385,6 +400,7 @@ async def evaluate_and_vote_on_proposal(
             "vote_result": result["vote_result"],
             "auto_voted": auto_vote
             and result["confidence_score"] >= confidence_threshold,
+            "tx_id": tx_id,
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)

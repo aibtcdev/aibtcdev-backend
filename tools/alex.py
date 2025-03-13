@@ -1,7 +1,9 @@
-from langchain.tools import BaseTool
-from lib.alex import AlexApi
-from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Type
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+
+from lib.alex import AlexApi
 
 
 class AlexBaseInput(BaseModel):

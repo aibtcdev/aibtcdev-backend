@@ -9,7 +9,9 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
+    VoteCreate,
 )
+from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
@@ -123,12 +125,58 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             approval = evaluation.get("approve", False)
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
+            vote_created = False
+            vote_id = None
 
             if result.get("auto_voted", False):
                 logger.info(
                     f"Proposal {proposal.id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
                     f"with confidence {confidence:.2f}"
                 )
+
+                # Get wallet information for the address
+                wallet = backend.get_wallet(wallet_id) if wallet_id else None
+                wallet_address = None
+
+                # Select the appropriate wallet address based on network type
+                if wallet:
+                    network_type = config.network.network.lower()
+                    if network_type == "mainnet":
+                        wallet_address = wallet.mainnet_address
+                        logger.debug(f"Using mainnet address: {wallet_address}")
+                    else:  # testnet or other networks
+                        wallet_address = wallet.testnet_address
+                        logger.debug(f"Using testnet address: {wallet_address}")
+
+                    if not wallet_address:
+                        logger.warning(
+                            f"No {network_type} address found for wallet {wallet_id}"
+                        )
+
+                # Get transaction ID if available
+                tx_id = result.get("tx_id")
+
+                # Create a vote record in the database
+                vote_data = VoteCreate(
+                    wallet_id=wallet_id,
+                    dao_id=dao_id,
+                    agent_id=wallet.agent_id if wallet and wallet.agent_id else None,
+                    answer=approval,
+                    proposal_id=proposal_id,
+                    reasoning=reasoning,
+                    tx_id=tx_id,
+                    address=wallet_address,
+                )
+
+                try:
+                    vote = backend.create_vote(vote_data)
+                    vote_created = True
+                    vote_id = vote.id
+                    logger.info(
+                        f"Created vote record {vote.id} for proposal {proposal_id}"
+                    )
+                except Exception as vote_error:
+                    logger.error(f"Failed to create vote record: {str(vote_error)}")
             else:
                 logger.info(
                     f"Proposal {proposal.id} ({dao.name}): No auto-vote - "
@@ -145,6 +193,8 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 "success": True,
                 "auto_voted": result.get("auto_voted", False),
                 "approve": approval,
+                "vote_created": vote_created,
+                "vote_id": vote_id,
             }
 
         except Exception as e:
@@ -176,6 +226,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         # Process each message
         processed_count = 0
         voted_count = 0
+        votes_created = 0
         errors = []
 
         for message in pending_messages:
@@ -185,18 +236,20 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if result.get("success"):
                 if result.get("auto_voted", False):
                     voted_count += 1
+                if result.get("vote_created", False):
+                    votes_created += 1
             else:
                 errors.append(result.get("error", "Unknown error"))
 
         logger.debug(
             f"Task metrics - Processed: {processed_count}, "
-            f"Voted: {voted_count}, Errors: {len(errors)}"
+            f"Voted: {voted_count}, Votes created: {votes_created}, Errors: {len(errors)}"
         )
 
         return [
             DAOProposalVoteResult(
                 success=True,
-                message=f"Processed {processed_count} proposal(s), voted on {voted_count} proposal(s)",
+                message=f"Processed {processed_count} proposal(s), voted on {voted_count} proposal(s), created {votes_created} vote record(s)",
                 proposals_processed=processed_count,
                 proposals_voted=voted_count,
                 errors=errors,

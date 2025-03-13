@@ -1,5 +1,6 @@
 import openai
 import requests
+
 from config import config
 
 openai.api_key = config.api.openai_api_key

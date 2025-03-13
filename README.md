@@ -10,7 +10,7 @@ aibtc.dev is not liable for any lost, locked, or mistakenly sent funds. This is 
 
 ## Prerequisites
 
-- Python 3.12
+- Python 3.13
 - [Bun](https://bun.sh/) (for running TypeScript scripts)
 - Git
 - Conda (recommended for development) or Docker

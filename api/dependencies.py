@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, Query
+from fastapi import Header, HTTPException, Query
 
 from backend.factory import backend
 from backend.models import KeyFilter, Profile, ProfileFilter

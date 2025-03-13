@@ -8,6 +8,8 @@ from services.webhooks.chainhook.handlers import (
     ChainhookEventHandler,
     ContractMessageHandler,
     DAOProposalBurnHeightHandler,
+    DAOProposalConclusionHandler,
+    DAOVoteHandler,
 )
 from services.webhooks.chainhook.models import ChainHookData
 from services.webhooks.chainhook.parser import ChainhookParser
@@ -21,4 +23,6 @@ __all__ = [
     "ChainhookEventHandler",
     "ContractMessageHandler",
     "DAOProposalBurnHeightHandler",
+    "DAOVoteHandler",
+    "DAOProposalConclusionHandler",
 ]
