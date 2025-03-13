@@ -1,8 +1,10 @@
-import pytest
-from lib.logger import configure_logger
-from lib.velar import VelarApi
 from typing import Dict, List
 from unittest.mock import Mock, patch
+
+import pytest
+
+from lib.logger import configure_logger
+from lib.velar import VelarApi
 
 logger = configure_logger(__name__)
 

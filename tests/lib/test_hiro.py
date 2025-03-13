@@ -1,11 +1,13 @@
+import time
+from typing import Any, Dict, List
+from unittest.mock import Mock, patch
+
 import aiohttp
 import pytest
 import requests
-import time
+
 from lib.hiro import HiroApi, HiroApiError, HiroApiRateLimitError, HiroApiTimeoutError
 from lib.logger import configure_logger
-from typing import Any, Dict, List
-from unittest.mock import Mock, patch
 
 logger = configure_logger(__name__)
 

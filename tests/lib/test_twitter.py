@@ -1,9 +1,11 @@
-import pytest
-from lib.logger import configure_logger
-from lib.twitter import TwitterService
-from pytwitter.models import Tweet, User
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
+
+import pytest
+from pytwitter.models import Tweet, User
+
+from lib.logger import configure_logger
+from lib.twitter import TwitterService
 
 logger = configure_logger(__name__)
 

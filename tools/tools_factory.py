@@ -62,16 +62,14 @@ from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
+from .smartwallet import ApproveAssetTool, DeploySmartWalletTool, DepositFTTool
+from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .smartwallet import (
-    ApproveAssetTool,
-    DeploySmartWalletTool,
-    DepositFTTool,
     GetBalanceSTXTool,
     GetConfigurationTool,
     IsApprovedAssetTool,
     RevokeAssetTool,
 )
-from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,

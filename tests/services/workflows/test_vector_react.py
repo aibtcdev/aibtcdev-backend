@@ -187,10 +187,11 @@ class TestVectorLangGraphService(unittest.IsolatedAsyncioTestCase):
         mock_task.__await__ = MagicMock(return_value=mock_result)
 
         # Execute
-        with patch("asyncio.Queue", return_value=mock_queue), patch(
-            "asyncio.get_running_loop"
-        ), patch("asyncio.create_task", return_value=mock_task), patch(
-            "asyncio.wait_for", side_effect=lambda *args, **kwargs: args[0]
+        with (
+            patch("asyncio.Queue", return_value=mock_queue),
+            patch("asyncio.get_running_loop"),
+            patch("asyncio.create_task", return_value=mock_task),
+            patch("asyncio.wait_for", side_effect=lambda *args, **kwargs: args[0]),
         ):
             results = [
                 chunk

@@ -1,7 +1,9 @@
+from unittest.mock import Mock, patch
+
 import pytest
+
 from lib.logger import configure_logger
 from lib.lunarcrush import LunarCrushApi
-from unittest.mock import Mock, patch
 
 logger = configure_logger(__name__)
 

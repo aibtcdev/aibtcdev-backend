@@ -167,7 +167,7 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
                     content=f"""
                     Follow these decisive actions to address the user's query:
                     
-                    {state['plan']}
+                    {state["plan"]}
                     
                     Execute these steps directly without asking for confirmation.
                     Be decisive and action-oriented in your responses.
@@ -244,7 +244,8 @@ class PreplanLangGraphService:
             # Setup callback handler
             callback_handler = StreamingCallbackHandler(
                 queue=callback_queue,
-                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
+                on_llm_new_token=lambda token,
+                **kwargs: asyncio.run_coroutine_threadsafe(
                     callback_queue.put({"type": "token", "content": token}), loop
                 ),
                 on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
@@ -277,7 +278,6 @@ class PreplanLangGraphService:
                 workflow.tool_descriptions = tool_descriptions
 
             try:
-
                 # The thought notes will be streamed through callbacks
                 plan = await workflow.create_plan(input_str)
 

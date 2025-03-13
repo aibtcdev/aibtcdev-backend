@@ -1,6 +1,9 @@
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 from services.workflows import (
     ExecutionError,
     LangGraphService,
@@ -10,7 +13,6 @@ from services.workflows import (
     StreamingError,
     execute_langgraph_stream,
 )
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture

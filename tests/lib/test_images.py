@@ -1,7 +1,9 @@
+from unittest.mock import Mock, patch
+
 import pytest
+
 from lib.images import ImageGenerationError, generate_image, generate_token_image
 from lib.logger import configure_logger
-from unittest.mock import Mock, patch
 
 logger = configure_logger(__name__)
 

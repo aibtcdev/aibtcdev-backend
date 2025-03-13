@@ -1,7 +1,9 @@
+from typing import Any, Dict, List
+
 import pytest
+
 from lib.logger import configure_logger
 from lib.tokenizer import Trimmer
-from typing import Any, Dict, List
 
 logger = configure_logger(__name__)
 
@@ -63,7 +65,7 @@ def test_trim_messages(sample_messages: List[Dict[str, Any]]) -> None:
 
 
 def test_trim_messages_short_conversation(
-    sample_messages: List[Dict[str, Any]]
+    sample_messages: List[Dict[str, Any]],
 ) -> None:
     """Test trimming with very short conversations."""
     trimmer = Trimmer()

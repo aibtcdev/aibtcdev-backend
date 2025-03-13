@@ -1,10 +1,12 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+from telegram import Update, User
+from telegram.ext import Application, ContextTypes
+
 from backend.models import TelegramUserBase
 from lib.logger import configure_logger
 from services.bot import TelegramBotConfig, TelegramBotService
-from telegram import Update, User
-from telegram.ext import Application, ContextTypes
-from unittest.mock import AsyncMock, MagicMock, patch
 
 logger = configure_logger(__name__)
 

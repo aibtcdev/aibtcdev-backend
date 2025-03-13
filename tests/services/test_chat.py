@@ -1,8 +1,9 @@
 import asyncio
 import datetime
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
+
+import pytest
 
 pytest_plugins = ("pytest_asyncio",)
 

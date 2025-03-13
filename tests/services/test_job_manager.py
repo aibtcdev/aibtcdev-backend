@@ -51,14 +51,15 @@ class TestJobManager:
         # Create mock scheduler
         mock_scheduler = MagicMock(spec=AsyncIOScheduler)
 
-        with patch(
-            "services.runner.job_manager.JobManager.get_all_jobs"
-        ) as mock_get_jobs, patch(
-            "services.runner.job_manager.execute_twitter_job"
-        ) as mock_twitter_func, patch(
-            "services.runner.job_manager.sync_schedules"
-        ) as mock_sync_func:
-
+        with (
+            patch(
+                "services.runner.job_manager.JobManager.get_all_jobs"
+            ) as mock_get_jobs,
+            patch(
+                "services.runner.job_manager.execute_twitter_job"
+            ) as mock_twitter_func,
+            patch("services.runner.job_manager.sync_schedules") as mock_sync_func,
+        ):
             # Create mock jobs
             mock_jobs = [
                 MagicMock(

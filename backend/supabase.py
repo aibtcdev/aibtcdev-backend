@@ -405,7 +405,9 @@ class SupabaseBackend(AbstractBackend):
                     f"Attempting file upload to {file_path} (attempt {attempt})"
                 )
                 upload_response = self.client.storage.from_(self.bucket_name).upload(
-                    file_path, file, {"upsert": "true"}  # Override if file exists
+                    file_path,
+                    file,
+                    {"upsert": "true"},  # Override if file exists
                 )
 
                 if not upload_response:

@@ -4,7 +4,6 @@ from config import config
 
 
 class LunarCrushApi:
-
     def __init__(self):
         """Initialize the LunarCrush API client."""
         self.base_url = config.api.lunarcrush_base_url

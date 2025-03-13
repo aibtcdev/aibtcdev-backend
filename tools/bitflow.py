@@ -67,9 +67,7 @@ class BitflowGetAvailableTokens(BaseTool):
 
 class BitflowExecuteTradeTool(BaseTool):
     name: str = "bitflow_execute_trade"
-    description: str = (
-        "Execute a market order to swap/trade tokens on Bitflow with specified parameters"
-    )
+    description: str = "Execute a market order to swap/trade tokens on Bitflow with specified parameters"
     args_schema: Type[BaseModel] = BitflowExecuteTradeInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None

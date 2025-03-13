@@ -1,5 +1,8 @@
-import pytest
 import uuid
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from backend.models import DAO, Token
 from services.daos import (
     DAORequest,
@@ -10,7 +13,6 @@ from services.daos import (
     TokenServiceError,
     TokenUpdateError,
 )
-from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture

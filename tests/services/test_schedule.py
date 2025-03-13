@@ -1,10 +1,12 @@
-import pytest
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+
 from backend.models import Task
 from services.schedule import SchedulerService, get_scheduler_service
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture
