@@ -1153,6 +1153,14 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("contract_principal", filters.contract_principal)
             if filters.proposal_id is not None:
                 query = query.eq("proposal_id", filters.proposal_id)
+            if filters.executed is not None:
+                query = query.eq("executed", filters.executed)
+            if filters.passed is not None:
+                query = query.eq("passed", filters.passed)
+            if filters.met_quorum is not None:
+                query = query.eq("met_quorum", filters.met_quorum)
+            if filters.met_threshold is not None:
+                query = query.eq("met_threshold", filters.met_threshold)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]

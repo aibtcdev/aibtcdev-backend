@@ -297,6 +297,14 @@ class ProposalBase(CustomBaseModel):
     start_block: Optional[int] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
     parameters: Optional[str] = None  # Hex encoded parameters
+    # Additional fields from blockchain data
+    concluded_by: Optional[str] = None
+    executed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
+    passed: Optional[bool] = None
+    votes_against: Optional[str] = None  # String to handle large numbers
+    votes_for: Optional[str] = None  # String to handle large numbers
 
 
 class ProposalCreate(ProposalBase):
@@ -521,6 +529,10 @@ class ProposalFilter(CustomBaseModel):
     status: Optional[ContractStatus] = None
     contract_principal: Optional[str] = None
     proposal_id: Optional[int] = None
+    executed: Optional[bool] = None
+    passed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
 
 
 class StepFilter(CustomBaseModel):
