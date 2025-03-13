@@ -32,18 +32,18 @@ async def get_profile_from_api_key(api_key: str) -> Optional[Profile]:
         # List all enabled keys that match this key ID
         keys = backend.list_keys(KeyFilter(id=api_key, is_enabled=True))
         if not keys:
-            logger.error(f"No enabled API key found")
+            logger.error("No enabled API key found")
             return None
 
         key = keys[0]
         if not key.profile_id:
-            logger.error(f"API key has no associated profile")
+            logger.error("API key has no associated profile")
             return None
 
         # Get the associated profile
         profile = backend.get_profile(key.profile_id)
         if not profile:
-            logger.error(f"No profile found for API key")
+            logger.error("No profile found for API key")
             return None
 
         return profile
@@ -154,7 +154,7 @@ async def verify_profile_from_token(
             logger.error(f"No profile found for email: {identifier}")
             raise HTTPException(
                 status_code=404,
-                detail=f"No profile found for the authenticated email. Please ensure your profile is properly set up.",
+                detail="No profile found for the authenticated email. Please ensure your profile is properly set up.",
             )
 
         return profile_response[0]

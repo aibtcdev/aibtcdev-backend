@@ -278,7 +278,7 @@ async def add_documents_to_vectors(
     # Ensure collection exists
     try:
         backend.get_vector_collection(collection_name)
-    except:
+    except Exception:
         # Create collection if it doesn't exist
         embed_dim = 1536  # Default for OpenAI embeddings
         if hasattr(embeddings, "embedding_dim"):

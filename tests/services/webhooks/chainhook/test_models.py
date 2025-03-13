@@ -1,6 +1,5 @@
 """Tests for the chainhook models."""
 
-import json
 import unittest
 from typing import Any, Dict
 

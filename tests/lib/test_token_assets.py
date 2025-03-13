@@ -1,5 +1,4 @@
 import json
-from typing import Dict
 from unittest.mock import Mock, patch
 
 import pytest

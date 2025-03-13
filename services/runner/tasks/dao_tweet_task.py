@@ -212,8 +212,7 @@ class DAOTweetTask(BaseTask[DAOTweetProcessingResult]):
                     logger.debug(f"Marked message {message.id} as processed")
 
             logger.debug(
-                f"Task metrics - Processed: {processed_count}, "
-                f"Successful: {success_count}"
+                f"Task metrics - Processed: {processed_count}, Successful: {success_count}"
             )
 
             return results

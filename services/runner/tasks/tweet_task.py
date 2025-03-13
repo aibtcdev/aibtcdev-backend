@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
 from backend.factory import backend
@@ -264,8 +264,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     logger.debug(f"Marked message {message.id} as processed")
 
             logger.debug(
-                f"Task metrics - Processed: {processed_count}, "
-                f"Successful: {success_count}"
+                f"Task metrics - Processed: {processed_count}, Successful: {success_count}"
             )
 
             return results

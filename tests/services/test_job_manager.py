@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from services.runner.job_manager import JobManager
@@ -58,7 +57,6 @@ class TestJobManager:
             patch(
                 "services.runner.job_manager.execute_twitter_job"
             ) as mock_twitter_func,
-            patch("services.runner.job_manager.sync_schedules") as mock_sync_func,
         ):
             # Create mock jobs
             mock_jobs = [

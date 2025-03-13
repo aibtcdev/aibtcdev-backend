@@ -82,7 +82,7 @@ class TwitterService:
                 text=text, reply_in_reply_to_tweet_id=reply_in_reply_to_tweet_id
             )
             logger.info(f"Successfully posted tweet: {text[:20]}...")
-            if type(response) == Tweet:
+            if isinstance(response, Tweet):
                 return response
         except Exception as e:
             logger.error(f"Failed to post tweet: {str(e)}")
@@ -102,7 +102,7 @@ class TwitterService:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
             response = self.client.get_user(username=username)
-            if type(response) == User:
+            if isinstance(response, User):
                 return response
         except Exception as e:
             logger.error(f"Failed to get user info for {username}: {str(e)}")
@@ -122,7 +122,7 @@ class TwitterService:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
             response = self.client.get_user(user_id=user_id)
-            if type(response) == User:
+            if isinstance(response, User):
                 return response
         except Exception as e:
             logger.error(f"Failed to get user info for {user_id}: {str(e)}")

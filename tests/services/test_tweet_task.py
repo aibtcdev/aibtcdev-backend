@@ -1,12 +1,8 @@
-from dataclasses import dataclass
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
-
 import pytest
-
 from backend.models import QueueMessage
-from services.runner.tasks.tweet_task import TweetProcessingResult, TweetTask
+from services.runner.tasks.tweet_task import TweetTask
+from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 
 @pytest.fixture

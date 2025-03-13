@@ -1,10 +1,9 @@
-from typing import Any, Dict
 from unittest.mock import Mock, patch
 
 import pytest
 
+from lib.hiro import PlatformApi
 from lib.logger import configure_logger
-from lib.platform import PlatformApi
 
 logger = configure_logger(__name__)
 

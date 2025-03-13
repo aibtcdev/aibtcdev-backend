@@ -37,7 +37,6 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageFilter,
     Secret,
-    SecretBase,
     SecretFilter,
     Step,
     StepBase,

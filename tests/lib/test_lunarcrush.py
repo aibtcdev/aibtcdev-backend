@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
 from lib.logger import configure_logger
 from lib.lunarcrush import LunarCrushApi

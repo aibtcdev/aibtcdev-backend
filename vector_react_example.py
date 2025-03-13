@@ -98,16 +98,14 @@ async def main():
     # Ensure the vector collection exists
     try:
         # Try to get the collection first
-        collection = backend.get_vector_collection(collection_name)
+        backend.get_vector_collection(collection_name)
         print(f"Using existing vector collection: {collection_name}")
     except Exception:
         # Create the collection if it doesn't exist
         embed_dim = 1536  # Default for OpenAI embeddings
         if hasattr(embeddings, "embedding_dim"):
             embed_dim = embeddings.embedding_dim
-        collection = backend.create_vector_collection(
-            collection_name, dimensions=embed_dim
-        )
+        backend.create_vector_collection(collection_name, dimensions=embed_dim)
         print(
             f"Created new vector collection: {collection_name} with dimensions: {embed_dim}"
         )

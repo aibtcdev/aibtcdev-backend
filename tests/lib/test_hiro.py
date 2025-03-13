@@ -1,5 +1,4 @@
 import time
-from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
 import aiohttp

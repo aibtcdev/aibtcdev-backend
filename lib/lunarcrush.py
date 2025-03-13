@@ -62,7 +62,7 @@ class LunarCrushApi:
         """Search for a specific token using its name or symbol."""
         try:
             # Make a GET request to the search endpoint
-            return self._get(f"searches/search", params={"term": term})
+            return self._get("searches/search", params={"term": term})
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Search error: {str(e)}")

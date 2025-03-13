@@ -79,7 +79,7 @@ class MessageProcessor:
         decisiveness_instruction = "Be decisive and action-oriented. When the user requests something, execute it immediately without asking for confirmation."
 
         if persona:
-            logger.debug(f"Adding persona message with decisiveness instruction")
+            logger.debug("Adding persona message with decisiveness instruction")
             # Add the decisiveness instruction to the persona
             enhanced_persona = f"{persona}\n\n{decisiveness_instruction}"
             messages.append(SystemMessage(content=enhanced_persona))

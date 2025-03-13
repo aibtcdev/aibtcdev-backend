@@ -1,18 +1,14 @@
 """Tests for the Vector React workflow."""
 
-import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 
-from backend.factory import backend
 from services.workflows.vector_react import (
     VectorLangGraphService,
     VectorReactWorkflow,
     add_documents_to_vectors,
-    execute_vector_langgraph_stream,
 )
 
 

@@ -1,9 +1,5 @@
 """Tests for backend models."""
 
-from uuid import UUID
-
-import pytest
-
 from backend.models import QueueMessageBase, QueueMessageFilter, QueueMessageType
 
 
