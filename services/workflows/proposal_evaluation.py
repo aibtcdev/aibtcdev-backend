@@ -54,13 +54,26 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             input_variables=["proposal_data", "dao_info"],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the following action proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
-            
+
             DAO Information:
             {dao_info}
-            
+
+            Note: The AIBTC Charter below represents high-level guiding principles for the AIBTC platform and AI agent operations, not the specific DAO’s own charter.
+
+            AIBTC Charter
+            1. Mission: Elevate human potential through Autonomous Intelligence on Bitcoin.
+            2. Core Values:
+            • Curiosity | Truth Maximizing | Humanity’s Best Interests
+            • Transparency | Resilience | Collaboration
+            3. Guardrails:
+            • Decentralized Governance
+            • Smart Contracts to enforce accountability
+            4. Amendments:
+            • Allowed only if they uphold the mission/values and pass a governance vote
+
             Proposal Data:
             {proposal_data}
-            
+
             # Action Proposal Types and Guidelines
 
             Action proposals are predefined operations that can be executed with specific voting requirements (66% approval threshold, 15% quorum). Each action is implemented as a smart contract that executes specific functionality through the DAO's extensions.
@@ -81,32 +94,33 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
             ### Bank Account Configuration
             * **Set Account Holder** (`aibtc-action-set-account-holder`): Designates authorized withdrawal address.
-            * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (must be between 0-100 STX).
-            * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (must be between 6-1,008 blocks).
+            * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (0–100 STX).
+            * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (6–1,008 blocks).
 
             ## Evaluation Guidelines:
 
             1. Identify the action type from the proposal data
             2. Evaluate the parameters based on the action type
-            3. Consider the DAO's mission and values
+            3. Consider the DAO's mission and values (in addition to the overarching AIBTC Charter)
             4. Assess potential security or financial risks
             5. Decide whether to vote FOR or AGAINST the proposal
 
             ### Specific Guidelines by Action Type:
-            
+
             * **For messaging actions**: Ensure the message is appropriate, aligned with DAO values, and doesn't contain harmful content.
             * **For treasury actions**: Verify the asset is legitimate and appropriate for the DAO to interact with.
             * **For payment actions**: Confirm the resource details are complete and pricing is reasonable.
-            * **For bank configuration**: Ensure the parameters are within acceptable ranges and the account holder is trustworthy.
+            * **For bank configuration**: Ensure parameters are within acceptable ranges and the account holder is trustworthy.
 
             When in doubt about technical parameters, lean toward approving proposals that come from trusted creators and follow established patterns.
-            
+
             Output format:
-            {{
-                "approve": bool,  # true to vote FOR, false to vote AGAINST the proposal
-                "confidence_score": float,  # between 0.0 and 1.0
-                "reasoning": str  # detailed explanation of your decision
-            }}
+
+            {
+            “approve”: bool,  # true to vote FOR, false to vote AGAINST the proposal
+            “confidence_score”: float,  # between 0.0 and 1.0
+            “reasoning”: str  # detailed explanation of your decision
+            }
             """,
         )
 
