@@ -35,7 +35,7 @@ class BunScriptRunner:
                 - error: Error message if execution failed, None otherwise
                 - success: Boolean indicating if execution was successful
         """
-        # Prepare environment with account index
+        # Set up environment with wallet credentials
         wallet = backend.get_wallet(wallet_id)
         secret = backend.get_secret(wallet.secret_id)
         mnemonic = secret.decrypted_secret
@@ -44,17 +44,23 @@ class BunScriptRunner:
         env["ACCOUNT_INDEX"] = "0"
         env["MNEMONIC"] = mnemonic
 
-        # Construct the full script path, handling both direct paths and nested paths
-        script_path = f"{BunScriptRunner.SCRIPT_DIR}/{script_path}/{script_name}"
-        # Construct command with script path
+        # Build script path and command
+        full_script_path = f"{BunScriptRunner.SCRIPT_DIR}/{script_path}/{script_name}"
         command: List[str] = [
             "bun",
             "run",
-            script_path,
+            full_script_path,
         ]
         command.extend(args)
 
+        # Log command execution (without sensitive data)
+        safe_command = command.copy()
+        logger.debug(
+            f"Executing Bun command: {' '.join(safe_command)} in directory: {BunScriptRunner.WORKING_DIR}"
+        )
+
         try:
+            logger.info(f"Running script: {script_name} for wallet: {wallet_id}")
             result = subprocess.run(
                 command,
                 check=True,
@@ -63,13 +69,28 @@ class BunScriptRunner:
                 cwd=BunScriptRunner.WORKING_DIR,
                 env=env,
             )
-            # return successful output
-            return {"output": result.stdout.strip(), "error": None, "success": True}
+
+            output = result.stdout.strip()
+            logger.debug(f"Script execution output: {output}")
+            logger.info(f"Successfully executed script: {script_name}")
+
+            return {"output": output, "error": None, "success": True}
         except subprocess.CalledProcessError as e:
+            error_output = e.stderr.strip() if e.stderr else "Unknown error occurred"
+            stdout_output = e.stdout.strip() if e.stdout else ""
+
+            logger.error(
+                f"Script execution failed: {script_name}, exit code: {e.returncode}"
+            )
+            logger.error(f"Error message: {error_output}")
+            if stdout_output:
+                logger.debug(f"Script stdout before failure: {stdout_output}")
+
             return {
-                "output": e.stdout.strip() if e.stdout else "",
-                "error": e.stderr.strip() if e.stderr else "Unknown error occurred",
+                "output": stdout_output,
+                "error": error_output,
                 "success": False,
             }
         except Exception as e:
+            logger.exception(f"Unexpected error running script {script_name}: {str(e)}")
             return {"output": "", "error": str(e), "success": False}

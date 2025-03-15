@@ -1,10 +1,69 @@
 ---
-description: Dealing with python files and code.
-globs: *.py
+description: Python Code Style and Formatting Guidelines
+globs: *.py,**/*.py
+alwaysApply: true
 ---
+# Code Style and Formatting
+- Use double quotes for strings as specified in ruff.toml.
+- Use 4 spaces for indentation, not tabs.
+- Maximum line length should be 88 characters (Black default).
+- Use type hints from the typing library for all function parameters and return types.
+- Include docstrings for all modules, classes, and functions following Google style format.
+- Use f-strings for string formatting instead of % or .format() when possible. But not when there are no variables.
+- Import statements should be grouped in the following order with a blank line between each group:
+  1. Standard library imports
+  2. Related third-party imports
+  3. Local application/library specific imports
+- Use absolute imports rather than relative imports.
+- Avoid wildcard imports (from module import *).
 
-Always use types using typing library when doing python code. Make sure to avoid creating new code that might already exist. 
-Make sure to add logging using the configure_logger. 
-Always look for any code that would reference code that gets modified so that it doesn't break any existing code.
-Make sure to remove any unused imports. 
-Also make sure to always create or update unit tests for anything you create.
+# Naming Conventions
+- Use snake_case for variables, functions, and methods.
+- Use PascalCase for class names.
+- Use UPPER_CASE for constants.
+- Prefix private attributes and methods with a single underscore (_).
+- Use descriptive names that clearly indicate the purpose of the variable, function, or class.
+
+# Code Organization
+- Each module should have a clear, single responsibility.
+- Keep functions and methods short and focused on a single task.
+- Use comments sparingly and only when necessary to explain complex logic.
+- Group related functionality together within modules and classes.
+- Place imports at the top of the file, followed by constants, then classes, and finally functions.
+
+# Error Handling
+- Use specific exception types rather than catching Exception.
+- Handle exceptions at the appropriate level of abstraction.
+- Include meaningful error messages in exceptions.
+- Use context managers (with statements) for resource management.
+
+# Testing
+- Write unit tests for all new functionality.
+- Test both normal and edge cases.
+- Use descriptive test names that explain what is being tested.
+- Keep tests independent of each other.
+
+# Logging
+- Use the project's standard logging configuration via configure_logger.
+- Include appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+- Provide context in log messages to aid debugging.
+
+# Performance
+- Prefer list/dict/set comprehensions over loops when appropriate.
+- Use generators for large data sets to minimize memory usage.
+- Consider the time and space complexity of algorithms.
+
+# Documentation
+- Keep docstrings up to date with code changes.
+- Include examples in docstrings for complex functions.
+- Document any non-obvious behavior or edge cases.
+
+# Security
+- Never hardcode sensitive information like API keys or passwords.
+- Validate and sanitize all user inputs.
+- Follow the principle of least privilege when accessing resources.
+
+# Maintenance
+- Remove any unused imports, variables, or functions.
+- Refactor duplicated code into reusable functions or classes.
+- Keep dependencies up to date and documented in requirements.txt.
