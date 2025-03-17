@@ -162,20 +162,47 @@ async def handle_chat_message(
                 result = await output_queue.get()
                 if result is None:
                     break
-                await manager.send_session_message(result, session)
+                try:
+                    await manager.send_session_message(result, session)
+                except Exception as e:
+                    logger.error(
+                        f"Error sending message to session {session}: {str(e)}"
+                    )
+                    # Client likely disconnected, break out of the loop
+                    break
         except Exception as e:
             logger.error(f"Error processing chat message results: {str(e)}")
-            await manager.broadcast_session_error(str(e), session)
+            try:
+                await manager.broadcast_session_error(str(e), session)
+            except Exception as e_inner:
+                logger.error(
+                    f"Failed to send error to disconnected session {session}: {str(e_inner)}"
+                )
 
     except ValueError as e:
         logger.error(f"Invalid UUID format: {e}")
-        await manager.broadcast_session_error("Invalid UUID format", session)
+        try:
+            await manager.broadcast_session_error("Invalid UUID format", session)
+        except Exception as e_inner:
+            logger.error(
+                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
+            )
     except HTTPException as he:
         logger.error(f"HTTP exception: {he.detail}")
-        await manager.broadcast_session_error(he.detail, session)
+        try:
+            await manager.broadcast_session_error(he.detail, session)
+        except Exception as e_inner:
+            logger.error(
+                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
+            )
     except Exception as e:
         logger.error(f"Error processing chat message: {str(e)}")
-        await manager.broadcast_session_error(str(e), session)
+        try:
+            await manager.broadcast_session_error(str(e), session)
+        except Exception as e_inner:
+            logger.error(
+                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
+            )
 
 
 @router.websocket("/ws")
@@ -232,10 +259,15 @@ async def websocket_endpoint(
                 else:
                     error_msg = f"Unknown message type: {message['type']}"
                     logger.warning(error_msg)
-                    await manager.send_session_message(
-                        WebSocketErrorMessage(type="error", message=error_msg),
-                        generated_session,
-                    )
+                    try:
+                        await manager.send_session_message(
+                            WebSocketErrorMessage(type="error", message=error_msg),
+                            generated_session,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send error message: {str(e)}")
+                        # Client likely disconnected, break out of the loop
+                        break
 
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected for session {generated_session}")
@@ -243,14 +275,24 @@ async def websocket_endpoint(
             except HTTPException as he:
                 logger.error(f"HTTP exception in message processing: {he.detail}")
                 if connection_accepted:
-                    await manager.send_session_message(
-                        WebSocketErrorMessage(type="error", message=he.detail),
-                        generated_session,
-                    )
+                    try:
+                        await manager.send_session_message(
+                            WebSocketErrorMessage(type="error", message=he.detail),
+                            generated_session,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send error message: {str(e)}")
+                        # Client likely disconnected, break out of the loop
+                        break
             except Exception as e:
                 logger.error(f"Error processing message: {str(e)}")
                 if connection_accepted:
-                    await manager.broadcast_session_error(str(e), generated_session)
+                    try:
+                        await manager.broadcast_session_error(str(e), generated_session)
+                    except Exception as e_inner:
+                        logger.error(f"Failed to send error message: {str(e_inner)}")
+                        # Client likely disconnected, break out of the loop
+                        break
 
     except WebSocketDisconnect:
         logger.info(
