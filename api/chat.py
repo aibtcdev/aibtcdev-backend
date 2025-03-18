@@ -161,45 +161,43 @@ async def handle_chat_message(
         # Process results
         try:
             while True:
-                result = await output_queue.get()
-                if result is None:
-                    break
+                try:
+                    result = await asyncio.wait_for(output_queue.get(), timeout=1.0)
+                    if result is None:
+                        break
 
-                # Check if connection is still active before sending
-                if job_id_str in running_jobs and running_jobs[job_id_str].get(
-                    "connection_active", False
-                ):
-                    try:
-                        await manager.send_session_message(result, session)
-                    except Exception as e:
-                        logger.error(
-                            f"Error sending message to session {session}: {str(e)}"
+                    # Check if connection is still active before sending
+                    if job_id_str in running_jobs and running_jobs[job_id_str].get(
+                        "connection_active", False
+                    ):
+                        try:
+                            await manager.send_session_message(result, session)
+                        except Exception as e:
+                            logger.debug(
+                                f"Error sending message to session {session}: {str(e)}"
+                            )
+                            running_jobs[job_id_str]["connection_active"] = False
+                            logger.info(
+                                f"Setting job {job_id_str} to continue processing without client connection"
+                            )
+                    else:
+                        logger.debug(
+                            f"Skipping message send for inactive connection {session}, job {job_id_str}"
                         )
-                        # Client disconnected, mark the job as disconnected
-                        running_jobs[job_id_str]["connection_active"] = False
-                        # Log but don't try to send another error message
-                        logger.info(
-                            f"Setting job {job_id_str} to continue processing without client connection"
-                        )
-                        # Continue processing without breaking to save results to DB
-                else:
-                    # Connection already marked as inactive, just log
-                    logger.debug(
-                        f"Skipping message send for inactive connection {session}, job {job_id_str}"
-                    )
+                except asyncio.TimeoutError:
+                    # Check if the job is still running
+                    if job_id_str not in running_jobs:
+                        break
+                    continue
+
         except Exception as e:
             logger.error(f"Error processing chat message results: {str(e)}")
-            # Only attempt to send error if connection is likely still active
             if job_id_str in running_jobs and running_jobs[job_id_str].get(
                 "connection_active", False
             ):
                 try:
                     await manager.broadcast_session_error(str(e), session)
-                except Exception as e_inner:
-                    logger.error(
-                        f"Failed to send error to disconnected session {session}: {str(e_inner)}"
-                    )
-                    # Mark connection as inactive
+                except Exception:
                     running_jobs[job_id_str]["connection_active"] = False
                     logger.info(
                         f"Setting job {job_id_str} to continue processing without client connection"
@@ -207,28 +205,13 @@ async def handle_chat_message(
 
     except ValueError as e:
         logger.error(f"Invalid UUID format: {e}")
-        try:
-            await manager.broadcast_session_error("Invalid UUID format", session)
-        except Exception as e_inner:
-            logger.error(
-                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
-            )
+        await manager.broadcast_session_error("Invalid UUID format", session)
     except HTTPException as he:
         logger.error(f"HTTP exception: {he.detail}")
-        try:
-            await manager.broadcast_session_error(he.detail, session)
-        except Exception as e_inner:
-            logger.error(
-                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
-            )
+        await manager.broadcast_session_error(he.detail, session)
     except Exception as e:
         logger.error(f"Error processing chat message: {str(e)}")
-        try:
-            await manager.broadcast_session_error(str(e), session)
-        except Exception as e_inner:
-            logger.error(
-                f"Failed to send error to disconnected session {session}: {str(e_inner)}"
-            )
+        await manager.broadcast_session_error(str(e), session)
 
 
 @router.websocket("/ws")
@@ -292,24 +275,18 @@ async def websocket_endpoint(
                         )
                     except Exception as e:
                         logger.debug(f"Failed to send error message: {str(e)}")
-                        # Client likely disconnected, break out of the loop
                         break
 
             except WebSocketDisconnect:
-                # Normal disconnect, log at info level
                 logger.info(f"WebSocket disconnected for session {generated_session}")
-                # Mark all running jobs for this session as disconnected
                 mark_jobs_disconnected_for_session(generated_session)
                 break
-
             except Exception as e:
                 logger.error(f"Error processing message: {str(e)}")
-                # Try to send error, but don't log additional errors if it fails
                 if connection_accepted:
                     try:
                         await manager.broadcast_session_error(str(e), generated_session)
                     except Exception:
-                        # Client likely disconnected, just break the loop
                         break
 
     except WebSocketDisconnect:
@@ -322,7 +299,10 @@ async def websocket_endpoint(
     finally:
         # Clean up connection only if it was accepted
         if connection_accepted:
-            await manager.disconnect_session(websocket, generated_session)
+            try:
+                await manager.disconnect_session(websocket, generated_session)
+            except Exception as e:
+                logger.debug(f"Error during WebSocket cleanup: {str(e)}")
             logger.debug(
                 f"Cleaned up WebSocket connection for session {generated_session}"
             )
@@ -339,4 +319,4 @@ def mark_jobs_disconnected_for_session(session_id: str) -> None:
             logger.info(
                 f"Marking job {job_id} as disconnected due to WebSocket disconnect"
             )
-            running_jobs[job_id]["connection_active"] = False
+            job_info["connection_active"] = False

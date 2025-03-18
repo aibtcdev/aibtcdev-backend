@@ -16,6 +16,34 @@ class ConnectionManager:
         self.thread_connections: Dict[str, Set[Tuple[WebSocket, float]]] = {}
         self.session_connections: Dict[str, Set[Tuple[WebSocket, float]]] = {}
         self.ttl_seconds = ttl_seconds
+        self.closed_websockets: Set[WebSocket] = set()  # Track closed WebSockets
+
+    def _is_websocket_closed(self, websocket: WebSocket) -> bool:
+        """Check if a WebSocket is closed."""
+        return (
+            websocket in self.closed_websockets or websocket.client_state.DISCONNECTED
+        )
+
+    async def _safe_send(self, websocket: WebSocket, message: dict) -> bool:
+        """Safely send a message through a WebSocket.
+
+        Args:
+            websocket: The WebSocket to send through
+            message: The message to send
+
+        Returns:
+            bool: True if message was sent successfully, False otherwise
+        """
+        if self._is_websocket_closed(websocket):
+            return False
+
+        try:
+            await websocket.send_json(message)
+            return True
+        except Exception as e:
+            logger.debug(f"Error in safe_send: {e}")
+            self.closed_websockets.add(websocket)
+            return False
 
     async def connect_job(self, websocket: WebSocket, job_id: str):
         try:
@@ -41,7 +69,6 @@ class ConnectionManager:
 
     async def connect_session(self, websocket: WebSocket, session_id: str):
         try:
-            # WebSocket should already be accepted in the endpoint
             if session_id not in self.session_connections:
                 self.session_connections[session_id] = set()
             self.session_connections[session_id].add((websocket, time.time()))
@@ -70,6 +97,7 @@ class ConnectionManager:
 
     async def disconnect_session(self, websocket: WebSocket, session_id: str):
         if session_id in self.session_connections:
+            self.closed_websockets.add(websocket)
             self.session_connections[session_id] = {
                 (ws, ts)
                 for ws, ts in self.session_connections[session_id]
@@ -137,17 +165,18 @@ class ConnectionManager:
 
         dead_connections = set()
         active_connections = set()
+
         for ws, ts in self.session_connections[session_id]:
-            try:
-                await ws.send_json(message)
-                active_connections.add(
-                    (ws, time.time())
-                )  # Update timestamp on successful send
-            except Exception as e:
-                logger.error(f"Error sending message to session WebSocket: {str(e)}")
+            if self._is_websocket_closed(ws):
+                dead_connections.add((ws, ts))
+                continue
+
+            if await self._safe_send(ws, message):
+                active_connections.add((ws, time.time()))
+            else:
                 dead_connections.add((ws, ts))
 
-        # Update connections with new timestamps and remove dead ones
+        # Update connections, removing dead ones
         if active_connections or dead_connections:
             self.session_connections[session_id] = active_connections
             if not self.session_connections[session_id]:
@@ -166,13 +195,15 @@ class ConnectionManager:
                     (ws, ts)
                     for ws, ts in connections_set
                     if current_time - ts > self.ttl_seconds
+                    or self._is_websocket_closed(ws)
                 }
                 if expired:
                     for ws, _ in expired:
+                        self.closed_websockets.add(ws)
                         try:
                             await ws.close()
                         except Exception as e:
-                            logger.error(f"Error closing expired WebSocket: {str(e)}")
+                            logger.debug(f"Error closing expired WebSocket: {str(e)}")
                     connections[id_] = connections_set - expired
                     if not connections[id_]:
                         ids_to_remove.append(id_)
@@ -181,9 +212,12 @@ class ConnectionManager:
                 del connections[id_]
 
         # Cleanup all connection types
-        await cleanup_connection_type(self.job_connections)
-        await cleanup_connection_type(self.thread_connections)
         await cleanup_connection_type(self.session_connections)
+        await cleanup_connection_type(self.thread_connections)
+        await cleanup_connection_type(self.job_connections)
+
+        # Clean up the closed_websockets set periodically to prevent memory leaks
+        self.closed_websockets.clear()
 
     async def start_cleanup_task(self):
         while True:
@@ -249,33 +283,18 @@ class ConnectionManager:
                 del self.thread_connections[thread_id]
 
     async def broadcast_session_error(self, error_message: str, session_id: str):
-        # First check if the session exists and has active connections
         if (
             session_id not in self.session_connections
             or not self.session_connections[session_id]
         ):
-            # Change from warning to debug level since this is common during disconnections
             logger.debug(
                 f"Cannot broadcast error to session {session_id}: no active connections"
             )
-            return  # Exit early if there are no active connections
+            return
 
-        dead_connections = set()
-        active_connections = set()
-
-        for ws, ts in self.session_connections[session_id]:
-            try:
-                await ws.send_json({"type": "error", "message": error_message})
-                active_connections.add((ws, time.time()))
-            except Exception as e:
-                logger.debug(f"Error sending error message to WebSocket: {str(e)}")
-                dead_connections.add((ws, ts))
-
-        # Update connections, removing dead ones
-        if active_connections or dead_connections:
-            self.session_connections[session_id] = active_connections
-            if not self.session_connections[session_id]:
-                del self.session_connections[session_id]
+        await self.send_session_message(
+            {"type": "error", "message": error_message}, session_id
+        )
 
 
 manager = ConnectionManager()
