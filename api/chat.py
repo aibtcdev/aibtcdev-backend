@@ -59,6 +59,7 @@ class JobInfo(TypedDict):
     thread_id: UUID
     agent_id: Optional[UUID]
     task: Optional[asyncio.Task]
+    connection_active: bool
 
 
 # Type aliases for better readability
@@ -140,6 +141,7 @@ async def handle_chat_message(
             thread_id=thread_id,
             agent_id=agent_id,
             task=None,
+            connection_active=True,
         )
 
         # Create and store task
@@ -168,7 +170,17 @@ async def handle_chat_message(
                     logger.error(
                         f"Error sending message to session {session}: {str(e)}"
                     )
-                    # Client likely disconnected, break out of the loop
+                    # Client likely disconnected, mark the job as disconnected
+                    job_id_str = str(job.id)
+                    if job_id_str in running_jobs and running_jobs[job_id_str]["task"]:
+                        # Set the processor's connection_active flag to False
+                        # This will prevent further attempts to send messages to the client
+                        # but allow the LLM to continue processing and save results to the database
+                        logger.info(
+                            f"Setting job {job_id_str} to continue processing without client connection"
+                        )
+                        # The task will continue running, but stop trying to send messages
+                        running_jobs[job_id_str]["connection_active"] = False
                     break
         except Exception as e:
             logger.error(f"Error processing chat message results: {str(e)}")
@@ -178,6 +190,13 @@ async def handle_chat_message(
                 logger.error(
                     f"Failed to send error to disconnected session {session}: {str(e_inner)}"
                 )
+                # Client likely disconnected, allow job to continue running silently
+                job_id_str = str(job.id)
+                if job_id_str in running_jobs and running_jobs[job_id_str]["task"]:
+                    logger.info(
+                        f"Setting job {job_id_str} to continue processing without client connection"
+                    )
+                    running_jobs[job_id_str]["connection_active"] = False
 
     except ValueError as e:
         logger.error(f"Invalid UUID format: {e}")
@@ -271,6 +290,13 @@ async def websocket_endpoint(
 
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected for session {generated_session}")
+                # Mark all running jobs for this session as disconnected
+                for job_id, job_info in running_jobs.items():
+                    if job_info.get("task") and job_info.get("connection_active", True):
+                        logger.info(
+                            f"Marking job {job_id} as disconnected due to WebSocket disconnect"
+                        )
+                        running_jobs[job_id]["connection_active"] = False
                 break
             except HTTPException as he:
                 logger.error(f"HTTP exception in message processing: {he.detail}")
@@ -298,6 +324,13 @@ async def websocket_endpoint(
         logger.info(
             f"WebSocket disconnected during setup for session {generated_session}"
         )
+        # In case there are any running jobs, mark them as disconnected
+        for job_id, job_info in running_jobs.items():
+            if job_info.get("task") and job_info.get("connection_active", True):
+                logger.info(
+                    f"Marking job {job_id} as disconnected due to early WebSocket disconnect"
+                )
+                running_jobs[job_id]["connection_active"] = False
     except Exception as e:
         logger.error(f"WebSocket error for session {generated_session}: {str(e)}")
     finally:

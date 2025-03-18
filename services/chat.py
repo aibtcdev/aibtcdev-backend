@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 from uuid import UUID
 
 from backend.factory import backend
@@ -64,6 +64,16 @@ class ToolExecutionHandler:
         }
 
 
+class JobInfo(TypedDict):
+    """Information about a running job."""
+
+    queue: asyncio.Queue
+    thread_id: UUID
+    agent_id: Optional[UUID]
+    task: Optional[asyncio.Task]
+    connection_active: bool = True
+
+
 class ChatProcessor:
     def __init__(
         self,
@@ -86,6 +96,7 @@ class ChatProcessor:
         self.message_handler = MessageHandler()
         self.tool_handler = ToolExecutionHandler()
         self.current_message = self._create_empty_message()
+        self.connection_active = True  # Flag to track if WebSocket is still connected
 
     def _create_empty_message(self) -> Dict[str, Any]:
         """Create an empty message template."""
@@ -126,7 +137,9 @@ class ChatProcessor:
                 }
             )
             self.results.append(tool_execution)
-            await self.output_queue.put(tool_execution)
+            # Only send to the client if the connection is still active
+            if self.connection_active:
+                await self.output_queue.put(tool_execution)
 
     async def process_stream(self) -> None:
         """Process the chat stream and handle different message types."""
@@ -185,8 +198,15 @@ class ChatProcessor:
         """Process a single stream result."""
         logger.debug(f"Processing stream result type: {result.get('type')}")
 
+        if not self.connection_active:
+            # Skip sending to output queue if connection is no longer active
+            # But continue processing to update the database
+            logger.debug(
+                f"Skipping output for disconnected client on job {self.job_id}"
+            )
+
         if result.get("type") == "end":
-            if not first_end:
+            if not first_end and self.connection_active:
                 await self.output_queue.put(
                     Message(
                         type="token",
@@ -240,7 +260,7 @@ class ChatProcessor:
             return
 
         if result.get("content"):
-            if result.get("type") == "token":
+            if result.get("type") == "token" and self.connection_active:
                 stream_message = self.message_handler.process_token_message(
                     {
                         "content": result.get("content", ""),
@@ -345,6 +365,16 @@ async def process_chat_message(
         history=history,
         output_queue=output_queue,
     )
+
+    # Check if the connection is already marked as inactive
+    job_id_str = str(job_id)
+    if job_id_str in running_jobs:
+        processor.connection_active = running_jobs[job_id_str].get(
+            "connection_active", True
+        )
+        if not processor.connection_active:
+            logger.info(f"Starting job {job_id} with inactive connection")
+
     await processor.process_stream()
 
 
