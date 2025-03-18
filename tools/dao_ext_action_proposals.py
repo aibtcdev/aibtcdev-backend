@@ -164,17 +164,17 @@ class ProposeActionAllowAssetInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
         ],
     )
-    dao_token_contract_address_to_allow: str = Field(
+    dao_token_contract_address: str = Field(
         ...,
-        description="Contract principal of the token to allow",
+        description="Contract principal of the token used by the DAO for voting",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
-    dao_token_contract_address: str = Field(
+    dao_token_contract_address_to_allow: str = Field(
         ...,
-        description="Contract principal of the token used by the DAO for voting",
+        description="Contract principal of the token to allow",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
@@ -200,8 +200,8 @@ class ProposeActionAllowAssetTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
-        dao_token_contract_address_to_allow: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -212,6 +212,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow
         ]
 
         return BunScriptRunner.bun_run(
@@ -226,6 +227,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -233,6 +235,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow,
             **kwargs,
         )
 
@@ -241,6 +244,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -248,6 +252,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow,
             **kwargs,
         )
 
@@ -690,41 +695,6 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             withdrawal_period,
             **kwargs,
         )
-
-
-class ProposeActionToggleResourceInput(BaseModel):
-    """Input schema for proposing to toggle a resource action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes toggling a resource in the DAO.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-toggle-resource",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    resource_name: str = Field(
-        ...,
-        description="Name of the resource to toggle",
-        examples=["apiv1", "protected-content", "1hr consulting"],
-    )
-
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
@@ -1350,6 +1320,39 @@ class GetVotingPowerTool(BaseTool):
             action_proposals_voting_extension, dao_token_contract_address, proposal_id, voter_address, **kwargs
         )
 
+
+class ProposeActionToggleResourceInput(BaseModel):
+    """Input schema for proposing to toggle a resource action."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    action_proposal_contract_to_execute: str = Field(
+        ...,
+        description="Contract principal of the action proposal that executes toggling a resource in the DAO.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-toggle-resource",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
+    resource_name: str = Field(
+        ...,
+        description="Name of the resource to toggle",
+        examples=["apiv1", "protected-content", "1hr consulting"],
+    )
 
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
