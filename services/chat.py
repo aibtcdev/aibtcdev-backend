@@ -108,6 +108,32 @@ class ChatProcessor:
             agent_id=str(self.agent_id) if self.agent_id else None,
         ).to_dict()
 
+    async def _safe_send_message(self, message: Dict[str, Any]) -> bool:
+        """Safely send a message through the output queue.
+
+        Args:
+            message: The message to send
+
+        Returns:
+            bool: True if message was sent successfully, False if connection is inactive
+        """
+        job_id_str = str(self.job_id)
+        if not self.connection_active or (
+            job_id_str in running_jobs
+            and not running_jobs[job_id_str]["connection_active"]
+        ):
+            return False
+
+        try:
+            await self.output_queue.put(message)
+            return True
+        except Exception as e:
+            logger.debug(f"Failed to send message to client: {e}")
+            self.connection_active = False
+            if job_id_str in running_jobs:
+                running_jobs[job_id_str]["connection_active"] = False
+            return False
+
     async def _handle_tool_execution(
         self, tool_name: str, tool_input: str, tool_output: str, tool_phase: str
     ) -> None:
@@ -138,9 +164,84 @@ class ChatProcessor:
                 }
             )
             self.results.append(tool_execution)
-            # Only send to the client if the connection is still active
-            if self.connection_active:
-                await self.output_queue.put(tool_execution)
+            await self._safe_send_message(tool_execution)
+
+    async def _process_stream_result(
+        self, result: Dict[str, Any], first_end: bool
+    ) -> None:
+        """Process a single stream result."""
+        logger.debug(f"Processing stream result type: {result.get('type')}")
+
+        # Early return for token messages if disconnected
+        if not self.connection_active and result.get("type") == "token":
+            return
+
+        if result.get("type") == "end":
+            if not first_end:
+                message = Message(
+                    type="token",
+                    status="end",
+                    content="",
+                    thread_id=str(self.thread_id),
+                    role="assistant",
+                    agent_id=str(self.agent_id) if self.agent_id else None,
+                    created_at=datetime.datetime.now().isoformat(),
+                ).to_dict()
+                await self._safe_send_message(message)
+            return
+
+        if result.get("type") == "token" and not result.get("content"):
+            return
+
+        if result.get("type") == "tool":
+            await self._handle_tool_execution(
+                str(result.get("tool", "")),
+                str(result.get("input", "")),
+                str(result.get("output", "")),
+                str(result.get("status", "")),
+            )
+            self.current_message = self._create_empty_message()
+            return
+
+        if result.get("content"):
+            if result.get("type") == "token":
+                stream_message = self.message_handler.process_token_message(
+                    {
+                        "content": result.get("content", ""),
+                        "thread_id": str(self.thread_id),
+                        "agent_id": str(self.agent_id) if self.agent_id else None,
+                    }
+                )
+                await self._safe_send_message(stream_message)
+            elif result.get("type") == "result":
+                logger.info(
+                    f"Received result message with content length: {len(result.get('content', ''))}"
+                )
+                self.current_message["content"] = result.get("content", "")
+
+                # Create step in the database
+                logger.info(f"Creating step in database for job {self.job_id}")
+                backend.create_step(
+                    new_step=StepCreate(
+                        profile_id=self.profile.id,
+                        job_id=self.job_id,
+                        agent_id=self.agent_id,
+                        role="assistant",
+                        content=self.current_message["content"],
+                        tool=None,
+                        tool_input=None,
+                        thought=None,
+                        tool_output=None,
+                    )
+                )
+
+                # Add to results
+                self.results.append(
+                    {
+                        **self.current_message,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                    }
+                )
 
     async def process_stream(self) -> None:
         """Process the chat stream and handle different message types."""
@@ -192,110 +293,6 @@ class ChatProcessor:
             raise
         finally:
             await self._cleanup()
-
-    async def _process_stream_result(
-        self, result: Dict[str, Any], first_end: bool
-    ) -> None:
-        """Process a single stream result."""
-        logger.debug(f"Processing stream result type: {result.get('type')}")
-
-        # Check both local and global connection state
-        job_id_str = str(self.job_id)
-        is_connected = self.connection_active and (
-            job_id_str not in running_jobs
-            or running_jobs[job_id_str]["connection_active"]
-        )
-
-        if not is_connected:
-            # Skip sending to output queue if connection is no longer active
-            logger.debug(
-                f"Skipping output for disconnected client on job {self.job_id}"
-            )
-            if result.get("type") == "token":
-                # Skip token messages entirely for disconnected clients
-                return
-
-        if result.get("type") == "end":
-            if not first_end and is_connected:
-                try:
-                    await self.output_queue.put(
-                        Message(
-                            type="token",
-                            status="end",
-                            content="",
-                            thread_id=str(self.thread_id),
-                            role="assistant",
-                            agent_id=str(self.agent_id) if self.agent_id else None,
-                            created_at=datetime.datetime.now().isoformat(),
-                        ).to_dict()
-                    )
-                except Exception as e:
-                    logger.debug(
-                        f"Failed to send end token to disconnected client: {e}"
-                    )
-                    self.connection_active = False
-                    if job_id_str in running_jobs:
-                        running_jobs[job_id_str]["connection_active"] = False
-            return
-
-        if result.get("type") == "token" and not result.get("content"):
-            return
-
-        if result.get("type") == "tool":
-            await self._handle_tool_execution(
-                str(result.get("tool", "")),
-                str(result.get("input", "")),
-                str(result.get("output", "")),
-                str(result.get("status", "")),
-            )
-            self.current_message = self._create_empty_message()
-            return
-
-        if result.get("content"):
-            if result.get("type") == "token" and is_connected:
-                try:
-                    stream_message = self.message_handler.process_token_message(
-                        {
-                            "content": result.get("content", ""),
-                            "thread_id": str(self.thread_id),
-                            "agent_id": str(self.agent_id) if self.agent_id else None,
-                        }
-                    )
-                    await self.output_queue.put(stream_message)
-                except Exception as e:
-                    logger.debug(f"Failed to send token to disconnected client: {e}")
-                    self.connection_active = False
-                    if job_id_str in running_jobs:
-                        running_jobs[job_id_str]["connection_active"] = False
-            elif result.get("type") == "result":
-                logger.info(
-                    f"Received result message with content length: {len(result.get('content', ''))}"
-                )
-                self.current_message["content"] = result.get("content", "")
-
-                # Create step in the database
-                logger.info(f"Creating step in database for job {self.job_id}")
-                backend.create_step(
-                    new_step=StepCreate(
-                        profile_id=self.profile.id,
-                        job_id=self.job_id,
-                        agent_id=self.agent_id,
-                        role="assistant",
-                        content=self.current_message["content"],
-                        tool=None,
-                        tool_input=None,
-                        thought=None,
-                        tool_output=None,
-                    )
-                )
-
-                # Add to results
-                self.results.append(
-                    {
-                        **self.current_message,
-                        "timestamp": datetime.datetime.now().isoformat(),
-                    }
-                )
 
     async def _finalize_processing(self) -> None:
         """Finalize the chat processing and update the job."""
