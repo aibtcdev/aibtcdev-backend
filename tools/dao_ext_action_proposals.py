@@ -891,435 +891,7 @@ class ConcludeActionProposalTool(BaseTool):
             action_proposal_contract_to_execute,
             **kwargs,
         )
-
-
-class GetLiquidSupplyInput(BaseModel):
-    """Input schema for getting the liquid supply."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    stacks_block_height: int = Field(
-        ..., description="Stacks block height to query the liquid supply at"
-    )
-
-
-class GetLiquidSupplyTool(BaseTool):
-    name: str = "dao_action_get_liquid_supply"
-    description: str = (
-        "Get the liquid supply of the DAO token at a specific Stacks block height. "
-        "Returns the total amount of tokens that are liquid at that block."
-    )
-    args_schema: Type[BaseModel] = GetLiquidSupplyInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        stacks_block_height: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get the liquid supply."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            dao_token_contract_address,
-            str(stacks_block_height),
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-liquid-supply.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        stacks_block_height: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get the liquid supply."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, stacks_block_height, **kwargs
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        stacks_block_height: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, stacks_block_height, **kwargs
-        )
-
-
-class GetProposalInput(BaseModel):
-    """Input schema for getting proposal data."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    proposal_id: int = Field(..., description="ID of the proposal to retrieve")
-
-
-class GetProposalTool(BaseTool):
-    name: str = "dao_action_get_proposal"
-    description: str = (
-        "Get the data for a specific proposal from the DAO action proposals contract. "
-        "Returns all stored information about the proposal if it exists."
-    )
-    args_schema: Type[BaseModel] = GetProposalInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get proposal data."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            dao_token_contract_address,
-            str(proposal_id),
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-proposal.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get proposal data."""
-        return self._deploy(action_proposals_voting_extension, dao_token_contract_address, proposal_id, **kwargs)
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(action_proposals_voting_extension, dao_token_contract_address, proposal_id, **kwargs)
-
-
-class GetTotalVotesInput(BaseModel):
-    """Input schema for getting total votes for a voter."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    proposal_id: int = Field(..., description="ID of the proposal to check")
-    voter_address: str = Field(..., description="Address of the voter to check")
-
-
-class GetTotalVotesTool(BaseTool):
-    name: str = "dao_action_get_total_votes"
-    description: str = (
-        "Get the total votes cast by a specific voter on a proposal. "
-        "Returns the number of votes the voter has cast on the given proposal."
-    )
-    args_schema: Type[BaseModel] = GetTotalVotesInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get total votes."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            dao_token_contract_address,
-            str(proposal_id),
-            voter_address,
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-total-votes.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get total votes."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, voter_address, **kwargs
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, voter_address, **kwargs
-        )
-
-
-class GetVotingConfigurationInput(BaseModel):
-    """Input schema for getting voting configuration."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-
-
-class GetVotingConfigurationTool(BaseTool):
-    name: str = "dao_action_get_voting_configuration"
-    description: str = (
-        "Get the voting configuration from the DAO action proposals contract. "
-        "Returns the current voting parameters and settings used for proposals."
-    )
-    args_schema: Type[BaseModel] = GetVotingConfigurationInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get voting configuration."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            dao_token_contract_address,
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-voting-configuration.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get voting configuration."""
-        return self._deploy(action_proposals_voting_extension, dao_token_contract_address, **kwargs)
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(action_proposals_voting_extension, dao_token_contract_address, **kwargs)
-
-
-class GetVotingPowerInput(BaseModel):
-    """Input schema for getting voting power."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    proposal_id: int = Field(..., description="ID of the proposal to check")
-    voter_address: str = Field(
-        ...,
-        description="Address of the voter to check voting power for",
-        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
-    )
-
-
-class GetVotingPowerTool(BaseTool):
-    name: str = "dao_action_get_voting_power"
-    description: str = (
-        "Get the voting power of a specific address for a proposal. "
-        "Returns the number of votes the address can cast on the given proposal."
-    )
-    args_schema: Type[BaseModel] = GetVotingPowerInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get voting power."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            dao_token_contract_address,
-            str(proposal_id),
-            voter_address,
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-voting-power.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get voting power."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, voter_address, **kwargs
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, voter_address, **kwargs
-        )
-
+    
 
 class ProposeActionToggleResourceInput(BaseModel):
     """Input schema for proposing to toggle a resource action."""
@@ -1427,3 +999,374 @@ class ProposeActionToggleResourceTool(BaseTool):
             resource_name,
             **kwargs,
         )
+
+
+
+class GetLiquidSupplyInput(BaseModel):
+    """Input schema for getting the liquid supply."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    stacks_block_height: int = Field(
+        ..., description="Stacks block height to query the liquid supply at"
+    )
+
+
+class GetLiquidSupplyTool(BaseTool):
+    name: str = "dao_action_get_liquid_supply"
+    description: str = (
+        "Get the liquid supply of the DAO token at a specific Stacks block height. "
+        "Returns the total amount of tokens that are liquid at that block."
+    )
+    args_schema: Type[BaseModel] = GetLiquidSupplyInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        stacks_block_height: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get the liquid supply."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+            str(stacks_block_height),
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/read-only",
+            "get-liquid-supply.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        stacks_block_height: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get the liquid supply."""
+        return self._deploy(
+            action_proposals_voting_extension, stacks_block_height, **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        stacks_block_height: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_voting_extension, stacks_block_height, **kwargs
+        )
+
+
+class GetProposalInput(BaseModel):
+    """Input schema for getting proposal data."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to retrieve")
+
+
+class GetProposalTool(BaseTool):
+    name: str = "dao_action_get_proposal"
+    description: str = (
+        "Get the data for a specific proposal from the DAO action proposals contract. "
+        "Returns all stored information about the proposal if it exists."
+    )
+    args_schema: Type[BaseModel] = GetProposalInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get proposal data."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+            str(proposal_id),
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/read-only",
+            "get-proposal.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get proposal data."""
+        return self._deploy(action_proposals_voting_extension, proposal_id, **kwargs)
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(action_proposals_voting_extension, proposal_id, **kwargs)
+
+
+class GetTotalVotesInput(BaseModel):
+    """Input schema for getting total votes for a voter."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(..., description="Address of the voter to check")
+
+
+class GetTotalVotesTool(BaseTool):
+    name: str = "dao_action_get_total_votes"
+    description: str = (
+        "Get the total votes cast by a specific voter on a proposal. "
+        "Returns the number of votes the voter has cast on the given proposal."
+    )
+    args_schema: Type[BaseModel] = GetTotalVotesInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total votes."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/read-only",
+            "get-total-votes.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total votes."""
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
+        )
+
+
+class GetVotingConfigurationInput(BaseModel):
+    """Input schema for getting voting configuration."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+
+
+class GetVotingConfigurationTool(BaseTool):
+    name: str = "dao_action_get_voting_configuration"
+    description: str = (
+        "Get the voting configuration from the DAO action proposals contract. "
+        "Returns the current voting parameters and settings used for proposals."
+    )
+    args_schema: Type[BaseModel] = GetVotingConfigurationInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting configuration."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/read-only",
+            "get-voting-configuration.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting configuration."""
+        return self._deploy(action_proposals_voting_extension, **kwargs)
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(action_proposals_voting_extension, **kwargs)
+
+
+class GetVotingPowerInput(BaseModel):
+    """Input schema for getting voting power."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(
+        ...,
+        description="Address of the voter to check voting power for",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
+    )
+
+
+class GetVotingPowerTool(BaseTool):
+    name: str = "dao_action_get_voting_power"
+    description: str = (
+        "Get the voting power of a specific address for a proposal. "
+        "Returns the number of votes the address can cast on the given proposal."
+    )
+    args_schema: Type[BaseModel] = GetVotingPowerInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting power."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/read-only",
+            "get-voting-power.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get voting power."""
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
+        )
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
+        )
+
