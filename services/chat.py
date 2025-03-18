@@ -14,8 +14,19 @@ from tools.tools_factory import initialize_tools
 
 logger = configure_logger(__name__)
 
+
+class JobInfo(TypedDict):
+    """Information about a running job."""
+
+    queue: asyncio.Queue
+    thread_id: UUID
+    agent_id: Optional[UUID]
+    task: Optional[asyncio.Task]
+    connection_active: bool
+
+
 thread_pool = ThreadPoolExecutor()
-running_jobs: Dict[UUID, Any] = {}
+running_jobs: Dict[UUID, JobInfo] = {}
 
 
 @dataclass
@@ -62,16 +73,6 @@ class ToolExecutionHandler:
             "thread_id": message.get("thread_id"),
             "agent_id": message.get("agent_id"),
         }
-
-
-class JobInfo(TypedDict):
-    """Information about a running job."""
-
-    queue: asyncio.Queue
-    thread_id: UUID
-    agent_id: Optional[UUID]
-    task: Optional[asyncio.Task]
-    connection_active: bool = True
 
 
 class ChatProcessor:
@@ -204,20 +205,28 @@ class ChatProcessor:
             logger.debug(
                 f"Skipping output for disconnected client on job {self.job_id}"
             )
+            if result.get("type") == "token":
+                # Skip token messages entirely for disconnected clients
+                return
 
         if result.get("type") == "end":
             if not first_end and self.connection_active:
-                await self.output_queue.put(
-                    Message(
-                        type="token",
-                        status="end",
-                        content="",
-                        thread_id=str(self.thread_id),
-                        role="assistant",
-                        agent_id=str(self.agent_id) if self.agent_id else None,
-                        created_at=datetime.datetime.now().isoformat(),
-                    ).to_dict()
-                )
+                try:
+                    await self.output_queue.put(
+                        Message(
+                            type="token",
+                            status="end",
+                            content="",
+                            thread_id=str(self.thread_id),
+                            role="assistant",
+                            agent_id=str(self.agent_id) if self.agent_id else None,
+                            created_at=datetime.datetime.now().isoformat(),
+                        ).to_dict()
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to send end token to disconnected client: {e}"
+                    )
             return
 
         if result.get("type") == "token" and not result.get("content"):
@@ -233,42 +242,20 @@ class ChatProcessor:
             self.current_message = self._create_empty_message()
             return
 
-        if result.get("type") == "step":
-            # Handle planning step
-            logger.info("Processing planning step")
-            backend.create_step(
-                new_step=StepCreate(
-                    profile_id=self.profile.id,
-                    job_id=self.job_id,
-                    agent_id=self.agent_id,
-                    role="assistant",
-                    content=result.get("content", ""),
-                    thought=result.get("thought"),
-                    tool=None,
-                    tool_input=None,
-                    tool_output=None,
-                )
-            )
-            self.results.append(
-                {
-                    **result,
-                    "timestamp": datetime.datetime.now().isoformat(),
-                    "thread_id": str(self.thread_id),
-                    "agent_id": str(self.agent_id) if self.agent_id else None,
-                }
-            )
-            return
-
         if result.get("content"):
             if result.get("type") == "token" and self.connection_active:
-                stream_message = self.message_handler.process_token_message(
-                    {
-                        "content": result.get("content", ""),
-                        "thread_id": str(self.thread_id),
-                        "agent_id": str(self.agent_id) if self.agent_id else None,
-                    }
-                )
-                await self.output_queue.put(stream_message)
+                try:
+                    stream_message = self.message_handler.process_token_message(
+                        {
+                            "content": result.get("content", ""),
+                            "thread_id": str(self.thread_id),
+                            "agent_id": str(self.agent_id) if self.agent_id else None,
+                        }
+                    )
+                    await self.output_queue.put(stream_message)
+                except Exception as e:
+                    logger.debug(f"Failed to send token to disconnected client: {e}")
+                    self.connection_active = False
             elif result.get("type") == "result":
                 logger.info(
                     f"Received result message with content length: {len(result.get('content', ''))}"
@@ -472,3 +459,15 @@ def get_thread_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]
 
     logger.debug(f"Found {len(formatted_history)} messages in thread history")
     return formatted_history
+
+
+def mark_job_disconnected(job_id: UUID) -> None:
+    """Mark a job as having its WebSocket connection disconnected.
+
+    Args:
+        job_id (UUID): The ID of the job to mark as disconnected
+    """
+    job_id_str = str(job_id)
+    if job_id_str in running_jobs:
+        logger.info(f"Marking job {job_id} as disconnected")
+        running_jobs[job_id_str]["connection_active"] = False
