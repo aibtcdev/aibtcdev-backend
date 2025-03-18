@@ -32,6 +32,14 @@ class ProposeActionAddResourceInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-add-resource"
         ],
     )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
     resource_name: str = Field(..., description="Name of the resource to add")
     resource_description: str = Field(..., description="Description of the resource")
     resource_price: int = Field(..., description="Price of the resource in microstacks")
@@ -60,6 +68,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -73,6 +82,7 @@ class ProposeActionAddResourceTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             str(resource_price),
@@ -92,6 +102,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -102,6 +113,7 @@ class ProposeActionAddResourceTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             resource_price,
@@ -113,6 +125,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -123,6 +136,7 @@ class ProposeActionAddResourceTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             resource_price,
@@ -150,9 +164,17 @@ class ProposeActionAllowAssetInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
         ],
     )
-    dao_token_contract_address: str = Field(
+    dao_token_contract_address_to_allow: str = Field(
         ...,
         description="Contract principal of the token to allow",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
@@ -178,6 +200,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address_to_allow: str,
         dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
