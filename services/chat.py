@@ -122,12 +122,17 @@ class ChatProcessor:
             job_id_str in running_jobs
             and not running_jobs[job_id_str]["connection_active"]
         ):
+            logger.debug(
+                f"Skipping message send for disconnected client on job {self.job_id}"
+            )
             return False
 
         try:
-            await self.output_queue.put(message)
+            await asyncio.wait_for(
+                self.output_queue.put(message), timeout=1.0
+            )  # Add 1 second timeout
             return True
-        except Exception as e:
+        except (asyncio.TimeoutError, Exception) as e:
             logger.debug(f"Failed to send message to client: {e}")
             self.connection_active = False
             if job_id_str in running_jobs:
@@ -323,9 +328,23 @@ class ChatProcessor:
     async def _cleanup(self) -> None:
         """Clean up resources after processing."""
         logger.debug(f"Cleaning up job {self.job_id}")
-        await self.output_queue.put(None)
-        if self.job_id in running_jobs:
-            del running_jobs[self.job_id]
+        job_id_str = str(self.job_id)
+
+        # Only try to send None if connection is still active
+        if (
+            self.connection_active
+            and job_id_str in running_jobs
+            and running_jobs[job_id_str]["connection_active"]
+        ):
+            try:
+                await self.output_queue.put(None)
+            except Exception as e:
+                logger.debug(f"Failed to send cleanup message: {e}")
+                # Don't raise the exception, just log it
+
+        # Always clean up the running jobs entry
+        if job_id_str in running_jobs:
+            del running_jobs[job_id_str]
 
 
 async def process_chat_message(
