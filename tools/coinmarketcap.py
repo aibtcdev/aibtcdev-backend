@@ -17,9 +17,7 @@ class GetBitcoinDataInput(BaseModel):
 
 class GetBitcoinData(BaseTool):
     name: str = "get_bitcoin_data"
-    description: str = (
-        "Fetch current Bitcoin market data including price, market cap, 24h trading volume, and percentage changes from CoinMarketCap"
-    )
+    description: str = "Fetch current Bitcoin market data including price, market cap, 24h trading volume, and percentage changes from CoinMarketCap"
     args_schema: Type[BaseModel] = GetBitcoinDataInput
     return_direct: bool = False
 

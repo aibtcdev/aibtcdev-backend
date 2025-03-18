@@ -1,7 +1,7 @@
 """Tests for the chainhook handlers."""
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from services.webhooks.chainhook.handlers import (
     BuyEventHandler,

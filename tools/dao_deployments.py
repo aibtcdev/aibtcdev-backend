@@ -347,9 +347,9 @@ class ContractDAODeployTool(BaseTool):
                             "success": False,
                         }
                     # call tool to construct dao
-                    logger.debug(f"Base DAO contract: {base_dao_contract["address"]}")
+                    logger.debug(f"Base DAO contract: {base_dao_contract['address']}")
                     logger.debug(
-                        f"Bootstrap proposal contract: {bootstrap_proposal_contract["address"]}"
+                        f"Bootstrap proposal contract: {bootstrap_proposal_contract['address']}"
                     )
                     construct_result = BunScriptRunner.bun_run(
                         self.wallet_id,

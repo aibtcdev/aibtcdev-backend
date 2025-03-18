@@ -2,9 +2,14 @@ import os
 from dataclasses import dataclass, field
 from typing import List
 
+from dotenv import load_dotenv
+
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
+
+# Load environment variables first
+load_dotenv()
 
 
 @dataclass

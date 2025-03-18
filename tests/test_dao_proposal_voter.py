@@ -1,9 +1,8 @@
 """Unit tests for the DAO proposal voter task."""
 
-import asyncio
 import datetime
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 from backend.models import QueueMessage

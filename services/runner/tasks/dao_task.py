@@ -186,7 +186,7 @@ class DAOTask(BaseTask[DAOProcessingResult]):
             ):
                 if chunk["type"] == "result":
                     deployment_data = chunk["content"]
-                    logger.info(f"DAO deployment completed successfully")
+                    logger.info("DAO deployment completed successfully")
                     logger.debug(f"Deployment data: {deployment_data}")
                 elif chunk["type"] == "tool":
                     logger.debug(f"Executing tool: {chunk}")

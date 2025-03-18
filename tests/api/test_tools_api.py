@@ -1,10 +1,10 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from api.tools import available_tools, router
+from api.tools import router
 from lib.tools import Tool
 
 

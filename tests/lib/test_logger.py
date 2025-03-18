@@ -1,8 +1,10 @@
 import logging
 import os
-import pytest
-from lib.logger import configure_logger
 from typing import Generator
+
+import pytest
+
+from lib.logger import configure_logger
 
 
 @pytest.fixture

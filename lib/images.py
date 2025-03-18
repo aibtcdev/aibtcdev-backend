@@ -86,7 +86,7 @@ An easily recognizable, mission-aligned icon with one strong centerpiece, minima
 
         return response.content
 
-    except ImageGenerationError as e:
+    except ImageGenerationError:
         raise  # Re-raise ImageGenerationError as is
     except Exception as e:
         raise ImageGenerationError(

@@ -120,7 +120,6 @@ async def search_tools(
                 or query in tool.description.lower()
                 or query in tool.id.lower()
             ):
-
                 # If category is specified, check if tool belongs to that category
                 if category and tool.category.upper() != category.upper():
                     continue

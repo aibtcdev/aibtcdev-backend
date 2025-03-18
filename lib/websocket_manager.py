@@ -79,70 +79,79 @@ class ConnectionManager:
                 del self.session_connections[session_id]
 
     async def send_job_message(self, message: dict, job_id: str):
-        if job_id in self.job_connections:
-            dead_connections = set()
-            active_connections = set()
-            for ws, ts in self.job_connections[job_id]:
-                try:
-                    await ws.send_json(message)
-                    active_connections.add(
-                        (ws, time.time())
-                    )  # Update timestamp on successful send
-                except Exception as e:
-                    logger.error(f"Error sending message to job WebSocket: {str(e)}")
-                    dead_connections.add(ws)
+        if job_id not in self.job_connections or not self.job_connections[job_id]:
+            logger.debug(f"No active connections for job {job_id}")
+            return
 
-            # Update connections with new timestamps and remove dead ones
-            if active_connections or dead_connections:
-                self.job_connections[job_id] = {conn for conn in active_connections}
-                if not self.job_connections[job_id]:
-                    del self.job_connections[job_id]
+        dead_connections = set()
+        active_connections = set()
+        for ws, ts in self.job_connections[job_id]:
+            try:
+                await ws.send_json(message)
+                active_connections.add(
+                    (ws, time.time())
+                )  # Update timestamp on successful send
+            except Exception as e:
+                logger.error(f"Error sending message to job WebSocket: {str(e)}")
+                dead_connections.add((ws, ts))
+
+        # Update connections with new timestamps and remove dead ones
+        if active_connections or dead_connections:
+            self.job_connections[job_id] = active_connections
+            if not self.job_connections[job_id]:
+                del self.job_connections[job_id]
 
     async def send_thread_message(self, message: dict, thread_id: str):
-        if thread_id in self.thread_connections:
-            dead_connections = set()
-            active_connections = set()
-            for ws, ts in self.thread_connections[thread_id]:
-                try:
-                    await ws.send_json(message)
-                    active_connections.add(
-                        (ws, time.time())
-                    )  # Update timestamp on successful send
-                except Exception as e:
-                    logger.error(f"Error sending message to thread WebSocket: {str(e)}")
-                    dead_connections.add(ws)
+        if (
+            thread_id not in self.thread_connections
+            or not self.thread_connections[thread_id]
+        ):
+            logger.debug(f"No active connections for thread {thread_id}")
+            return
 
-            # Update connections with new timestamps and remove dead ones
-            if active_connections or dead_connections:
-                self.thread_connections[thread_id] = {
-                    conn for conn in active_connections
-                }
-                if not self.thread_connections[thread_id]:
-                    del self.thread_connections[thread_id]
+        dead_connections = set()
+        active_connections = set()
+        for ws, ts in self.thread_connections[thread_id]:
+            try:
+                await ws.send_json(message)
+                active_connections.add(
+                    (ws, time.time())
+                )  # Update timestamp on successful send
+            except Exception as e:
+                logger.error(f"Error sending message to thread WebSocket: {str(e)}")
+                dead_connections.add((ws, ts))
+
+        # Update connections with new timestamps and remove dead ones
+        if active_connections or dead_connections:
+            self.thread_connections[thread_id] = active_connections
+            if not self.thread_connections[thread_id]:
+                del self.thread_connections[thread_id]
 
     async def send_session_message(self, message: dict, session_id: str):
-        if session_id in self.session_connections:
-            dead_connections = set()
-            active_connections = set()
-            for ws, ts in self.session_connections[session_id]:
-                try:
-                    await ws.send_json(message)
-                    active_connections.add(
-                        (ws, time.time())
-                    )  # Update timestamp on successful send
-                except Exception as e:
-                    logger.error(
-                        f"Error sending message to session WebSocket: {str(e)}"
-                    )
-                    dead_connections.add(ws)
+        if (
+            session_id not in self.session_connections
+            or not self.session_connections[session_id]
+        ):
+            logger.debug(f"No active connections for session {session_id}")
+            return
 
-            # Update connections with new timestamps and remove dead ones
-            if active_connections or dead_connections:
-                self.session_connections[session_id] = {
-                    conn for conn in active_connections
-                }
-                if not self.session_connections[session_id]:
-                    del self.session_connections[session_id]
+        dead_connections = set()
+        active_connections = set()
+        for ws, ts in self.session_connections[session_id]:
+            try:
+                await ws.send_json(message)
+                active_connections.add(
+                    (ws, time.time())
+                )  # Update timestamp on successful send
+            except Exception as e:
+                logger.error(f"Error sending message to session WebSocket: {str(e)}")
+                dead_connections.add((ws, ts))
+
+        # Update connections with new timestamps and remove dead ones
+        if active_connections or dead_connections:
+            self.session_connections[session_id] = active_connections
+            if not self.session_connections[session_id]:
+                del self.session_connections[session_id]
 
     async def cleanup_expired_connections(self):
         current_time = time.time()
@@ -185,49 +194,55 @@ class ConnectionManager:
             await asyncio.sleep(60)  # Run cleanup every minute
 
     async def broadcast_job_error(self, error_message: str, job_id: str):
+        # First check if the job exists and has active connections
+        if job_id not in self.job_connections or not self.job_connections[job_id]:
+            logger.warning(
+                f"Cannot broadcast error to job {job_id}: no active connections"
+            )
+            return  # Exit early if there are no active connections
+
         try:
-            if job_id in self.job_connections and self.job_connections[job_id]:
-                await self.send_job_message(
-                    {"type": "error", "message": error_message}, job_id
-                )
-            else:
-                logger.warning(
-                    f"Cannot broadcast error to job {job_id}: no active connections"
-                )
+            await self.send_job_message(
+                {"type": "error", "message": error_message}, job_id
+            )
         except Exception as e:
             logger.error(f"Error broadcasting job error: {str(e)}")
             # Don't re-raise to prevent cascading errors
 
     async def broadcast_thread_error(self, error_message: str, thread_id: str):
+        # First check if the thread exists and has active connections
+        if (
+            thread_id not in self.thread_connections
+            or not self.thread_connections[thread_id]
+        ):
+            logger.warning(
+                f"Cannot broadcast error to thread {thread_id}: no active connections"
+            )
+            return  # Exit early if there are no active connections
+
         try:
-            if (
-                thread_id in self.thread_connections
-                and self.thread_connections[thread_id]
-            ):
-                await self.send_thread_message(
-                    {"type": "error", "message": error_message}, thread_id
-                )
-            else:
-                logger.warning(
-                    f"Cannot broadcast error to thread {thread_id}: no active connections"
-                )
+            await self.send_thread_message(
+                {"type": "error", "message": error_message}, thread_id
+            )
         except Exception as e:
             logger.error(f"Error broadcasting thread error: {str(e)}")
             # Don't re-raise to prevent cascading errors
 
     async def broadcast_session_error(self, error_message: str, session_id: str):
+        # First check if the session exists and has active connections
+        if (
+            session_id not in self.session_connections
+            or not self.session_connections[session_id]
+        ):
+            logger.warning(
+                f"Cannot broadcast error to session {session_id}: no active connections"
+            )
+            return  # Exit early if there are no active connections
+
         try:
-            if (
-                session_id in self.session_connections
-                and self.session_connections[session_id]
-            ):
-                await self.send_session_message(
-                    {"type": "error", "message": error_message}, session_id
-                )
-            else:
-                logger.warning(
-                    f"Cannot broadcast error to session {session_id}: no active connections"
-                )
+            await self.send_session_message(
+                {"type": "error", "message": error_message}, session_id
+            )
         except Exception as e:
             logger.error(f"Error broadcasting session error: {str(e)}")
             # Don't re-raise to prevent cascading errors

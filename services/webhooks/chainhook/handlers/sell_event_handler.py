@@ -36,7 +36,6 @@ class SellEventHandler(ChainhookEventHandler):
         tx_data = self.extract_transaction_data(transaction)
         tx_kind = tx_data["tx_kind"]
         tx_data_content = tx_data["tx_data"]
-        tx_metadata = tx_data["tx_metadata"]
 
         # Only handle ContractCall type transactions with 'sell' method
         if not isinstance(tx_kind, dict):

@@ -1,15 +1,9 @@
 from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
-
-# Load environment variables first
-load_dotenv()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import chat, tools, webhooks
-from config import config
 from lib.logger import configure_logger
 from services.startup import init_background_tasks, shutdown
 

@@ -95,7 +95,7 @@ class TweetRepository:
         try:
             tweets = backend.list_x_tweets(filters=XTweetFilter(tweet_id=tweet_id))
             if tweets and len(tweets) > 0:
-                logger.debug(f"Updating existing tweet record with analysis results")
+                logger.debug("Updating existing tweet record with analysis results")
                 backend.update_x_tweet(
                     x_tweet_id=tweets[0].id,
                     update_data=XTweetBase(
@@ -343,7 +343,7 @@ class TwitterMentionHandler:
                     continue
 
         except Exception as e:
-            logger.error("Twitter mention processing failed: {str(e)}", exc_info=True)
+            logger.error(f"Twitter mention processing failed: {str(e)}", exc_info=True)
             raise
 
 

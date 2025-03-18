@@ -1,18 +1,14 @@
 """Tests for the Vector React workflow."""
 
-import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 
-from backend.factory import backend
 from services.workflows.vector_react import (
     VectorLangGraphService,
     VectorReactWorkflow,
     add_documents_to_vectors,
-    execute_vector_langgraph_stream,
 )
 
 
@@ -187,10 +183,11 @@ class TestVectorLangGraphService(unittest.IsolatedAsyncioTestCase):
         mock_task.__await__ = MagicMock(return_value=mock_result)
 
         # Execute
-        with patch("asyncio.Queue", return_value=mock_queue), patch(
-            "asyncio.get_running_loop"
-        ), patch("asyncio.create_task", return_value=mock_task), patch(
-            "asyncio.wait_for", side_effect=lambda *args, **kwargs: args[0]
+        with (
+            patch("asyncio.Queue", return_value=mock_queue),
+            patch("asyncio.get_running_loop"),
+            patch("asyncio.create_task", return_value=mock_task),
+            patch("asyncio.wait_for", side_effect=lambda *args, **kwargs: args[0]),
         ):
             results = [
                 chunk

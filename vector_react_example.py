@@ -59,25 +59,35 @@ async def main():
     """Run the Vector React example."""
     # Set your OpenAI API key
     # Create some example documents
-    documents = [
-        Document(
-            page_content="OpenAI was founded in 2015 and released GPT-1, GPT-2, GPT-3, and GPT-4.",
-            metadata={"source": "about_openai.txt"},
-        ),
-        Document(
-            page_content="Python is a programming language known for its readability and versatility.",
-            metadata={"source": "programming_languages.txt"},
-        ),
-        Document(
-            page_content="Supabase is an open source Firebase alternative with a PostgreSQL database.",
-            metadata={"source": "database_services.txt"},
-        ),
-    ]
+    # documents = [
+    #     Document(
+    #         page_content="OpenAI was founded in 2015 and released GPT-1, GPT-2, GPT-3, and GPT-4.",
+    #         metadata={"source": "about_openai.txt"},
+    #     ),
+    #     Document(
+    #         page_content="Python is a programming language known for its readability and versatility.",
+    #         metadata={"source": "programming_languages.txt"},
+    #     ),
+    #     Document(
+    #         page_content="Supabase is an open source Firebase alternative with a PostgreSQL database.",
+    #         metadata={"source": "database_services.txt"},
+    #     ),
+    # ]
+    documents = []
 
     # Add Stacks documentation content
     stacks_urls = [
         "https://docs.stacks.co/reference/functions",
         "https://docs.stacks.co/reference/keywords",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/README.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/action-proposals.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/bank-account.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/core-proposals.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/dao-charter.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/onchain-messaging.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/payments-invoices.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/token-owner.md",
+        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/treasury.md",
     ]
 
     for url in stacks_urls:
@@ -98,16 +108,14 @@ async def main():
     # Ensure the vector collection exists
     try:
         # Try to get the collection first
-        collection = backend.get_vector_collection(collection_name)
+        backend.get_vector_collection(collection_name)
         print(f"Using existing vector collection: {collection_name}")
     except Exception:
         # Create the collection if it doesn't exist
         embed_dim = 1536  # Default for OpenAI embeddings
         if hasattr(embeddings, "embedding_dim"):
             embed_dim = embeddings.embedding_dim
-        collection = backend.create_vector_collection(
-            collection_name, dimensions=embed_dim
-        )
+        backend.create_vector_collection(collection_name, dimensions=embed_dim)
         print(
             f"Created new vector collection: {collection_name} with dimensions: {embed_dim}"
         )

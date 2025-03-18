@@ -177,9 +177,7 @@ class FaktoryExecuteSellInput(BaseModel):
 
 class FaktoryExecuteSellTool(BaseTool):
     name: str = "faktory_execute_sell"
-    description: str = (
-        "Execute a sell order on Faktory DEX with specified token amount and DEX details"
-    )
+    description: str = "Execute a sell order on Faktory DEX with specified token amount and DEX details"
     args_schema: Type[BaseModel] = FaktoryExecuteSellInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None
@@ -325,9 +323,7 @@ class FaktoryGetDaoTokensInput(BaseModel):
 
 class FaktoryGetDaoTokensTool(BaseTool):
     name: str = "faktory_get_dao_tokens"
-    description: str = (
-        "Get a list of DAO tokens from Faktory with optional pagination, search, and sorting"
-    )
+    description: str = "Get a list of DAO tokens from Faktory with optional pagination, search, and sorting"
     args_schema: Type[BaseModel] = FaktoryGetDaoTokensInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None

@@ -1,7 +1,9 @@
 import json
-import pytest
-from lib.tools import Tool, extract_tool_info, get_available_tools
 from unittest.mock import Mock, patch
+
+import pytest
+
+from lib.tools import Tool, extract_tool_info, get_available_tools
 
 
 class MockToolInstance:

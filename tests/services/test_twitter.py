@@ -1,4 +1,7 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
 from services.twitter import (
     TweetAnalyzer,
     TweetData,
@@ -7,7 +10,6 @@ from services.twitter import (
     TwitterMentionHandler,
     create_twitter_handler,
 )
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture
@@ -248,18 +250,21 @@ class TestTwitterMentionHandler:
 
 
 def test_create_twitter_handler():
-    with patch("services.twitter.load_dotenv"), patch.dict(
-        "os.environ",
-        {
-            "AIBTC_TWITTER_CONSUMER_KEY": "test_key",
-            "AIBTC_TWITTER_CONSUMER_SECRET": "test_secret",
-            "AIBTC_TWITTER_CLIENT_ID": "test_client_id",
-            "AIBTC_TWITTER_CLIENT_SECRET": "test_client_secret",
-            "AIBTC_TWITTER_ACCESS_TOKEN": "test_token",
-            "AIBTC_TWITTER_ACCESS_SECRET": "test_secret",
-            "AIBTC_TWITTER_AUTOMATED_USER_ID": "test_user_id",
-            "AIBTC_TWITTER_WHITELISTED": "whitelisted_author",
-        },
+    with (
+        patch("services.twitter.load_dotenv"),
+        patch.dict(
+            "os.environ",
+            {
+                "AIBTC_TWITTER_CONSUMER_KEY": "test_key",
+                "AIBTC_TWITTER_CONSUMER_SECRET": "test_secret",
+                "AIBTC_TWITTER_CLIENT_ID": "test_client_id",
+                "AIBTC_TWITTER_CLIENT_SECRET": "test_client_secret",
+                "AIBTC_TWITTER_ACCESS_TOKEN": "test_token",
+                "AIBTC_TWITTER_ACCESS_SECRET": "test_secret",
+                "AIBTC_TWITTER_AUTOMATED_USER_ID": "test_user_id",
+                "AIBTC_TWITTER_WHITELISTED": "whitelisted_author",
+            },
+        ),
     ):
         handler = create_twitter_handler()
         assert isinstance(handler, TwitterMentionHandler)

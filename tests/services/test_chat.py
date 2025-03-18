@@ -1,14 +1,14 @@
 import asyncio
 import datetime
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 from uuid import UUID
+
+import pytest
 
 pytest_plugins = ("pytest_asyncio",)
 
-from backend.models import Agent, JobBase, Profile, StepCreate
+from backend.models import Agent, Profile
 from services.chat import (
-    ChatProcessor,
     MessageHandler,
     ToolExecutionHandler,
     process_chat_message,

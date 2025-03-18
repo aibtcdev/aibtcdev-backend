@@ -188,7 +188,8 @@ class VectorLangGraphService:
             # Setup callback handler
             callback_handler = StreamingCallbackHandler(
                 queue=callback_queue,
-                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
+                on_llm_new_token=lambda token,
+                **kwargs: asyncio.run_coroutine_threadsafe(
                     callback_queue.put({"type": "token", "content": token}), loop
                 ),
                 on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
@@ -277,7 +278,7 @@ async def add_documents_to_vectors(
     # Ensure collection exists
     try:
         backend.get_vector_collection(collection_name)
-    except:
+    except Exception:
         # Create collection if it doesn't exist
         embed_dim = 1536  # Default for OpenAI embeddings
         if hasattr(embeddings, "embedding_dim"):

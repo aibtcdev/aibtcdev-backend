@@ -46,7 +46,6 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageFilter,
     Secret,
-    SecretBase,
     SecretCreate,
     SecretFilter,
     Step,
@@ -162,7 +161,7 @@ class SupabaseBackend(AbstractBackend):
         self._vector_collections = {}
 
         try:
-            with self.sqlalchemy_engine.connect() as connection:
+            with self.sqlalchemy_engine.connect():
                 logger.info("SQLAlchemy connection successful!")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
@@ -375,7 +374,7 @@ class SupabaseBackend(AbstractBackend):
         try:
             user = self.client.auth.get_user(token)
             return user.user.email
-        except Exception as e:
+        except Exception:
             return None
 
     def upload_file(self, file_path: str, file: bytes) -> str:
@@ -405,7 +404,9 @@ class SupabaseBackend(AbstractBackend):
                     f"Attempting file upload to {file_path} (attempt {attempt})"
                 )
                 upload_response = self.client.storage.from_(self.bucket_name).upload(
-                    file_path, file, {"upsert": "true"}  # Override if file exists
+                    file_path,
+                    file,
+                    {"upsert": "true"},  # Override if file exists
                 )
 
                 if not upload_response:

@@ -4,7 +4,6 @@ from config import config
 
 
 class AlexApi:
-
     def __init__(self):
         """Initialize the Alex API client."""
         self.base_url = config.api.alex_base_url

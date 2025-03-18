@@ -1,9 +1,10 @@
+from unittest.mock import Mock
+
 import pytest
+
 from backend.models import Agent
 from lib.logger import configure_logger
 from lib.persona import generate_persona, generate_static_persona
-from typing import Any, Dict
-from unittest.mock import Mock
 
 logger = configure_logger(__name__)
 
