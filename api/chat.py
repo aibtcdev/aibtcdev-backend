@@ -8,13 +8,13 @@ from api.dependencies import verify_profile_from_token
 from backend.factory import backend
 from backend.models import UUID, JobCreate, Profile
 from lib.logger import configure_logger
-from lib.websocket_manager import manager
 from services.chat import (
     get_job_history,
     get_thread_history,
     process_chat_message,
     running_jobs,
 )
+from services.websocket import websocket_manager
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -82,14 +82,14 @@ async def handle_history_message(
         formatted_history = get_thread_history(thread_id, profile_id)
 
         for history_msg in formatted_history:
-            await manager.send_session_message(history_msg, session)
+            await websocket_manager.broadcast(history_msg, session)
 
     except ValueError as e:
         logger.error(f"Invalid thread ID format: {e}")
-        await manager.broadcast_session_error("Invalid thread ID format", session)
+        await websocket_manager.broadcast_error("Invalid thread ID format", session)
     except Exception as e:
         logger.error(f"Error retrieving history: {str(e)}")
-        await manager.broadcast_session_error(
+        await websocket_manager.broadcast_error(
             f"Error retrieving history: {str(e)}", session
         )
 
@@ -105,9 +105,6 @@ async def handle_chat_message(
         message: The chat message containing thread_id, agent_id, and content
         profile: The user's profile
         session: The WebSocket session ID
-
-    Raises:
-        HTTPException: If thread_id is invalid or missing
     """
     try:
         # Validate thread_id
@@ -170,16 +167,7 @@ async def handle_chat_message(
                     if job_id_str in running_jobs and running_jobs[job_id_str].get(
                         "connection_active", False
                     ):
-                        try:
-                            await manager.send_session_message(result, session)
-                        except Exception as e:
-                            logger.debug(
-                                f"Error sending message to session {session}: {str(e)}"
-                            )
-                            running_jobs[job_id_str]["connection_active"] = False
-                            logger.info(
-                                f"Setting job {job_id_str} to continue processing without client connection"
-                            )
+                        await websocket_manager.broadcast(result, session)
                     else:
                         logger.debug(
                             f"Skipping message send for inactive connection {session}, job {job_id_str}"
@@ -195,23 +183,17 @@ async def handle_chat_message(
             if job_id_str in running_jobs and running_jobs[job_id_str].get(
                 "connection_active", False
             ):
-                try:
-                    await manager.broadcast_session_error(str(e), session)
-                except Exception:
-                    running_jobs[job_id_str]["connection_active"] = False
-                    logger.info(
-                        f"Setting job {job_id_str} to continue processing without client connection"
-                    )
+                await websocket_manager.broadcast_error(str(e), session)
 
     except ValueError as e:
         logger.error(f"Invalid UUID format: {e}")
-        await manager.broadcast_session_error("Invalid UUID format", session)
+        await websocket_manager.broadcast_error("Invalid UUID format", session)
     except HTTPException as he:
         logger.error(f"HTTP exception: {he.detail}")
-        await manager.broadcast_session_error(he.detail, session)
+        await websocket_manager.broadcast_error(he.detail, session)
     except Exception as e:
         logger.error(f"Error processing chat message: {str(e)}")
-        await manager.broadcast_session_error(str(e), session)
+        await websocket_manager.broadcast_error(str(e), session)
 
 
 @router.websocket("/ws")
@@ -227,12 +209,9 @@ async def websocket_endpoint(
     Args:
         websocket: The WebSocket connection
         profile: The user's profile information
-
-    Raises:
-        WebSocketDisconnect: When client disconnects
     """
     # Generate unique session ID
-    generated_session = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
     logger.info(f"New WebSocket connection request for user {profile.id}")
 
     # Flag to track if the WebSocket has been accepted
@@ -241,11 +220,9 @@ async def websocket_endpoint(
     try:
         # Connect the session
         await websocket.accept()
-        await manager.connect_session(websocket, generated_session)
+        await websocket_manager.connect(websocket, session_id)
         connection_accepted = True
-        logger.debug(
-            f"WebSocket connection established for session {generated_session}"
-        )
+        logger.debug(f"WebSocket connection established for session {session_id}")
 
         # Main message processing loop
         while True:
@@ -259,64 +236,30 @@ async def websocket_endpoint(
                     await handle_history_message(
                         cast(WebSocketHistoryMessage, message),
                         profile.id,
-                        generated_session,
+                        session_id,
                     )
                 elif message["type"] == "message":
                     await handle_chat_message(
-                        cast(WebSocketChatMessage, message), profile, generated_session
+                        cast(WebSocketChatMessage, message), profile, session_id
                     )
                 else:
                     error_msg = f"Unknown message type: {message['type']}"
                     logger.warning(error_msg)
-                    try:
-                        await manager.send_session_message(
-                            WebSocketErrorMessage(type="error", message=error_msg),
-                            generated_session,
-                        )
-                    except Exception as e:
-                        logger.debug(f"Failed to send error message: {str(e)}")
-                        break
+                    await websocket_manager.broadcast_error(error_msg, session_id)
 
             except WebSocketDisconnect:
-                logger.info(f"WebSocket disconnected for session {generated_session}")
-                mark_jobs_disconnected_for_session(generated_session)
+                logger.info(f"WebSocket disconnected for session {session_id}")
                 break
             except Exception as e:
                 logger.error(f"Error processing message: {str(e)}")
-                if connection_accepted:
-                    try:
-                        await manager.broadcast_session_error(str(e), generated_session)
-                    except Exception:
-                        break
+                await websocket_manager.broadcast_error(str(e), session_id)
 
     except WebSocketDisconnect:
-        logger.info(
-            f"WebSocket disconnected during setup for session {generated_session}"
-        )
-        mark_jobs_disconnected_for_session(generated_session)
+        logger.info(f"WebSocket disconnected during setup for session {session_id}")
     except Exception as e:
-        logger.error(f"WebSocket error for session {generated_session}: {str(e)}")
+        logger.error(f"WebSocket error for session {session_id}: {str(e)}")
     finally:
-        # Clean up connection only if it was accepted
+        # Clean up connection if it was accepted
         if connection_accepted:
-            try:
-                await manager.disconnect_session(websocket, generated_session)
-            except Exception as e:
-                logger.debug(f"Error during WebSocket cleanup: {str(e)}")
-            logger.debug(
-                f"Cleaned up WebSocket connection for session {generated_session}"
-            )
-
-
-def mark_jobs_disconnected_for_session(session_id: str) -> None:
-    """Mark all running jobs associated with a session as disconnected.
-
-    Args:
-        session_id: The session ID to mark jobs for
-    """
-    for job_id, job_info in running_jobs.items():
-        if job_info.get("task") and job_info.get("connection_active", True):
-            logger.info(
-                f"Marking job {job_id} as disconnected due to WebSocket disconnect"
-            )
-            job_info["connection_active"] = False
+            await websocket_manager.disconnect(websocket, session_id)
+            logger.debug(f"Cleaned up WebSocket connection for session {session_id}")

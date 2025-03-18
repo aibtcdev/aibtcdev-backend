@@ -5,9 +5,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import config
 from lib.logger import configure_logger
-from lib.websocket_manager import manager
 from services.bot import start_application
 from services.runner.job_manager import JobManager
+from services.websocket import websocket_manager
 
 logger = configure_logger(__name__)
 
@@ -22,7 +22,7 @@ class StartupService:
     async def start_websocket_cleanup(self) -> None:
         """Start the WebSocket cleanup task."""
         try:
-            await manager.start_cleanup_task()
+            await websocket_manager.start_cleanup_task()
         except Exception as e:
             logger.error(f"Error starting WebSocket cleanup task: {str(e)}")
             raise
@@ -90,7 +90,7 @@ startup_service = StartupService()
 
 
 # Convenience functions that use the global instance
-async def init_background_tasks() -> asyncio.Task:
+async def run() -> asyncio.Task:
     """Initialize all background tasks using the global startup service."""
     return await startup_service.init_background_tasks()
 

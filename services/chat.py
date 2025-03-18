@@ -25,12 +25,15 @@ class JobInfo(TypedDict):
     connection_active: bool
 
 
+# Global job tracking
 thread_pool = ThreadPoolExecutor()
-running_jobs: Dict[UUID, JobInfo] = {}
+running_jobs: Dict[str, JobInfo] = {}
 
 
 @dataclass
 class Message:
+    """Base message structure for chat communication."""
+
     content: str
     type: str
     thread_id: str
@@ -43,10 +46,13 @@ class Message:
     created_at: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert message to dictionary, excluding None values."""
         return {k: v for k, v in self.__dict__.items() if v is not None}
 
 
 class MessageHandler:
+    """Handler for token-type messages."""
+
     def process_token_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Process a token message and prepare it for streaming."""
         return {
@@ -61,6 +67,8 @@ class MessageHandler:
 
 
 class ToolExecutionHandler:
+    """Handler for tool execution messages."""
+
     def process_tool_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Process a tool execution message."""
         return {
@@ -76,6 +84,8 @@ class ToolExecutionHandler:
 
 
 class ChatProcessor:
+    """Processes chat messages and manages streaming responses."""
+
     def __init__(
         self,
         job_id: UUID,
@@ -86,6 +96,17 @@ class ChatProcessor:
         history: List[Dict[str, Any]],
         output_queue: asyncio.Queue,
     ):
+        """Initialize the chat processor.
+
+        Args:
+            job_id: The ID of the job
+            thread_id: The ID of the thread
+            profile: The user's profile
+            agent_id: Optional agent ID
+            input_str: The input message
+            history: Chat history
+            output_queue: Queue for streaming output
+        """
         self.job_id = job_id
         self.thread_id = thread_id
         self.profile = profile
@@ -347,163 +368,174 @@ class ChatProcessor:
             del running_jobs[job_id_str]
 
 
-async def process_chat_message(
-    job_id: UUID,
-    thread_id: UUID,
-    profile: Profile,
-    agent_id: Optional[UUID],
-    input_str: str,
-    history: List[Dict[str, Any]],
-    output_queue: asyncio.Queue,
-) -> None:
-    """Process a chat message.
+class ChatService:
+    """Main service for chat processing and management."""
 
-    Args:
-        job_id (UUID): The ID of the job
-        thread_id (UUID): The ID of the thread
-        profile (Profile): The user's profile information
-        agent_id (Optional[UUID]): The ID of the agent
-        input_str (str): The input string for the chat job
-        history (List[Dict[str, Any]]): The thread history
-        output_queue (asyncio.Queue): The output queue for WebSocket streaming
+    @staticmethod
+    async def process_chat_message(
+        job_id: UUID,
+        thread_id: UUID,
+        profile: Profile,
+        agent_id: Optional[UUID],
+        input_str: str,
+        history: List[Dict[str, Any]],
+        output_queue: asyncio.Queue,
+    ) -> None:
+        """Process a chat message.
 
-    Raises:
-        Exception: If the chat message cannot be processed
-    """
-    # Initialize job info in running_jobs
-    job_id_str = str(job_id)
-    running_jobs[job_id_str] = {
-        "queue": output_queue,
-        "thread_id": thread_id,
-        "agent_id": agent_id,
-        "task": None,
-        "connection_active": True,
-    }
+        Args:
+            job_id: The ID of the job
+            thread_id: The ID of the thread
+            profile: The user's profile
+            agent_id: Optional agent ID
+            input_str: The input message
+            history: Chat history
+            output_queue: Queue for streaming output
+        """
+        # Initialize job info in running_jobs
+        job_id_str = str(job_id)
+        running_jobs[job_id_str] = {
+            "queue": output_queue,
+            "thread_id": thread_id,
+            "agent_id": agent_id,
+            "task": None,
+            "connection_active": True,
+        }
 
-    processor = ChatProcessor(
-        job_id=job_id,
-        thread_id=thread_id,
-        profile=profile,
-        agent_id=agent_id,
-        input_str=input_str,
-        history=history,
-        output_queue=output_queue,
-    )
+        processor = ChatProcessor(
+            job_id=job_id,
+            thread_id=thread_id,
+            profile=profile,
+            agent_id=agent_id,
+            input_str=input_str,
+            history=history,
+            output_queue=output_queue,
+        )
 
-    try:
-        await processor.process_stream()
-    except Exception as e:
-        logger.error(f"Error processing chat message: {e}")
-        raise
-    finally:
-        # Clean up job info
-        if job_id_str in running_jobs:
-            del running_jobs[job_id_str]
+        try:
+            await processor.process_stream()
+        except Exception as e:
+            logger.error(f"Error processing chat message: {e}")
+            raise
+        finally:
+            # Clean up job info
+            if job_id_str in running_jobs:
+                del running_jobs[job_id_str]
 
+    @staticmethod
+    def get_job_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
+        """Get the chat history for a specific job.
 
-def get_job_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
-    """Get the chat history for a specific job.
+        Args:
+            thread_id: The ID of the thread
+            profile_id: The ID of the profile
 
-    Args:
-        thread_id (UUID): The ID of the thread
-        profile_id (UUID): The ID of the profile
-
-    Returns:
-        List[Dict[str, Any]]: List of formatted chat messages
-    """
-    logger.debug(
-        f"Fetching job history for thread {thread_id} and profile {profile_id}"
-    )
-    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id))
-    formatted_history = []
-    for job in jobs:
-        if job.profile_id == profile_id:
-            formatted_history.append(
-                {
-                    "role": "user",
-                    "content": job.input,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread_id),
-                }
-            )
-            formatted_history.append(
-                {
-                    "role": "assistant",
-                    "content": job.result,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread_id),
-                }
-            )
-    logger.debug(f"Found {len(formatted_history)} messages in job history")
-    return formatted_history
-
-
-def get_thread_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
-    """Get the complete thread history including all steps.
-
-    Args:
-        thread_id (UUID): The ID of the thread
-        profile_id (UUID): The ID of the profile
-
-    Returns:
-        List[Dict[str, Any]]: List of formatted chat messages and steps
-    """
-    logger.debug(
-        f"Fetching thread history for thread {thread_id} and profile {profile_id}"
-    )
-    thread = backend.get_thread(thread_id=thread_id)
-    if thread.profile_id != profile_id:
-        logger.warning(f"Profile {profile_id} not authorized for thread {thread_id}")
-        return []
-
-    jobs = backend.list_jobs(filters=JobFilter(thread_id=thread.id))
-    formatted_history = []
-    if jobs:
+        Returns:
+            List of formatted chat messages
+        """
+        logger.debug(
+            f"Fetching job history for thread {thread_id} and profile {profile_id}"
+        )
+        jobs = backend.list_jobs(filters=JobFilter(thread_id=thread_id))
+        formatted_history = []
         for job in jobs:
-            logger.debug(f"Processing job {job}")
-            # Add user input message
-            formatted_history.append(
-                {
-                    "role": "user",
-                    "content": job.input,
-                    "created_at": job.created_at.isoformat(),
-                    "thread_id": str(thread.id),
-                    "type": "user",
-                }
+            if job.profile_id == profile_id:
+                formatted_history.append(
+                    {
+                        "role": "user",
+                        "content": job.input,
+                        "created_at": job.created_at.isoformat(),
+                        "thread_id": str(thread_id),
+                    }
+                )
+                formatted_history.append(
+                    {
+                        "role": "assistant",
+                        "content": job.result,
+                        "created_at": job.created_at.isoformat(),
+                        "thread_id": str(thread_id),
+                    }
+                )
+        logger.debug(f"Found {len(formatted_history)} messages in job history")
+        return formatted_history
+
+    @staticmethod
+    def get_thread_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
+        """Get the complete thread history including all steps.
+
+        Args:
+            thread_id: The ID of the thread
+            profile_id: The ID of the profile
+
+        Returns:
+            List of formatted chat messages and steps
+        """
+        logger.debug(
+            f"Fetching thread history for thread {thread_id} and profile {profile_id}"
+        )
+        thread = backend.get_thread(thread_id=thread_id)
+        if thread.profile_id != profile_id:
+            logger.warning(
+                f"Profile {profile_id} not authorized for thread {thread_id}"
             )
+            return []
 
-            steps = backend.list_steps(filters=StepFilter(job_id=job.id))
-            if not steps:
-                continue
-            for step in steps:
-                type = "tool" if step.tool else "step"
-                formatted_msg = {
-                    "role": step.role,
-                    "content": step.content,
-                    "created_at": step.created_at.isoformat(),
-                    "tool": step.tool,
-                    "tool_input": step.tool_input,
-                    "tool_output": step.tool_output,
-                    "agent_id": str(step.agent_id),
-                    "thread_id": str(thread.id),
-                    "type": type,
-                }
-                formatted_history.append(formatted_msg)
+        jobs = backend.list_jobs(filters=JobFilter(thread_id=thread.id))
+        formatted_history = []
+        if jobs:
+            for job in jobs:
+                logger.debug(f"Processing job {job}")
+                # Add user input message
+                formatted_history.append(
+                    {
+                        "role": "user",
+                        "content": job.input,
+                        "created_at": job.created_at.isoformat(),
+                        "thread_id": str(thread.id),
+                        "type": "user",
+                    }
+                )
 
-        # Sort messages by timestamp
-        formatted_history.sort(key=lambda x: x["created_at"])
+                steps = backend.list_steps(filters=StepFilter(job_id=job.id))
+                if not steps:
+                    continue
+                for step in steps:
+                    type = "tool" if step.tool else "step"
+                    formatted_msg = {
+                        "role": step.role,
+                        "content": step.content,
+                        "created_at": step.created_at.isoformat(),
+                        "tool": step.tool,
+                        "tool_input": step.tool_input,
+                        "tool_output": step.tool_output,
+                        "agent_id": str(step.agent_id),
+                        "thread_id": str(thread.id),
+                        "type": type,
+                    }
+                    formatted_history.append(formatted_msg)
 
-    logger.debug(f"Found {len(formatted_history)} messages in thread history")
-    return formatted_history
+            # Sort messages by timestamp
+            formatted_history.sort(key=lambda x: x["created_at"])
+
+        logger.debug(f"Found {len(formatted_history)} messages in thread history")
+        return formatted_history
 
 
-def mark_job_disconnected(job_id: UUID) -> None:
-    """Mark a job as having its WebSocket connection disconnected.
+def mark_jobs_disconnected_for_session(session_id: str) -> None:
+    """Mark all running jobs associated with a session as disconnected.
 
     Args:
-        job_id (UUID): The ID of the job to mark as disconnected
+        session_id: The session ID to mark jobs for
     """
-    job_id_str = str(job_id)
-    if job_id_str in running_jobs:
-        logger.info(f"Marking job {job_id} as disconnected")
-        running_jobs[job_id_str]["connection_active"] = False
+    for job_id, job_info in running_jobs.items():
+        if job_info.get("task") and job_info.get("connection_active", True):
+            logger.info(
+                f"Marking job {job_id} as disconnected due to WebSocket disconnect"
+            )
+            job_info["connection_active"] = False
+
+
+# For backward compatibility
+process_chat_message = ChatService.process_chat_message
+get_job_history = ChatService.get_job_history
+get_thread_history = ChatService.get_thread_history
