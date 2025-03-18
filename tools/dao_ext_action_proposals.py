@@ -32,6 +32,14 @@ class ProposeActionAddResourceInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-add-resource"
         ],
     )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
     resource_name: str = Field(..., description="Name of the resource to add")
     resource_description: str = Field(..., description="Description of the resource")
     resource_price: int = Field(..., description="Price of the resource in microstacks")
@@ -60,6 +68,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -73,6 +82,7 @@ class ProposeActionAddResourceTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             str(resource_price),
@@ -92,6 +102,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -102,6 +113,7 @@ class ProposeActionAddResourceTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             resource_price,
@@ -113,6 +125,7 @@ class ProposeActionAddResourceTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         resource_name: str,
         resource_description: str,
         resource_price: int,
@@ -123,6 +136,7 @@ class ProposeActionAddResourceTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             resource_name,
             resource_description,
             resource_price,
@@ -152,6 +166,14 @@ class ProposeActionAllowAssetInput(BaseModel):
     )
     dao_token_contract_address: str = Field(
         ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
+    dao_token_contract_address_to_allow: str = Field(
+        ...,
         description="Contract principal of the token to allow",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
@@ -179,6 +201,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -189,6 +212,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow
         ]
 
         return BunScriptRunner.bun_run(
@@ -203,6 +227,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -210,6 +235,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow,
             **kwargs,
         )
 
@@ -218,6 +244,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
+        dao_token_contract_address_to_allow: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -225,6 +252,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            dao_token_contract_address_to_allow,
             **kwargs,
         )
 
@@ -246,6 +274,14 @@ class ProposeActionSendMessageInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-send-message",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     message: str = Field(
@@ -273,6 +309,7 @@ class ProposeActionSendMessageTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -283,6 +320,7 @@ class ProposeActionSendMessageTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             message,
         ]
 
@@ -297,6 +335,7 @@ class ProposeActionSendMessageTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -304,6 +343,7 @@ class ProposeActionSendMessageTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             message,
             **kwargs,
         )
@@ -312,6 +352,7 @@ class ProposeActionSendMessageTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         message: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -319,6 +360,7 @@ class ProposeActionSendMessageTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             message,
             **kwargs,
         )
@@ -341,6 +383,14 @@ class ProposeActionSetAccountHolderInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-account-holder",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     account_holder: str = Field(
@@ -372,6 +422,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -382,6 +433,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             account_holder,
         ]
 
@@ -396,6 +448,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -403,6 +456,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             account_holder,
             **kwargs,
         )
@@ -411,6 +465,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         account_holder: str,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -418,6 +473,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             account_holder,
             **kwargs,
         )
@@ -440,6 +496,14 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-amount",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     withdrawal_amount: int = Field(
@@ -467,6 +531,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -477,6 +542,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             str(withdrawal_amount),
         ]
 
@@ -491,6 +557,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -498,6 +565,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             withdrawal_amount,
             **kwargs,
         )
@@ -506,6 +574,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -513,6 +582,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             withdrawal_amount,
             **kwargs,
         )
@@ -535,6 +605,14 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-period",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     withdrawal_period: int = Field(
@@ -562,6 +640,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -572,6 +651,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             str(withdrawal_period),
         ]
 
@@ -586,6 +666,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -593,6 +674,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             withdrawal_period,
             **kwargs,
         )
@@ -601,6 +683,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         self,
         action_proposals_voting_extension: str,
         action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
         withdrawal_period: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -608,36 +691,10 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
             withdrawal_period,
             **kwargs,
         )
-
-
-class ProposeActionToggleResourceInput(BaseModel):
-    """Input schema for proposing to toggle a resource action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes toggling a resource in the DAO.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-toggle-resource",
-        ],
-    )
-    resource_name: str = Field(
-        ...,
-        description="Name of the resource to toggle",
-        examples=["apiv1", "protected-content", "1hr consulting"],
-    )
-
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
@@ -648,6 +705,14 @@ class VoteOnActionProposalInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to vote on")
@@ -672,6 +737,7 @@ class VoteOnActionProposalTool(BaseTool):
     def _deploy(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
@@ -682,6 +748,7 @@ class VoteOnActionProposalTool(BaseTool):
 
         args = [
             action_proposals_voting_extension,
+            dao_token_contract_address,
             str(proposal_id),
             str(vote).lower(),
         ]
@@ -696,25 +763,27 @@ class VoteOnActionProposalTool(BaseTool):
     def _run(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
         return self._deploy(
-            action_proposals_voting_extension, proposal_id, vote, **kwargs
+            action_proposals_voting_extension, dao_token_contract_address, proposal_id, vote, **kwargs
         )
 
     async def _arun(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_voting_extension, proposal_id, vote, **kwargs
+            action_proposals_voting_extension, dao_token_contract_address, proposal_id, vote, **kwargs
         )
 
 
@@ -727,6 +796,14 @@ class ConcludeActionProposalInput(BaseModel):
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to conclude")
@@ -758,6 +835,7 @@ class ConcludeActionProposalTool(BaseTool):
     def _deploy(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         action_proposal_contract_to_execute: str,
         **kwargs,
@@ -768,6 +846,7 @@ class ConcludeActionProposalTool(BaseTool):
 
         args = [
             action_proposals_voting_extension,
+            dao_token_contract_address,
             str(proposal_id),
             action_proposal_contract_to_execute,
         ]
@@ -782,6 +861,7 @@ class ConcludeActionProposalTool(BaseTool):
     def _run(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         action_proposal_contract_to_execute: str,
         **kwargs,
@@ -789,6 +869,7 @@ class ConcludeActionProposalTool(BaseTool):
         """Execute the tool to conclude an action proposal."""
         return self._deploy(
             action_proposals_voting_extension,
+            dao_token_contract_address,
             proposal_id,
             action_proposal_contract_to_execute,
             **kwargs,
@@ -797,6 +878,7 @@ class ConcludeActionProposalTool(BaseTool):
     async def _arun(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         proposal_id: int,
         action_proposal_contract_to_execute: str,
         **kwargs,
@@ -804,10 +886,120 @@ class ConcludeActionProposalTool(BaseTool):
         """Async version of the tool."""
         return self._deploy(
             action_proposals_voting_extension,
+            dao_token_contract_address,
             proposal_id,
             action_proposal_contract_to_execute,
             **kwargs,
         )
+    
+
+class ProposeActionToggleResourceInput(BaseModel):
+    """Input schema for proposing to toggle a resource action."""
+
+    action_proposals_voting_extension: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    action_proposal_contract_to_execute: str = Field(
+        ...,
+        description="Contract principal of the action proposal that executes toggling a resource in the DAO.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-toggle-resource",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
+        ],
+    )
+    resource_name: str = Field(
+        ...,
+        description="Name of the resource to toggle",
+        examples=["apiv1", "protected-content", "1hr consulting"],
+    )
+
+class ProposeActionToggleResourceTool(BaseTool):
+    name: str = "dao_propose_action_toggle_resource"
+    description: str = (
+        "This creates a proposal that DAO members can vote on to enable or disable "
+        "whether a specific resource can be paid for in the DAO resource contract."
+    )
+    args_schema: Type[BaseModel] = ProposeActionToggleResourceInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
+        resource_name: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose toggling a resource."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_token_contract_address,
+            resource_name,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-dao/extensions/action-proposals/public",
+            "propose-action-toggle-resource-by-name.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
+        resource_name: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to propose toggling a resource."""
+        return self._deploy(
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_token_contract_address,
+            resource_name,
+            **kwargs,
+        )
+
+    async def _arun(
+        self,
+        action_proposals_voting_extension: str,
+        action_proposal_contract_to_execute: str,
+        dao_token_contract_address: str,
+        resource_name: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            action_proposals_voting_extension,
+            action_proposal_contract_to_execute,
+            dao_token_contract_address,
+            resource_name,
+            **kwargs,
+        )
+
 
 
 class GetLiquidSupplyInput(BaseModel):
@@ -1090,6 +1282,7 @@ class GetVotingConfigurationTool(BaseTool):
     async def _arun(
         self,
         action_proposals_voting_extension: str,
+        dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -1177,71 +1370,3 @@ class GetVotingPowerTool(BaseTool):
             action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
 
-
-class ProposeActionToggleResourceTool(BaseTool):
-    name: str = "dao_propose_action_toggle_resource"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to enable or disable "
-        "whether a specific resource can be paid for in the DAO resource contract."
-    )
-    args_schema: Type[BaseModel] = ProposeActionToggleResourceInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        resource_name: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose toggling a resource."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            resource_name,
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-toggle-resource-by-name.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        resource_name: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose toggling a resource."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            resource_name,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        resource_name: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            resource_name,
-            **kwargs,
-        )
