@@ -337,7 +337,7 @@ class ProposeActionSetAccountHolderInput(BaseModel):
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
-        description="Contract principal of the action proposal that executes setting the account holder in a DAO bank account.",
+        description="Contract principal of the action proposal that executes setting the account holder in a DAO timed vault.",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-account-holder",
@@ -358,7 +358,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
     name: str = "dao_propose_action_set_account_holder"
     description: str = (
         "This creates a proposal that DAO members can vote on to change the account holder "
-        "in a DAO bank account to a specified standard or contract address."
+        "in a DAO timed vault to a specified standard or contract address."
     )
     args_schema: Type[BaseModel] = ProposeActionSetAccountHolderInput
     return_direct: bool = False
@@ -436,7 +436,7 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
-        description="Contract principal of the action proposal that executes setting the withdrawal amount in a DAO bank account.",
+        description="Contract principal of the action proposal that executes setting the withdrawal amount in a DAO timed vault.",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-amount",
@@ -453,7 +453,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_amount"
     description: str = (
         "This creates a proposal that DAO members can vote on to change the withdrawal amount "
-        " to a specified number of microSTX in a DAO bank account."
+        " to a specified number of microSTX in a DAO timed vault."
     )
     args_schema: Type[BaseModel] = ProposeActionSetWithdrawalAmountInput
     return_direct: bool = False
@@ -531,7 +531,7 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
-        description="Contract principal of the action proposal that executes setting the withdrawal period in a DAO bank account.",
+        description="Contract principal of the action proposal that executes setting the withdrawal period in a DAO timed vault.",
         examples=[
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-period",
@@ -548,7 +548,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
     name: str = "dao_propose_action_set_withdrawal_period"
     description: str = (
         "This creates a proposal that DAO members can vote on to change the withdrawal period "
-        " to a specified number of Bitcoin blocks in a DAO bank account."
+        " to a specified number of Bitcoin blocks in a DAO timed vault."
     )
     args_schema: Type[BaseModel] = ProposeActionSetWithdrawalPeriodInput
     return_direct: bool = False
