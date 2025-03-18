@@ -27,8 +27,8 @@ from .dao_ext_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
-from .dao_ext_bank_account import DepositSTXTool as BankAccountDepositSTXTool
-from .dao_ext_bank_account import GetAccountTermsTool, WithdrawSTXTool
+from .dao_ext_timed_vault import DepositSTXTool as TimedVaultDepositSTXTool
+from .dao_ext_timed_vault import GetAccountTermsTool, WithdrawSTXTool
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
     GetCurrentDaoCharterVersionTool,
@@ -161,9 +161,9 @@ def initialize_tools(
         "dao_actionproposals_propose_toggle_resource": ProposeActionToggleResourceTool(
             wallet_id
         ),
-        "dao_bank_get_account_terms": GetAccountTermsTool(wallet_id),
-        "dao_bank_deposit_stx": BankAccountDepositSTXTool(wallet_id),
-        "dao_bank_withdraw_stx": WithdrawSTXTool(wallet_id),
+        "dao_timedvault_get_account_terms": GetAccountTermsTool(wallet_id),
+        "dao_timedvault_deposit_stx": TimedVaultDepositSTXTool(wallet_id),
+        "dao_timedvault_withdraw_stx": WithdrawSTXTool(wallet_id),
         "dao_charter_get_current": GetCurrentDaoCharterTool(wallet_id),
         "dao_charter_get_current_version": GetCurrentDaoCharterVersionTool(wallet_id),
         "dao_charter_get_version": GetDaoCharterTool(wallet_id),

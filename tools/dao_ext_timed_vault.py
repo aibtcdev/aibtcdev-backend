@@ -8,19 +8,19 @@ from tools.bun import BunScriptRunner
 
 
 class GetAccountTermsInput(BaseModel):
-    """Input schema for getting bank account terms."""
+    """Input schema for getting timed vault terms."""
 
-    bank_account_contract: str = Field(
+    timed_vault_contract: str = Field(
         ...,
-        description="Contract principal of the bank account",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
+        description="Contract principal of the timed vault",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-timed-vault",
     )
 
 
 class GetAccountTermsTool(BaseTool):
-    name: str = "dao_bank_get_account_terms"
+    name: str = "dao_timedvault_get_account_terms"
     description: str = (
-        "Get the current terms of the DAO's bank account. "
+        "Get the current terms of the DAO's timed vault. "
         "Returns information about withdrawal limits, periods, and account holder."
     )
     args_schema: Type[BaseModel] = GetAccountTermsInput
@@ -33,54 +33,54 @@ class GetAccountTermsTool(BaseTool):
 
     def _deploy(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get account terms."""
         if self.wallet_id is None:
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
-        args = [bank_account_contract]
+        args = [timed_vault_contract]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/bank-account/read-only",
+            "aibtc-dao/extensions/timed-vault/read-only",
             "get-account-terms.ts",
             *args,
         )
 
     def _run(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to get account terms."""
-        return self._deploy(bank_account_contract, **kwargs)
+        return self._deploy(timed_vault_contract, **kwargs)
 
     async def _arun(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(bank_account_contract, **kwargs)
+        return self._deploy(timed_vault_contract, **kwargs)
 
 
 class DepositSTXInput(BaseModel):
     """Input schema for depositing STX."""
 
-    bank_account_contract: str = Field(
+    timed_vault_contract: str = Field(
         ...,
-        description="Contract principal of the bank account",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
+        description="Contract principal of the timed vault",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-timed-vault",
     )
     amount: int = Field(..., description="Amount of STX to deposit in microstacks")
 
 
 class DepositSTXTool(BaseTool):
-    name: str = "dao_bank_deposit_stx"
+    name: str = "dao_timedvault_deposit_stx"
     description: str = (
-        "Deposit STX into the DAO's bank account. "
+        "Deposit STX into the DAO's timed vault. "
         "The amount should be specified in microstacks (1 STX = 1,000,000 microstacks)."
     )
     args_schema: Type[BaseModel] = DepositSTXInput
@@ -93,7 +93,7 @@ class DepositSTXTool(BaseTool):
 
     def _deploy(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -101,48 +101,48 @@ class DepositSTXTool(BaseTool):
         if self.wallet_id is None:
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
-        args = [bank_account_contract, str(amount)]
+        args = [timed_vault_contract, str(amount)]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/bank-account/public",
+            "aibtc-dao/extensions/timed-vault/public",
             "deposit-stx.ts",
             *args,
         )
 
     def _run(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to deposit STX."""
-        return self._deploy(bank_account_contract, amount, **kwargs)
+        return self._deploy(timed_vault_contract, amount, **kwargs)
 
     async def _arun(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         amount: int,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(bank_account_contract, amount, **kwargs)
+        return self._deploy(timed_vault_contract, amount, **kwargs)
 
 
 class WithdrawSTXInput(BaseModel):
     """Input schema for withdrawing STX."""
 
-    bank_account_contract: str = Field(
+    timed_vault_contract: str = Field(
         ...,
-        description="Contract principal of the bank account",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-bank-account",
+        description="Contract principal of the timed vault",
+        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-timed-vault",
     )
 
 
 class WithdrawSTXTool(BaseTool):
-    name: str = "dao_bank_withdraw_stx"
+    name: str = "dao_timedvault_withdraw_stx"
     description: str = (
-        "Withdraw STX from the DAO's bank account. "
+        "Withdraw STX from the DAO's timed vault. "
         "This will withdraw the maximum allowed amount based on the account terms."
     )
     args_schema: Type[BaseModel] = WithdrawSTXInput
@@ -155,34 +155,34 @@ class WithdrawSTXTool(BaseTool):
 
     def _deploy(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to withdraw STX."""
         if self.wallet_id is None:
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
-        args = [bank_account_contract]
+        args = [timed_vault_contract]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/bank-account/public",
+            "aibtc-dao/extensions/timed-vault/public",
             "withdraw-stx.ts",
             *args,
         )
 
     def _run(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to withdraw STX."""
-        return self._deploy(bank_account_contract, **kwargs)
+        return self._deploy(timed_vault_contract, **kwargs)
 
     async def _arun(
         self,
-        bank_account_contract: str,
+        timed_vault_contract: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(bank_account_contract, **kwargs)
+        return self._deploy(timed_vault_contract, **kwargs)

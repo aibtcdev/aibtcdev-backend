@@ -92,7 +92,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             ### Messaging
             * **Send Message** (`aibtc-action-send-message`): Posts verified DAO message on-chain. Message includes DAO verification flag. Limited to 1MB size.
 
-            ### Bank Account Configuration
+            ### Timed Vault Configuration
             * **Set Account Holder** (`aibtc-action-set-account-holder`): Designates authorized withdrawal address.
             * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (0–100 STX).
             * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (6–1,008 blocks).
@@ -110,7 +110,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             * **For messaging actions**: Ensure the message is appropriate, aligned with DAO values, and doesn't contain harmful content.
             * **For treasury actions**: Verify the asset is legitimate and appropriate for the DAO to interact with.
             * **For payment actions**: Confirm the resource details are complete and pricing is reasonable.
-            * **For bank configuration**: Ensure parameters are within acceptable ranges and the account holder is trustworthy.
+            * **For timed vault configuration**: Ensure parameters are within acceptable ranges and the account holder is trustworthy.
 
             When in doubt about technical parameters, lean toward approving proposals that come from trusted creators and follow established patterns.
 
