@@ -199,9 +199,15 @@ class ChatProcessor:
         """Process a single stream result."""
         logger.debug(f"Processing stream result type: {result.get('type')}")
 
-        if not self.connection_active:
+        # Check both local and global connection state
+        job_id_str = str(self.job_id)
+        is_connected = self.connection_active and (
+            job_id_str not in running_jobs
+            or running_jobs[job_id_str]["connection_active"]
+        )
+
+        if not is_connected:
             # Skip sending to output queue if connection is no longer active
-            # But continue processing to update the database
             logger.debug(
                 f"Skipping output for disconnected client on job {self.job_id}"
             )
@@ -210,7 +216,7 @@ class ChatProcessor:
                 return
 
         if result.get("type") == "end":
-            if not first_end and self.connection_active:
+            if not first_end and is_connected:
                 try:
                     await self.output_queue.put(
                         Message(
@@ -227,6 +233,9 @@ class ChatProcessor:
                     logger.debug(
                         f"Failed to send end token to disconnected client: {e}"
                     )
+                    self.connection_active = False
+                    if job_id_str in running_jobs:
+                        running_jobs[job_id_str]["connection_active"] = False
             return
 
         if result.get("type") == "token" and not result.get("content"):
@@ -243,7 +252,7 @@ class ChatProcessor:
             return
 
         if result.get("content"):
-            if result.get("type") == "token" and self.connection_active:
+            if result.get("type") == "token" and is_connected:
                 try:
                     stream_message = self.message_handler.process_token_message(
                         {
@@ -256,6 +265,8 @@ class ChatProcessor:
                 except Exception as e:
                     logger.debug(f"Failed to send token to disconnected client: {e}")
                     self.connection_active = False
+                    if job_id_str in running_jobs:
+                        running_jobs[job_id_str]["connection_active"] = False
             elif result.get("type") == "result":
                 logger.info(
                     f"Received result message with content length: {len(result.get('content', ''))}"
@@ -343,6 +354,16 @@ async def process_chat_message(
     Raises:
         Exception: If the chat message cannot be processed
     """
+    # Initialize job info in running_jobs
+    job_id_str = str(job_id)
+    running_jobs[job_id_str] = {
+        "queue": output_queue,
+        "thread_id": thread_id,
+        "agent_id": agent_id,
+        "task": None,
+        "connection_active": True,
+    }
+
     processor = ChatProcessor(
         job_id=job_id,
         thread_id=thread_id,
@@ -353,16 +374,15 @@ async def process_chat_message(
         output_queue=output_queue,
     )
 
-    # Check if the connection is already marked as inactive
-    job_id_str = str(job_id)
-    if job_id_str in running_jobs:
-        processor.connection_active = running_jobs[job_id_str].get(
-            "connection_active", True
-        )
-        if not processor.connection_active:
-            logger.info(f"Starting job {job_id} with inactive connection")
-
-    await processor.process_stream()
+    try:
+        await processor.process_stream()
+    except Exception as e:
+        logger.error(f"Error processing chat message: {e}")
+        raise
+    finally:
+        # Clean up job info
+        if job_id_str in running_jobs:
+            del running_jobs[job_id_str]
 
 
 def get_job_history(thread_id: UUID, profile_id: UUID) -> List[Dict[str, Any]]:
