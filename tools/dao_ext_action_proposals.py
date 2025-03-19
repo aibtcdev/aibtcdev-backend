@@ -707,14 +707,6 @@ class VoteOnActionProposalInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
         ],
     )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
     proposal_id: int = Field(..., description="ID of the proposal to vote on")
     vote: bool = Field(..., description="True for yes/for, False for no/against")
 
@@ -737,7 +729,6 @@ class VoteOnActionProposalTool(BaseTool):
     def _deploy(
         self,
         action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
@@ -748,7 +739,6 @@ class VoteOnActionProposalTool(BaseTool):
 
         args = [
             action_proposals_voting_extension,
-            dao_token_contract_address,
             str(proposal_id),
             str(vote).lower(),
         ]
@@ -763,27 +753,25 @@ class VoteOnActionProposalTool(BaseTool):
     def _run(
         self,
         action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
         return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, vote, **kwargs
+            action_proposals_voting_extension, proposal_id, vote, **kwargs
         )
 
     async def _arun(
         self,
         action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
         proposal_id: int,
         vote: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_voting_extension, dao_token_contract_address, proposal_id, vote, **kwargs
+            action_proposals_voting_extension, proposal_id, vote, **kwargs
         )
 
 
