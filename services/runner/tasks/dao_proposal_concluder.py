@@ -9,6 +9,7 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
+    TokenFilter,
 )
 from config import config
 from lib.logger import configure_logger
@@ -103,6 +104,16 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
+            # Get the DAO token information
+            tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao_id))
+            if not tokens:
+                error_msg = f"No token found for DAO: {dao_id}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+
+            # Use the first token as the DAO token
+            dao_token = tokens[0]
+
             # Initialize the ConcludeActionProposalTool
             logger.debug(f"Preparing to conclude proposal {proposal.proposal_id}")
             conclude_tool = ConcludeActionProposalTool(
@@ -115,6 +126,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 action_proposals_voting_extension=proposal.contract_principal,  # This is the voting extension contract
                 proposal_id=proposal.proposal_id,  # This is the on-chain proposal ID
                 action_proposal_contract_to_execute=proposal.action,  # This is the contract that will be executed
+                dao_token_contract_address=dao_token.contract_principal,  # This is the DAO token contract
             )
             logger.debug(f"Conclusion result: {conclusion_result}")
 
