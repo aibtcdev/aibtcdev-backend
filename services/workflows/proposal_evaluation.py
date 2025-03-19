@@ -58,12 +58,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             DAO Information:
             {dao_info}
 
-            Note: The AIBTC Charter below represents high-level guiding principles for the AIBTC platform and AI agent operations, not the specific DAO’s own charter.
+            Note: The AIBTC Charter below represents high-level guiding principles for the AIBTC platform and AI agent operations, not the specific DAO's own charter.
 
             AIBTC Charter
             1. Mission: Elevate human potential through Autonomous Intelligence on Bitcoin.
             2. Core Values:
-            • Curiosity | Truth Maximizing | Humanity’s Best Interests
+            • Curiosity | Truth Maximizing | Humanity's Best Interests
             • Transparency | Resilience | Collaboration
             3. Guardrails:
             • Decentralized Governance
@@ -116,11 +116,11 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
             Output format:
 
-            {
-            “approve”: bool,  # true to vote FOR, false to vote AGAINST the proposal
-            “confidence_score”: float,  # between 0.0 and 1.0
-            “reasoning”: str  # detailed explanation of your decision
-            }
+            {{
+            "approve": bool,  # true to vote FOR, false to vote AGAINST the proposal
+            "confidence_score": float,  # between 0.0 and 1.0
+            "reasoning": str  # detailed explanation of your decision
+            }}
             """,
         )
 
