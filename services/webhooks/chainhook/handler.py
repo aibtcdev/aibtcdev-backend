@@ -61,7 +61,7 @@ class ChainhookHandler(WebhookHandler):
 
             for apply in parsed_data.apply:
                 for transaction in apply.transactions:
-                    self.logger.debug(
+                    self.logger.info(
                         f"Processing transaction {transaction.transaction_identifier.hash}"
                     )
 
