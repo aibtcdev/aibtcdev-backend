@@ -118,6 +118,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 wallet_id=wallet_id,
                 auto_vote=self.DEFAULT_AUTO_VOTE,
                 confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
+                dao_id=dao_id,
             )
 
             # Log the results

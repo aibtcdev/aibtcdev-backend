@@ -7,11 +7,7 @@ from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
-from backend.models import (
-    UUID,
-    Profile,
-    TokenFilter,
-)
+from backend.models import UUID, Profile, TokenFilter
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
@@ -214,19 +210,21 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 )
                 vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
-                # Get the token contract address from the dao_info
+                # Get DAO info
+                dao_info = state.get("dao_info", {})
+                dao_id = dao_info.get("id")
+
+                # Get token info for the DAO
                 dao_token_contract_address = None
-                if state.get("dao_info") and isinstance(state["dao_info"], dict):
-                    dao_id = state["dao_info"].get("id")
-                    if dao_id:
-                        # Get the token for this DAO
-                        tokens = backend.list_tokens(TokenFilter(dao_id=dao_id))
-                        if tokens and len(tokens) > 0:
-                            # Use the first token's contract principal
-                            dao_token_contract_address = tokens[0].contract_principal
-                            self.logger.debug(
-                                f"Found token contract address: {dao_token_contract_address}"
-                            )
+                if dao_id:
+                    # Query for tokens associated with this DAO ID
+                    tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao_id))
+                    if tokens and len(tokens) > 0:
+                        # Use the first token's contract principal as the token contract address
+                        dao_token_contract_address = tokens[0].contract_principal
+                        self.logger.debug(
+                            f"Found token contract address: {dao_token_contract_address}"
+                        )
 
                 if not dao_token_contract_address:
                     raise ValueError(
@@ -366,6 +364,7 @@ async def evaluate_and_vote_on_proposal(
     wallet_id: Optional[UUID] = None,
     auto_vote: bool = True,
     confidence_threshold: float = 0.7,
+    dao_id: Optional[UUID] = None,
 ) -> Dict:
     """Evaluate a proposal and automatically vote based on the evaluation.
 
@@ -375,6 +374,7 @@ async def evaluate_and_vote_on_proposal(
         wallet_id: Optional wallet ID to use for voting
         auto_vote: Whether to automatically vote based on the evaluation
         confidence_threshold: Minimum confidence score required to auto-vote (0.0-1.0)
+        dao_id: Optional DAO ID to explicitly pass to the workflow
 
     Returns:
         Dictionary containing the evaluation results and voting outcome
@@ -408,12 +408,27 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        # Get DAO info
-        dao_info = backend.get_dao(proposal_data.dao_id)
+        # Get DAO info based on provided dao_id or from proposal
+        dao_info = None
+        if dao_id:
+            logger.debug(f"Using provided DAO ID: {dao_id}")
+            dao_info = backend.get_dao(dao_id)
+            if not dao_info:
+                logger.warning(
+                    f"Provided DAO ID {dao_id} not found, falling back to proposal's DAO ID"
+                )
+
+        # If dao_info is still None, try to get it from proposal's dao_id
+        if not dao_info and proposal_data.dao_id:
+            logger.debug(f"Using proposal's DAO ID: {proposal_data.dao_id}")
+            dao_info = backend.get_dao(proposal_data.dao_id)
+
         if not dao_info:
-            error_msg = f"DAO with ID {proposal_data.dao_id} not found"
+            error_msg = "Could not find DAO information"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
+
+        logger.debug(f"Using DAO: {dao_info.name} (ID: {dao_info.id})")
 
         # Initialize state
         state = {
