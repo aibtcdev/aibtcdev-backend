@@ -116,34 +116,44 @@ class DAOProposalHandler(ChainhookEventHandler):
             Optional[Dict]: Dictionary containing proposal information if found, None otherwise
         """
         for event in events:
-            # Find print events with proposal information
-            if (
-                event.type == "SmartContractEvent"
-                and hasattr(event, "data")
-                and event.data.get("topic") == "print"
-            ):
-                event_data = event.data
-                value = event_data.get("value", {})
+            # Find SmartContractEvent events
+            if event.type != "SmartContractEvent" or not hasattr(event, "data"):
+                continue
 
-                if value.get("notification") == "propose-action":
-                    payload = value.get("payload", {})
-                    if not payload:
-                        self.logger.warning("Empty payload in proposal event")
-                        return None
+            event_data = event.data
 
-                    return {
-                        "proposal_id": payload.get("proposalId"),
-                        "action": payload.get("action"),
-                        "caller": payload.get("caller"),
-                        "creator": payload.get("creator"),
-                        "created_at_block": payload.get("createdAt"),
-                        "end_block": payload.get("endBlock"),
-                        "start_block": payload.get("startBlock"),
-                        "liquid_tokens": str(
-                            payload.get("liquidTokens")
-                        ),  # Convert to string to handle large numbers
-                        "parameters": payload.get("parameters"),
-                    }
+            # Check if this is a print event
+            if event_data.get("topic") != "print":
+                continue
+
+            # Get the value, which might be None
+            value = event_data.get("value")
+
+            # Skip events with null values
+            if value is None:
+                self.logger.debug("Value is None in SmartContractEvent data")
+                continue
+
+            # Check if this is a proposal event
+            if value.get("notification") == "propose-action":
+                payload = value.get("payload", {})
+                if not payload:
+                    self.logger.warning("Empty payload in proposal event")
+                    return None
+
+                return {
+                    "proposal_id": payload.get("proposalId"),
+                    "action": payload.get("action"),
+                    "caller": payload.get("caller"),
+                    "creator": payload.get("creator"),
+                    "created_at_block": payload.get("createdAt"),
+                    "end_block": payload.get("endBlock"),
+                    "start_block": payload.get("startBlock"),
+                    "liquid_tokens": str(
+                        payload.get("liquidTokens")
+                    ),  # Convert to string to handle large numbers
+                    "parameters": payload.get("parameters"),
+                }
 
         self.logger.warning("Could not find proposal information in transaction events")
         return None
