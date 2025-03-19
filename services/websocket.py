@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import time
 from typing import Any, Dict, Optional, Set, Tuple
 from uuid import UUID
@@ -259,6 +260,44 @@ class WebSocketManager:
             del self.connections[session_id]
             return False
 
+        # Ensure message has required fields
+        if "created_at" not in message:
+            message["created_at"] = datetime.datetime.now().isoformat()
+
+        # Handle planning_only flag - remove it before sending to client
+        planning_only = message.pop("planning_only", False)
+
+        # Preserve thought field for planning steps
+        has_thought = "thought" in message and message["thought"]
+
+        # Add status field if missing based on type
+        if "status" not in message:
+            if message.get("type") == "token":
+                if planning_only:
+                    message["status"] = "planning"
+                else:
+                    message["status"] = "processing"
+            elif message.get("type") == "step":
+                message["status"] = "planning"
+            elif message.get("type") == "tool":
+                message["status"] = "processing"
+            elif message.get("type") == "error":
+                message["status"] = "error"
+            else:
+                message["status"] = "complete"  # Default for other types
+
+        # Handle step messages consistently
+        if (
+            message.get("type") == "step"
+            and not has_thought
+            and message.get("status") == "planning"
+        ):
+            message["thought"] = "Planning Phase"
+
+        logger.debug(
+            f"Sending message type: {message.get('type')}, status: {message.get('status')}"
+        )
+
         # Try to send the message with a retry
         success = False
         try:
@@ -315,7 +354,13 @@ class WebSocketManager:
                 return False
 
             return await self.send_message(
-                {"type": "error", "message": error_message}, session_id
+                {
+                    "type": "error",
+                    "message": error_message,
+                    "status": "error",
+                    "created_at": datetime.datetime.now().isoformat(),
+                },
+                session_id,
             )
         except Exception as e:
             logger.error(f"Error sending error message: {type(e).__name__}: {str(e)}")

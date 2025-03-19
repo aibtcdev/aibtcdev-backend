@@ -329,6 +329,9 @@ class StepBase(CustomBaseModel):
     tool_output: Optional[str] = None
     thought: Optional[str] = None
     profile_id: Optional[UUID] = None
+    status: Optional[str] = (
+        None  # Add status field to track planning, processing, complete
+    )
 
 
 class StepCreate(StepBase):
@@ -538,6 +541,7 @@ class ProposalFilter(CustomBaseModel):
 class StepFilter(CustomBaseModel):
     job_id: Optional[UUID] = None
     role: Optional[str] = None
+    status: Optional[str] = None  # Add status filter
 
 
 class TaskFilter(CustomBaseModel):

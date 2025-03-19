@@ -84,6 +84,42 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
         - What information or tools you'll use to complete the task
         - The exact actions you'll take to fulfill the request
         
+        AIBTC DAO Context Information:
+        You are an AI governance agent integrated with an AIBTC DAO. Your role is to interact with the DAO's smart contracts 
+        on behalf of token holders, either by assisting human users or by acting autonomously within the DAO's rules. The DAO 
+        is governed entirely by its token holders through proposals – members submit proposals, vote on them, and if a proposal passes, 
+        it is executed on-chain. Always maintain the integrity of the DAO's decentralized process: never bypass on-chain governance, 
+        and ensure all actions strictly follow the DAO's smart contract rules and parameters.
+
+        Your responsibilities include:
+        1. Helping users create and submit proposals to the DAO
+        2. Guiding users through the voting process
+        3. Explaining how DAO contract interactions work
+        4. Preventing invalid actions and detecting potential exploits
+        5. In autonomous mode, monitoring DAO state, proposing actions, and voting according to governance rules
+
+        When interacting with users about the DAO, always:
+        - Retrieve contract addresses automatically instead of asking users
+        - Validate transactions before submission
+        - Present clear summaries of proposed actions
+        - Verify eligibility and check voting power
+        - Format transactions precisely according to blockchain requirements
+        - Provide confirmation and feedback after actions
+        
+        DAO Tools Usage:
+        For ANY DAO-related request, use the appropriate DAO tools to access real-time information:
+        - Use dao_list tool to retrieve all DAOs, their tokens, and extensions
+        - Use dao_search tool to find specific DAOs by name, description, token name, symbol, or contract ID
+        - Do NOT hardcode DAO information or assumptions about contract addresses
+        - Always query for the latest DAO data through the tools rather than relying on static information
+        - When analyzing user requests, determine if they're asking about a specific DAO or need a list of DAOs
+        - After retrieving DAO information, use it to accurately guide users through governance processes
+        
+        Examples of effective DAO tool usage:
+        1. If user asks about voting on a proposal: First use dao_search to find the specific DAO, then guide them with the correct contract details
+        2. If user asks to list available DAOs: Use dao_list to retrieve current DAOs and present them clearly
+        3. If user wants to create a proposal: Use dao_search to get the DAO details first, then assist with the proposal creation using the current contract addresses
+        
         Be decisive and action-oriented. Don't include phrases like "I would," "I could," or "I might." 
         Instead, use phrases like "I will," "I am going to," and "I'll execute."
         Don't ask for confirmation before taking actions - assume the user wants you to proceed.
@@ -115,27 +151,58 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
         try:
             logger.info("Creating thought process notes for user query")
 
+            # Configure custom callback for planning to properly mark planning tokens
+            original_new_token = self.callback_handler.custom_on_llm_new_token
+
+            # Create temporary wrapper to mark planning tokens
+            async def planning_token_wrapper(token, **kwargs):
+                # Add planning flag to tokens during the planning phase
+                if asyncio.iscoroutinefunction(original_new_token):
+                    await original_new_token(token, planning_only=True, **kwargs)
+                else:
+                    # If it's not a coroutine, assume it's a function that uses run_coroutine_threadsafe
+                    loop = asyncio.get_running_loop()
+                    asyncio.run_coroutine_threadsafe(
+                        self.callback_handler.queue.put(
+                            {
+                                "type": "token",
+                                "content": token,
+                                "status": "planning",
+                                "planning_only": True,
+                            }
+                        ),
+                        loop,
+                    )
+
+            # Set the temporary wrapper
+            self.callback_handler.custom_on_llm_new_token = planning_token_wrapper
+
             # Create a task to invoke the planning LLM
             task = asyncio.create_task(self.planning_llm.ainvoke(planning_messages))
 
             # Wait for the task to complete
             response = await task
             plan = response.content
+
+            # Restore original callback
+            self.callback_handler.custom_on_llm_new_token = original_new_token
+
             logger.info("Thought process notes created successfully")
             logger.debug(f"Notes content length: {len(plan)}")
 
-            # Emit the plan through the callback system so it can be saved as a step
-            await self.callback_handler.queue.put(
-                {
-                    "type": "step",
-                    "content": plan,
-                    "role": "assistant",
-                    "thought": "Planning Phase",
-                }
+            # Use the new process_step method to emit the plan with a planning status
+            await self.callback_handler.process_step(
+                content=plan, role="assistant", thought="Planning Phase"
             )
 
             return plan
         except Exception as e:
+            # Restore original callback in case of error
+            if hasattr(self, "callback_handler") and hasattr(
+                self.callback_handler, "custom_on_llm_new_token"
+            ):
+                self.callback_handler.custom_on_llm_new_token = original_new_token
+
             logger.error(f"Failed to create plan: {str(e)}", exc_info=True)
             # Let the LLM handle the planning naturally without a static fallback
             raise
@@ -244,12 +311,14 @@ class PreplanLangGraphService:
             # Setup callback handler
             callback_handler = StreamingCallbackHandler(
                 queue=callback_queue,
-                on_llm_new_token=lambda token,
-                **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "token", "content": token}), loop
+                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
+                    callback_queue.put(
+                        {"type": "token", "content": token, "status": "processing"}
+                    ),
+                    loop,
                 ),
                 on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end"}), loop
+                    callback_queue.put({"type": "end", "status": "complete"}), loop
                 ),
             )
 

@@ -1,6 +1,7 @@
 """ReAct workflow functionality."""
 
 import asyncio
+import datetime
 from dataclasses import dataclass
 from typing import (
     Annotated,
@@ -120,6 +121,8 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         self.tool_inputs = {}  # Store tool inputs by tool name
         self.custom_on_llm_new_token = on_llm_new_token
         self.custom_on_llm_end = on_llm_end
+        # Track the current execution phase
+        self.current_phase = "processing"  # Default phase is processing
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
         """Get the current event loop or create a new one if necessary."""
@@ -155,6 +158,36 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             logger.error(f"Failed to put item in queue: {str(e)}")
             raise StreamingError(f"Queue operation failed: {str(e)}")
 
+    async def process_step(
+        self, content: str, role: str = "assistant", thought: Optional[str] = None
+    ) -> None:
+        """Process a planning step and queue it with the planning status.
+
+        Args:
+            content: The planning step content
+            role: The role associated with the step (usually assistant)
+            thought: Optional thought process notes
+        """
+        try:
+            # Create step message with explicit planning status
+            current_time = datetime.datetime.now().isoformat()
+            step_message = {
+                "type": "step",
+                "status": "planning",  # Explicitly mark as planning phase
+                "content": content,
+                "role": role,
+                "thought": thought
+                or "Planning Phase",  # Default to Planning Phase if thought is not provided
+                "created_at": current_time,
+                "planning_only": True,  # Mark this content as planning-only to prevent duplication
+            }
+
+            logger.debug(f"Queuing planning step message with length: {len(content)}")
+            await self._async_put_to_queue(step_message)
+        except Exception as e:
+            logger.error(f"Failed to process planning step: {str(e)}")
+            raise StreamingError(f"Planning step processing failed: {str(e)}")
+
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs) -> None:
         """Run when tool starts running."""
         self.current_tool = serialized.get("name")
@@ -168,7 +201,8 @@ class StreamingCallbackHandler(BaseCallbackHandler):
                 "type": "tool",
                 "tool": self.current_tool,
                 "input": input_str,
-                "status": "start",
+                "status": "processing",  # Update to use consistent status
+                "created_at": datetime.datetime.now().isoformat(),
             }
         )
         logger.info(
@@ -190,7 +224,8 @@ class StreamingCallbackHandler(BaseCallbackHandler):
                     "tool": self.current_tool,
                     "input": tool_input,  # Use the stored input instead of None
                     "output": str(output),
-                    "status": "end",
+                    "status": "complete",  # Update to use consistent status
+                    "created_at": datetime.datetime.now().isoformat(),
                 }
             )
             logger.info(
@@ -204,19 +239,53 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Run on new token."""
+        # Check if we have planning_only in the kwargs
+        planning_only = kwargs.get("planning_only", False)
+
         if self.custom_on_llm_new_token:
             self.custom_on_llm_new_token(token, **kwargs)
-        logger.debug(f"Received new token (length: {len(token)})")
+
+        # Log token information with phase information
+        phase = "planning" if planning_only else "processing"
+        logger.debug(f"Received new token (length: {len(token)}, phase: {phase})")
 
     def on_llm_end(self, response: LLMResult, **kwargs) -> None:
         """Run when LLM ends running."""
         logger.info("LLM processing completed")
+
+        # Queue an end message with complete status
+        try:
+            self._put_to_queue(
+                {
+                    "type": "token",
+                    "status": "complete",
+                    "content": "",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue completion message: {str(e)}")
+
         if self.custom_on_llm_end:
             self.custom_on_llm_end(response, **kwargs)
 
     def on_llm_error(self, error: Exception, **kwargs) -> None:
         """Run when LLM errors."""
         logger.error(f"LLM error occurred: {str(error)}", exc_info=True)
+
+        # Send error status
+        try:
+            self._put_to_queue(
+                {
+                    "type": "token",
+                    "status": "error",
+                    "content": f"Error: {str(error)}",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+        except Exception:
+            pass  # Don't raise another error if this fails
+
         raise ExecutionError("LLM processing failed", {"error": str(error)})
 
     def on_tool_error(self, error: Exception, **kwargs) -> None:
@@ -229,6 +298,7 @@ class StreamingCallbackHandler(BaseCallbackHandler):
                     "input": None,
                     "output": f"Error: {str(error)}",
                     "status": "error",
+                    "created_at": datetime.datetime.now().isoformat(),
                 }
             )
             logger.error(
@@ -330,12 +400,14 @@ class LangGraphService:
             # Setup callback handler
             callback_handler = StreamingCallbackHandler(
                 queue=callback_queue,
-                on_llm_new_token=lambda token,
-                **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "token", "content": token}), loop
+                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
+                    callback_queue.put(
+                        {"type": "token", "content": token, "status": "processing"}
+                    ),
+                    loop,
                 ),
                 on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end"}), loop
+                    callback_queue.put({"type": "end", "status": "complete"}), loop
                 ),
             )
 
