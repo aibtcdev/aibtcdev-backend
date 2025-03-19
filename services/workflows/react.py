@@ -196,15 +196,6 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         if self.current_tool:
             self.tool_inputs[self.current_tool] = input_str
 
-        self._put_to_queue(
-            {
-                "type": "tool",
-                "tool": self.current_tool,
-                "input": input_str,
-                "status": "processing",  # Update to use consistent status
-                "created_at": datetime.datetime.now().isoformat(),
-            }
-        )
         logger.info(
             f"Tool started: {self.current_tool} with input: {input_str[:100]}..."
         )
@@ -224,7 +215,7 @@ class StreamingCallbackHandler(BaseCallbackHandler):
                     "tool": self.current_tool,
                     "input": tool_input,  # Use the stored input instead of None
                     "output": str(output),
-                    "status": "complete",  # Update to use consistent status
+                    "status": "processing",  # Use "processing" status for tool end
                     "created_at": datetime.datetime.now().isoformat(),
                 }
             )
@@ -291,13 +282,16 @@ class StreamingCallbackHandler(BaseCallbackHandler):
     def on_tool_error(self, error: Exception, **kwargs) -> None:
         """Run when tool errors."""
         if self.current_tool:
+            # Retrieve the stored input for this tool
+            tool_input = self.tool_inputs.get(self.current_tool, "")
+
             self._put_to_queue(
                 {
                     "type": "tool",
                     "tool": self.current_tool,
-                    "input": None,
+                    "input": tool_input,  # Use the stored input instead of None
                     "output": f"Error: {str(error)}",
-                    "status": "error",
+                    "status": "error",  # Keep "error" status for error conditions
                     "created_at": datetime.datetime.now().isoformat(),
                 }
             )

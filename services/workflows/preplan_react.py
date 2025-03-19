@@ -308,7 +308,7 @@ class PreplanLangGraphService:
                 filtered_content, input_str, persona
             )
 
-            # Setup callback handler
+            # Configure callback handler
             callback_handler = StreamingCallbackHandler(
                 queue=callback_queue,
                 on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(

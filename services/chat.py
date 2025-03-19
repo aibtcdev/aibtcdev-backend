@@ -102,7 +102,7 @@ class ToolExecutionHandler:
         return {
             "role": "assistant",
             "type": "tool",
-            "status": status,
+            "status": status,  # Use the exact status passed from the tool execution
             "tool": message.get("tool"),
             "tool_input": message.get("input"),
             "tool_output": message.get("output"),
@@ -198,40 +198,63 @@ class ChatProcessor:
     async def _handle_tool_execution(
         self, tool_name: str, tool_input: str, tool_output: str, tool_phase: str
     ) -> None:
-        """Handle tool execution messages."""
-        if tool_phase == "end":
-            try:
-                # Map tool phase to appropriate status
-                status = "complete" if tool_phase == "end" else "processing"
-                if tool_phase == "error":
-                    status = "error"
+        """Handle tool execution messages.
 
-                new_step = StepCreate(
-                    profile_id=self.profile.id,
-                    job_id=self.job_id,
-                    agent_id=self.agent_id,
-                    role="assistant",
-                    tool=tool_name,
-                    tool_input=tool_input,
-                    tool_output=tool_output,
-                    status=status,  # Save the tool's status
-                )
-                backend.create_step(new_step=new_step)
-            except Exception as e:
-                logger.error(f"Error creating tool execution step: {e}")
-                raise
-        elif tool_phase == "start":
-            tool_execution = self.tool_handler.process_tool_message(
-                {
-                    "tool": tool_name,
-                    "input": tool_input,
-                    "output": tool_output,
-                    "thread_id": str(self.thread_id),
-                    "agent_id": str(self.agent_id) if self.agent_id else None,
-                }
+        Args:
+            tool_name: The name of the tool being executed
+            tool_input: The input provided to the tool
+            tool_output: The output returned by the tool (empty for start phase)
+            tool_phase: The phase of tool execution: always "processing" for both start/end
+        """
+        # Determine if this is start or end phase based on tool_output
+        # Empty output indicates start phase, non-empty indicates end phase
+        is_start_phase = not bool(tool_output)
+        is_error = "error" in tool_phase.lower()
+
+        # Set appropriate database status based on the phase we determined
+        if is_error:
+            status = "error"
+        elif is_start_phase:
+            status = "processing"  # Start phase always maps to processing
+        else:
+            status = "complete"  # End phase (with output) maps to complete
+
+        # Create a step in the database for every tool phase
+        try:
+            new_step = StepCreate(
+                profile_id=self.profile.id,
+                job_id=self.job_id,
+                agent_id=self.agent_id,
+                role="assistant",
+                tool=tool_name,
+                tool_input=tool_input,
+                tool_output=tool_output,
+                status=status,
             )
-            self.results.append(tool_execution)
-            await self._safe_send_message(tool_execution)
+            backend.create_step(new_step=new_step)
+            phase_type = (
+                "start" if is_start_phase else "end" if not is_error else "error"
+            )
+            logger.info(
+                f"Created tool execution step for {tool_name}, phase: {phase_type}, with status: {status}"
+            )
+        except Exception as e:
+            logger.error(f"Error creating tool execution step: {e}")
+            raise
+
+        # Send message to client for tool visualization
+        tool_execution = self.tool_handler.process_tool_message(
+            {
+                "tool": tool_name,
+                "input": tool_input,
+                "output": tool_output,
+                "thread_id": str(self.thread_id),
+                "agent_id": str(self.agent_id) if self.agent_id else None,
+                "status": tool_phase,  # Use the original status for client-side display
+            }
+        )
+        self.results.append(tool_execution)
+        await self._safe_send_message(tool_execution)
 
     async def _process_stream_result(
         self, result: Dict[str, Any], first_end: bool
