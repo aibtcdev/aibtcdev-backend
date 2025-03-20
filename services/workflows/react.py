@@ -236,8 +236,22 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         # Check if we have planning_only in the kwargs
         planning_only = kwargs.get("planning_only", False)
 
+        # Handle custom token processing if provided
         if self.custom_on_llm_new_token:
-            self.custom_on_llm_new_token(token, **kwargs)
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_new_token):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_new_token(token, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_new_token(token, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom token handler: {str(e)}", exc_info=True)
 
         # Log token information with phase information
         phase = "planning" if planning_only else "processing"
@@ -260,8 +274,22 @@ class StreamingCallbackHandler(BaseCallbackHandler):
         except Exception as e:
             logger.error(f"Failed to queue completion message: {str(e)}")
 
+        # Handle custom end processing if provided
         if self.custom_on_llm_end:
-            self.custom_on_llm_end(response, **kwargs)
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_end):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_end(response, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_end(response, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom end handler: {str(e)}", exc_info=True)
 
     def on_llm_error(self, error: Exception, **kwargs) -> None:
         """Run when LLM errors."""
@@ -461,6 +489,28 @@ class LangGraphService:
         # Call the new implementation
         async for chunk in self._execute_stream_impl(
             messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
+
+    # Add execute_stream as alias for consistency across services
+    async def execute_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+        **kwargs,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a workflow stream.
+
+        This is an alias for execute_react_stream to maintain consistent API
+        across different workflow services.
+        """
+        async for chunk in self.execute_react_stream(
+            history=history,
             input_str=input_str,
             persona=persona,
             tools_map=tools_map,
