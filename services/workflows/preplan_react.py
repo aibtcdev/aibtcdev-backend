@@ -5,17 +5,27 @@ the ReAct workflow to complete the task according to the plan.
 """
 
 import asyncio
-from typing import Annotated, Any, AsyncGenerator, Dict, List, Optional, TypedDict
+from typing import (
+    Annotated,
+    Any,
+    AsyncGenerator,
+    Dict,
+    List,
+    Optional,
+    TypedDict,
+    Union,
+)
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError
+from services.workflows.base import BaseWorkflow, ExecutionError, PlanningCapability
 from services.workflows.react import MessageProcessor, StreamingCallbackHandler
+from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -27,7 +37,7 @@ class PreplanState(TypedDict):
     plan: Optional[str]
 
 
-class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
+class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
     """PrePlan ReAct workflow implementation.
 
     This workflow first creates a plan based on the user's query,
@@ -43,20 +53,16 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
         super().__init__(**kwargs)
         self.callback_handler = callback_handler
         self.tools = tools
+        self.required_fields = ["messages"]
         # Set decisive behavior flag
         self.decisive_behavior = True
 
         # Create a new LLM instance with the callback handler
-        self.llm = ChatOpenAI(
-            model=self.llm.model_name,
-            temperature=self.llm.temperature,
-            streaming=True,
-            callbacks=[callback_handler],
-        ).bind_tools(tools)
+        self.llm = self.create_llm_with_callbacks([callback_handler]).bind_tools(tools)
 
         # Create a separate LLM for planning with streaming enabled
         self.planning_llm = ChatOpenAI(
-            model=self.llm.model_name,
+            model=self.model_name,
             streaming=True,  # Enable streaming for the planning LLM
             temperature=0.2,  # Lower temperature for more structured planning
             callbacks=[callback_handler],
@@ -68,6 +74,10 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
             self.tool_names = [
                 tool.name if hasattr(tool, "name") else str(tool) for tool in tools
             ]
+
+        # Additional attributes for planning
+        self.persona = None
+        self.tool_descriptions = None
 
     def _create_prompt(self) -> None:
         """Not used in PrePlan ReAct workflow."""
@@ -276,57 +286,60 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState]):
 
         return workflow
 
+    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
+        """Integrate planning capability with the graph.
 
-class PreplanLangGraphService:
+        Args:
+            graph: The graph to integrate with
+            **kwargs: Additional arguments
+        """
+        # Implementation would modify the graph to include planning step
+        # before the main execution flow
+        pass
+
+
+class PreplanLangGraphService(BaseWorkflowService):
     """Service for executing PrePlan LangGraph operations"""
 
     def __init__(self):
-        self.message_processor = MessageProcessor()
+        super().__init__()
 
-    async def execute_preplan_react_stream(
+    async def _execute_stream_impl(
         self,
-        history: List[Dict],
+        messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
         input_str: str,
         persona: Optional[str] = None,
         tools_map: Optional[Dict] = None,
+        **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a PrePlan ReAct stream using LangGraph."""
-        logger.info("Starting new PrePlan LangGraph ReAct stream execution")
-        logger.debug(
-            f"Input parameters - History length: {len(history)}, "
-            f"Persona present: {bool(persona)}, "
-            f"Tools count: {len(tools_map) if tools_map else 0}"
-        )
+        """Execute a PrePlan React stream implementation.
 
+        Args:
+            messages: Processed messages
+            input_str: Current user input
+            persona: Optional persona to use
+            tools_map: Optional tools to use
+            **kwargs: Additional arguments
+
+        Returns:
+            Async generator of result chunks
+        """
         try:
+            # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            # Process messages
-            filtered_content = self.message_processor.extract_filtered_content(history)
-            messages = self.message_processor.convert_to_langchain_messages(
-                filtered_content, input_str, persona
+            # Setup callback handler
+            callback_handler = self.setup_callback_handler(callback_queue, loop)
+
+            # Create workflow using builder pattern
+            workflow_builder = (
+                WorkflowBuilder(PreplanReactWorkflow)
+                .with_callback_handler(callback_handler)
+                .with_tools(list(tools_map.values()) if tools_map else [])
             )
 
-            # Configure callback handler
-            callback_handler = StreamingCallbackHandler(
-                queue=callback_queue,
-                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put(
-                        {"type": "token", "content": token, "status": "processing"}
-                    ),
-                    loop,
-                ),
-                on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end", "status": "complete"}), loop
-                ),
-            )
-
-            # Create workflow
-            workflow = PreplanReactWorkflow(
-                callback_handler=callback_handler,
-                tools=list(tools_map.values()) if tools_map else [],
-            )
+            workflow = workflow_builder.build()
 
             # Store persona and tool information for planning
             if persona:
@@ -376,52 +389,43 @@ class PreplanLangGraphService:
             config = {"callbacks": [callback_handler]}
             logger.debug("Configuration set up with callbacks")
 
-            # Execute workflow with callbacks config - use the same approach as react.py
+            # Execute workflow with callbacks config
             logger.info("Creating task to execute workflow")
             task = asyncio.create_task(runnable.ainvoke(initial_state, config=config))
 
-            # Stream results - use the same approach as react.py
-            logger.info("Starting to stream results from callback queue")
-            while not task.done():
-                try:
-                    data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
-                    if data:
-                        logger.debug(f"Yielding data of type: {data.get('type')}")
-                        yield data
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    logger.error("Task cancelled unexpectedly")
-                    task.cancel()
-                    raise ExecutionError("Task cancelled unexpectedly")
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
-                    raise ExecutionError(f"Streaming error: {str(e)}")
-
-            # Get final result
-            result = await task
-            logger.info("Workflow execution completed successfully")
-            logger.debug(
-                f"Final result content length: {len(result['messages'][-1].content) if result.get('messages') and hasattr(result['messages'][-1], 'content') else 0}"
-            )
-
-            # Final yield to indicate completion with type "result" to ensure database storage
-            yield {
-                "type": "result",
-                "content": (
-                    result["messages"][-1].content
-                    if result.get("messages")
-                    and hasattr(result["messages"][-1], "content")
-                    else ""
-                ),
-                "tokens": None,
-            }
+            # Stream results
+            async for chunk in self.stream_task_results(task, callback_queue):
+                yield chunk
 
         except Exception as e:
             logger.error(
                 f"Failed to execute PrePlan ReAct stream: {str(e)}", exc_info=True
             )
             raise ExecutionError(f"PrePlan ReAct stream execution failed: {str(e)}")
+
+    # Keep the old method for backward compatibility
+    async def execute_preplan_react_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a PrePlan ReAct stream using LangGraph."""
+        # Process messages for backward compatibility
+        filtered_content = self.message_processor.extract_filtered_content(history)
+        messages = self.message_processor.convert_to_langchain_messages(
+            filtered_content, input_str, persona
+        )
+
+        # Call the new implementation
+        async for chunk in self._execute_stream_impl(
+            messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
 
 
 # Facade function for compatibility with the API
@@ -433,7 +437,5 @@ async def execute_preplan_react_stream(
 ) -> AsyncGenerator[Dict, None]:
     """Execute a PrePlan ReAct stream using LangGraph with optional persona."""
     service = PreplanLangGraphService()
-    async for chunk in service.execute_preplan_react_stream(
-        history, input_str, persona, tools_map
-    ):
+    async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk

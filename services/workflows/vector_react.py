@@ -1,23 +1,28 @@
 """Vector-enabled ReAct workflow functionality with Supabase Vecs integration."""
 
 import asyncio
-from typing import Any, AsyncGenerator, Dict, List, Optional, TypedDict
+from typing import Any, AsyncGenerator, Dict, List, Optional, TypedDict, Union
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from backend.factory import backend
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError
+from services.workflows.base import (
+    BaseWorkflow,
+    ExecutionError,
+    VectorRetrievalCapability,
+)
 from services.workflows.react import (
     MessageProcessor,
     ReactState,
     StreamingCallbackHandler,
 )
+from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -35,7 +40,7 @@ class VectorReactState(ReactState):
     vector_results: Optional[List[Document]]
 
 
-class VectorReactWorkflow(BaseWorkflow[VectorReactState]):
+class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapability):
     """ReAct workflow with vector store integration."""
 
     def __init__(
@@ -51,17 +56,58 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState]):
         self.tools = tools
         self.collection_name = collection_name
         self.embeddings = embeddings or OpenAIEmbeddings()
+        self.required_fields = ["messages"]
 
         # Create a new LLM instance with the callback handler
-        self.llm = ChatOpenAI(
-            model=self.llm.model_name,
-            temperature=self.llm.temperature,
-            streaming=True,
-            callbacks=[callback_handler],
-        ).bind_tools(tools)
+        self.llm = self.create_llm_with_callbacks([callback_handler]).bind_tools(tools)
 
     def _create_prompt(self) -> None:
         """Not used in VectorReact workflow."""
+        pass
+
+    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve relevant documents from vector store.
+
+        Args:
+            query: The query to search for
+            **kwargs: Additional arguments
+
+        Returns:
+            List of retrieved documents
+        """
+        try:
+            # Query vectors using the backend
+            vector_results = await backend.query_vectors(
+                collection_name=self.collection_name,
+                query_text=query,
+                limit=kwargs.get("limit", 4),
+                embeddings=self.embeddings,
+            )
+
+            # Convert to LangChain Documents
+            documents = [
+                Document(
+                    page_content=doc.get("page_content", ""),
+                    metadata=doc.get("metadata", {}),
+                )
+                for doc in vector_results
+            ]
+
+            logger.info(f"Retrieved {len(documents)} documents from vector store")
+            return documents
+        except Exception as e:
+            logger.error(f"Vector store retrieval failed: {str(e)}")
+            return []
+
+    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
+        """Integrate vector retrieval capability with a graph.
+
+        Args:
+            graph: The graph to integrate with
+            **kwargs: Additional arguments
+        """
+        # Modify the graph to include vector retrieval
+        # This is specific to the VectorReactWorkflow
         pass
 
     def _create_graph(self) -> StateGraph:
@@ -89,29 +135,8 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState]):
                 logger.warning("No user message found for vector retrieval")
                 return {"vector_results": []}
 
-            try:
-                # Query vectors using the backend
-                vector_results = await backend.query_vectors(
-                    collection_name=self.collection_name,
-                    query_text=last_user_message,
-                    limit=4,
-                    embeddings=self.embeddings,
-                )
-
-                # Convert to LangChain Documents
-                documents = [
-                    Document(
-                        page_content=doc.get("page_content", ""),
-                        metadata=doc.get("metadata", {}),
-                    )
-                    for doc in vector_results
-                ]
-
-                logger.info(f"Retrieved {len(documents)} documents from vector store")
-                return {"vector_results": documents}
-            except Exception as e:
-                logger.error(f"Vector store retrieval failed: {str(e)}")
-                return {"vector_results": []}
+            documents = await self.retrieve_from_vector_store(query=last_user_message)
+            return {"vector_results": documents}
 
         def call_model_with_context(state: VectorReactState) -> Dict:
             """Call model with additional context from vector store."""
@@ -152,57 +177,51 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState]):
         return workflow
 
 
-class VectorLangGraphService:
+class VectorLangGraphService(BaseWorkflowService):
     """Service for executing VectorReact LangGraph operations"""
 
     def __init__(self, collection_name: str, embeddings: Optional[Embeddings] = None):
-        self.message_processor = MessageProcessor()
+        super().__init__()
         self.collection_name = collection_name
         self.embeddings = embeddings or OpenAIEmbeddings()
 
-    async def execute_vector_react_stream(
+    async def _execute_stream_impl(
         self,
-        history: List[Dict],
+        messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
         input_str: str,
         persona: Optional[str] = None,
         tools_map: Optional[Dict] = None,
+        **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a VectorReact stream using LangGraph."""
-        logger.info("Starting new LangGraph VectorReact stream execution")
-        logger.debug(
-            f"Input parameters - History length: {len(history)}, "
-            f"Persona present: {bool(persona)}, "
-            f"Tools count: {len(tools_map) if tools_map else 0}"
-        )
+        """Execute a Vector React stream implementation.
 
+        Args:
+            messages: Processed messages
+            input_str: Current user input
+            persona: Optional persona to use
+            tools_map: Optional tools to use
+            **kwargs: Additional arguments
+
+        Returns:
+            Async generator of result chunks
+        """
         try:
+            # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            # Process messages
-            filtered_content = self.message_processor.extract_filtered_content(history)
-            messages = self.message_processor.convert_to_langchain_messages(
-                filtered_content, input_str, persona
-            )
-
             # Setup callback handler
-            callback_handler = StreamingCallbackHandler(
-                queue=callback_queue,
-                on_llm_new_token=lambda token,
-                **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "token", "content": token}), loop
-                ),
-                on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end"}), loop
-                ),
-            )
+            callback_handler = self.setup_callback_handler(callback_queue, loop)
 
-            # Create workflow
-            workflow = VectorReactWorkflow(
-                callback_handler=callback_handler,
-                tools=list(tools_map.values()) if tools_map else [],
-                collection_name=self.collection_name,
-                embeddings=self.embeddings,
+            # Create workflow using builder pattern
+            workflow = (
+                WorkflowBuilder(VectorReactWorkflow)
+                .with_callback_handler(callback_handler)
+                .with_tools(list(tools_map.values()) if tools_map else [])
+                .build(
+                    collection_name=self.collection_name,
+                    embeddings=self.embeddings,
+                )
             )
 
             # Create graph and compile
@@ -218,39 +237,38 @@ class VectorLangGraphService:
             )
 
             # Stream results
-            while not task.done():
-                try:
-                    data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
-                    if data:
-                        yield data
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    logger.error("Task cancelled unexpectedly")
-                    task.cancel()
-                    raise ExecutionError("Task cancelled unexpectedly")
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
-                    raise ExecutionError(f"Streaming error: {str(e)}")
-
-            # Get final result
-            result = await task
-            logger.info("Workflow execution completed successfully")
-            logger.debug(
-                f"Final result content length: {len(result['messages'][-1].content)}"
-            )
-
-            yield {
-                "type": "result",
-                "content": result["messages"][-1].content,
-                "tokens": None,
-            }
+            async for chunk in self.stream_task_results(task, callback_queue):
+                yield chunk
 
         except Exception as e:
             logger.error(
                 f"Failed to execute VectorReact stream: {str(e)}", exc_info=True
             )
             raise ExecutionError(f"VectorReact stream execution failed: {str(e)}")
+
+    # Keep the old method for backward compatibility
+    async def execute_vector_react_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a VectorReact stream using LangGraph."""
+        # Process messages for backward compatibility
+        filtered_content = self.message_processor.extract_filtered_content(history)
+        messages = self.message_processor.convert_to_langchain_messages(
+            filtered_content, input_str, persona
+        )
+
+        # Call the new implementation
+        async for chunk in self._execute_stream_impl(
+            messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
 
 
 # Helper function for adding documents to vector store
@@ -310,7 +328,7 @@ async def add_documents_to_vectors(
     return ids
 
 
-# Facade function for use
+# Facade function for backward compatibility
 async def execute_vector_langgraph_stream(
     collection_name: str,
     history: List[Dict],
@@ -327,7 +345,5 @@ async def execute_vector_langgraph_stream(
         embeddings=embeddings,
     )
 
-    async for chunk in service.execute_vector_react_stream(
-        history, input_str, persona, tools_map
-    ):
+    async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk

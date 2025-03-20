@@ -24,6 +24,7 @@ from langgraph.prebuilt import ToolNode
 
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
+from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -321,12 +322,8 @@ class ReactWorkflow(BaseWorkflow[ReactState]):
         self.callback_handler = callback_handler
         self.tools = tools
         # Create a new LLM instance with the callback handler
-        self.llm = ChatOpenAI(
-            model=self.llm.model_name,
-            temperature=self.llm.temperature,
-            streaming=True,
-            callbacks=[callback_handler],
-        ).bind_tools(tools)
+        self.llm = self.create_llm_with_callbacks([callback_handler]).bind_tools(tools)
+        self.required_fields = ["messages"]
 
     def _create_prompt(self) -> None:
         """Not used in ReAct workflow."""
@@ -360,55 +357,43 @@ class ReactWorkflow(BaseWorkflow[ReactState]):
         return workflow
 
 
-class LangGraphService:
+class LangGraphService(BaseWorkflowService):
     """Service for executing LangGraph operations"""
 
-    def __init__(self):
-        self.message_processor = MessageProcessor()
-
-    async def execute_react_stream(
+    async def _execute_stream_impl(
         self,
-        history: List[Dict],
+        messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
         input_str: str,
         persona: Optional[str] = None,
         tools_map: Optional[Dict] = None,
+        **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a ReAct stream using LangGraph."""
-        logger.info("Starting new LangGraph ReAct stream execution")
-        logger.debug(
-            f"Input parameters - History length: {len(history)}, "
-            f"Persona present: {bool(persona)}, "
-            f"Tools count: {len(tools_map) if tools_map else 0}"
-        )
+        """Execute a ReAct stream using LangGraph.
 
+        Args:
+            messages: Processed messages ready for the LLM
+            input_str: Current user input
+            persona: Optional persona to use
+            tools_map: Optional tools to use
+            **kwargs: Additional arguments
+
+        Returns:
+            Async generator of result chunks
+        """
         try:
+            # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            # Process messages
-            filtered_content = self.message_processor.extract_filtered_content(history)
-            messages = self.message_processor.convert_to_langchain_messages(
-                filtered_content, input_str, persona
-            )
-
             # Setup callback handler
-            callback_handler = StreamingCallbackHandler(
-                queue=callback_queue,
-                on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put(
-                        {"type": "token", "content": token, "status": "processing"}
-                    ),
-                    loop,
-                ),
-                on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end", "status": "complete"}), loop
-                ),
-            )
+            callback_handler = self.setup_callback_handler(callback_queue, loop)
 
-            # Create workflow
-            workflow = ReactWorkflow(
-                callback_handler=callback_handler,
-                tools=list(tools_map.values()) if tools_map else [],
+            # Create workflow using builder pattern
+            workflow = (
+                WorkflowBuilder(ReactWorkflow)
+                .with_callback_handler(callback_handler)
+                .with_tools(list(tools_map.values()) if tools_map else [])
+                .build()
             )
 
             # Create graph and compile
@@ -422,37 +407,36 @@ class LangGraphService:
             )
 
             # Stream results
-            while not task.done():
-                try:
-                    data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
-                    if data:
-                        yield data
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    logger.error("Task cancelled unexpectedly")
-                    task.cancel()
-                    raise ExecutionError("Task cancelled unexpectedly")
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
-                    raise ExecutionError(f"Streaming error: {str(e)}")
-
-            # Get final result
-            result = await task
-            logger.info("Workflow execution completed successfully")
-            logger.debug(
-                f"Final result content length: {len(result['messages'][-1].content)}"
-            )
-
-            yield {
-                "type": "result",
-                "content": result["messages"][-1].content,
-                "tokens": None,
-            }
+            async for chunk in self.stream_task_results(task, callback_queue):
+                yield chunk
 
         except Exception as e:
             logger.error(f"Failed to execute ReAct stream: {str(e)}", exc_info=True)
             raise ExecutionError(f"ReAct stream execution failed: {str(e)}")
+
+    # Keep the old method for backward compatibility
+    async def execute_react_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a ReAct stream using LangGraph."""
+        # Process messages for backward compatibility
+        filtered_content = self.message_processor.extract_filtered_content(history)
+        messages = self.message_processor.convert_to_langchain_messages(
+            filtered_content, input_str, persona
+        )
+
+        # Call the new implementation
+        async for chunk in self._execute_stream_impl(
+            messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
 
 
 # Facade function for backward compatibility
@@ -464,7 +448,5 @@ async def execute_langgraph_stream(
 ) -> AsyncGenerator[Dict, None]:
     """Execute a ReAct stream using LangGraph with optional persona."""
     service = LangGraphService()
-    async for chunk in service.execute_react_stream(
-        history, input_str, persona, tools_map
-    ):
+    async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk
