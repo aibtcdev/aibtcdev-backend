@@ -47,6 +47,12 @@ from services.workflows.tweet_generator import (
     TweetGeneratorWorkflow,
     generate_dao_tweet,
 )
+from services.workflows.vector_preplan_react import (
+    VectorPreplanLangGraphService,
+    VectorPreplanReactWorkflow,
+    VectorPreplanState,
+    execute_vector_preplan_stream,
+)
 from services.workflows.vector_react import (
     VectorLangGraphService,
     VectorReactState,
@@ -101,6 +107,11 @@ __all__ = [
     "VectorReactWorkflow",
     "add_documents_to_vectors",
     "execute_vector_langgraph_stream",
+    # Vector PrePlan ReAct workflow
+    "VectorPreplanLangGraphService",
+    "VectorPreplanReactWorkflow",
+    "VectorPreplanState",
+    "execute_vector_preplan_stream",
     # Special purpose workflows
     "ProposalEvaluationWorkflow",
     "TweetAnalysisWorkflow",

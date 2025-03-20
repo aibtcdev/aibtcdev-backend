@@ -24,7 +24,9 @@ from langgraph.prebuilt import ToolNode
 
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
-from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
+
+# Remove this import to avoid circular dependencies
+# from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -357,7 +359,7 @@ class ReactWorkflow(BaseWorkflow[ReactState]):
         return workflow
 
 
-class LangGraphService(BaseWorkflowService):
+class LangGraphService:
     """Service for executing LangGraph operations"""
 
     async def _execute_stream_impl(
@@ -381,6 +383,12 @@ class LangGraphService(BaseWorkflowService):
             Async generator of result chunks
         """
         try:
+            # Import here to avoid circular dependencies
+            from services.workflows.workflow_service import (
+                BaseWorkflowService,
+                WorkflowBuilder,
+            )
+
             # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
@@ -413,6 +421,23 @@ class LangGraphService(BaseWorkflowService):
         except Exception as e:
             logger.error(f"Failed to execute ReAct stream: {str(e)}", exc_info=True)
             raise ExecutionError(f"ReAct stream execution failed: {str(e)}")
+
+    def setup_callback_handler(self, queue, loop):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        return BaseWorkflowService.create_callback_handler(queue, loop)
+
+    async def stream_task_results(self, task, queue):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        async for chunk in BaseWorkflowService.stream_results_from_task(
+            task=task, callback_queue=queue, logger_name=self.__class__.__name__
+        ):
+            yield chunk
 
     # Keep the old method for backward compatibility
     async def execute_react_stream(

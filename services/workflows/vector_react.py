@@ -22,7 +22,9 @@ from services.workflows.react import (
     ReactState,
     StreamingCallbackHandler,
 )
-from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
+
+# Remove this import to avoid circular dependencies
+# from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -177,13 +179,33 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapabil
         return workflow
 
 
-class VectorLangGraphService(BaseWorkflowService):
+class VectorLangGraphService:
     """Service for executing VectorReact LangGraph operations"""
 
     def __init__(self, collection_name: str, embeddings: Optional[Embeddings] = None):
-        super().__init__()
+        # Import here to avoid circular imports
+        from services.workflows.react import MessageProcessor
+
         self.collection_name = collection_name
         self.embeddings = embeddings or OpenAIEmbeddings()
+        self.message_processor = MessageProcessor()
+
+    def setup_callback_handler(self, queue, loop):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        return BaseWorkflowService.create_callback_handler(queue, loop)
+
+    async def stream_task_results(self, task, queue):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        async for chunk in BaseWorkflowService.stream_results_from_task(
+            task=task, callback_queue=queue, logger_name=self.__class__.__name__
+        ):
+            yield chunk
 
     async def _execute_stream_impl(
         self,
@@ -206,6 +228,9 @@ class VectorLangGraphService(BaseWorkflowService):
             Async generator of result chunks
         """
         try:
+            # Import here to avoid circular dependencies
+            from services.workflows.workflow_service import WorkflowBuilder
+
             # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
@@ -246,6 +271,35 @@ class VectorLangGraphService(BaseWorkflowService):
             )
             raise ExecutionError(f"VectorReact stream execution failed: {str(e)}")
 
+    # Add execute_stream method to maintain the same interface as BaseWorkflowService
+    async def execute_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+        **kwargs,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a workflow stream.
+
+        This processes the history and delegates to _execute_stream_impl.
+        """
+        # Process messages
+        filtered_content = self.message_processor.extract_filtered_content(history)
+        messages = self.message_processor.convert_to_langchain_messages(
+            filtered_content, input_str, persona
+        )
+
+        # Call the implementation
+        async for chunk in self._execute_stream_impl(
+            messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+            **kwargs,
+        ):
+            yield chunk
+
     # Keep the old method for backward compatibility
     async def execute_vector_react_stream(
         self,
@@ -255,19 +309,8 @@ class VectorLangGraphService(BaseWorkflowService):
         tools_map: Optional[Dict] = None,
     ) -> AsyncGenerator[Dict, None]:
         """Execute a VectorReact stream using LangGraph."""
-        # Process messages for backward compatibility
-        filtered_content = self.message_processor.extract_filtered_content(history)
-        messages = self.message_processor.convert_to_langchain_messages(
-            filtered_content, input_str, persona
-        )
-
-        # Call the new implementation
-        async for chunk in self._execute_stream_impl(
-            messages=messages,
-            input_str=input_str,
-            persona=persona,
-            tools_map=tools_map,
-        ):
+        # Call the new method
+        async for chunk in self.execute_stream(history, input_str, persona, tools_map):
             yield chunk
 
 

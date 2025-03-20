@@ -87,6 +87,17 @@ ReAct workflow with vector store integration for context retrieval.
 
 ReAct workflow with planning before execution.
 
+### VectorPreplanReactWorkflow
+
+ReAct workflow that combines vector retrieval and planning:
+1. Retrieves relevant context from vector storage based on the user query
+2. Creates a plan using both the query and retrieved context
+3. Executes the workflow with both context and plan
+
+This workflow is ideal for complex tasks that benefit from both:
+- External knowledge from vector storage
+- Strategic planning before execution
+
 ## 4. Special Purpose Workflows
 
 Domain-specific implementations:
@@ -135,6 +146,21 @@ async for chunk in execute_workflow_stream(
     workflow_type="preplan",
     history=conversation_history,
     input_str="Create a proposal for the treasury",
+    tools_map=proposal_tools
+):
+    yield chunk
+```
+
+### Vector PrePlan Workflow
+
+```python
+from services.workflows import execute_workflow_stream
+
+async for chunk in execute_workflow_stream(
+    workflow_type="vector_preplan",
+    history=conversation_history,
+    input_str="Create a proposal for the treasury using past proposals as references",
+    vector_collection="dao_docs",
     tools_map=proposal_tools
 ):
     yield chunk

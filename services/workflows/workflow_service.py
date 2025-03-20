@@ -16,7 +16,6 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from lib.logger import configure_logger
 from services.workflows.base import ExecutionError, StreamingError
-from services.workflows.preplan_react import PreplanLangGraphService
 from services.workflows.react import (
     LangGraphService,
     MessageProcessor,
@@ -149,18 +148,34 @@ class BaseWorkflowService(WorkflowService):
         if not loop:
             loop = asyncio.get_running_loop()
 
-        return StreamingCallbackHandler(
-            queue=callback_queue,
-            on_llm_new_token=lambda token, **kwargs: asyncio.run_coroutine_threadsafe(
-                callback_queue.put(
-                    {"type": "token", "content": token, "status": "processing"}
-                ),
-                loop,
-            ),
-            on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                callback_queue.put({"type": "end", "status": "complete"}), loop
-            ),
+        def on_llm_new_token(token: str, **kwargs) -> None:
+            """Handle new token generation."""
+            # Skip tokens marked as planning_only as they'll be sent as steps
+            if kwargs.get("planning_only", False):
+                return
+
+            # Create token message
+            token_message = {
+                "type": "token",
+                "content": token,
+                "status": "processing",
+                "created_at": datetime.datetime.now().isoformat(),
+            }
+
+            # Use run_coroutine_threadsafe because this callback might
+            # be called from a different thread
+            asyncio.run_coroutine_threadsafe(callback_queue.put(token_message), loop)
+
+        # Create and return the callback handler
+        handler = StreamingCallbackHandler(
+            queue=callback_queue, on_llm_new_token=on_llm_new_token
         )
+
+        # Store the original function as an attribute so it can be accessed and modified
+        # by the planning workflows
+        handler.custom_on_llm_new_token = on_llm_new_token
+
+        return handler
 
     async def stream_task_results(
         self,
@@ -168,62 +183,202 @@ class BaseWorkflowService(WorkflowService):
         callback_queue: asyncio.Queue,
         final_result_processor: Optional[callable] = None,
     ) -> AsyncGenerator[Dict, None]:
-        """Stream results from a task through a callback queue.
+        """Stream results from a task to a queue.
 
         Args:
-            task: Task to execute and stream results from
-            callback_queue: Queue containing streamed results
-            final_result_processor: Optional function to process the final result
+            task: Task to stream results from
+            callback_queue: Queue to receive streamed results
+            final_result_processor: Optional function to process the final task result
 
         Returns:
-            Async generator of result chunks
+            Async generator of streamed results
         """
-        # Stream results while the task is running
-        while not task.done():
-            try:
-                data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
-                if data:
-                    yield data
-            except asyncio.TimeoutError:
-                continue
-            except asyncio.CancelledError:
-                self.logger.error("Task cancelled unexpectedly")
-                task.cancel()
-                raise ExecutionError("Task cancelled unexpectedly")
-            except Exception as e:
-                self.logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
-                raise ExecutionError(f"Streaming error: {str(e)}")
-
-        # Get final result
+        self.logger.debug("Starting to stream task results")
         try:
-            result = await task
-            self.logger.info("Workflow execution completed successfully")
+            # Setup initial state tracking
+            task_complete = False
+            queue_size_reported = False
 
-            # Process final result if provided
-            if final_result_processor:
-                final_content = final_result_processor(result)
-            else:
-                # Default processing: extract content from messages[-1]
-                final_content = (
-                    result["messages"][-1].content
-                    if "messages" in result and result["messages"]
-                    else ""
-                )
+            # Stream intermediate results
+            while not task_complete:
+                try:
+                    # Try to get a chunk from the queue, with timeout
+                    # This allows for checking the task status periodically
+                    chunk = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
 
-            self.logger.debug(f"Final result content length: {len(final_content)}")
+                    # A None chunk signals the end of streaming
+                    if chunk is None:
+                        self.logger.debug("Received None chunk, ending stream")
+                        task_complete = True
+                        break
 
-            # Yield final result
+                    # Yield the chunk to the consumer
+                    self.logger.debug(f"Yielding chunk of type: {chunk.get('type')}")
+                    yield chunk
+
+                except asyncio.TimeoutError:
+                    # Check if the task is done
+                    if task.done():
+                        task_complete = True
+
+                        # If we have a final result processor, call it
+                        if final_result_processor and not task.exception():
+                            try:
+                                final_result = task.result()
+                                await final_result_processor(final_result)
+                            except Exception as e:
+                                self.logger.error(f"Error processing final result: {e}")
+
+                        # Report any queue items left
+                        if not queue_size_reported and not callback_queue.empty():
+                            size = callback_queue.qsize()
+                            self.logger.debug(
+                                f"Task complete but {size} items left in queue"
+                            )
+                            queue_size_reported = True
+                    # If the timeout just expired, continue and try again
+                    continue
+
+            # Send an end signal
+            yield {"type": "end"}
+
+        except Exception as e:
+            self.logger.error(f"Error streaming task results: {e}")
+            # Yield the error and re-raise
             yield {
-                "type": "result",
-                "content": final_content,
-                "tokens": None,
-                "status": "complete",
+                "type": "error",
+                "content": f"Streaming error: {str(e)}",
+                "status": "error",
+                "created_at": datetime.datetime.now().isoformat(),
+            }
+            raise StreamingError(f"Failed to stream results: {str(e)}")
+
+    # Static utility methods for non-BaseWorkflowService classes
+
+    @staticmethod
+    def create_callback_handler(
+        callback_queue: asyncio.Queue,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+    ) -> StreamingCallbackHandler:
+        """Static utility method to create a callback handler without instantiating BaseWorkflowService.
+
+        Args:
+            callback_queue: Queue to stream results
+            loop: Optional event loop to use
+
+        Returns:
+            Configured StreamingCallbackHandler
+        """
+        if not loop:
+            loop = asyncio.get_running_loop()
+
+        def on_llm_new_token(token: str, **kwargs) -> None:
+            """Handle new token generation."""
+            # Skip tokens marked as planning_only as they'll be sent as steps
+            if kwargs.get("planning_only", False):
+                return
+
+            # Create token message
+            token_message = {
+                "type": "token",
+                "content": token,
+                "status": "processing",
                 "created_at": datetime.datetime.now().isoformat(),
             }
 
+            # Use run_coroutine_threadsafe because this callback might
+            # be called from a different thread
+            asyncio.run_coroutine_threadsafe(callback_queue.put(token_message), loop)
+
+        # Create and return the callback handler
+        handler = StreamingCallbackHandler(
+            queue=callback_queue, on_llm_new_token=on_llm_new_token
+        )
+
+        # Store the original function as an attribute so it can be accessed and modified
+        # by the planning workflows
+        handler.custom_on_llm_new_token = on_llm_new_token
+
+        return handler
+
+    @staticmethod
+    async def stream_results_from_task(
+        task: asyncio.Task,
+        callback_queue: asyncio.Queue,
+        final_result_processor: Optional[callable] = None,
+        logger_name: str = "WorkflowService",
+    ) -> AsyncGenerator[Dict, None]:
+        """Static utility method to stream results from a task without instantiating BaseWorkflowService.
+
+        Args:
+            task: Task to stream results from
+            callback_queue: Queue to receive streamed results
+            final_result_processor: Optional function to process the final task result
+            logger_name: Name to use for the logger
+
+        Returns:
+            Async generator of streamed results
+        """
+        logger = configure_logger(logger_name)
+        logger.debug("Starting to stream task results")
+        try:
+            # Setup initial state tracking
+            task_complete = False
+            queue_size_reported = False
+
+            # Stream intermediate results
+            while not task_complete:
+                try:
+                    # Try to get a chunk from the queue, with timeout
+                    # This allows for checking the task status periodically
+                    chunk = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
+
+                    # A None chunk signals the end of streaming
+                    if chunk is None:
+                        logger.debug("Received None chunk, ending stream")
+                        task_complete = True
+                        break
+
+                    # Yield the chunk to the consumer
+                    logger.debug(f"Yielding chunk of type: {chunk.get('type')}")
+                    yield chunk
+
+                except asyncio.TimeoutError:
+                    # Check if the task is done
+                    if task.done():
+                        task_complete = True
+
+                        # If we have a final result processor, call it
+                        if final_result_processor and not task.exception():
+                            try:
+                                final_result = task.result()
+                                await final_result_processor(final_result)
+                            except Exception as e:
+                                logger.error(f"Error processing final result: {e}")
+
+                        # Report any queue items left
+                        if not queue_size_reported and not callback_queue.empty():
+                            size = callback_queue.qsize()
+                            logger.debug(
+                                f"Task complete but {size} items left in queue"
+                            )
+                            queue_size_reported = True
+                    # If the timeout just expired, continue and try again
+                    continue
+
+            # Send an end signal
+            yield {"type": "end"}
+
         except Exception as e:
-            self.logger.error(f"Error processing final result: {str(e)}", exc_info=True)
-            raise ExecutionError(f"Final result processing failed: {str(e)}")
+            logger.error(f"Error streaming task results: {e}")
+            # Yield the error and re-raise
+            yield {
+                "type": "error",
+                "content": f"Streaming error: {str(e)}",
+                "status": "error",
+                "created_at": datetime.datetime.now().isoformat(),
+            }
+            raise StreamingError(f"Failed to stream results: {str(e)}")
 
 
 class WorkflowBuilder:
@@ -296,8 +451,11 @@ class WorkflowBuilder:
         self.temperature = temperature
         return self
 
-    def build(self) -> Any:
+    def build(self, **extra_kwargs) -> Any:
         """Build the workflow instance.
+
+        Args:
+            **extra_kwargs: Additional arguments to pass to the workflow constructor
 
         Returns:
             The configured workflow instance
@@ -307,6 +465,7 @@ class WorkflowBuilder:
             "model_name": self.model_name,
             "temperature": self.temperature,
             **self.kwargs,
+            **extra_kwargs,  # Add any extra kwargs passed during build
         }
 
         # Add callback handler and tools if provided
@@ -332,7 +491,7 @@ class WorkflowFactory:
         """Create a workflow service instance based on the workflow type.
 
         Args:
-            workflow_type: Type of workflow to create ("react", "preplan", "vector")
+            workflow_type: Type of workflow to create ("react", "preplan", "vector", "vector_preplan")
             vector_collection: Vector collection name for vector workflows
             embeddings: Embeddings model for vector workflows
             **kwargs: Additional parameters to pass to the service
@@ -340,11 +499,18 @@ class WorkflowFactory:
         Returns:
             An instance of a WorkflowService implementation
         """
+        # Import service classes here to avoid circular imports
+        from services.workflows.preplan_react import PreplanLangGraphService
+        from services.workflows.vector_preplan_react import (
+            VectorPreplanLangGraphService,
+        )
+
         # Map workflow types to their service classes
         service_map = {
             "react": LangGraphService,
             "preplan": PreplanLangGraphService,
             "vector": VectorLangGraphService,
+            "vector_preplan": VectorPreplanLangGraphService,
         }
 
         if workflow_type not in service_map:
@@ -352,10 +518,12 @@ class WorkflowFactory:
 
         service_class = service_map[workflow_type]
 
-        # Handle vector workflow special case
-        if workflow_type == "vector":
+        # Handle vector-based workflow special cases
+        if workflow_type in ["vector", "vector_preplan"]:
             if not vector_collection:
-                raise ValueError("Vector collection name required for vector workflow")
+                raise ValueError(
+                    f"Vector collection name required for {workflow_type} workflow"
+                )
 
             if not embeddings:
                 embeddings = OpenAIEmbeddings()
