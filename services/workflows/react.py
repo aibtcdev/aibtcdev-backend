@@ -362,6 +362,10 @@ class ReactWorkflow(BaseWorkflow[ReactState]):
 class LangGraphService:
     """Service for executing LangGraph operations"""
 
+    def __init__(self):
+        """Initialize the service."""
+        self.message_processor = MessageProcessor()
+
     async def _execute_stream_impl(
         self,
         messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
