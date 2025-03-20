@@ -9,7 +9,7 @@ from backend.factory import backend
 from backend.models import JobBase, JobFilter, Profile, StepCreate, StepFilter
 from lib.logger import configure_logger
 from lib.persona import generate_persona, generate_static_persona
-from services.workflows import execute_preplan_react_stream
+from services.workflows import execute_workflow_stream
 from tools.tools_factory import initialize_tools
 
 logger = configure_logger(__name__)
@@ -485,13 +485,42 @@ class ChatProcessor:
             tools_map = initialize_tools(self.profile, agent_id=self.agent_id)
             first_end = True
 
+            # Determine if vector collection is configured for this agent
+            vector_collection = None
+            if self.agent_id:
+                agent_config = (
+                    agent.config if agent and hasattr(agent, "config") else {}
+                )
+                vector_collection = (
+                    agent_config.get("vector_collection") if agent_config else None
+                )
+
+            # Default to "example_collection" if no collection is specified
+            if not vector_collection:
+                vector_collection = "example_collection"
+                logger.info(
+                    f"No vector collection configured, defaulting to: {vector_collection}"
+                )
+
+            # Always use vector_preplan workflow since we always have a vector collection now
+            workflow_type = "vector_preplan"
             logger.info(
-                f"Starting preplan_react_stream with input: {self.input_str[:50]}..."
+                f"Using {workflow_type} workflow with collection: {vector_collection}"
+            )
+
+            logger.info(
+                f"Starting {workflow_type} workflow with input: {self.input_str[:50]}..."
             )
             result_count = 0
 
-            async for result in execute_preplan_react_stream(
-                self.history, self.input_str, persona, tools_map
+            # Use the unified workflow interface
+            async for result in execute_workflow_stream(
+                workflow_type=workflow_type,
+                history=self.history,
+                input_str=self.input_str,
+                persona=persona,
+                tools_map=tools_map,
+                vector_collection=vector_collection,
             ):
                 result_count += 1
                 logger.debug(
@@ -501,7 +530,9 @@ class ChatProcessor:
                 if result.get("type") == "end" and first_end:
                     first_end = False
 
-            logger.info(f"Processed {result_count} results from preplan_react_stream")
+            logger.info(
+                f"Processed {result_count} results from {workflow_type} workflow"
+            )
 
             # If we have any tokens remaining in the buffer AND we haven't received a final result
             # message, save the buffer contents as the final response
