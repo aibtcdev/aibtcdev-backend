@@ -210,34 +210,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 )
                 vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
-                # Get DAO info
-                dao_info = state.get("dao_info", {})
-                dao_id = dao_info.get("id")
-
-                # Get token info for the DAO
-                dao_token_contract_address = None
-                if dao_id:
-                    # Query for tokens associated with this DAO ID
-                    tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao_id))
-                    if tokens and len(tokens) > 0:
-                        # Use the first token's contract principal as the token contract address
-                        dao_token_contract_address = tokens[0].contract_principal
-                        self.logger.debug(
-                            f"Found token contract address: {dao_token_contract_address}"
-                        )
-
-                if not dao_token_contract_address:
-                    raise ValueError(
-                        "Could not find DAO token contract address for voting"
-                    )
-
                 # Execute the vote
                 self.logger.debug("Executing vote...")
                 vote_result = await vote_tool._arun(
                     action_proposals_voting_extension=state[
                         "action_proposals_contract"
                     ],
-                    dao_token_contract_address=dao_token_contract_address,
                     proposal_id=state["proposal_id"],
                     vote=state["approve"],
                 )
