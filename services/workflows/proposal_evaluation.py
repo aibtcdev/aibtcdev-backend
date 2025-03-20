@@ -1,15 +1,18 @@
 """Proposal evaluation workflow."""
 
-from typing import Dict, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict, Union
 
 from langchain.prompts import PromptTemplate
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, Graph, StateGraph
+from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
 from backend.models import UUID, Profile, TokenFilter
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
+from services.workflows.react import LangGraphService
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -200,30 +203,67 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
                 return "skip_vote"
 
-        # Create voting node
+        # Create voting node using ReAct pattern
         async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
-            """Vote on the proposal based on the evaluation."""
+            """Vote on the proposal using ReAct workflow."""
             try:
-                # Initialize the VoteOnActionProposalTool
                 self.logger.debug(
-                    f"Preparing to vote on proposal {state['proposal_id']}, vote={state['approve']}"
+                    f"Setting up ReAct workflow to vote on proposal {state['proposal_id']}, vote={state['approve']}"
                 )
-                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
-                # Execute the vote
-                self.logger.debug("Executing vote...")
-                vote_result = await vote_tool._arun(
-                    action_proposals_voting_extension=state[
-                        "action_proposals_contract"
-                    ],
-                    proposal_id=state["proposal_id"],
-                    vote=state["approve"],
-                )
-                self.logger.debug(f"Vote result: {vote_result}")
+                # Set up the voting tool
+                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
+                tools_map = {"dao_action_vote_on_proposal": vote_tool}
+
+                # Create a user input message that instructs the LLM what to do
+                vote_instruction = f"""
+                I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}.
+                
+                Please vote {"FOR" if state['approve'] else "AGAINST"} the proposal.
+                
+                Use the dao_action_vote_on_proposal tool to submit the vote.
+                """
+
+                # Create LangGraph service
+                service = LangGraphService()
+
+                # History with system message only
+                history = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant tasked with voting on DAO proposals. Follow the instructions precisely.",
+                    }
+                ]
+
+                self.logger.debug("Executing ReAct workflow for voting...")
+
+                # Collect response chunks
+                response_chunks = []
+                vote_result = None
+
+                # Execute the ReAct workflow
+                async for chunk in service.execute_react_stream(
+                    history=history,
+                    input_str=vote_instruction,
+                    tools_map=tools_map,
+                ):
+                    response_chunks.append(chunk)
+                    self.logger.debug(f"ReAct chunk: {chunk}")
+
+                    # Extract tool results
+                    if (
+                        chunk.get("type") == "tool"
+                        and chunk.get("tool") == "dao_action_vote_on_proposal"
+                    ):
+                        if "output" in chunk:
+                            vote_result = chunk.get("output")
+                            self.logger.info(f"Vote result: {vote_result}")
 
                 # Update state with vote result
-                state["vote_result"] = vote_result
-                self.logger.info(f"Vote complete: {vote_result.get('success', False)}")
+                state["vote_result"] = {
+                    "success": vote_result is not None,
+                    "output": vote_result,
+                }
 
                 return state
             except Exception as e:
@@ -439,7 +479,7 @@ async def evaluate_and_vote_on_proposal(
         if result.get("vote_result") and result["vote_result"].get("output"):
             # Try to extract tx_id from the output
             output = result["vote_result"]["output"]
-            if "txid:" in output.lower():
+            if isinstance(output, str) and "txid:" in output.lower():
                 # Extract the transaction ID from the output
                 for line in output.split("\n"):
                     if "txid:" in line.lower():
