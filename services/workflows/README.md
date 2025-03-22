@@ -131,7 +131,7 @@ async for chunk in execute_workflow_stream(
     workflow_type="vector",
     history=conversation_history,
     input_str="Tell me about DAO governance",
-    vector_collection="dao_docs",
+    vector_collections="dao_docs",
     tools_map=dao_tools
 ):
     yield chunk
@@ -160,7 +160,7 @@ async for chunk in execute_workflow_stream(
     workflow_type="vector_preplan",
     history=conversation_history,
     input_str="Create a proposal for the treasury using past proposals as references",
-    vector_collection="dao_docs",
+    vector_collections=["dao_docs", "knowledge_collection"],
     tools_map=proposal_tools
 ):
     yield chunk

@@ -146,7 +146,15 @@ class BaseWorkflowService(WorkflowService):
             Configured StreamingCallbackHandler
         """
         if not loop:
-            loop = asyncio.get_running_loop()
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+        async def _put_token_in_queue(token_message: Dict) -> None:
+            """Async helper to put token in queue."""
+            await callback_queue.put(token_message)
 
         def on_llm_new_token(token: str, **kwargs) -> None:
             """Handle new token generation."""
@@ -162,9 +170,16 @@ class BaseWorkflowService(WorkflowService):
                 "created_at": datetime.datetime.now().isoformat(),
             }
 
-            # Use run_coroutine_threadsafe because this callback might
-            # be called from a different thread
-            asyncio.run_coroutine_threadsafe(callback_queue.put(token_message), loop)
+            try:
+                # Use the event loop directly instead of run_coroutine_threadsafe
+                if loop.is_running():
+                    loop.call_soon_threadsafe(
+                        lambda: loop.create_task(_put_token_in_queue(token_message))
+                    )
+                else:
+                    loop.run_until_complete(_put_token_in_queue(token_message))
+            except Exception as e:
+                logger.error(f"Error putting token in queue: {e}")
 
         # Create and return the callback handler
         handler = StreamingCallbackHandler(
@@ -270,7 +285,15 @@ class BaseWorkflowService(WorkflowService):
             Configured StreamingCallbackHandler
         """
         if not loop:
-            loop = asyncio.get_running_loop()
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+        async def _put_token_in_queue(token_message: Dict) -> None:
+            """Async helper to put token in queue."""
+            await callback_queue.put(token_message)
 
         def on_llm_new_token(token: str, **kwargs) -> None:
             """Handle new token generation."""
@@ -286,9 +309,16 @@ class BaseWorkflowService(WorkflowService):
                 "created_at": datetime.datetime.now().isoformat(),
             }
 
-            # Use run_coroutine_threadsafe because this callback might
-            # be called from a different thread
-            asyncio.run_coroutine_threadsafe(callback_queue.put(token_message), loop)
+            try:
+                # Use the event loop directly instead of run_coroutine_threadsafe
+                if loop.is_running():
+                    loop.call_soon_threadsafe(
+                        lambda: loop.create_task(_put_token_in_queue(token_message))
+                    )
+                else:
+                    loop.run_until_complete(_put_token_in_queue(token_message))
+            except Exception as e:
+                logger.error(f"Error putting token in queue: {e}")
 
         # Create and return the callback handler
         handler = StreamingCallbackHandler(
@@ -484,7 +514,7 @@ class WorkflowFactory:
     def create_workflow_service(
         cls,
         workflow_type: str = "react",
-        vector_collection: Optional[str] = None,
+        vector_collections: Optional[Union[str, List[str]]] = None,
         embeddings: Optional[Embeddings] = None,
         **kwargs,
     ) -> WorkflowService:
@@ -492,7 +522,7 @@ class WorkflowFactory:
 
         Args:
             workflow_type: Type of workflow to create ("react", "preplan", "vector", "vector_preplan")
-            vector_collection: Vector collection name for vector workflows
+            vector_collections: Vector collection name(s) for vector workflows
             embeddings: Embeddings model for vector workflows
             **kwargs: Additional parameters to pass to the service
 
@@ -520,16 +550,16 @@ class WorkflowFactory:
 
         # Handle vector-based workflow special cases
         if workflow_type in ["vector", "vector_preplan"]:
-            if not vector_collection:
+            if not vector_collections:
                 raise ValueError(
-                    f"Vector collection name required for {workflow_type} workflow"
+                    f"Vector collection name(s) required for {workflow_type} workflow"
                 )
 
             if not embeddings:
                 embeddings = OpenAIEmbeddings()
 
             return service_class(
-                collection_name=vector_collection,
+                collection_names=vector_collections,
                 embeddings=embeddings,
                 **kwargs,
             )
@@ -544,7 +574,7 @@ async def execute_workflow_stream(
     input_str: str,
     persona: Optional[str] = None,
     tools_map: Optional[Dict] = None,
-    vector_collection: Optional[str] = None,
+    vector_collections: Optional[Union[str, List[str]]] = None,
     embeddings: Optional[Embeddings] = None,
     **kwargs,
 ) -> AsyncGenerator[Dict, None]:
@@ -556,7 +586,7 @@ async def execute_workflow_stream(
         input_str: Current user input
         persona: Optional persona to use
         tools_map: Optional tools to make available
-        vector_collection: Vector collection name for vector workflows
+        vector_collections: Vector collection name(s) for vector workflows
         embeddings: Embeddings model for vector workflows
         **kwargs: Additional parameters for specific workflow types
 
@@ -565,7 +595,7 @@ async def execute_workflow_stream(
     """
     service = WorkflowFactory.create_workflow_service(
         workflow_type=workflow_type,
-        vector_collection=vector_collection,
+        vector_collections=vector_collections,
         embeddings=embeddings,
         **kwargs,
     )

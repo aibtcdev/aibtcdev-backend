@@ -485,27 +485,27 @@ class ChatProcessor:
             tools_map = initialize_tools(self.profile, agent_id=self.agent_id)
             first_end = True
 
-            # Determine if vector collection is configured for this agent
-            vector_collection = None
+            # Determine if vector collections are configured for this agent
+            vector_collections = None
             if self.agent_id:
                 agent_config = (
                     agent.config if agent and hasattr(agent, "config") else {}
                 )
-                vector_collection = (
-                    agent_config.get("vector_collection") if agent_config else None
+                vector_collections = (
+                    agent_config.get("vector_collections") if agent_config else None
                 )
 
-            # Default to "example_collection" if no collection is specified
-            if not vector_collection:
-                vector_collection = "example_collection"
+            # Default collections if none specified
+            if not vector_collections:
+                vector_collections = ["dao_collection", "knowledge_collection"]
                 logger.info(
-                    f"No vector collection configured, defaulting to: {vector_collection}"
+                    f"No vector collections configured, defaulting to: {vector_collections}"
                 )
 
-            # Always use vector_preplan workflow since we always have a vector collection now
+            # Always use vector_preplan workflow since we always have vector collections now
             workflow_type = "vector_preplan"
             logger.info(
-                f"Using {workflow_type} workflow with collection: {vector_collection}"
+                f"Using {workflow_type} workflow with collections: {vector_collections}"
             )
 
             logger.info(
@@ -520,7 +520,7 @@ class ChatProcessor:
                 input_str=self.input_str,
                 persona=persona,
                 tools_map=tools_map,
-                vector_collection=vector_collection,
+                vector_collections=vector_collections,  # Use the new parameter name
             ):
                 result_count += 1
                 logger.debug(

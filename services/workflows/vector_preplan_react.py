@@ -54,7 +54,7 @@ class VectorPreplanReactWorkflow(
     """Workflow that combines vector retrieval and planning capabilities.
 
     This workflow:
-    1. Retrieves relevant context from a vector store
+    1. Retrieves relevant context from multiple vector stores
     2. Creates a plan based on the user's query and retrieved context
     3. Executes the ReAct workflow with both context and plan
     """
@@ -63,14 +63,21 @@ class VectorPreplanReactWorkflow(
         self,
         callback_handler: StreamingCallbackHandler,
         tools: List[Any],
-        collection_name: str,
+        collection_names: Union[
+            str, List[str]
+        ],  # Modified to accept single or multiple collections
         embeddings: Optional[Embeddings] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.callback_handler = callback_handler
         self.tools = tools
-        self.collection_name = collection_name
+        # Convert single collection to list for consistency
+        self.collection_names = (
+            [collection_names]
+            if isinstance(collection_names, str)
+            else collection_names
+        )
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.required_fields = ["messages"]
 
@@ -114,7 +121,7 @@ class VectorPreplanReactWorkflow(
         pass
 
     async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
-        """Retrieve relevant documents from vector store.
+        """Retrieve relevant documents from multiple vector stores.
 
         Args:
             query: The query to search for
@@ -124,25 +131,48 @@ class VectorPreplanReactWorkflow(
             List of retrieved documents
         """
         try:
-            # Query vectors using the backend
-            vector_results = await backend.query_vectors(
-                collection_name=self.collection_name,
-                query_text=query,
-                limit=kwargs.get("limit", 4),
-                embeddings=self.embeddings,
+            all_documents = []
+            limit_per_collection = kwargs.get(
+                "limit", 4
+            )  # Get 4 results from each collection
+
+            # Query each collection and gather results
+            for collection_name in self.collection_names:
+                try:
+                    # Query vectors using the backend
+                    vector_results = await backend.query_vectors(
+                        collection_name=collection_name,
+                        query_text=query,
+                        limit=limit_per_collection,
+                        embeddings=self.embeddings,
+                    )
+
+                    # Convert to LangChain Documents and add collection source
+                    documents = [
+                        Document(
+                            page_content=doc.get("page_content", ""),
+                            metadata={
+                                **doc.get("metadata", {}),
+                                "collection_source": collection_name,
+                            },
+                        )
+                        for doc in vector_results
+                    ]
+
+                    all_documents.extend(documents)
+                    logger.info(
+                        f"Retrieved {len(documents)} documents from collection {collection_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to retrieve from collection {collection_name}: {str(e)}"
+                    )
+                    continue  # Continue with other collections if one fails
+
+            logger.info(
+                f"Retrieved total of {len(all_documents)} documents from all collections"
             )
-
-            # Convert to LangChain Documents
-            documents = [
-                Document(
-                    page_content=doc.get("page_content", ""),
-                    metadata=doc.get("metadata", {}),
-                )
-                for doc in vector_results
-            ]
-
-            logger.info(f"Retrieved {len(documents)} documents from vector store")
-            return documents
+            return all_documents
         except Exception as e:
             logger.error(f"Vector store retrieval failed: {str(e)}")
             return []
@@ -415,11 +445,15 @@ class VectorPreplanReactWorkflow(
 class VectorPreplanLangGraphService:
     """Service for executing Vector PrePlan React LangGraph operations"""
 
-    def __init__(self, collection_name: str, embeddings: Optional[Embeddings] = None):
+    def __init__(
+        self,
+        collection_names: Union[str, List[str]],
+        embeddings: Optional[Embeddings] = None,
+    ):
         # Import here to avoid circular imports
         from services.workflows.react import MessageProcessor
 
-        self.collection_name = collection_name
+        self.collection_names = collection_names
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.message_processor = MessageProcessor()
 
@@ -477,7 +511,7 @@ class VectorPreplanLangGraphService:
                 .with_callback_handler(callback_handler)
                 .with_tools(list(tools_map.values()) if tools_map else [])
                 .build(
-                    collection_name=self.collection_name,
+                    collection_names=self.collection_names,
                     embeddings=self.embeddings,
                 )
             )
@@ -578,7 +612,7 @@ class VectorPreplanLangGraphService:
 
 # Facade function
 async def execute_vector_preplan_stream(
-    collection_name: str,
+    collection_names: Union[str, List[str]],
     history: List[Dict],
     input_str: str,
     persona: Optional[str] = None,
@@ -588,12 +622,12 @@ async def execute_vector_preplan_stream(
     """Execute a Vector PrePlan ReAct stream.
 
     This workflow combines vector retrieval and planning:
-    1. Retrieves relevant context from a vector store
+    1. Retrieves relevant context from multiple vector stores
     2. Creates a plan based on the user's query and retrieved context
     3. Executes the ReAct workflow with both context and plan
 
     Args:
-        collection_name: Name of the vector collection to use
+        collection_names: Name(s) of the vector collections to use
         history: Conversation history
         input_str: Current user input
         persona: Optional persona to use
@@ -606,7 +640,7 @@ async def execute_vector_preplan_stream(
     # Initialize service and run stream
     embeddings = embeddings or OpenAIEmbeddings()
     service = VectorPreplanLangGraphService(
-        collection_name=collection_name,
+        collection_names=collection_names,
         embeddings=embeddings,
     )
 
