@@ -6,3 +6,4 @@ shell.nix
 .DS_Store
 tweets.db
 generated
+aibtcdev-docs
