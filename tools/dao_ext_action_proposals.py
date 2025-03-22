@@ -212,7 +212,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
             dao_token_contract_address,
-            dao_token_contract_address_to_allow
+            dao_token_contract_address_to_allow,
         ]
 
         return BunScriptRunner.bun_run(
@@ -696,6 +696,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             **kwargs,
         )
 
+
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
 
@@ -834,9 +835,9 @@ class ConcludeActionProposalTool(BaseTool):
 
         args = [
             action_proposals_voting_extension,
-            dao_token_contract_address,
             str(proposal_id),
             action_proposal_contract_to_execute,
+            dao_token_contract_address,
         ]
 
         return BunScriptRunner.bun_run(
@@ -879,7 +880,7 @@ class ConcludeActionProposalTool(BaseTool):
             action_proposal_contract_to_execute,
             **kwargs,
         )
-    
+
 
 class ProposeActionToggleResourceInput(BaseModel):
     """Input schema for proposing to toggle a resource action."""
@@ -913,6 +914,7 @@ class ProposeActionToggleResourceInput(BaseModel):
         description="Name of the resource to toggle",
         examples=["apiv1", "protected-content", "1hr consulting"],
     )
+
 
 class ProposeActionToggleResourceTool(BaseTool):
     name: str = "dao_propose_action_toggle_resource"
@@ -987,7 +989,6 @@ class ProposeActionToggleResourceTool(BaseTool):
             resource_name,
             **kwargs,
         )
-
 
 
 class GetLiquidSupplyInput(BaseModel):
@@ -1357,4 +1358,3 @@ class GetVotingPowerTool(BaseTool):
         return self._deploy(
             action_proposals_voting_extension, proposal_id, voter_address, **kwargs
         )
-
