@@ -787,14 +787,6 @@ class ConcludeActionProposalInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
         ],
     )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
     proposal_id: int = Field(..., description="ID of the proposal to conclude")
     action_proposal_contract_to_execute: str = Field(
         ...,
@@ -803,6 +795,14 @@ class ConcludeActionProposalInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-send-message",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
+        ],
+    )
+    dao_token_contract_address: str = Field(
+        ...,
+        description="Contract principal of the token used by the DAO for voting",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
 
