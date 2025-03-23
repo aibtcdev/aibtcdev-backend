@@ -18,6 +18,10 @@ from backend.models import (
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
+    ChainState,
+    ChainStateBase,
+    ChainStateCreate,
+    ChainStateFilter,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -367,7 +371,90 @@ class SupabaseBackend(AbstractBackend):
             )
             return False
 
-    # ---------------------------------------------------------------
+    # ----------------------------------------------------------------
+    # CHAIN STATE
+    # ----------------------------------------------------------------
+    def create_chain_state(self, new_chain_state: "ChainStateCreate") -> "ChainState":
+        """Create a new chain state record."""
+        payload = new_chain_state.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("chain_states").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from chain_states insert.")
+        return ChainState(**data[0])
+
+    def get_chain_state(self, chain_state_id: UUID) -> Optional["ChainState"]:
+        """Get a chain state record by ID."""
+        response = (
+            self.client.table("chain_states")
+            .select("*")
+            .eq("id", str(chain_state_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return ChainState(**response.data)
+
+    def list_chain_states(
+        self, filters: Optional["ChainStateFilter"] = None
+    ) -> List["ChainState"]:
+        """List chain state records with optional filters."""
+        query = self.client.table("chain_states").select("*")
+        if filters:
+            if filters.network is not None:
+                query = query.eq("network", filters.network)
+        response = query.execute()
+        data = response.data or []
+        return [ChainState(**row) for row in data]
+
+    def update_chain_state(
+        self, chain_state_id: UUID, update_data: "ChainStateBase"
+    ) -> Optional["ChainState"]:
+        """Update a chain state record."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_chain_state(chain_state_id)
+        response = (
+            self.client.table("chain_states")
+            .update(payload)
+            .eq("id", str(chain_state_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return ChainState(**updated[0])
+
+    def delete_chain_state(self, chain_state_id: UUID) -> bool:
+        """Delete a chain state record."""
+        response = (
+            self.client.table("chain_states")
+            .delete()
+            .eq("id", str(chain_state_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    def get_latest_chain_state(
+        self, network: str = "mainnet"
+    ) -> Optional["ChainState"]:
+        """Get the latest chain state for a given network."""
+        response = (
+            self.client.table("chain_states")
+            .select("*")
+            .eq("network", network)
+            .order("block_height", desc=True)
+            .limit(1)
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return ChainState(**response.data)
+
+    # ----------------------------------------------------------------
     # HELPER FUNCTIONS
     # ----------------------------------------------------------------
     def verify_session_token(self, token: str) -> Optional[str]:

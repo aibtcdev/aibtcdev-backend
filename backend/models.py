@@ -23,6 +23,28 @@ class ContractStatus(Enum):
         return self.value
 
 
+class ChainStateBase(CustomBaseModel):
+    """Base model for tracking blockchain state."""
+
+    block_height: Optional[int] = None
+    block_hash: Optional[str] = None
+    network: Optional[str] = "mainnet"  # mainnet or testnet
+
+
+class ChainStateCreate(ChainStateBase):
+    pass
+
+
+class ChainState(ChainStateBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChainStateFilter(CustomBaseModel):
+    network: Optional[str] = None
+
+
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
     CONVERSATION = "thread"

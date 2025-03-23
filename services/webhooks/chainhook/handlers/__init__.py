@@ -4,6 +4,7 @@ This module contains specialized handlers for different types of chainhook event
 """
 
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
+from services.webhooks.chainhook.handlers.block_state_handler import BlockStateHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,
@@ -27,4 +28,5 @@ __all__ = [
     "DAOProposalBurnHeightHandler",
     "DAOVoteHandler",
     "DAOProposalConclusionHandler",
+    "BlockStateHandler",
 ]

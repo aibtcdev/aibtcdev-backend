@@ -9,6 +9,10 @@ from backend.models import (
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
+    ChainState,
+    ChainStateBase,
+    ChainStateCreate,
+    ChainStateFilter,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -168,6 +172,41 @@ class AbstractBackend(ABC):
         Returns:
             True if successfully deleted, False otherwise
         """
+        pass
+
+    # ----------- CHAIN STATE -----------
+    @abstractmethod
+    def create_chain_state(self, new_chain_state: ChainStateCreate) -> ChainState:
+        """Create a new chain state record."""
+        pass
+
+    @abstractmethod
+    def get_chain_state(self, chain_state_id: UUID) -> Optional[ChainState]:
+        """Get a chain state record by ID."""
+        pass
+
+    @abstractmethod
+    def list_chain_states(
+        self, filters: Optional[ChainStateFilter] = None
+    ) -> List[ChainState]:
+        """List chain state records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_chain_state(
+        self, chain_state_id: UUID, update_data: ChainStateBase
+    ) -> Optional[ChainState]:
+        """Update a chain state record."""
+        pass
+
+    @abstractmethod
+    def delete_chain_state(self, chain_state_id: UUID) -> bool:
+        """Delete a chain state record."""
+        pass
+
+    @abstractmethod
+    def get_latest_chain_state(self, network: str = "mainnet") -> Optional[ChainState]:
+        """Get the latest chain state for a given network."""
         pass
 
     # ----------- SECRETS -----------

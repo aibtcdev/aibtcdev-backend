@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
+from services.webhooks.chainhook.handlers.block_state_handler import BlockStateHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
 from services.webhooks.chainhook.handlers.contract_message_handler import (
     ContractMessageHandler,
@@ -39,6 +40,7 @@ class ChainhookHandler(WebhookHandler):
             DAOProposalBurnHeightHandler(),
             DAOVoteHandler(),
             DAOProposalConclusionHandler(),
+            BlockStateHandler(),
         ]
 
     async def handle(self, parsed_data: ChainHookData) -> Dict[str, Any]:
