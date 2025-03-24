@@ -3,8 +3,8 @@
 import logging
 from typing import Optional
 
+from backend.factory import backend
 from backend.models import ChainState, ChainStateBase, ChainStateCreate
-from backend.supabase import SupabaseBackend
 from config import config
 from services.webhooks.chainhook.models import (
     Apply,
@@ -20,10 +20,9 @@ logger = logging.getLogger(__name__)
 class BlockStateHandler(ChainhookEventHandler):
     """Handler for tracking the latest block state."""
 
-    def __init__(self, db: SupabaseBackend):
-        """Initialize the handler with database connection."""
+    def __init__(self):
+        """Initialize the handler."""
         super().__init__()
-        self.db = db
         self._latest_chain_state: Optional[ChainState] = None
 
     def can_handle(self, transaction: TransactionWithReceipt) -> bool:
@@ -70,7 +69,7 @@ class BlockStateHandler(ChainhookEventHandler):
 
         try:
             # Get current chain state
-            current_state = self.db.get_latest_chain_state(
+            current_state = backend.get_latest_chain_state(
                 network=config.network.network
             )
 
@@ -88,7 +87,7 @@ class BlockStateHandler(ChainhookEventHandler):
                     return True
 
                 # Update existing record
-                updated = self.db.update_chain_state(
+                updated = backend.update_chain_state(
                     current_state.id,
                     ChainStateBase(block_height=block_height, block_hash=block_hash),
                 )
@@ -100,7 +99,7 @@ class BlockStateHandler(ChainhookEventHandler):
 
             else:
                 # Create first record
-                created = self.db.create_chain_state(
+                created = backend.create_chain_state(
                     ChainStateCreate(
                         block_height=block_height,
                         block_hash=block_hash,
@@ -124,5 +123,5 @@ class BlockStateHandler(ChainhookEventHandler):
     def latest_chain_state(self) -> Optional[ChainState]:
         """Get the latest known chain state."""
         if not self._latest_chain_state:
-            self._latest_chain_state = self.db.get_latest_chain_state()
+            self._latest_chain_state = backend.get_latest_chain_state()
         return self._latest_chain_state
