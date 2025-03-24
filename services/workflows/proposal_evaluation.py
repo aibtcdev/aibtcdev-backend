@@ -9,7 +9,8 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
-from backend.models import UUID, Profile, TokenFilter
+from backend.models import UUID, Profile, ProposalType, TokenFilter
+from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
 from services.workflows.react import LangGraphService
@@ -54,9 +55,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
         return PromptTemplate(
-            input_variables=["proposal_data", "dao_info"],
+            input_variables=["proposal_data", "dao_info", "contract_source"],
             template="""
-            You are a DAO proposal evaluator. Your task is to analyze the following action proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
+            You are a DAO proposal evaluator. Your task is to analyze the following proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
 
             DAO Information:
             {dao_info}
@@ -77,36 +78,55 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             Proposal Data:
             {proposal_data}
 
-            # Action Proposal Types and Guidelines
+            Contract Source Code (for core proposals):
+            {contract_source}
 
+            # Proposal Types and Guidelines
+
+            ## Core Proposals
+            Core proposals suggest changes to the DAO's fundamental smart contracts. When evaluating core proposals:
+            1. Review the contract source code carefully
+            2. Assess security implications
+            3. Verify alignment with DAO's mission and values
+            4. Check for potential vulnerabilities or exploits
+            5. Evaluate impact on existing functionality
+            6. Consider upgrade path and backwards compatibility
+
+            ## Action Proposals
             Action proposals are predefined operations that can be executed with specific voting requirements (66% approval threshold, 15% quorum). Each action is implemented as a smart contract that executes specific functionality through the DAO's extensions.
 
             Focus on the "action" field in the proposal data to identify the proposal type, and the "parameters" field (a hexadecimal string starting with "0x") which contains the encoded content.
 
-            ## Available Action Types:
+            ### Available Action Types:
 
-            ### Payment/Invoice Management
+            #### Payment/Invoice Management
             * **Add Resource** (`aibtc-action-add-resource`): Creates new payable resource in the payments system. Sets resource name, description, price, and URL.
             * **Toggle Resource** (`aibtc-action-toggle-resource-by-name`): Enables or disables a payment resource.
 
-            ### Treasury Management
+            #### Treasury Management
             * **Allow Asset** (`aibtc-action-allow-asset`): Adds FT or NFT to treasury allowlist. Enables deposits and withdrawals of the asset.
 
-            ### Messaging
+            #### Messaging
             * **Send Message** (`aibtc-action-send-message`): Posts verified DAO message on-chain. Message includes DAO verification flag. Limited to 1MB size.
 
-            ### Timed Vault Configuration
+            #### Timed Vault Configuration
             * **Set Account Holder** (`aibtc-action-set-account-holder`): Designates authorized withdrawal address.
             * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (0–100 STX).
             * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (6–1,008 blocks).
 
             ## Evaluation Guidelines:
 
-            1. Identify the action type from the proposal data
-            2. Evaluate the parameters based on the action type
-            3. Consider the DAO's mission and values (in addition to the overarching AIBTC Charter)
-            4. Assess potential security or financial risks
-            5. Decide whether to vote FOR or AGAINST the proposal
+            1. Identify the proposal type (core or action)
+            2. For core proposals:
+               - Review contract source code
+               - Assess security implications
+               - Verify alignment with DAO mission
+            3. For action proposals:
+               - Identify the action type
+               - Evaluate the parameters
+            4. Consider the DAO's mission and values
+            5. Assess potential security or financial risks
+            6. Decide whether to vote FOR or AGAINST the proposal
 
             ### Specific Guidelines by Action Type:
 
@@ -138,9 +158,35 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 # Get proposal data from state
                 proposal_data = state["proposal_data"]
 
-                # Ensure we have parameters
-                if not proposal_data.get("parameters"):
-                    raise ValueError("No parameters found in proposal data")
+                # If this is a core proposal, fetch the contract source
+                contract_source = ""
+                if proposal_data.get("type") == "core" and proposal_data.get(
+                    "proposal_contract"
+                ):
+                    # Split contract address into parts
+                    parts = proposal_data["proposal_contract"].split(".")
+                    if len(parts) >= 2:
+                        contract_address = parts[0]
+                        contract_name = parts[1]
+
+                        # Use HiroApi to fetch contract source
+                        try:
+                            api = HiroApi()
+                            result = api.get_contract_source(
+                                contract_address, contract_name
+                            )
+                            if "source" in result:
+                                contract_source = result["source"]
+                            else:
+                                logger.warning(
+                                    f"Could not find source code in API response: {result}"
+                                )
+                        except Exception as e:
+                            logger.error(f"Error fetching contract source: {str(e)}")
+                    else:
+                        logger.warning(
+                            f"Invalid contract address format: {proposal_data['proposal_contract']}"
+                        )
 
                 # Format prompt with state
                 self.logger.debug("Formatting evaluation prompt...")
@@ -149,6 +195,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
+                    contract_source=contract_source,
                 )
 
                 # Get evaluation from LLM
@@ -320,7 +367,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
     def _validate_state(self, state: EvaluationState) -> bool:
         """Validate the workflow state."""
-        required_fields = ["action_proposals_contract", "proposal_id", "proposal_data"]
+        required_fields = ["proposal_id", "proposal_data"]
 
         # Log the state for debugging
         self.logger.debug(f"Validating state: {state}")
@@ -334,9 +381,27 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Empty required field: {field}")
                 return False
 
-        # Ensure proposal_data has parameters
-        if not state["proposal_data"].get("parameters"):
-            self.logger.error("No parameters field in proposal_data")
+        # Get proposal type
+        proposal_type = state["proposal_data"].get("type", ProposalType.ACTION)
+
+        # Validate based on proposal type
+        if proposal_type == ProposalType.ACTION:
+            # Action proposals require action_proposals_contract and parameters
+            if not state.get("action_proposals_contract"):
+                self.logger.error(
+                    "Missing action_proposals_contract for action proposal"
+                )
+                return False
+            if not state["proposal_data"].get("parameters"):
+                self.logger.error("No parameters field in action proposal data")
+                return False
+        elif proposal_type == ProposalType.CORE:
+            # Core proposals require proposal_contract
+            if not state["proposal_data"].get("proposal_contract"):
+                self.logger.error("Missing proposal_contract for core proposal")
+                return False
+        else:
+            self.logger.error(f"Invalid proposal type: {proposal_type}")
             return False
 
         return True
@@ -419,10 +484,23 @@ async def evaluate_and_vote_on_proposal(
             "end_block": proposal_data.end_block,
             "start_block": proposal_data.start_block,
             "liquid_tokens": proposal_data.liquid_tokens,
+            "type": proposal_data.type,  # Add proposal type
+            "proposal_contract": proposal_data.proposal_contract,  # Add proposal contract for core proposals
         }
 
-        if not proposal_dict.get("parameters"):
-            error_msg = "No parameters found in proposal data"
+        # For action proposals, parameters are required
+        if proposal_data.type == ProposalType.ACTION and not proposal_dict.get(
+            "parameters"
+        ):
+            error_msg = "No parameters found in action proposal data"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        # For core proposals, proposal_contract is required
+        if proposal_data.type == ProposalType.CORE and not proposal_dict.get(
+            "proposal_contract"
+        ):
+            error_msg = "No proposal contract found in core proposal data"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
