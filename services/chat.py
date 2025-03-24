@@ -9,6 +9,7 @@ from backend.factory import backend
 from backend.models import JobBase, JobFilter, Profile, StepCreate, StepFilter
 from lib.logger import configure_logger
 from lib.persona import generate_persona, generate_static_persona
+from services.websocket import websocket_manager
 from services.workflows import execute_workflow_stream
 from tools.tools_factory import initialize_tools
 
@@ -643,6 +644,18 @@ class ChatProcessor:
             ),
         )
         logger.info(f"Chat job {self.job_id} completed and stored")
+
+        # Send final completion message through WebSocket
+        await websocket_manager.send_message(
+            {
+                "type": "completion",
+                "status": "complete",
+                "message": "Processing complete",
+                "thread_id": str(self.thread_id),
+                "agent_id": str(self.agent_id) if self.agent_id else None,
+            },
+            str(self.job_id),
+        )
 
     async def _cleanup(self) -> None:
         """Clean up resources after processing."""
