@@ -26,6 +26,11 @@ class ChainhookHandler(WebhookHandler):
 
     This handler coordinates the processing of Chainhook webhook events
     by delegating to specialized handlers based on the event type.
+
+    The processing happens in the following order:
+    1. Block-level processing - for handlers that need to process entire blocks
+    2. Transaction-level processing - for handlers that process individual transactions
+    3. Post-processing - for handlers that need to perform cleanup after all blocks
     """
 
     def __init__(self):
@@ -61,7 +66,22 @@ class ChainhookHandler(WebhookHandler):
             for handler in self.handlers:
                 handler.set_chainhook_data(parsed_data)
 
+            # Process each block
             for apply in parsed_data.apply:
+                self.logger.info(
+                    f"Processing block {apply.block_identifier.hash} "
+                    f"(height: {apply.block_identifier.index})"
+                )
+
+                # Process block-level handlers first
+                for handler in self.handlers:
+                    if handler.can_handle_block(apply):
+                        self.logger.debug(
+                            f"Using handler {handler.__class__.__name__} for block-level processing"
+                        )
+                        await handler.handle_block(apply)
+
+                # Then process transactions within the block
                 for transaction in apply.transactions:
                     self.logger.info(
                         f"Processing transaction {transaction.transaction_identifier.hash}"
@@ -69,13 +89,19 @@ class ChainhookHandler(WebhookHandler):
 
                     # Try each handler in turn
                     for handler in self.handlers:
-                        if handler.can_handle(transaction):
+                        if handler.can_handle_transaction(transaction):
                             self.logger.debug(
-                                f"Using handler {handler.__class__.__name__} for transaction"
+                                f"Using handler {handler.__class__.__name__} for transaction-level processing"
                             )
                             await handler.handle_transaction(transaction)
 
-            self.logger.info("Finished processing all transactions in webhook")
+            # Allow handlers to perform any post-processing
+            for handler in self.handlers:
+                await handler.post_block_processing()
+
+            self.logger.info(
+                "Finished processing all blocks and transactions in webhook"
+            )
             return {
                 "success": True,
                 "message": "Successfully processed webhook",

@@ -61,13 +61,15 @@ class TestContractMessageHandler(unittest.TestCase):
             operations=[],
         )
 
-    def test_can_handle(self):
+    def test_can_handle_transaction(self):
         """Test the can_handle method."""
         # Should handle message transactions
-        self.assertTrue(self.handler.can_handle(self.message_transaction))
+        self.assertTrue(self.handler.can_handle_transaction(self.message_transaction))
 
         # Should not handle non-message transactions
-        self.assertFalse(self.handler.can_handle(self.non_message_transaction))
+        self.assertFalse(
+            self.handler.can_handle_transaction(self.non_message_transaction)
+        )
 
     @patch("backend.factory.backend")
     async def test_handle_transaction(self, mock_backend):
@@ -116,10 +118,10 @@ class TestTransactionStatusHandler(unittest.TestCase):
             operations=[],
         )
 
-    def test_can_handle(self):
+    def test_can_handle_transaction(self):
         """Test the can_handle method."""
         # Should handle any transaction
-        self.assertTrue(self.handler.can_handle(self.transaction))
+        self.assertTrue(self.handler.can_handle_transaction(self.transaction))
 
     @patch("backend.factory.backend")
     async def test_handle_transaction(self, mock_backend):
@@ -239,13 +241,13 @@ class TestBuyEventHandler(unittest.TestCase):
             operations=[],
         )
 
-    def test_can_handle(self):
+    def test_can_handle_transaction(self):
         """Test the can_handle method."""
         # Should handle buy transactions
-        self.assertTrue(self.handler.can_handle(self.buy_transaction))
+        self.assertTrue(self.handler.can_handle_transaction(self.buy_transaction))
 
         # Should not handle non-buy transactions
-        self.assertFalse(self.handler.can_handle(self.non_buy_transaction))
+        self.assertFalse(self.handler.can_handle_transaction(self.non_buy_transaction))
 
 
 class TestSellEventHandler(unittest.TestCase):
@@ -329,13 +331,13 @@ class TestSellEventHandler(unittest.TestCase):
             operations=[],
         )
 
-    def test_can_handle(self):
+    def test_can_handle_transaction(self):
         """Test the can_handle method."""
         # Should handle sell transactions
-        self.assertTrue(self.handler.can_handle(self.sell_transaction))
+        self.assertTrue(self.handler.can_handle_transaction(self.sell_transaction))
 
         # Should not handle non-sell transactions
-        self.assertFalse(self.handler.can_handle(self.non_sell_transaction))
+        self.assertFalse(self.handler.can_handle_transaction(self.non_sell_transaction))
 
 
 if __name__ == "__main__":

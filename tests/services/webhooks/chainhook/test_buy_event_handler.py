@@ -71,7 +71,7 @@ class TestBuyEventHandler(unittest.TestCase):
     def test_can_handle_buy_transaction(self):
         """Test that the handler can handle buy transactions."""
         # Test with a buy transaction
-        result = self.handler.can_handle(self.sample_transaction)
+        result = self.handler.can_handle_transaction(self.sample_transaction)
         self.assertTrue(result)
 
         # Test with a buy-tokens transaction
@@ -103,7 +103,7 @@ class TestBuyEventHandler(unittest.TestCase):
             operations=[],
         )
 
-        result = self.handler.can_handle(buy_tokens_transaction)
+        result = self.handler.can_handle_transaction(buy_tokens_transaction)
         self.assertTrue(result)
 
     def test_cannot_handle_non_buy_transaction(self):
@@ -137,7 +137,7 @@ class TestBuyEventHandler(unittest.TestCase):
             operations=[],
         )
 
-        result = self.handler.can_handle(non_buy_transaction)
+        result = self.handler.can_handle_transaction(non_buy_transaction)
         self.assertFalse(result)
 
     @patch("services.webhooks.chainhook.handlers.buy_event_handler.configure_logger")

@@ -440,19 +440,36 @@ class SupabaseBackend(AbstractBackend):
     def get_latest_chain_state(
         self, network: str = "mainnet"
     ) -> Optional["ChainState"]:
-        """Get the latest chain state for a given network."""
-        response = (
-            self.client.table("chain_states")
-            .select("*")
-            .eq("network", network)
-            .order("block_height", desc=True)
-            .limit(1)
-            .single()
-            .execute()
-        )
-        if not response.data:
+        """Get the latest chain state for a given network.
+
+        Args:
+            network (str): The network to get the chain state for. Defaults to "mainnet".
+
+        Returns:
+            Optional[ChainState]: The latest chain state for the network, or None if no chain state exists.
+        """
+        try:
+            response = (
+                self.client.table("chain_states")
+                .select("*")
+                .eq("network", network)
+                .order("block_height", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            # Check if we got any data back
+            if not response.data or len(response.data) == 0:
+                return None
+
+            # Return the first (and only) result
+            return ChainState(**response.data[0])
+
+        except Exception as e:
+            logger.error(
+                f"Error getting latest chain state for network {network}: {str(e)}"
+            )
             return None
-        return ChainState(**response.data)
 
     # ----------------------------------------------------------------
     # HELPER FUNCTIONS

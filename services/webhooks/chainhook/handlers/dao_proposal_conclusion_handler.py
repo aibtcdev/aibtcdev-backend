@@ -21,7 +21,7 @@ class DAOProposalConclusionHandler(ChainhookEventHandler):
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
 
-    def can_handle(self, transaction: TransactionWithReceipt) -> bool:
+    def can_handle_transaction(self, transaction: TransactionWithReceipt) -> bool:
         """Check if this handler can handle the given transaction.
 
         This handler can handle contract call transactions related to concluding proposals.

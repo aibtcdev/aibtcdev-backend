@@ -78,7 +78,7 @@ class TestSellEventHandler(unittest.TestCase):
     def test_can_handle_sell_transaction(self):
         """Test that the handler can handle sell transactions."""
         # Test with a sell transaction
-        result = self.handler.can_handle(self.sample_transaction)
+        result = self.handler.can_handle_transaction(self.sample_transaction)
         self.assertTrue(result)
 
         # Test with a sell-tokens transaction
@@ -110,7 +110,7 @@ class TestSellEventHandler(unittest.TestCase):
             operations=[],
         )
 
-        result = self.handler.can_handle(sell_tokens_transaction)
+        result = self.handler.can_handle_transaction(sell_tokens_transaction)
         self.assertTrue(result)
 
     def test_cannot_handle_non_sell_transaction(self):
@@ -144,7 +144,7 @@ class TestSellEventHandler(unittest.TestCase):
             operations=[],
         )
 
-        result = self.handler.can_handle(non_sell_transaction)
+        result = self.handler.can_handle_transaction(non_sell_transaction)
         self.assertFalse(result)
 
     @patch("backend.factory.backend")
