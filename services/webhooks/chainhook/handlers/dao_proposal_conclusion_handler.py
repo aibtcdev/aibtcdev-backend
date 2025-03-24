@@ -3,7 +3,7 @@
 from typing import Dict, List, Optional
 
 from backend.factory import backend
-from backend.models import ProposalBase, ProposalFilter
+from backend.models import ProposalBase, ProposalFilter, ProposalType
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
@@ -75,37 +75,76 @@ class DAOProposalConclusionHandler(ChainhookEventHandler):
         """
         for event in events:
             # Find print events with conclusion information
-            if (
-                event.type == "SmartContractEvent"
-                and hasattr(event, "data")
-                and event.data.get("topic") == "print"
-            ):
-                event_data = event.data
-                value = event_data.get("value", {})
+            if not isinstance(event, Event):
+                self.logger.debug(f"Skipping non-Event object: {type(event)}")
+                continue
 
-                if value.get("notification") == "conclude-proposal":
-                    payload = value.get("payload", {})
-                    if not payload:
-                        self.logger.warning("Empty payload in conclusion event")
-                        return None
+            if not hasattr(event, "type") or event.type != "SmartContractEvent":
+                continue
 
-                    # Extract all the conclusion data
-                    return {
-                        "proposal_id": payload.get("proposalId"),
-                        "caller": payload.get("caller"),
-                        "concluded_by": payload.get("concludedBy"),
-                        "executed": payload.get("executed"),
-                        "liquid_tokens": str(
-                            payload.get("liquidTokens")
-                        ),  # Convert to string
-                        "met_quorum": payload.get("metQuorum"),
-                        "met_threshold": payload.get("metThreshold"),
-                        "passed": payload.get("passed"),
-                        "votes_against": str(
-                            payload.get("votesAgainst")
-                        ),  # Convert to string
-                        "votes_for": str(payload.get("votesFor")),  # Convert to string
-                    }
+            if not hasattr(event, "data"):
+                continue
+
+            event_data = event.data
+            if not isinstance(event_data, dict):
+                self.logger.debug(f"Event data is not a dictionary: {type(event_data)}")
+                continue
+
+            if event_data.get("topic") != "print":
+                continue
+
+            value = event_data.get("value")
+            if not isinstance(value, dict):
+                self.logger.debug(f"Event value is not a dictionary: {type(value)}")
+                continue
+
+            if value.get("notification") != "conclude-proposal":
+                continue
+
+            payload = value.get("payload")
+            if not isinstance(payload, dict):
+                self.logger.warning("Empty or invalid payload in conclusion event")
+                continue
+
+            # Extract all the conclusion data
+            try:
+                # Common fields for both types
+                base_data = {
+                    "caller": payload.get("caller"),
+                    "concluded_by": payload.get("concludedBy"),
+                    "executed": payload.get("executed"),
+                    "liquid_tokens": str(
+                        payload.get("liquidTokens", "0")
+                    ),  # Default to "0"
+                    "met_quorum": payload.get("metQuorum"),
+                    "met_threshold": payload.get("metThreshold"),
+                    "passed": payload.get("passed"),
+                    "votes_against": str(
+                        payload.get("votesAgainst", "0")
+                    ),  # Default to "0"
+                    "votes_for": str(payload.get("votesFor", "0")),  # Default to "0"
+                }
+
+                # Check if it's an action proposal (has proposal_id) or core proposal (has proposal contract)
+                if "proposalId" in payload:
+                    # Action proposal
+                    base_data["proposal_id"] = payload.get("proposalId")
+                    base_data["type"] = ProposalType.ACTION
+                elif "proposal" in payload:
+                    # Core proposal
+                    base_data["proposal_contract"] = payload.get("proposal")
+                    base_data["type"] = ProposalType.CORE
+                else:
+                    self.logger.warning(
+                        "Could not determine proposal type from payload"
+                    )
+                    continue
+
+                return base_data
+
+            except Exception as e:
+                self.logger.error(f"Error extracting conclusion data: {str(e)}")
+                continue
 
         self.logger.warning(
             "Could not find conclusion information in transaction events"

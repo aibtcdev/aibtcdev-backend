@@ -54,6 +54,14 @@ class TweetType(str, Enum):
         return self.value
 
 
+class ProposalType(str, Enum):
+    ACTION = "action"
+    CORE = "core"
+
+    def __str__(self):
+        return self.value
+
+
 class QueueMessageType(str, Enum):
     TWEET = "tweet"
     DAO = "dao"
@@ -310,7 +318,11 @@ class ProposalBase(CustomBaseModel):
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    proposal_id: Optional[int] = None  # On-chain proposal ID
+    proposal_id: Optional[int] = None  # On-chain proposal ID if its an action proposal
+    proposal_contract: Optional[str] = (
+        None  # Contract address of the proposal if its a core contract proposal
+    )
+    type: Optional[ProposalType] = ProposalType.ACTION
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
@@ -327,6 +339,7 @@ class ProposalBase(CustomBaseModel):
     passed: Optional[bool] = None
     votes_against: Optional[str] = None  # String to handle large numbers
     votes_for: Optional[str] = None  # String to handle large numbers
+    bond: Optional[str] = None  # String to handle large numbers
 
 
 class ProposalCreate(ProposalBase):
@@ -558,6 +571,8 @@ class ProposalFilter(CustomBaseModel):
     passed: Optional[bool] = None
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
+    type: Optional[ProposalType] = None
+    proposal_contract: Optional[str] = None
 
 
 class StepFilter(CustomBaseModel):
