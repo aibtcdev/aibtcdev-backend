@@ -6,20 +6,48 @@ from typing import Optional
 from backend.models import ChainState, ChainStateBase, ChainStateCreate
 from backend.supabase import SupabaseBackend
 from config import config
-from services.webhooks.chainhook.models import Apply, ChainHookData
+from services.webhooks.chainhook.models import (
+    Apply,
+    ChainHookData,
+    TransactionWithReceipt,
+)
 
-from .base import BaseHandler
+from .base import ChainhookEventHandler
 
 logger = logging.getLogger(__name__)
 
 
-class BlockStateHandler(BaseHandler):
+class BlockStateHandler(ChainhookEventHandler):
     """Handler for tracking the latest block state."""
 
     def __init__(self, db: SupabaseBackend):
         """Initialize the handler with database connection."""
-        super().__init__(db)
+        super().__init__()
+        self.db = db
         self._latest_chain_state: Optional[ChainState] = None
+
+    def can_handle(self, transaction: TransactionWithReceipt) -> bool:
+        """Check if this handler can handle the given transaction.
+
+        This handler processes all transactions as it tracks block state.
+
+        Args:
+            transaction: The transaction to check
+
+        Returns:
+            bool: Always returns True as this handler processes all transactions
+        """
+        return True
+
+    async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
+        """Handle a single transaction.
+
+        This handler doesn't process individual transactions, only block state.
+
+        Args:
+            transaction: The transaction to handle
+        """
+        pass
 
     async def handle(self, data: ChainHookData) -> bool:
         """Handle incoming chainhook data by updating the latest block state.

@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import uuid
 from dataclasses import dataclass
 from typing import (
     Annotated,
@@ -120,8 +121,9 @@ class StreamingCallbackHandler(BaseCallbackHandler):
     ):
         """Initialize the callback handler with a queue."""
         self.queue = queue
-        self.current_tool = None
-        self.tool_inputs = {}  # Store tool inputs by tool name
+        self.tool_states = {}  # Store tool states by invocation ID
+        self.tool_inputs = {}  # Store tool inputs by invocation ID
+        self.active_tools = {}  # Track active tools by name for fallback
         self.custom_on_llm_new_token = on_llm_new_token
         self.custom_on_llm_end = on_llm_end
         # Track the current execution phase
@@ -161,6 +163,25 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             logger.error(f"Failed to put item in queue: {str(e)}")
             raise StreamingError(f"Queue operation failed: {str(e)}")
 
+    def _get_tool_info(
+        self, invocation_id: Optional[str], tool_name: Optional[str] = None
+    ) -> Optional[tuple]:
+        """Get tool information using either invocation_id or tool_name.
+
+        Returns:
+            Optional[tuple]: (tool_name, tool_input, invocation_id) if found, None otherwise
+        """
+        if invocation_id and invocation_id in self.tool_states:
+            return (
+                self.tool_states[invocation_id],
+                self.tool_inputs.get(invocation_id, ""),
+                invocation_id,
+            )
+        elif tool_name and tool_name in self.active_tools:
+            active_info = self.active_tools[tool_name]
+            return (tool_name, active_info["input"], active_info["invocation_id"])
+        return None
+
     async def process_step(
         self, content: str, role: str = "assistant", thought: Optional[str] = None
     ) -> None:
@@ -193,39 +214,99 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs) -> None:
         """Run when tool starts running."""
-        self.current_tool = serialized.get("name")
+        tool_name = serialized.get("name")
+        if not tool_name:
+            logger.warning("Tool start called without tool name")
+            return
 
-        # Store the input for this tool
-        if self.current_tool:
-            self.tool_inputs[self.current_tool] = input_str
+        invocation_id = kwargs.get("invocation_id", str(uuid.uuid4()))
+
+        # Store in both tracking systems
+        self.tool_states[invocation_id] = tool_name
+        self.tool_inputs[invocation_id] = input_str
+        self.active_tools[tool_name] = {
+            "invocation_id": invocation_id,
+            "input": input_str,
+            "start_time": datetime.datetime.now(),
+        }
 
         logger.info(
-            f"Tool started: {self.current_tool} with input: {input_str[:100]}..."
+            f"Tool started: {tool_name} (ID: {invocation_id}) with input: {input_str[:100]}..."
         )
 
     def on_tool_end(self, output: str, **kwargs) -> None:
         """Run when tool ends running."""
-        if self.current_tool:
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
+
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
+
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
             if hasattr(output, "content"):
                 output = output.content
-
-            # Retrieve the stored input for this tool
-            tool_input = self.tool_inputs.get(self.current_tool, "")
 
             self._put_to_queue(
                 {
                     "type": "tool",
-                    "tool": self.current_tool,
-                    "input": tool_input,  # Use the stored input instead of None
+                    "tool": tool_name,
+                    "input": tool_input,
                     "output": str(output),
                     "status": "processing",  # Use "processing" status for tool end
                     "created_at": datetime.datetime.now().isoformat(),
                 }
             )
             logger.info(
-                f"Tool {self.current_tool} completed with output length: {len(str(output))}"
+                f"Tool {tool_name} (ID: {used_invocation_id}) completed with output length: {len(str(output))}"
             )
-            self.current_tool = None
+
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool end called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
+
+    def on_tool_error(self, error: Exception, **kwargs) -> None:
+        """Run when tool errors."""
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
+
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
+
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
+            self._put_to_queue(
+                {
+                    "type": "tool",
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": f"Error: {str(error)}",
+                    "status": "error",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+            logger.error(
+                f"Tool {tool_name} (ID: {used_invocation_id}) failed with error: {str(error)}",
+                exc_info=True,
+            )
+
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool error called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
 
     def on_llm_start(self, *args, **kwargs) -> None:
         """Run when LLM starts running."""
@@ -309,28 +390,6 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             pass  # Don't raise another error if this fails
 
         raise ExecutionError("LLM processing failed", {"error": str(error)})
-
-    def on_tool_error(self, error: Exception, **kwargs) -> None:
-        """Run when tool errors."""
-        if self.current_tool:
-            # Retrieve the stored input for this tool
-            tool_input = self.tool_inputs.get(self.current_tool, "")
-
-            self._put_to_queue(
-                {
-                    "type": "tool",
-                    "tool": self.current_tool,
-                    "input": tool_input,  # Use the stored input instead of None
-                    "output": f"Error: {str(error)}",
-                    "status": "error",  # Keep "error" status for error conditions
-                    "created_at": datetime.datetime.now().isoformat(),
-                }
-            )
-            logger.error(
-                f"Tool {self.current_tool} failed with error: {str(error)}",
-                exc_info=True,
-            )
-            self.current_tool = None
 
 
 class ReactState(TypedDict):
