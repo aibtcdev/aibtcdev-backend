@@ -583,6 +583,8 @@ async def main() -> None:
     urls = [
         "https://docs.stacks.co/reference/functions",
         "https://docs.stacks.co/reference/keywords",
+        "https://docs.stacks.co/reference/types",
+        "https://docs.stacks.co/reference/the-stack",
         "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/README.md",
     ]
 
@@ -590,6 +592,13 @@ async def main() -> None:
     directories = [
         "./aibtcdev-docs",  # Replace with actual directories
         "./aibtcdev-contracts/contracts/dao",
+        "./stacks-docs/press-and-top-links",
+        "./stacks-docs/nakamoto-upgrade",
+        "./stacks-docs/concepts",
+        "./stacks-docs/example-contracts",
+        "./stacks-docs/guides-and-tutorials",
+        "./stacks-docs/bitcoin-theses-and-reports",
+        "./stacks-docs/reference",
     ]
 
     # Example individual files to process
@@ -603,7 +612,7 @@ async def main() -> None:
         knowledge_collection_name="knowledge_collection",  # Collection for URLs and files
         dao_collection_name="dao_collection",  # Collection for DAO database data
         recursive=True,
-        include_database=True,  # Include DAO data from the database
+        include_database=False,  # Include DAO data from the database
     )
 
 
