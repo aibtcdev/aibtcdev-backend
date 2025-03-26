@@ -8,6 +8,10 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentPrompt,
+    AgentPromptBase,
+    AgentPromptCreate,
+    AgentPromptFilter,
     AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
@@ -673,4 +677,34 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
+        pass
+
+    # ----------- AGENT PROMPTS -----------
+    @abstractmethod
+    def create_agent_prompt(self, new_prompt: AgentPromptCreate) -> AgentPrompt:
+        """Create a new agent prompt."""
+        pass
+
+    @abstractmethod
+    def get_agent_prompt(self, prompt_id: UUID) -> Optional[AgentPrompt]:
+        """Get an agent prompt by ID."""
+        pass
+
+    @abstractmethod
+    def list_agent_prompts(
+        self, filters: Optional[AgentPromptFilter] = None
+    ) -> List[AgentPrompt]:
+        """List agent prompts with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_agent_prompt(
+        self, prompt_id: UUID, update_data: AgentPromptBase
+    ) -> Optional[AgentPrompt]:
+        """Update an agent prompt."""
+        pass
+
+    @abstractmethod
+    def delete_agent_prompt(self, prompt_id: UUID) -> bool:
+        """Delete an agent prompt."""
         pass

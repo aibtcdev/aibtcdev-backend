@@ -9,7 +9,13 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
-from backend.models import UUID, Profile, ProposalType, TokenFilter
+from backend.models import (
+    UUID,
+    AgentPromptFilter,
+    Profile,
+    ProposalType,
+    TokenFilter,
+)
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
@@ -55,7 +61,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
         return PromptTemplate(
-            input_variables=["proposal_data", "dao_info", "contract_source"],
+            input_variables=[
+                "proposal_data",
+                "dao_info",
+                "contract_source",
+                "agent_prompts",
+            ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the following proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
 
@@ -74,6 +85,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             • Smart Contracts to enforce accountability
             4. Amendments:
             • Allowed only if they uphold the mission/values and pass a governance vote
+
+            Agent Specific Instructions:
+            {agent_prompts}
 
             Proposal Data:
             {proposal_data}
@@ -126,7 +140,8 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                - Evaluate the parameters
             4. Consider the DAO's mission and values
             5. Assess potential security or financial risks
-            6. Decide whether to vote FOR or AGAINST the proposal
+            6. Follow any agent-specific instructions provided above
+            7. Decide whether to vote FOR or AGAINST the proposal
 
             ### Specific Guidelines by Action Type:
 
@@ -190,12 +205,24 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
                 # Format prompt with state
                 self.logger.debug("Formatting evaluation prompt...")
+
+                # Format agent prompts as a string
+                agent_prompts_str = "No agent-specific instructions available."
+                if state.get("agent_prompts"):
+                    agent_prompts_str = "\n\n".join(
+                        [
+                            f"--- {p['name']} ({p['type']}) ---\n{p['text']}"
+                            for p in state["agent_prompts"]
+                        ]
+                    )
+
                 formatted_prompt = prompt.format(
                     proposal_data=proposal_data,
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
                     contract_source=contract_source,
+                    agent_prompts=agent_prompts_str,
                 )
 
                 # Get evaluation from LLM
@@ -526,13 +553,45 @@ async def evaluate_and_vote_on_proposal(
 
         logger.debug(f"Using DAO: {dao_info.name} (ID: {dao_info.id})")
 
+        # Get the wallet and agent information if available
+        agent_id = None
+        if wallet_id:
+            wallet = backend.get_wallet(wallet_id)
+            if wallet and wallet.agent_id:
+                agent_id = wallet.agent_id
+                logger.debug(f"Found agent ID {agent_id} for wallet {wallet_id}")
+
+        # Fetch agent prompts if we have an agent_id
+        agent_prompts = []
+        if agent_id:
+            prompts = backend.list_agent_prompts(
+                filters=AgentPromptFilter(
+                    agent_id=agent_id,
+                    dao_id=dao_info.id,
+                    is_active=True,
+                )
+            )
+            if prompts:
+                agent_prompts = [
+                    {
+                        "type": p.prompt_type,
+                        "text": p.prompt_text,
+                        "name": p.name,
+                    }
+                    for p in prompts
+                ]
+                logger.debug(
+                    f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
+                )
+
         # Initialize state
         state = {
             "action_proposals_contract": proposal_dict["contract_principal"],
             "action_proposals_voting_extension": proposal_dict["action"],
             "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
-            "dao_info": dao_info or {},
+            "dao_info": dao_info.model_dump() if dao_info else {},
+            "agent_prompts": agent_prompts,  # Add agent prompts to state
             "approve": False,
             "confidence_score": 0.0,
             "reasoning": "",

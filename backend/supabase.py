@@ -17,6 +17,10 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentPrompt,
+    AgentPromptBase,
+    AgentPromptCreate,
+    AgentPromptFilter,
     AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
@@ -370,6 +374,80 @@ class SupabaseBackend(AbstractBackend):
                 f"Failed to delete vector collection {collection_name}: {str(e)}"
             )
             return False
+
+    # ----------------------------------------------------------------
+    # 18. AGENT PROMPTS
+    # ----------------------------------------------------------------
+    def create_agent_prompt(self, new_prompt: "AgentPromptCreate") -> "AgentPrompt":
+        """Create a new agent prompt."""
+        payload = new_prompt.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("agent_prompts").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from agent_prompts insert.")
+        return AgentPrompt(**data[0])
+
+    def get_agent_prompt(self, prompt_id: UUID) -> Optional["AgentPrompt"]:
+        """Get an agent prompt by ID."""
+        response = (
+            self.client.table("agent_prompts")
+            .select("*")
+            .eq("id", str(prompt_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return AgentPrompt(**response.data)
+
+    def list_agent_prompts(
+        self, filters: Optional["AgentPromptFilter"] = None
+    ) -> List["AgentPrompt"]:
+        """List agent prompts with optional filters."""
+        query = self.client.table("agent_prompts").select("*")
+        if filters:
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.agent_id is not None:
+                query = query.eq("agent_id", str(filters.agent_id))
+            if filters.name is not None:
+                query = query.eq("name", filters.name)
+            if filters.prompt_type is not None:
+                query = query.eq("prompt_type", filters.prompt_type)
+            if filters.is_active is not None:
+                query = query.eq("is_active", filters.is_active)
+        response = query.execute()
+        data = response.data or []
+        return [AgentPrompt(**row) for row in data]
+
+    def update_agent_prompt(
+        self, prompt_id: UUID, update_data: "AgentPromptBase"
+    ) -> Optional["AgentPrompt"]:
+        """Update an agent prompt."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_agent_prompt(prompt_id)
+        response = (
+            self.client.table("agent_prompts")
+            .update(payload)
+            .eq("id", str(prompt_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return AgentPrompt(**updated[0])
+
+    def delete_agent_prompt(self, prompt_id: UUID) -> bool:
+        """Delete an agent prompt."""
+        response = (
+            self.client.table("agent_prompts")
+            .delete()
+            .eq("id", str(prompt_id))
+            .execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # CHAIN STATE
