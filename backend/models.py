@@ -676,6 +676,7 @@ class VoteBase(CustomBaseModel):
     tx_id: Optional[str] = None
     address: Optional[str] = None
     amount: Optional[str] = None  # String to handle large token amounts
+    confidence: Optional[float] = None
 
 
 class VoteCreate(VoteBase):
@@ -706,3 +707,37 @@ class AgentWithWalletTokenDTO(CustomBaseModel):
     token_amount: str
     dao_id: UUID
     dao_name: str
+
+
+#
+# AGENT PROMPTS
+#
+class AgentPromptBase(CustomBaseModel):
+    """Base model for agent prompts."""
+
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None  # Reference to the agent this prompt belongs to
+    name: Optional[str] = None
+    description: Optional[str] = None
+    prompt_text: Optional[str] = None
+    prompt_type: Optional[str] = None  # e.g., 'persona', 'rules', 'customization'
+    is_active: Optional[bool] = True
+    metadata: Optional[dict] = None
+
+
+class AgentPromptCreate(AgentPromptBase):
+    pass
+
+
+class AgentPrompt(AgentPromptBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class AgentPromptFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None  # Add agent_id to filter options
+    name: Optional[str] = None
+    prompt_type: Optional[str] = None
+    is_active: Optional[bool] = None
