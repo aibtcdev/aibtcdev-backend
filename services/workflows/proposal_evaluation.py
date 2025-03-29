@@ -1,5 +1,6 @@
 """Proposal evaluation workflow."""
 
+import binascii
 from typing import Dict, List, Optional, TypedDict, Union
 
 from langchain.prompts import PromptTemplate
@@ -109,7 +110,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             ## Action Proposals
             Action proposals are predefined operations that can be executed with specific voting requirements (66% approval threshold, 15% quorum). Each action is implemented as a smart contract that executes specific functionality through the DAO's extensions.
 
-            Focus on the "action" field in the proposal data to identify the proposal type, and the "parameters" field (a hexadecimal string starting with "0x") which contains the encoded content.
+            Focus on the "action" field in the proposal data to identify the proposal type, and the "parameters" field which contains the decoded content of the proposal.
 
             ### Available Action Types:
 
@@ -468,6 +469,22 @@ def get_proposal_evaluation_tools(
     return filtered_tools
 
 
+def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
+    """Decodes a hexadecimal-encoded string if valid."""
+    if not hex_string:
+        return None
+    if hex_string.startswith("0x"):
+        hex_string = hex_string[2:]  # Remove "0x" prefix
+    try:
+        decoded_bytes = binascii.unhexlify(hex_string)
+        decoded_string = decoded_bytes.decode(
+            "utf-8", errors="ignore"
+        )  # Decode as UTF-8
+        return decoded_string
+    except (binascii.Error, UnicodeDecodeError):
+        return None  # Return None if decoding fails
+
+
 async def evaluate_and_vote_on_proposal(
     proposal_id: UUID,
     dao_name: Optional[str] = None,
@@ -499,10 +516,16 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
+        # Decode parameters if they exist
+        decoded_parameters = decode_hex_parameters(proposal_data.parameters)
+        if decoded_parameters:
+            logger.debug(f"Decoded parameters: {decoded_parameters}")
+
         # Convert proposal data to dictionary and ensure parameters exist
         proposal_dict = {
             "proposal_id": proposal_data.proposal_id,
-            "parameters": proposal_data.parameters,
+            "parameters": decoded_parameters
+            or proposal_data.parameters,  # Use decoded if available
             "action": proposal_data.action,
             "caller": proposal_data.caller,
             "contract_principal": proposal_data.contract_principal,
