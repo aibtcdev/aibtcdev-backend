@@ -1,9 +1,12 @@
 """Handler for capturing sell function events from contracts."""
 
-from datetime import datetime
-
 from backend.factory import backend
-from backend.models import TokenFilter, WalletFilter, WalletTokenBase, WalletTokenFilter
+from backend.models import (
+    HolderBase,
+    HolderFilter,
+    TokenFilter,
+    WalletFilter,
+)
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import TransactionWithReceipt
@@ -125,40 +128,32 @@ class SellEventHandler(ChainhookEventHandler):
                     token = tokens[0]
                     dao_id = token.dao_id
 
-                    # Check if we already have a record for this wallet+token
-                    existing_records = backend.list_wallet_tokens(
-                        WalletTokenFilter(wallet_id=wallet.id, token_id=token.id)
+                    # Get existing wallet token records
+                    existing_records = backend.list_holders(
+                        HolderFilter(
+                            wallet_id=wallet.id,
+                            token_id=token.id,
+                            dao_id=token.dao_id,
+                        )
                     )
 
-                    if existing_records:
-                        # Update existing record - decrease the amount
-                        record = existing_records[0]
-                        # Convert string to decimal for subtraction, then back to string
-                        current_amount = float(record.amount)
-                        sold_amount = float(amount)
+                    # Update the amount for each record
+                    for record in existing_records:
+                        # Calculate new amount
+                        current_amount = int(record.amount)
+                        new_amount = current_amount - amount
 
-                        # Ensure we don't go below zero
-                        new_amount = max(0, current_amount - sold_amount)
-                        new_amount_str = str(new_amount)
-
-                        # Create a WalletTokenBase instance for the update
-                        update_data = WalletTokenBase(
+                        # Update the record with new amount
+                        update_data = HolderBase(
                             wallet_id=record.wallet_id,
                             token_id=record.token_id,
                             dao_id=record.dao_id,
-                            amount=new_amount_str,
-                            updated_at=datetime.now(),
+                            amount=str(new_amount),
                         )
-
-                        backend.update_wallet_token(record.id, update_data)
+                        backend.update_holder(record.id, update_data)
                         self.logger.info(
                             f"Updated token balance after sell for wallet {wallet.id}: "
-                            f"token {token.id} (DAO {dao_id}), new amount: {new_amount_str}"
-                        )
-                    else:
-                        self.logger.warning(
-                            f"Attempted to sell token {token.id} from wallet {wallet.id} "
-                            f"but no existing record found. This may indicate an inconsistency."
+                            f"token {token.id} (DAO {dao_id}), new amount: {new_amount}"
                         )
             else:
                 self.logger.info(

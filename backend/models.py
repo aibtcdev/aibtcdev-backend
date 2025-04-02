@@ -638,9 +638,9 @@ class XTweetFilter(CustomBaseModel):
 
 
 #
-# WALLET TOKENS
+# HOLDERS
 #
-class WalletTokenBase(CustomBaseModel):
+class HolderBase(CustomBaseModel):
     wallet_id: UUID
     token_id: UUID
     dao_id: UUID  # Direct reference to the DAO for easier queries
@@ -648,16 +648,16 @@ class WalletTokenBase(CustomBaseModel):
     updated_at: datetime = datetime.now()
 
 
-class WalletTokenCreate(WalletTokenBase):
+class HolderCreate(HolderBase):
     pass
 
 
-class WalletToken(WalletTokenBase):
+class Holder(HolderBase):
     id: UUID
     created_at: datetime
 
 
-class WalletTokenFilter(CustomBaseModel):
+class HolderFilter(CustomBaseModel):
     wallet_id: Optional[UUID] = None
     token_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
@@ -712,32 +712,28 @@ class AgentWithWalletTokenDTO(CustomBaseModel):
 #
 # AGENT PROMPTS
 #
-class AgentPromptBase(CustomBaseModel):
-    """Base model for agent prompts."""
+class PromptBase(CustomBaseModel):
+    """Base model for prompts."""
 
     dao_id: Optional[UUID] = None
-    agent_id: Optional[UUID] = None  # Reference to the agent this prompt belongs to
-    name: Optional[str] = None
-    description: Optional[str] = None
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
     prompt_text: Optional[str] = None
-    prompt_type: Optional[str] = None  # e.g., 'persona', 'rules', 'customization'
     is_active: Optional[bool] = True
-    metadata: Optional[dict] = None
 
 
-class AgentPromptCreate(AgentPromptBase):
+class PromptCreate(PromptBase):
     pass
 
 
-class AgentPrompt(AgentPromptBase):
+class Prompt(PromptBase):
     id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
 
-class AgentPromptFilter(CustomBaseModel):
+class PromptFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
-    agent_id: Optional[UUID] = None  # Add agent_id to filter options
-    name: Optional[str] = None
-    prompt_type: Optional[str] = None
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
     is_active: Optional[bool] = None

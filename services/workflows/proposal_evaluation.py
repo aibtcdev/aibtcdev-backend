@@ -1,21 +1,18 @@
 """Proposal evaluation workflow."""
 
 import binascii
-from typing import Dict, List, Optional, TypedDict, Union
+from typing import Dict, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, Graph, StateGraph
-from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
 from backend.models import (
     UUID,
-    AgentPromptFilter,
     Profile,
+    PromptFilter,
     ProposalType,
-    TokenFilter,
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
@@ -584,28 +581,23 @@ async def evaluate_and_vote_on_proposal(
                 agent_id = wallet.agent_id
                 logger.debug(f"Found agent ID {agent_id} for wallet {wallet_id}")
 
-        # Fetch agent prompts if we have an agent_id
+        # Get agent prompts
         agent_prompts = []
-        if agent_id:
-            prompts = backend.list_agent_prompts(
-                filters=AgentPromptFilter(
+        try:
+            prompts = backend.list_prompts(
+                PromptFilter(
                     agent_id=agent_id,
-                    dao_id=dao_info.id,
+                    dao_id=proposal_data.dao_id,
                     is_active=True,
                 )
             )
-            if prompts:
-                agent_prompts = [
-                    {
-                        "type": p.prompt_type,
-                        "text": p.prompt_text,
-                        "name": p.name,
-                    }
-                    for p in prompts
-                ]
-                logger.debug(
-                    f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
-                )
+            # Extract prompt texts
+            agent_prompts = [p.prompt_text for p in prompts if p.prompt_text]
+            logger.info(
+                f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
+            )
+        except Exception as e:
+            logger.error(f"Error getting agent prompts: {e}")
 
         # Initialize state
         state = {

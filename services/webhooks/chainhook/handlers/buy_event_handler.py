@@ -1,14 +1,12 @@
 """Handler for capturing buy function events from contracts."""
 
-from datetime import datetime
-
 from backend.factory import backend
 from backend.models import (
+    HolderBase,
+    HolderCreate,
+    HolderFilter,
     TokenFilter,
     WalletFilter,
-    WalletTokenBase,
-    WalletTokenCreate,
-    WalletTokenFilter,
 )
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
@@ -131,41 +129,47 @@ class BuyEventHandler(ChainhookEventHandler):
                     dao_id = token.dao_id
 
                     # Check if we already have a record for this wallet+token
-                    existing_records = backend.list_wallet_tokens(
-                        WalletTokenFilter(wallet_id=wallet.id, token_id=token.id)
+                    existing_records = backend.list_holders(
+                        HolderFilter(
+                            wallet_id=wallet.id,
+                            token_id=token.id,
+                            dao_id=token.dao_id,
+                        )
                     )
 
                     if existing_records:
-                        # Update existing record
+                        # Update existing record - increase the amount
                         record = existing_records[0]
                         # Convert string to decimal for addition, then back to string
-                        new_amount = str(float(record.amount) + float(amount))
+                        current_amount = float(record.amount)
+                        bought_amount = float(amount)
+                        new_amount = current_amount + bought_amount
+                        new_amount_str = str(new_amount)
 
-                        # Create a WalletTokenBase instance instead of using a dictionary
-                        update_data = WalletTokenBase(
+                        # Create a HolderBase instance for the update
+                        update_data = HolderBase(
                             wallet_id=record.wallet_id,
                             token_id=record.token_id,
                             dao_id=record.dao_id,
-                            amount=new_amount,
-                            updated_at=datetime.now(),
+                            amount=new_amount_str,
                         )
 
-                        backend.update_wallet_token(record.id, update_data)
+                        backend.update_holder(record.id, update_data)
                         self.logger.info(
-                            f"Updated token balance for wallet {wallet.id}: "
-                            f"token {token.id} (DAO {dao_id}), new amount: {new_amount}"
+                            f"Updated token balance after buy for wallet {wallet.id}: "
+                            f"token {token.id} (DAO {dao_id}), new amount: {new_amount_str}"
                         )
                     else:
                         # Create new record
-                        new_record = WalletTokenCreate(
+                        new_record = HolderCreate(
                             wallet_id=wallet.id,
                             token_id=token.id,
                             dao_id=dao_id,
-                            amount=amount,
+                            amount=str(amount),
                         )
-                        backend.create_wallet_token(new_record)
+                        backend.create_holder(new_record)
                         self.logger.info(
-                            f"Added new token to wallet {wallet.id}: "
+                            f"Created new token balance record for wallet {wallet.id}: "
                             f"token {token.id} (DAO {dao_id}), amount: {amount}"
                         )
             else:

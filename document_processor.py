@@ -26,6 +26,7 @@ from backend.models import (
     DAOFilter,
     Extension,
     ExtensionFilter,
+    HolderFilter,
     Proposal,
     ProposalFilter,
     Token,
@@ -386,6 +387,46 @@ def extract_dao_documents() -> List[Document]:
                     },
                 )
                 documents.append(wallet_token_doc)
+
+            # Process token holders
+            holders = backend.list_holders(HolderFilter(dao_id=dao.id))
+            if holders:
+                print(f"Found {len(holders)} holders for DAO {dao.name}")
+
+                # Create content for token holders
+                holder_content = f"""
+                Token Holders for DAO {dao.name}
+                ===================================
+                """
+
+                for holder in holders:
+                    # Get wallet info
+                    wallet = backend.get_wallet(holder.wallet_id)
+                    if not wallet:
+                        continue
+
+                    # Get token info
+                    token = backend.get_token(holder.token_id)
+                    if not token:
+                        continue
+
+                    holder_content += f"""
+                    Wallet: {wallet.mainnet_address or wallet.testnet_address}
+                    Token: {token.name} ({token.symbol})
+                    Amount: {holder.amount}
+                    """
+
+                # Create document for token holders
+                holder_doc = Document(
+                    page_content=holder_content,
+                    metadata={
+                        "type": "holders",
+                        "dao_id": str(dao.id),
+                        "dao_name": dao.name,
+                        "entity_type": "holders",
+                    },
+                )
+                documents.append(holder_doc)
 
         # Split the documents if they are too large
         text_splitter = RecursiveCharacterTextSplitter(

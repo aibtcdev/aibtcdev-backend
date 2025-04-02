@@ -8,10 +8,6 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    AgentPrompt,
-    AgentPromptBase,
-    AgentPromptCreate,
-    AgentPromptFilter,
     AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
@@ -24,6 +20,10 @@ from backend.models import (
     ExtensionBase,
     ExtensionCreate,
     ExtensionFilter,
+    Holder,
+    HolderBase,
+    HolderCreate,
+    HolderFilter,
     Job,
     JobBase,
     JobCreate,
@@ -36,6 +36,10 @@ from backend.models import (
     ProfileBase,
     ProfileCreate,
     ProfileFilter,
+    Prompt,
+    PromptBase,
+    PromptCreate,
+    PromptFilter,
     Proposal,
     ProposalBase,
     ProposalCreate,
@@ -74,10 +78,6 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
-    WalletToken,
-    WalletTokenBase,
-    WalletTokenCreate,
-    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -284,43 +284,6 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_wallet(self, wallet_id: UUID) -> bool:
-        pass
-
-    # ----------- WALLET TOKENS -----------
-    @abstractmethod
-    def create_wallet_token(self, new_wallet_token: WalletTokenCreate) -> WalletToken:
-        pass
-
-    @abstractmethod
-    def get_wallet_token(self, wallet_token_id: UUID) -> Optional[WalletToken]:
-        pass
-
-    @abstractmethod
-    def list_wallet_tokens(
-        self, filters: Optional[WalletTokenFilter] = None
-    ) -> List[WalletToken]:
-        pass
-
-    @abstractmethod
-    def update_wallet_token(
-        self, wallet_token_id: UUID, update_data: WalletTokenBase
-    ) -> Optional[WalletToken]:
-        pass
-
-    @abstractmethod
-    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
-        pass
-
-    @abstractmethod
-    def get_agents_with_dao_tokens(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
-        """Get all agents with wallets that hold tokens for a specific DAO.
-
-        Args:
-            dao_id: The ID of the DAO
-
-        Returns:
-            List of agent info with wallet and token details
-        """
         pass
 
     # ----------- AGENTS -----------
@@ -681,30 +644,55 @@ class AbstractBackend(ABC):
 
     # ----------- AGENT PROMPTS -----------
     @abstractmethod
-    def create_agent_prompt(self, new_prompt: AgentPromptCreate) -> AgentPrompt:
-        """Create a new agent prompt."""
+    def create_prompt(self, new_prompt: PromptCreate) -> Prompt:
+        """Create a new prompt."""
         pass
 
     @abstractmethod
-    def get_agent_prompt(self, prompt_id: UUID) -> Optional[AgentPrompt]:
-        """Get an agent prompt by ID."""
+    def get_prompt(self, prompt_id: UUID) -> Optional[Prompt]:
+        """Get a prompt by ID."""
         pass
 
     @abstractmethod
-    def list_agent_prompts(
-        self, filters: Optional[AgentPromptFilter] = None
-    ) -> List[AgentPrompt]:
-        """List agent prompts with optional filters."""
+    def list_prompts(self, filters: Optional[PromptFilter] = None) -> List[Prompt]:
+        """List prompts with optional filters."""
         pass
 
     @abstractmethod
-    def update_agent_prompt(
-        self, prompt_id: UUID, update_data: AgentPromptBase
-    ) -> Optional[AgentPrompt]:
-        """Update an agent prompt."""
+    def update_prompt(
+        self, prompt_id: UUID, update_data: PromptBase
+    ) -> Optional[Prompt]:
+        """Update a prompt."""
         pass
 
     @abstractmethod
-    def delete_agent_prompt(self, prompt_id: UUID) -> bool:
-        """Delete an agent prompt."""
+    def delete_prompt(self, prompt_id: UUID) -> bool:
+        """Delete a prompt."""
+        pass
+
+    @abstractmethod
+    def create_holder(self, new_holder: HolderCreate) -> Holder:
+        """Create a new holder record."""
+        pass
+
+    @abstractmethod
+    def get_holder(self, holder_id: UUID) -> Optional[Holder]:
+        """Get a holder record by ID."""
+        pass
+
+    @abstractmethod
+    def list_holders(self, filters: Optional[HolderFilter] = None) -> List[Holder]:
+        """List holder records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_holder(
+        self, holder_id: UUID, update_data: HolderBase
+    ) -> Optional[Holder]:
+        """Update a holder record."""
+        pass
+
+    @abstractmethod
+    def delete_holder(self, holder_id: UUID) -> bool:
+        """Delete a holder record."""
         pass

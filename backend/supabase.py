@@ -17,10 +17,6 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    AgentPrompt,
-    AgentPromptBase,
-    AgentPromptCreate,
-    AgentPromptFilter,
     AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
@@ -33,6 +29,10 @@ from backend.models import (
     ExtensionBase,
     ExtensionCreate,
     ExtensionFilter,
+    Holder,
+    HolderBase,
+    HolderCreate,
+    HolderFilter,
     Job,
     JobBase,
     JobCreate,
@@ -45,6 +45,10 @@ from backend.models import (
     ProfileBase,
     ProfileCreate,
     ProfileFilter,
+    Prompt,
+    PromptBase,
+    PromptCreate,
+    PromptFilter,
     Proposal,
     ProposalBase,
     ProposalCreate,
@@ -84,10 +88,6 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
-    WalletToken,
-    WalletTokenBase,
-    WalletTokenCreate,
-    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -376,21 +376,21 @@ class SupabaseBackend(AbstractBackend):
             return False
 
     # ----------------------------------------------------------------
-    # 18. AGENT PROMPTS
+    # 18. PROMPTS
     # ----------------------------------------------------------------
-    def create_agent_prompt(self, new_prompt: "AgentPromptCreate") -> "AgentPrompt":
-        """Create a new agent prompt."""
+    def create_prompt(self, new_prompt: "PromptCreate") -> "Prompt":
+        """Create a new prompt."""
         payload = new_prompt.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("agent_prompts").insert(payload).execute()
+        response = self.client.table("prompts").insert(payload).execute()
         data = response.data or []
         if not data:
-            raise ValueError("No data returned from agent_prompts insert.")
-        return AgentPrompt(**data[0])
+            raise ValueError("No data returned from prompts insert.")
+        return Prompt(**data[0])
 
-    def get_agent_prompt(self, prompt_id: UUID) -> Optional["AgentPrompt"]:
-        """Get an agent prompt by ID."""
+    def get_prompt(self, prompt_id: UUID) -> Optional["Prompt"]:
+        """Get a prompt by ID."""
         response = (
-            self.client.table("agent_prompts")
+            self.client.table("prompts")
             .select("*")
             .eq("id", str(prompt_id))
             .single()
@@ -398,37 +398,33 @@ class SupabaseBackend(AbstractBackend):
         )
         if not response.data:
             return None
-        return AgentPrompt(**response.data)
+        return Prompt(**response.data)
 
-    def list_agent_prompts(
-        self, filters: Optional["AgentPromptFilter"] = None
-    ) -> List["AgentPrompt"]:
-        """List agent prompts with optional filters."""
-        query = self.client.table("agent_prompts").select("*")
+    def list_prompts(self, filters: Optional["PromptFilter"] = None) -> List["Prompt"]:
+        """List prompts with optional filters."""
+        query = self.client.table("prompts").select("*")
         if filters:
             if filters.dao_id is not None:
                 query = query.eq("dao_id", str(filters.dao_id))
             if filters.agent_id is not None:
                 query = query.eq("agent_id", str(filters.agent_id))
-            if filters.name is not None:
-                query = query.eq("name", filters.name)
-            if filters.prompt_type is not None:
-                query = query.eq("prompt_type", filters.prompt_type)
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
             if filters.is_active is not None:
                 query = query.eq("is_active", filters.is_active)
         response = query.execute()
         data = response.data or []
-        return [AgentPrompt(**row) for row in data]
+        return [Prompt(**row) for row in data]
 
-    def update_agent_prompt(
-        self, prompt_id: UUID, update_data: "AgentPromptBase"
-    ) -> Optional["AgentPrompt"]:
-        """Update an agent prompt."""
+    def update_prompt(
+        self, prompt_id: UUID, update_data: "PromptBase"
+    ) -> Optional["Prompt"]:
+        """Update a prompt."""
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
-            return self.get_agent_prompt(prompt_id)
+            return self.get_prompt(prompt_id)
         response = (
-            self.client.table("agent_prompts")
+            self.client.table("prompts")
             .update(payload)
             .eq("id", str(prompt_id))
             .execute()
@@ -436,15 +432,12 @@ class SupabaseBackend(AbstractBackend):
         updated = response.data or []
         if not updated:
             return None
-        return AgentPrompt(**updated[0])
+        return Prompt(**updated[0])
 
-    def delete_agent_prompt(self, prompt_id: UUID) -> bool:
-        """Delete an agent prompt."""
+    def delete_prompt(self, prompt_id: UUID) -> bool:
+        """Delete a prompt."""
         response = (
-            self.client.table("agent_prompts")
-            .delete()
-            .eq("id", str(prompt_id))
-            .execute()
+            self.client.table("prompts").delete().eq("id", str(prompt_id)).execute()
         )
         deleted = response.data or []
         return len(deleted) > 0
@@ -765,83 +758,16 @@ class SupabaseBackend(AbstractBackend):
         deleted = response.data or []
         return len(deleted) > 0
 
-    # ----------------------------------------------------------------
-    # 1. WALLET TOKENS
-    # ----------------------------------------------------------------
-    def create_wallet_token(
-        self, new_wallet_token: "WalletTokenCreate"
-    ) -> "WalletToken":
-        payload = new_wallet_token.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("wallet_tokens").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from wallet_tokens insert.")
-        return WalletToken(**data[0])
-
-    def get_wallet_token(self, wallet_token_id: UUID) -> Optional["WalletToken"]:
-        response = (
-            self.client.table("wallet_tokens")
-            .select("*")
-            .eq("id", str(wallet_token_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return WalletToken(**response.data)
-
-    def list_wallet_tokens(
-        self, filters: Optional["WalletTokenFilter"] = None
-    ) -> List["WalletToken"]:
-        query = self.client.table("wallet_tokens").select("*")
-        if filters:
-            if filters.wallet_id is not None:
-                query = query.eq("wallet_id", str(filters.wallet_id))
-            if filters.token_id is not None:
-                query = query.eq("token_id", str(filters.token_id))
-            if filters.dao_id is not None:
-                query = query.eq("dao_id", str(filters.dao_id))
-        response = query.execute()
-        data = response.data or []
-        return [WalletToken(**row) for row in data]
-
-    def update_wallet_token(
-        self, wallet_token_id: UUID, update_data: "WalletTokenBase"
-    ) -> Optional["WalletToken"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_wallet_token(wallet_token_id)
-        response = (
-            self.client.table("wallet_tokens")
-            .update(payload)
-            .eq("id", str(wallet_token_id))
-            .execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return WalletToken(**updated[0])
-
-    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
-        response = (
-            self.client.table("wallet_tokens")
-            .delete()
-            .eq("id", str(wallet_token_id))
-            .execute()
-        )
-        deleted = response.data or []
-        return len(deleted) > 0
-
     def get_agents_with_dao_tokens(
         self, dao_id: UUID
     ) -> List["AgentWithWalletTokenDTO"]:
         """Get all agents with wallets that hold tokens for a specific DAO using models."""
         result = []
 
-        # Step 1: Find all wallet tokens for this DAO
-        wallet_tokens = self.list_wallet_tokens(WalletTokenFilter(dao_id=dao_id))
+        # Step 1: Find all holders for this DAO
+        holders = self.list_holders(HolderFilter(dao_id=dao_id))
 
-        if not wallet_tokens:
+        if not holders:
             return []
 
         # Get the DAO information once
@@ -850,12 +776,12 @@ class SupabaseBackend(AbstractBackend):
             logger.warning(f"DAO with ID {dao_id} not found")
             return []
 
-        # Process each wallet token
-        for wallet_token in wallet_tokens:
+        # Process each holder
+        for holder in holders:
             # Step 2: Get the wallet
-            wallet = self.get_wallet(wallet_token.wallet_id)
+            wallet = self.get_wallet(holder.wallet_id)
             if not wallet:
-                logger.warning(f"Wallet with ID {wallet_token.wallet_id} not found")
+                logger.warning(f"Wallet with ID {holder.wallet_id} not found")
                 continue
 
             # Skip wallets not associated with agents
@@ -869,9 +795,9 @@ class SupabaseBackend(AbstractBackend):
                 continue
 
             # Step 4: Get the token
-            token = self.get_token(wallet_token.token_id)
+            token = self.get_token(holder.token_id)
             if not token:
-                logger.warning(f"Token with ID {wallet_token.token_id} not found")
+                logger.warning(f"Token with ID {holder.token_id} not found")
                 continue
 
             # Step 5: Create the DTO
@@ -888,7 +814,7 @@ class SupabaseBackend(AbstractBackend):
                     wallet_id=wallet.id,
                     wallet_address=wallet_address,
                     token_id=token.id,
-                    token_amount=wallet_token.amount,
+                    token_amount=holder.amount,
                     dao_id=dao_id,
                     dao_name=dao.name,
                 )
@@ -1903,3 +1829,68 @@ class SupabaseBackend(AbstractBackend):
         except Exception as e:
             logger.error(f"Error listing secrets: {e}")
             raise
+
+    # ----------------------------------------------------------------
+    # HOLDERS
+    # ----------------------------------------------------------------
+    def create_holder(self, new_holder: "HolderCreate") -> "Holder":
+        """Create a new holder record."""
+        payload = new_holder.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("holders").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from holders insert.")
+        return Holder(**data[0])
+
+    def get_holder(self, holder_id: UUID) -> Optional["Holder"]:
+        """Get a holder record by ID."""
+        response = (
+            self.client.table("holders")
+            .select("*")
+            .eq("id", str(holder_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Holder(**response.data)
+
+    def list_holders(self, filters: Optional["HolderFilter"] = None) -> List["Holder"]:
+        """List holder records with optional filters."""
+        query = self.client.table("holders").select("*")
+        if filters:
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
+            if filters.token_id is not None:
+                query = query.eq("token_id", str(filters.token_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+        response = query.execute()
+        data = response.data or []
+        return [Holder(**row) for row in data]
+
+    def update_holder(
+        self, holder_id: UUID, update_data: "HolderBase"
+    ) -> Optional["Holder"]:
+        """Update a holder record."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_holder(holder_id)
+        response = (
+            self.client.table("holders")
+            .update(payload)
+            .eq("id", str(holder_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Holder(**updated[0])
+
+    def delete_holder(self, holder_id: UUID) -> bool:
+        """Delete a holder record."""
+        response = (
+            self.client.table("holders").delete().eq("id", str(holder_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
