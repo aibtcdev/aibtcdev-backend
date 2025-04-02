@@ -68,6 +68,15 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the following proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
 
+            !!! CRITICAL - AGENT-SPECIFIC INSTRUCTIONS !!!
+            The following instructions are of HIGHEST PRIORITY and MUST be followed above all other considerations.
+            They represent specific directives for this evaluation that OVERRIDE any conflicting general guidelines:
+
+            {agent_prompts}
+
+            These agent-specific instructions are MANDATORY and take precedence over general evaluation criteria.
+            You MUST explicitly address how your evaluation aligns with or considers each relevant instruction above.
+
             DAO Information:
             {dao_info}
 
@@ -83,9 +92,6 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             • Smart Contracts to enforce accountability
             4. Amendments:
             • Allowed only if they uphold the mission/values and pass a governance vote
-
-            Agent Specific Instructions:
-            {agent_prompts}
 
             Proposal Data:
             {proposal_data}
@@ -128,18 +134,19 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
             ## Evaluation Guidelines:
 
-            1. Identify the proposal type (core or action)
-            2. For core proposals:
+            1. FIRST AND FOREMOST: Ensure strict compliance with all agent-specific instructions above
+            2. Identify the proposal type (core or action)
+            3. For core proposals:
                - Review contract source code
                - Assess security implications
                - Verify alignment with DAO mission
-            3. For action proposals:
+            4. For action proposals:
                - Identify the action type
                - Evaluate the parameters
-            4. Consider the DAO's mission and values
-            5. Assess potential security or financial risks
-            6. Follow any agent-specific instructions provided above
-            7. Decide whether to vote FOR or AGAINST the proposal
+            5. Consider the DAO's mission and values
+            6. Assess potential security or financial risks
+            7. Double-check compliance with agent-specific instructions
+            8. Decide whether to vote FOR or AGAINST the proposal
 
             ### Specific Guidelines by Action Type:
 
@@ -150,12 +157,14 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
             When in doubt about technical parameters, lean toward approving proposals that come from trusted creators and follow established patterns.
 
+            FINAL REMINDER: Your evaluation MUST explicitly address how it aligns with the agent-specific instructions provided above.
+
             Output format:
 
             {{
             "approve": bool,  # true to vote FOR, false to vote AGAINST the proposal
             "confidence_score": float,  # between 0.0 and 1.0
-            "reasoning": str  # detailed explanation of your decision
+            "reasoning": str  # detailed explanation of your decision, with explicit reference to agent instructions
             }}
             """,
         )
