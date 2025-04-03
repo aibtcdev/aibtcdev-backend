@@ -64,9 +64,8 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
 
         # Create a separate LLM for planning with streaming enabled
         self.planning_llm = ChatOpenAI(
-            model="gpt-4o",
+            model="o3-mini",
             streaming=True,  # Enable streaming for the planning LLM
-            temperature=0.1,  # Lower temperature for more structured planning
             callbacks=[callback_handler],
         )
 

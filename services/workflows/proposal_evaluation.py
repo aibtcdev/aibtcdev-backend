@@ -628,7 +628,7 @@ async def evaluate_and_vote_on_proposal(
         }
 
         # Create and run workflow
-        workflow = ProposalEvaluationWorkflow(model_name="gpt-4o")
+        workflow = ProposalEvaluationWorkflow(model_name="o3-mini", temperature=None)
         if not workflow._validate_state(state):
             return {
                 "success": False,

@@ -469,11 +469,11 @@ class WorkflowBuilder:
         self.model_name = model_name
         return self
 
-    def with_temperature(self, temperature: float) -> "WorkflowBuilder":
+    def with_temperature(self, temperature: Optional[float]) -> "WorkflowBuilder":
         """Set the temperature for the workflow.
 
         Args:
-            temperature: The temperature to use
+            temperature: The temperature to use, can be a float or None
 
         Returns:
             Self for chaining

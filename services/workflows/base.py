@@ -56,7 +56,7 @@ class BaseWorkflow(Generic[StateType]):
     def __init__(
         self,
         model_name: str = "gpt-4o",
-        temperature: float = 0.1,
+        temperature: Optional[float] = 0.1,
         streaming: bool = True,
         callbacks: Optional[List[Any]] = None,
     ):
@@ -64,7 +64,7 @@ class BaseWorkflow(Generic[StateType]):
 
         Args:
             model_name: LLM model to use
-            temperature: Temperature for LLM generation
+            temperature: Temperature for LLM generation, can be a float or None
             streaming: Whether to enable streaming
             callbacks: Optional callback handlers
         """
