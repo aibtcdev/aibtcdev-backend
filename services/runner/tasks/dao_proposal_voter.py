@@ -126,6 +126,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             approval = evaluation.get("approve", False)
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
+            formatted_prompt = evaluation.get("formatted_prompt", "No prompt provided")
             vote_created = False
             vote_id = None
 
@@ -169,6 +170,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 agent_id=wallet.agent_id if wallet and wallet.agent_id else None,
                 answer=approval,
                 proposal_id=proposal_id,
+                prompt=formatted_prompt,
                 reasoning=reasoning,
                 tx_id=tx_id,
                 address=wallet_address,

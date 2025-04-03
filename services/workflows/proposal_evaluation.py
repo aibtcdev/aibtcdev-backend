@@ -51,6 +51,7 @@ class EvaluationState(TypedDict):
     wallet_id: Optional[UUID]
     confidence_threshold: float
     auto_vote: bool
+    formatted_prompt: str
 
 
 class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
@@ -241,6 +242,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.debug(f"LLM evaluation result: {result}")
 
                 # Update state
+                state["formatted_prompt"] = formatted_prompt
                 state["approve"] = result.approve
                 state["confidence_score"] = result.confidence_score
                 state["reasoning"] = result.reasoning
@@ -626,7 +628,7 @@ async def evaluate_and_vote_on_proposal(
         }
 
         # Create and run workflow
-        workflow = ProposalEvaluationWorkflow()
+        workflow = ProposalEvaluationWorkflow(model_name="o3-mini")
         if not workflow._validate_state(state):
             return {
                 "success": False,
@@ -660,6 +662,7 @@ async def evaluate_and_vote_on_proposal(
             "auto_voted": auto_vote
             and result["confidence_score"] >= confidence_threshold,
             "tx_id": tx_id,
+            "formatted_prompt": result["formatted_prompt"],
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
