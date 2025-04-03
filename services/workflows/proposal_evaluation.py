@@ -1,7 +1,7 @@
 """Proposal evaluation workflow."""
 
 import binascii
-from typing import Dict, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
@@ -52,6 +52,7 @@ class EvaluationState(TypedDict):
     confidence_threshold: float
     auto_vote: bool
     formatted_prompt: str
+    agent_prompts: List[Dict]
 
 
 class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
