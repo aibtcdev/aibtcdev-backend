@@ -618,7 +618,7 @@ async def evaluate_and_vote_on_proposal(
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
 
         # Create and run workflow
-        workflow = ProposalEvaluationWorkflow(model_name="o3-mini", temperature=None)
+        workflow = ProposalEvaluationWorkflow()
         if not workflow._validate_state(state):
             return {
                 "success": False,
