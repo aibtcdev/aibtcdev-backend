@@ -114,7 +114,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             result = await evaluate_and_vote_on_proposal(
                 proposal_id=proposal.id,
-                dao_name=dao.name,
                 wallet_id=wallet_id,
                 auto_vote=self.DEFAULT_AUTO_VOTE,
                 confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,

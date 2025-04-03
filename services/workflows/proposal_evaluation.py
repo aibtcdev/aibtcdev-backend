@@ -217,12 +217,24 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 # Format agent prompts as a string
                 agent_prompts_str = "No agent-specific instructions available."
                 if state.get("agent_prompts"):
-                    agent_prompts_str = "\n\n".join(
-                        [
-                            f"--- {p['name']} ({p['type']}) ---\n{p['text']}"
-                            for p in state["agent_prompts"]
-                        ]
+                    logger.debug(
+                        f"Raw agent prompts from state: {state['agent_prompts']}"
                     )
+                    if (
+                        isinstance(state["agent_prompts"], list)
+                        and state["agent_prompts"]
+                    ):
+                        # Just use the prompt text directly since that's what we're storing
+                        agent_prompts_str = "\n\n".join(state["agent_prompts"])
+                        logger.debug(
+                            f"Formatted agent prompts string: {agent_prompts_str}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Invalid agent prompts format in state: {type(state['agent_prompts'])}"
+                        )
+                else:
+                    logger.warning("No agent prompts found in state")
 
                 formatted_prompt = prompt.format(
                     proposal_data=proposal_data,
@@ -495,7 +507,6 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
 
 async def evaluate_and_vote_on_proposal(
     proposal_id: UUID,
-    dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
     auto_vote: bool = True,
     confidence_threshold: float = 0.7,
@@ -505,7 +516,6 @@ async def evaluate_and_vote_on_proposal(
 
     Args:
         proposal_id: The ID of the proposal to evaluate and vote on
-        dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for voting
         auto_vote: Whether to automatically vote based on the evaluation
         confidence_threshold: Minimum confidence score required to auto-vote (0.0-1.0)
@@ -595,6 +605,9 @@ async def evaluate_and_vote_on_proposal(
         # Get agent prompts
         agent_prompts = []
         try:
+            logger.debug(
+                f"Fetching prompts for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
+            )
             prompts = backend.list_prompts(
                 PromptFilter(
                     agent_id=agent_id,
@@ -602,13 +615,21 @@ async def evaluate_and_vote_on_proposal(
                     is_active=True,
                 )
             )
+            logger.debug(f"Raw prompts from database: {prompts}")
+
             # Extract prompt texts
             agent_prompts = [p.prompt_text for p in prompts if p.prompt_text]
+            logger.debug(f"Extracted agent prompts: {agent_prompts}")
+
             logger.info(
                 f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
             )
+            if not agent_prompts:
+                logger.warning(
+                    f"No active prompts found for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
+                )
         except Exception as e:
-            logger.error(f"Error getting agent prompts: {e}")
+            logger.error(f"Error getting agent prompts: {e}", exc_info=True)
 
         # Initialize state
         state = {
@@ -626,6 +647,8 @@ async def evaluate_and_vote_on_proposal(
             "confidence_threshold": confidence_threshold,
             "auto_vote": auto_vote,
         }
+
+        logger.debug(f"State agent_prompts: {state['agent_prompts']}")
 
         # Create and run workflow
         workflow = ProposalEvaluationWorkflow(model_name="o3-mini", temperature=None)
@@ -674,16 +697,12 @@ async def evaluate_and_vote_on_proposal(
 
 async def evaluate_proposal_only(
     proposal_id: UUID,
-    dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
 ) -> Dict:
     """Evaluate a proposal without voting.
 
     Args:
-        action_proposals_contract: The contract ID of the DAO action proposals
-        action_proposals_voting_extension: The contract ID of the DAO action proposals voting extension
         proposal_id: The ID of the proposal to evaluate
-        dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for retrieving proposal data
 
     Returns:
@@ -691,7 +710,6 @@ async def evaluate_proposal_only(
     """
     result = await evaluate_and_vote_on_proposal(
         proposal_id=proposal_id,
-        dao_name=dao_name,
         wallet_id=wallet_id,
         auto_vote=True,
     )
