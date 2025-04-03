@@ -111,16 +111,28 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             - 0.7-0.8: High confidence (minor concerns if any)
             - 0.9-1.0: Very high confidence (clear positive alignment)
 
+            # 8. QUALITY STANDARDS
+            Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
+            • Be clear and specific — avoid vagueness or filler
+            • Use a consistent tone, but reflect the DAO's personality if known
+            • Avoid casual throwaway phrases, sarcasm, or hype
+            • Don't hedge — take a position and justify it clearly
+            • Make every point logically sound and backed by facts or context
+            • Cite relevant parts of the proposal, DAO mission, or prior actions
+            • Use terms accurately — don't fake precision
+            • Keep structure clean and easy to follow
+
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
             {{
                 "approve": boolean,  // true for FOR, false for AGAINST
                 "confidence_score": float,  // MUST be from the confidence bands above
-                "reasoning": string  // Brief explanation addressing:
+                "reasoning": string  // Brief, professional explanation addressing:
                                    // 1. How agent instructions were applied
                                    // 2. How DAO context influenced decision
                                    // 3. How AIBTC Charter alignment was considered
                                    // 4. Key factors in confidence score selection
+                                   // Must be clear, precise, and well-structured
             }}
             """,
         )
