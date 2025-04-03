@@ -126,7 +126,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             approval = evaluation.get("approve", False)
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
-            formatted_prompt = evaluation.get("formatted_prompt", "No prompt provided")
+            formatted_prompt = result.get("formatted_prompt", "No prompt provided")
             vote_created = False
             vote_id = None
 
