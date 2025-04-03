@@ -189,7 +189,7 @@ class FaktoryExecuteSellTool(BaseTool):
     def _deploy(
         self,
         token_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
@@ -205,29 +205,29 @@ class FaktoryExecuteSellTool(BaseTool):
             "stacks-faktory",
             "exec-sell.ts",
             token_amount,
-            dex_contract_id,
+            dao_token_dex_contract_address,
             slippage,
         )
 
     def _run(
         self,
         token_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order."""
-        return self._deploy(token_amount, dex_contract_id, slippage)
+        return self._deploy(token_amount, dao_token_dex_contract_address, slippage)
 
     async def _arun(
         self,
         token_amount: str,
-        dex_contract_id: str,
+        dao_token_dex_contract_address: str,
         slippage: Optional[str] = "15",
         **kwargs,
     ) -> str:
         """Execute the tool to place a sell order (async)."""
-        return self._deploy(token_amount, dex_contract_id, slippage)
+        return self._deploy(token_amount, dao_token_dex_contract_address, slippage)
 
 
 class FaktoryGetBuyQuoteInput(BaseModel):

@@ -114,10 +114,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             result = await evaluate_and_vote_on_proposal(
                 proposal_id=proposal.id,
-                dao_name=dao.name,
                 wallet_id=wallet_id,
                 auto_vote=self.DEFAULT_AUTO_VOTE,
                 confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
+                dao_id=dao_id,
             )
 
             # Log the results
@@ -125,6 +125,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             approval = evaluation.get("approve", False)
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
+            formatted_prompt = result.get("formatted_prompt", "No prompt provided")
             vote_created = False
             vote_id = None
 
@@ -133,55 +134,55 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     f"Proposal {proposal.id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
                     f"with confidence {confidence:.2f}"
                 )
-
-                # Get wallet information for the address
-                wallet = backend.get_wallet(wallet_id) if wallet_id else None
-                wallet_address = None
-
-                # Select the appropriate wallet address based on network type
-                if wallet:
-                    network_type = config.network.network.lower()
-                    if network_type == "mainnet":
-                        wallet_address = wallet.mainnet_address
-                        logger.debug(f"Using mainnet address: {wallet_address}")
-                    else:  # testnet or other networks
-                        wallet_address = wallet.testnet_address
-                        logger.debug(f"Using testnet address: {wallet_address}")
-
-                    if not wallet_address:
-                        logger.warning(
-                            f"No {network_type} address found for wallet {wallet_id}"
-                        )
-
-                # Get transaction ID if available
-                tx_id = result.get("tx_id")
-
-                # Create a vote record in the database
-                vote_data = VoteCreate(
-                    wallet_id=wallet_id,
-                    dao_id=dao_id,
-                    agent_id=wallet.agent_id if wallet and wallet.agent_id else None,
-                    answer=approval,
-                    proposal_id=proposal_id,
-                    reasoning=reasoning,
-                    tx_id=tx_id,
-                    address=wallet_address,
-                )
-
-                try:
-                    vote = backend.create_vote(vote_data)
-                    vote_created = True
-                    vote_id = vote.id
-                    logger.info(
-                        f"Created vote record {vote.id} for proposal {proposal_id}"
-                    )
-                except Exception as vote_error:
-                    logger.error(f"Failed to create vote record: {str(vote_error)}")
             else:
                 logger.info(
-                    f"Proposal {proposal.id} ({dao.name}): No auto-vote - "
+                    f"Proposal {proposal.id} ({dao.name}): Evaluated but not auto-voted - "
                     f"confidence {confidence:.2f} below threshold"
                 )
+
+            # Get wallet information for the address
+            wallet = backend.get_wallet(wallet_id) if wallet_id else None
+            wallet_address = None
+
+            # Select the appropriate wallet address based on network type
+            if wallet:
+                network_type = config.network.network.lower()
+                if network_type == "mainnet":
+                    wallet_address = wallet.mainnet_address
+                    logger.debug(f"Using mainnet address: {wallet_address}")
+                else:  # testnet or other networks
+                    wallet_address = wallet.testnet_address
+                    logger.debug(f"Using testnet address: {wallet_address}")
+
+                if not wallet_address:
+                    logger.warning(
+                        f"No {network_type} address found for wallet {wallet_id}"
+                    )
+
+            # Get transaction ID if available (will be None if not auto-voted)
+            tx_id = result.get("tx_id")
+
+            # Always create a vote record to store the evaluation results
+            vote_data = VoteCreate(
+                wallet_id=wallet_id,
+                dao_id=dao_id,
+                agent_id=wallet.agent_id if wallet and wallet.agent_id else None,
+                answer=approval,
+                proposal_id=proposal_id,
+                prompt=formatted_prompt,
+                reasoning=reasoning,
+                tx_id=tx_id,
+                address=wallet_address,
+                confidence=confidence,
+            )
+
+            try:
+                vote = backend.create_vote(vote_data)
+                vote_created = True
+                vote_id = vote.id
+                logger.info(f"Created vote record {vote.id} for proposal {proposal_id}")
+            except Exception as vote_error:
+                logger.error(f"Failed to create vote record: {str(vote_error)}")
 
             logger.debug(f"Proposal {proposal.id} reasoning: {reasoning}")
 

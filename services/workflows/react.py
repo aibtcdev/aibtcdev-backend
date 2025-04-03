@@ -1,6 +1,8 @@
 """ReAct workflow functionality."""
 
 import asyncio
+import datetime
+import uuid
 from dataclasses import dataclass
 from typing import (
     Annotated,
@@ -23,6 +25,9 @@ from langgraph.prebuilt import ToolNode
 
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow, ExecutionError, StreamingError
+
+# Remove this import to avoid circular dependencies
+# from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
 
 logger = configure_logger(__name__)
 
@@ -116,10 +121,13 @@ class StreamingCallbackHandler(BaseCallbackHandler):
     ):
         """Initialize the callback handler with a queue."""
         self.queue = queue
-        self.current_tool = None
-        self.tool_inputs = {}  # Store tool inputs by tool name
+        self.tool_states = {}  # Store tool states by invocation ID
+        self.tool_inputs = {}  # Store tool inputs by invocation ID
+        self.active_tools = {}  # Track active tools by name for fallback
         self.custom_on_llm_new_token = on_llm_new_token
         self.custom_on_llm_end = on_llm_end
+        # Track the current execution phase
+        self.current_phase = "processing"  # Default phase is processing
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
         """Get the current event loop or create a new one if necessary."""
@@ -127,7 +135,7 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             loop = asyncio.get_running_loop()
             return loop
         except RuntimeError:
-            logger.warning("No running event loop found. Creating a new one.")
+            logger.debug("No running event loop found. Creating a new one.")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             return loop
@@ -155,48 +163,150 @@ class StreamingCallbackHandler(BaseCallbackHandler):
             logger.error(f"Failed to put item in queue: {str(e)}")
             raise StreamingError(f"Queue operation failed: {str(e)}")
 
+    def _get_tool_info(
+        self, invocation_id: Optional[str], tool_name: Optional[str] = None
+    ) -> Optional[tuple]:
+        """Get tool information using either invocation_id or tool_name.
+
+        Returns:
+            Optional[tuple]: (tool_name, tool_input, invocation_id) if found, None otherwise
+        """
+        if invocation_id and invocation_id in self.tool_states:
+            return (
+                self.tool_states[invocation_id],
+                self.tool_inputs.get(invocation_id, ""),
+                invocation_id,
+            )
+        elif tool_name and tool_name in self.active_tools:
+            active_info = self.active_tools[tool_name]
+            return (tool_name, active_info["input"], active_info["invocation_id"])
+        return None
+
+    async def process_step(
+        self, content: str, role: str = "assistant", thought: Optional[str] = None
+    ) -> None:
+        """Process a planning step and queue it with the planning status.
+
+        Args:
+            content: The planning step content
+            role: The role associated with the step (usually assistant)
+            thought: Optional thought process notes
+        """
+        try:
+            # Create step message with explicit planning status
+            current_time = datetime.datetime.now().isoformat()
+            step_message = {
+                "type": "step",
+                "status": "planning",  # Explicitly mark as planning phase
+                "content": content,
+                "role": role,
+                "thought": thought
+                or "Planning Phase",  # Default to Planning Phase if thought is not provided
+                "created_at": current_time,
+                "planning_only": True,  # Mark this content as planning-only to prevent duplication
+            }
+
+            logger.debug(f"Queuing planning step message with length: {len(content)}")
+            await self._async_put_to_queue(step_message)
+        except Exception as e:
+            logger.error(f"Failed to process planning step: {str(e)}")
+            raise StreamingError(f"Planning step processing failed: {str(e)}")
+
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs) -> None:
         """Run when tool starts running."""
-        self.current_tool = serialized.get("name")
+        tool_name = serialized.get("name")
+        if not tool_name:
+            logger.warning("Tool start called without tool name")
+            return
 
-        # Store the input for this tool
-        if self.current_tool:
-            self.tool_inputs[self.current_tool] = input_str
+        invocation_id = kwargs.get("invocation_id", str(uuid.uuid4()))
 
-        self._put_to_queue(
-            {
-                "type": "tool",
-                "tool": self.current_tool,
-                "input": input_str,
-                "status": "start",
-            }
-        )
+        # Store in both tracking systems
+        self.tool_states[invocation_id] = tool_name
+        self.tool_inputs[invocation_id] = input_str
+        self.active_tools[tool_name] = {
+            "invocation_id": invocation_id,
+            "input": input_str,
+            "start_time": datetime.datetime.now(),
+        }
+
         logger.info(
-            f"Tool started: {self.current_tool} with input: {input_str[:100]}..."
+            f"Tool started: {tool_name} (ID: {invocation_id}) with input: {input_str[:100]}..."
         )
 
     def on_tool_end(self, output: str, **kwargs) -> None:
         """Run when tool ends running."""
-        if self.current_tool:
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
+
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
+
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
             if hasattr(output, "content"):
                 output = output.content
-
-            # Retrieve the stored input for this tool
-            tool_input = self.tool_inputs.get(self.current_tool, "")
 
             self._put_to_queue(
                 {
                     "type": "tool",
-                    "tool": self.current_tool,
-                    "input": tool_input,  # Use the stored input instead of None
+                    "tool": tool_name,
+                    "input": tool_input,
                     "output": str(output),
-                    "status": "end",
+                    "status": "processing",  # Use "processing" status for tool end
+                    "created_at": datetime.datetime.now().isoformat(),
                 }
             )
             logger.info(
-                f"Tool {self.current_tool} completed with output length: {len(str(output))}"
+                f"Tool {tool_name} (ID: {used_invocation_id}) completed with output length: {len(str(output))}"
             )
-            self.current_tool = None
+
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool end called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
+
+    def on_tool_error(self, error: Exception, **kwargs) -> None:
+        """Run when tool errors."""
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
+
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
+
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
+            self._put_to_queue(
+                {
+                    "type": "tool",
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": f"Error: {str(error)}",
+                    "status": "error",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+            logger.error(
+                f"Tool {tool_name} (ID: {used_invocation_id}) failed with error: {str(error)}",
+                exc_info=True,
+            )
+
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool error called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
 
     def on_llm_start(self, *args, **kwargs) -> None:
         """Run when LLM starts running."""
@@ -204,38 +314,82 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Run on new token."""
+        # Check if we have planning_only in the kwargs
+        planning_only = kwargs.get("planning_only", False)
+
+        # Handle custom token processing if provided
         if self.custom_on_llm_new_token:
-            self.custom_on_llm_new_token(token, **kwargs)
-        logger.debug(f"Received new token (length: {len(token)})")
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_new_token):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_new_token(token, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_new_token(token, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom token handler: {str(e)}", exc_info=True)
+
+        # Log token information with phase information
+        phase = "planning" if planning_only else "processing"
+        logger.debug(f"Received new token (length: {len(token)}, phase: {phase})")
 
     def on_llm_end(self, response: LLMResult, **kwargs) -> None:
         """Run when LLM ends running."""
         logger.info("LLM processing completed")
+
+        # Queue an end message with complete status
+        try:
+            self._put_to_queue(
+                {
+                    "type": "token",
+                    "status": "complete",
+                    "content": "",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue completion message: {str(e)}")
+
+        # Handle custom end processing if provided
         if self.custom_on_llm_end:
-            self.custom_on_llm_end(response, **kwargs)
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_end):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_end(response, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_end(response, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom end handler: {str(e)}", exc_info=True)
 
     def on_llm_error(self, error: Exception, **kwargs) -> None:
         """Run when LLM errors."""
         logger.error(f"LLM error occurred: {str(error)}", exc_info=True)
-        raise ExecutionError("LLM processing failed", {"error": str(error)})
 
-    def on_tool_error(self, error: Exception, **kwargs) -> None:
-        """Run when tool errors."""
-        if self.current_tool:
+        # Send error status
+        try:
             self._put_to_queue(
                 {
-                    "type": "tool",
-                    "tool": self.current_tool,
-                    "input": None,
-                    "output": f"Error: {str(error)}",
+                    "type": "token",
                     "status": "error",
+                    "content": f"Error: {str(error)}",
+                    "created_at": datetime.datetime.now().isoformat(),
                 }
             )
-            logger.error(
-                f"Tool {self.current_tool} failed with error: {str(error)}",
-                exc_info=True,
-            )
-            self.current_tool = None
+        except Exception:
+            pass  # Don't raise another error if this fails
+
+        raise ExecutionError("LLM processing failed", {"error": str(error)})
 
 
 class ReactState(TypedDict):
@@ -257,12 +411,8 @@ class ReactWorkflow(BaseWorkflow[ReactState]):
         self.callback_handler = callback_handler
         self.tools = tools
         # Create a new LLM instance with the callback handler
-        self.llm = ChatOpenAI(
-            model=self.llm.model_name,
-            temperature=self.llm.temperature,
-            streaming=True,
-            callbacks=[callback_handler],
-        ).bind_tools(tools)
+        self.llm = self.create_llm_with_callbacks([callback_handler]).bind_tools(tools)
+        self.required_fields = ["messages"]
 
     def _create_prompt(self) -> None:
         """Not used in ReAct workflow."""
@@ -300,49 +450,49 @@ class LangGraphService:
     """Service for executing LangGraph operations"""
 
     def __init__(self):
+        """Initialize the service."""
         self.message_processor = MessageProcessor()
 
-    async def execute_react_stream(
+    async def _execute_stream_impl(
         self,
-        history: List[Dict],
+        messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
         input_str: str,
         persona: Optional[str] = None,
         tools_map: Optional[Dict] = None,
+        **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a ReAct stream using LangGraph."""
-        logger.info("Starting new LangGraph ReAct stream execution")
-        logger.debug(
-            f"Input parameters - History length: {len(history)}, "
-            f"Persona present: {bool(persona)}, "
-            f"Tools count: {len(tools_map) if tools_map else 0}"
-        )
+        """Execute a ReAct stream using LangGraph.
 
+        Args:
+            messages: Processed messages ready for the LLM
+            input_str: Current user input
+            persona: Optional persona to use
+            tools_map: Optional tools to use
+            **kwargs: Additional arguments
+
+        Returns:
+            Async generator of result chunks
+        """
         try:
+            # Import here to avoid circular dependencies
+            from services.workflows.workflow_service import (
+                BaseWorkflowService,
+                WorkflowBuilder,
+            )
+
+            # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            # Process messages
-            filtered_content = self.message_processor.extract_filtered_content(history)
-            messages = self.message_processor.convert_to_langchain_messages(
-                filtered_content, input_str, persona
-            )
-
             # Setup callback handler
-            callback_handler = StreamingCallbackHandler(
-                queue=callback_queue,
-                on_llm_new_token=lambda token,
-                **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "token", "content": token}), loop
-                ),
-                on_llm_end=lambda *args, **kwargs: asyncio.run_coroutine_threadsafe(
-                    callback_queue.put({"type": "end"}), loop
-                ),
-            )
+            callback_handler = self.setup_callback_handler(callback_queue, loop)
 
-            # Create workflow
-            workflow = ReactWorkflow(
-                callback_handler=callback_handler,
-                tools=list(tools_map.values()) if tools_map else [],
+            # Create workflow using builder pattern
+            workflow = (
+                WorkflowBuilder(ReactWorkflow)
+                .with_callback_handler(callback_handler)
+                .with_tools(list(tools_map.values()) if tools_map else [])
+                .build()
             )
 
             # Create graph and compile
@@ -356,37 +506,75 @@ class LangGraphService:
             )
 
             # Stream results
-            while not task.done():
-                try:
-                    data = await asyncio.wait_for(callback_queue.get(), timeout=0.1)
-                    if data:
-                        yield data
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    logger.error("Task cancelled unexpectedly")
-                    task.cancel()
-                    raise ExecutionError("Task cancelled unexpectedly")
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {str(e)}", exc_info=True)
-                    raise ExecutionError(f"Streaming error: {str(e)}")
-
-            # Get final result
-            result = await task
-            logger.info("Workflow execution completed successfully")
-            logger.debug(
-                f"Final result content length: {len(result['messages'][-1].content)}"
-            )
-
-            yield {
-                "type": "result",
-                "content": result["messages"][-1].content,
-                "tokens": None,
-            }
+            async for chunk in self.stream_task_results(task, callback_queue):
+                yield chunk
 
         except Exception as e:
             logger.error(f"Failed to execute ReAct stream: {str(e)}", exc_info=True)
             raise ExecutionError(f"ReAct stream execution failed: {str(e)}")
+
+    def setup_callback_handler(self, queue, loop):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        return BaseWorkflowService.create_callback_handler(queue, loop)
+
+    async def stream_task_results(self, task, queue):
+        # Import here to avoid circular dependencies
+        from services.workflows.workflow_service import BaseWorkflowService
+
+        # Use the static method instead of instantiating BaseWorkflowService
+        async for chunk in BaseWorkflowService.stream_results_from_task(
+            task=task, callback_queue=queue, logger_name=self.__class__.__name__
+        ):
+            yield chunk
+
+    # Keep the old method for backward compatibility
+    async def execute_react_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a ReAct stream using LangGraph."""
+        # Process messages for backward compatibility
+        filtered_content = self.message_processor.extract_filtered_content(history)
+        messages = self.message_processor.convert_to_langchain_messages(
+            filtered_content, input_str, persona
+        )
+
+        # Call the new implementation
+        async for chunk in self._execute_stream_impl(
+            messages=messages,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
+
+    # Add execute_stream as alias for consistency across services
+    async def execute_stream(
+        self,
+        history: List[Dict],
+        input_str: str,
+        persona: Optional[str] = None,
+        tools_map: Optional[Dict] = None,
+        **kwargs,
+    ) -> AsyncGenerator[Dict, None]:
+        """Execute a workflow stream.
+
+        This is an alias for execute_react_stream to maintain consistent API
+        across different workflow services.
+        """
+        async for chunk in self.execute_react_stream(
+            history=history,
+            input_str=input_str,
+            persona=persona,
+            tools_map=tools_map,
+        ):
+            yield chunk
 
 
 # Facade function for backward compatibility
@@ -398,7 +586,5 @@ async def execute_langgraph_stream(
 ) -> AsyncGenerator[Dict, None]:
     """Execute a ReAct stream using LangGraph with optional persona."""
     service = LangGraphService()
-    async for chunk in service.execute_react_stream(
-        history, input_str, persona, tools_map
-    ):
+    async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk

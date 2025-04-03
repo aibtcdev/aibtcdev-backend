@@ -470,6 +470,11 @@ class DeploySmartWalletInput(BaseModel):
         description="Contract principal of the DAO token",
         example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token",
     )
+    dao_token_dex_contract: str = Field(
+        ...,
+        description="Contract principal of the DAO token DEX",
+        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token-dex",
+    )
 
 
 class DeploySmartWalletTool(BaseTool):

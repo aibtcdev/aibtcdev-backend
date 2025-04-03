@@ -1,15 +1,23 @@
 """Proposal evaluation workflow."""
 
-from typing import Dict, Optional, TypedDict
+import binascii
+from typing import Dict, List, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
-from backend.models import UUID, Profile
+from backend.models import (
+    UUID,
+    Profile,
+    PromptFilter,
+    ProposalType,
+)
+from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflow
+from services.workflows.react import LangGraphService
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -43,6 +51,8 @@ class EvaluationState(TypedDict):
     wallet_id: Optional[UUID]
     confidence_threshold: float
     auto_vote: bool
+    formatted_prompt: str
+    agent_prompts: List[Dict]
 
 
 class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
@@ -51,76 +61,79 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
         return PromptTemplate(
-            input_variables=["proposal_data", "dao_info"],
+            input_variables=[
+                "proposal_data",
+                "dao_info",
+                "contract_source",
+                "agent_prompts",
+            ],
             template="""
-            You are a DAO proposal evaluator. Your task is to analyze the following action proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
+            You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
 
-            DAO Information:
-            {dao_info}
+            # 1. AGENT-SPECIFIC INSTRUCTIONS (HIGHEST PRIORITY)
+            {agent_prompts}
 
-            Note: The AIBTC Charter below represents high-level guiding principles for the AIBTC platform and AI agent operations, not the specific DAO’s own charter.
+            If no agent-specific instructions are provided, explicitly state: "No agent-specific instructions provided."
+            You MUST explain how each instruction influenced your decision.
 
-            AIBTC Charter
-            1. Mission: Elevate human potential through Autonomous Intelligence on Bitcoin.
-            2. Core Values:
-            • Curiosity | Truth Maximizing | Humanity’s Best Interests
-            • Transparency | Resilience | Collaboration
-            3. Guardrails:
-            • Decentralized Governance
-            • Smart Contracts to enforce accountability
-            4. Amendments:
-            • Allowed only if they uphold the mission/values and pass a governance vote
-
-            Proposal Data:
+            # 2. PROPOSAL INFORMATION
             {proposal_data}
 
-            # Action Proposal Types and Guidelines
+            # 3. DAO CONTEXT
+            {dao_info}
 
-            Action proposals are predefined operations that can be executed with specific voting requirements (66% approval threshold, 15% quorum). Each action is implemented as a smart contract that executes specific functionality through the DAO's extensions.
+            # 4. AIBTC CHARTER
+            Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
+            Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
+            Guardrails: Decentralized Governance, Smart Contract accountability
 
-            Focus on the "action" field in the proposal data to identify the proposal type, and the "parameters" field (a hexadecimal string starting with "0x") which contains the encoded content.
+            # 5. CONTRACT SOURCE (for core proposals)
+            {contract_source}
 
-            ## Available Action Types:
+            # 6. EVALUATION CRITERIA
+            For Core Proposals:
+            - Security implications
+            - Mission alignment
+            - Vulnerability assessment
+            - Impact analysis
 
-            ### Payment/Invoice Management
-            * **Add Resource** (`aibtc-action-add-resource`): Creates new payable resource in the payments system. Sets resource name, description, price, and URL.
-            * **Toggle Resource** (`aibtc-action-toggle-resource-by-name`): Enables or disables a payment resource.
+            For Action Proposals:
+            - Parameter validation
+            - Resource implications
+            - Security considerations
+            - Alignment with DAO goals
 
-            ### Treasury Management
-            * **Allow Asset** (`aibtc-action-allow-asset`): Adds FT or NFT to treasury allowlist. Enables deposits and withdrawals of the asset.
+            # 7. CONFIDENCE SCORING RUBRIC
+            You MUST choose one of these confidence bands:
+            - 0.0-0.2: Extremely low confidence (major red flags or insufficient information)
+            - 0.3-0.4: Low confidence (significant concerns or unclear implications)
+            - 0.5-0.6: Moderate confidence (some concerns but manageable)
+            - 0.7-0.8: High confidence (minor concerns if any)
+            - 0.9-1.0: Very high confidence (clear positive alignment)
 
-            ### Messaging
-            * **Send Message** (`aibtc-action-send-message`): Posts verified DAO message on-chain. Message includes DAO verification flag. Limited to 1MB size.
+            # 8. QUALITY STANDARDS
+            Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
+            • Be clear and specific — avoid vagueness or filler
+            • Use a consistent tone, but reflect the DAO's personality if known
+            • Avoid casual throwaway phrases, sarcasm, or hype
+            • Don't hedge — take a position and justify it clearly
+            • Make every point logically sound and backed by facts or context
+            • Cite relevant parts of the proposal, DAO mission, or prior actions
+            • Use terms accurately — don't fake precision
+            • Keep structure clean and easy to follow
 
-            ### Bank Account Configuration
-            * **Set Account Holder** (`aibtc-action-set-account-holder`): Designates authorized withdrawal address.
-            * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (0–100 STX).
-            * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (6–1,008 blocks).
-
-            ## Evaluation Guidelines:
-
-            1. Identify the action type from the proposal data
-            2. Evaluate the parameters based on the action type
-            3. Consider the DAO's mission and values (in addition to the overarching AIBTC Charter)
-            4. Assess potential security or financial risks
-            5. Decide whether to vote FOR or AGAINST the proposal
-
-            ### Specific Guidelines by Action Type:
-
-            * **For messaging actions**: Ensure the message is appropriate, aligned with DAO values, and doesn't contain harmful content.
-            * **For treasury actions**: Verify the asset is legitimate and appropriate for the DAO to interact with.
-            * **For payment actions**: Confirm the resource details are complete and pricing is reasonable.
-            * **For bank configuration**: Ensure parameters are within acceptable ranges and the account holder is trustworthy.
-
-            When in doubt about technical parameters, lean toward approving proposals that come from trusted creators and follow established patterns.
-
-            Output format:
-
-            {
-            “approve”: bool,  # true to vote FOR, false to vote AGAINST the proposal
-            “confidence_score”: float,  # between 0.0 and 1.0
-            “reasoning”: str  # detailed explanation of your decision
-            }
+            # OUTPUT FORMAT
+            Provide your evaluation in this exact JSON format:
+            {{
+                "approve": boolean,  // true for FOR, false for AGAINST
+                "confidence_score": float,  // MUST be from the confidence bands above
+                "reasoning": string  // Brief, professional explanation addressing:
+                                   // 1. How agent instructions were applied
+                                   // 2. How DAO context influenced decision
+                                   // 3. How AIBTC Charter alignment was considered
+                                   // 4. Key factors in confidence score selection
+                                   // Must be clear, precise, and well-structured
+            }}
             """,
         )
 
@@ -135,17 +148,68 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 # Get proposal data from state
                 proposal_data = state["proposal_data"]
 
-                # Ensure we have parameters
-                if not proposal_data.get("parameters"):
-                    raise ValueError("No parameters found in proposal data")
+                # If this is a core proposal, fetch the contract source
+                contract_source = ""
+                if proposal_data.get("type") == "core" and proposal_data.get(
+                    "proposal_contract"
+                ):
+                    # Split contract address into parts
+                    parts = proposal_data["proposal_contract"].split(".")
+                    if len(parts) >= 2:
+                        contract_address = parts[0]
+                        contract_name = parts[1]
+
+                        # Use HiroApi to fetch contract source
+                        try:
+                            api = HiroApi()
+                            result = api.get_contract_source(
+                                contract_address, contract_name
+                            )
+                            if "source" in result:
+                                contract_source = result["source"]
+                            else:
+                                logger.warning(
+                                    f"Could not find source code in API response: {result}"
+                                )
+                        except Exception as e:
+                            logger.error(f"Error fetching contract source: {str(e)}")
+                    else:
+                        logger.warning(
+                            f"Invalid contract address format: {proposal_data['proposal_contract']}"
+                        )
 
                 # Format prompt with state
                 self.logger.debug("Formatting evaluation prompt...")
+
+                # Format agent prompts as a string
+                agent_prompts_str = "No agent-specific instructions available."
+                if state.get("agent_prompts"):
+                    logger.debug(
+                        f"Raw agent prompts from state: {state['agent_prompts']}"
+                    )
+                    if (
+                        isinstance(state["agent_prompts"], list)
+                        and state["agent_prompts"]
+                    ):
+                        # Just use the prompt text directly since that's what we're storing
+                        agent_prompts_str = "\n\n".join(state["agent_prompts"])
+                        logger.debug(
+                            f"Formatted agent prompts string: {agent_prompts_str}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Invalid agent prompts format in state: {type(state['agent_prompts'])}"
+                        )
+                else:
+                    logger.warning("No agent prompts found in state")
+
                 formatted_prompt = prompt.format(
                     proposal_data=proposal_data,
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
+                    contract_source=contract_source,
+                    agent_prompts=agent_prompts_str,
                 )
 
                 # Get evaluation from LLM
@@ -157,6 +221,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.debug(f"LLM evaluation result: {result}")
 
                 # Update state
+                state["formatted_prompt"] = formatted_prompt
                 state["approve"] = result.approve
                 state["confidence_score"] = result.confidence_score
                 state["reasoning"] = result.reasoning
@@ -200,30 +265,67 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
                 return "skip_vote"
 
-        # Create voting node
+        # Create voting node using ReAct pattern
         async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
-            """Vote on the proposal based on the evaluation."""
+            """Vote on the proposal using ReAct workflow."""
             try:
-                # Initialize the VoteOnActionProposalTool
                 self.logger.debug(
-                    f"Preparing to vote on proposal {state['proposal_id']}, vote={state['approve']}"
+                    f"Setting up ReAct workflow to vote on proposal {state['proposal_id']}, vote={state['approve']}"
                 )
-                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
 
-                # Execute the vote
-                self.logger.debug("Executing vote...")
-                vote_result = await vote_tool._arun(
-                    action_proposals_voting_extension=state[
-                        "action_proposals_contract"
-                    ],
-                    proposal_id=state["proposal_id"],
-                    vote=state["approve"],
-                )
-                self.logger.debug(f"Vote result: {vote_result}")
+                # Set up the voting tool
+                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
+                tools_map = {"dao_action_vote_on_proposal": vote_tool}
+
+                # Create a user input message that instructs the LLM what to do
+                vote_instruction = f"""
+                I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}.
+                
+                Please vote {"FOR" if state['approve'] else "AGAINST"} the proposal.
+                
+                Use the dao_action_vote_on_proposal tool to submit the vote.
+                """
+
+                # Create LangGraph service
+                service = LangGraphService()
+
+                # History with system message only
+                history = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant tasked with voting on DAO proposals. Follow the instructions precisely.",
+                    }
+                ]
+
+                self.logger.debug("Executing ReAct workflow for voting...")
+
+                # Collect response chunks
+                response_chunks = []
+                vote_result = None
+
+                # Execute the ReAct workflow
+                async for chunk in service.execute_react_stream(
+                    history=history,
+                    input_str=vote_instruction,
+                    tools_map=tools_map,
+                ):
+                    response_chunks.append(chunk)
+                    self.logger.debug(f"ReAct chunk: {chunk}")
+
+                    # Extract tool results
+                    if (
+                        chunk.get("type") == "tool"
+                        and chunk.get("tool") == "dao_action_vote_on_proposal"
+                    ):
+                        if "output" in chunk:
+                            vote_result = chunk.get("output")
+                            self.logger.info(f"Vote result: {vote_result}")
 
                 # Update state with vote result
-                state["vote_result"] = vote_result
-                self.logger.info(f"Vote complete: {vote_result.get('success', False)}")
+                state["vote_result"] = {
+                    "success": vote_result is not None,
+                    "output": vote_result,
+                }
 
                 return state
             except Exception as e:
@@ -280,7 +382,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
 
     def _validate_state(self, state: EvaluationState) -> bool:
         """Validate the workflow state."""
-        required_fields = ["action_proposals_contract", "proposal_id", "proposal_data"]
+        required_fields = ["proposal_id", "proposal_data"]
 
         # Log the state for debugging
         self.logger.debug(f"Validating state: {state}")
@@ -294,9 +396,27 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Empty required field: {field}")
                 return False
 
-        # Ensure proposal_data has parameters
-        if not state["proposal_data"].get("parameters"):
-            self.logger.error("No parameters field in proposal_data")
+        # Get proposal type
+        proposal_type = state["proposal_data"].get("type", ProposalType.ACTION)
+
+        # Validate based on proposal type
+        if proposal_type == ProposalType.ACTION:
+            # Action proposals require action_proposals_contract and parameters
+            if not state.get("action_proposals_contract"):
+                self.logger.error(
+                    "Missing action_proposals_contract for action proposal"
+                )
+                return False
+            if not state["proposal_data"].get("parameters"):
+                self.logger.error("No parameters field in action proposal data")
+                return False
+        elif proposal_type == ProposalType.CORE:
+            # Core proposals require proposal_contract
+            if not state["proposal_data"].get("proposal_contract"):
+                self.logger.error("Missing proposal_contract for core proposal")
+                return False
+        else:
+            self.logger.error(f"Invalid proposal type: {proposal_type}")
             return False
 
         return True
@@ -336,21 +456,37 @@ def get_proposal_evaluation_tools(
     return filtered_tools
 
 
+def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
+    """Decodes a hexadecimal-encoded string if valid."""
+    if not hex_string:
+        return None
+    if hex_string.startswith("0x"):
+        hex_string = hex_string[2:]  # Remove "0x" prefix
+    try:
+        decoded_bytes = binascii.unhexlify(hex_string)
+        decoded_string = decoded_bytes.decode(
+            "utf-8", errors="ignore"
+        )  # Decode as UTF-8
+        return decoded_string
+    except (binascii.Error, UnicodeDecodeError):
+        return None  # Return None if decoding fails
+
+
 async def evaluate_and_vote_on_proposal(
     proposal_id: UUID,
-    dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
     auto_vote: bool = True,
     confidence_threshold: float = 0.7,
+    dao_id: Optional[UUID] = None,
 ) -> Dict:
     """Evaluate a proposal and automatically vote based on the evaluation.
 
     Args:
         proposal_id: The ID of the proposal to evaluate and vote on
-        dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for voting
         auto_vote: Whether to automatically vote based on the evaluation
         confidence_threshold: Minimum confidence score required to auto-vote (0.0-1.0)
+        dao_id: Optional DAO ID to explicitly pass to the workflow
 
     Returns:
         Dictionary containing the evaluation results and voting outcome
@@ -365,10 +501,16 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
+        # Decode parameters if they exist
+        decoded_parameters = decode_hex_parameters(proposal_data.parameters)
+        if decoded_parameters:
+            logger.debug(f"Decoded parameters: {decoded_parameters}")
+
         # Convert proposal data to dictionary and ensure parameters exist
         proposal_dict = {
             "proposal_id": proposal_data.proposal_id,
-            "parameters": proposal_data.parameters,
+            "parameters": decoded_parameters
+            or proposal_data.parameters,  # Use decoded if available
             "action": proposal_data.action,
             "caller": proposal_data.caller,
             "contract_principal": proposal_data.contract_principal,
@@ -377,19 +519,84 @@ async def evaluate_and_vote_on_proposal(
             "end_block": proposal_data.end_block,
             "start_block": proposal_data.start_block,
             "liquid_tokens": proposal_data.liquid_tokens,
+            "type": proposal_data.type,  # Add proposal type
+            "proposal_contract": proposal_data.proposal_contract,  # Add proposal contract for core proposals
         }
 
-        if not proposal_dict.get("parameters"):
-            error_msg = "No parameters found in proposal data"
+        # For action proposals, parameters are required
+        if proposal_data.type == ProposalType.ACTION and not proposal_dict.get(
+            "parameters"
+        ):
+            error_msg = "No parameters found in action proposal data"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        # Get DAO info
-        dao_info = backend.get_dao(proposal_data.dao_id)
-        if not dao_info:
-            error_msg = f"DAO with ID {proposal_data.dao_id} not found"
+        # For core proposals, proposal_contract is required
+        if proposal_data.type == ProposalType.CORE and not proposal_dict.get(
+            "proposal_contract"
+        ):
+            error_msg = "No proposal contract found in core proposal data"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
+
+        # Get DAO info based on provided dao_id or from proposal
+        dao_info = None
+        if dao_id:
+            logger.debug(f"Using provided DAO ID: {dao_id}")
+            dao_info = backend.get_dao(dao_id)
+            if not dao_info:
+                logger.warning(
+                    f"Provided DAO ID {dao_id} not found, falling back to proposal's DAO ID"
+                )
+
+        # If dao_info is still None, try to get it from proposal's dao_id
+        if not dao_info and proposal_data.dao_id:
+            logger.debug(f"Using proposal's DAO ID: {proposal_data.dao_id}")
+            dao_info = backend.get_dao(proposal_data.dao_id)
+
+        if not dao_info:
+            error_msg = "Could not find DAO information"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        logger.debug(f"Using DAO: {dao_info.name} (ID: {dao_info.id})")
+
+        # Get the wallet and agent information if available
+        agent_id = None
+        if wallet_id:
+            wallet = backend.get_wallet(wallet_id)
+            if wallet and wallet.agent_id:
+                agent_id = wallet.agent_id
+                logger.debug(f"Found agent ID {agent_id} for wallet {wallet_id}")
+
+        # Get agent prompts
+        agent_prompts = []
+        try:
+            logger.debug(
+                f"Fetching prompts for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
+            )
+            prompts = backend.list_prompts(
+                PromptFilter(
+                    agent_id=agent_id,
+                    dao_id=proposal_data.dao_id,
+                    is_active=True,
+                )
+            )
+            logger.debug(f"Raw prompts from database: {prompts}")
+
+            # Extract prompt texts
+            agent_prompts = [p.prompt_text for p in prompts if p.prompt_text]
+            logger.debug(f"Extracted agent prompts: {agent_prompts}")
+
+            logger.info(
+                f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
+            )
+            if not agent_prompts:
+                logger.warning(
+                    f"No active prompts found for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
+                )
+        except Exception as e:
+            logger.error(f"Error getting agent prompts: {e}", exc_info=True)
 
         # Initialize state
         state = {
@@ -397,7 +604,8 @@ async def evaluate_and_vote_on_proposal(
             "action_proposals_voting_extension": proposal_dict["action"],
             "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
-            "dao_info": dao_info or {},
+            "dao_info": dao_info.model_dump() if dao_info else {},
+            "agent_prompts": agent_prompts,  # Add agent prompts to state
             "approve": False,
             "confidence_score": 0.0,
             "reasoning": "",
@@ -406,6 +614,8 @@ async def evaluate_and_vote_on_proposal(
             "confidence_threshold": confidence_threshold,
             "auto_vote": auto_vote,
         }
+
+        logger.debug(f"State agent_prompts: {state['agent_prompts']}")
 
         # Create and run workflow
         workflow = ProposalEvaluationWorkflow()
@@ -422,7 +632,7 @@ async def evaluate_and_vote_on_proposal(
         if result.get("vote_result") and result["vote_result"].get("output"):
             # Try to extract tx_id from the output
             output = result["vote_result"]["output"]
-            if "txid:" in output.lower():
+            if isinstance(output, str) and "txid:" in output.lower():
                 # Extract the transaction ID from the output
                 for line in output.split("\n"):
                     if "txid:" in line.lower():
@@ -442,6 +652,7 @@ async def evaluate_and_vote_on_proposal(
             "auto_voted": auto_vote
             and result["confidence_score"] >= confidence_threshold,
             "tx_id": tx_id,
+            "formatted_prompt": result["formatted_prompt"],
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
@@ -453,16 +664,12 @@ async def evaluate_and_vote_on_proposal(
 
 async def evaluate_proposal_only(
     proposal_id: UUID,
-    dao_name: Optional[str] = None,
     wallet_id: Optional[UUID] = None,
 ) -> Dict:
     """Evaluate a proposal without voting.
 
     Args:
-        action_proposals_contract: The contract ID of the DAO action proposals
-        action_proposals_voting_extension: The contract ID of the DAO action proposals voting extension
         proposal_id: The ID of the proposal to evaluate
-        dao_name: Optional name of the DAO for additional context
         wallet_id: Optional wallet ID to use for retrieving proposal data
 
     Returns:
@@ -470,7 +677,6 @@ async def evaluate_proposal_only(
     """
     result = await evaluate_and_vote_on_proposal(
         proposal_id=proposal_id,
-        dao_name=dao_name,
         wallet_id=wallet_id,
         auto_vote=True,
     )

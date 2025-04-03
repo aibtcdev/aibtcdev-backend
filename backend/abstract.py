@@ -9,6 +9,10 @@ from backend.models import (
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
+    ChainState,
+    ChainStateBase,
+    ChainStateCreate,
+    ChainStateFilter,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -16,6 +20,10 @@ from backend.models import (
     ExtensionBase,
     ExtensionCreate,
     ExtensionFilter,
+    Holder,
+    HolderBase,
+    HolderCreate,
+    HolderFilter,
     Job,
     JobBase,
     JobCreate,
@@ -28,6 +36,10 @@ from backend.models import (
     ProfileBase,
     ProfileCreate,
     ProfileFilter,
+    Prompt,
+    PromptBase,
+    PromptCreate,
+    PromptFilter,
     Proposal,
     ProposalBase,
     ProposalCreate,
@@ -66,10 +78,6 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
-    WalletToken,
-    WalletTokenBase,
-    WalletTokenCreate,
-    WalletTokenFilter,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -170,6 +178,41 @@ class AbstractBackend(ABC):
         """
         pass
 
+    # ----------- CHAIN STATE -----------
+    @abstractmethod
+    def create_chain_state(self, new_chain_state: ChainStateCreate) -> ChainState:
+        """Create a new chain state record."""
+        pass
+
+    @abstractmethod
+    def get_chain_state(self, chain_state_id: UUID) -> Optional[ChainState]:
+        """Get a chain state record by ID."""
+        pass
+
+    @abstractmethod
+    def list_chain_states(
+        self, filters: Optional[ChainStateFilter] = None
+    ) -> List[ChainState]:
+        """List chain state records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_chain_state(
+        self, chain_state_id: UUID, update_data: ChainStateBase
+    ) -> Optional[ChainState]:
+        """Update a chain state record."""
+        pass
+
+    @abstractmethod
+    def delete_chain_state(self, chain_state_id: UUID) -> bool:
+        """Delete a chain state record."""
+        pass
+
+    @abstractmethod
+    def get_latest_chain_state(self, network: str = "mainnet") -> Optional[ChainState]:
+        """Get the latest chain state for a given network."""
+        pass
+
     # ----------- SECRETS -----------
     # @abstractmethod
     # def create_secret(self, new_secret: SecretBase) -> Secret:
@@ -241,43 +284,6 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_wallet(self, wallet_id: UUID) -> bool:
-        pass
-
-    # ----------- WALLET TOKENS -----------
-    @abstractmethod
-    def create_wallet_token(self, new_wallet_token: WalletTokenCreate) -> WalletToken:
-        pass
-
-    @abstractmethod
-    def get_wallet_token(self, wallet_token_id: UUID) -> Optional[WalletToken]:
-        pass
-
-    @abstractmethod
-    def list_wallet_tokens(
-        self, filters: Optional[WalletTokenFilter] = None
-    ) -> List[WalletToken]:
-        pass
-
-    @abstractmethod
-    def update_wallet_token(
-        self, wallet_token_id: UUID, update_data: WalletTokenBase
-    ) -> Optional[WalletToken]:
-        pass
-
-    @abstractmethod
-    def delete_wallet_token(self, wallet_token_id: UUID) -> bool:
-        pass
-
-    @abstractmethod
-    def get_agents_with_dao_tokens(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
-        """Get all agents with wallets that hold tokens for a specific DAO.
-
-        Args:
-            dao_id: The ID of the DAO
-
-        Returns:
-            List of agent info with wallet and token details
-        """
         pass
 
     # ----------- AGENTS -----------
@@ -634,4 +640,59 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
+        pass
+
+    # ----------- AGENT PROMPTS -----------
+    @abstractmethod
+    def create_prompt(self, new_prompt: PromptCreate) -> Prompt:
+        """Create a new prompt."""
+        pass
+
+    @abstractmethod
+    def get_prompt(self, prompt_id: UUID) -> Optional[Prompt]:
+        """Get a prompt by ID."""
+        pass
+
+    @abstractmethod
+    def list_prompts(self, filters: Optional[PromptFilter] = None) -> List[Prompt]:
+        """List prompts with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_prompt(
+        self, prompt_id: UUID, update_data: PromptBase
+    ) -> Optional[Prompt]:
+        """Update a prompt."""
+        pass
+
+    @abstractmethod
+    def delete_prompt(self, prompt_id: UUID) -> bool:
+        """Delete a prompt."""
+        pass
+
+    @abstractmethod
+    def create_holder(self, new_holder: HolderCreate) -> Holder:
+        """Create a new holder record."""
+        pass
+
+    @abstractmethod
+    def get_holder(self, holder_id: UUID) -> Optional[Holder]:
+        """Get a holder record by ID."""
+        pass
+
+    @abstractmethod
+    def list_holders(self, filters: Optional[HolderFilter] = None) -> List[Holder]:
+        """List holder records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_holder(
+        self, holder_id: UUID, update_data: HolderBase
+    ) -> Optional[Holder]:
+        """Update a holder record."""
+        pass
+
+    @abstractmethod
+    def delete_holder(self, holder_id: UUID) -> bool:
+        """Delete a holder record."""
         pass

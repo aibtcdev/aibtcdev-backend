@@ -5,6 +5,7 @@ This module provides components for parsing and handling Chainhook webhook paylo
 
 from services.webhooks.chainhook.handler import ChainhookHandler
 from services.webhooks.chainhook.handlers import (
+    BlockStateHandler,
     ChainhookEventHandler,
     ContractMessageHandler,
     DAOProposalBurnHeightHandler,
@@ -25,4 +26,5 @@ __all__ = [
     "DAOProposalBurnHeightHandler",
     "DAOVoteHandler",
     "DAOProposalConclusionHandler",
+    "BlockStateHandler",
 ]

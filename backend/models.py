@@ -23,10 +23,40 @@ class ContractStatus(Enum):
         return self.value
 
 
+class ChainStateBase(CustomBaseModel):
+    """Base model for tracking blockchain state."""
+
+    block_height: Optional[int] = None
+    block_hash: Optional[str] = None
+    network: Optional[str] = "mainnet"  # mainnet or testnet
+
+
+class ChainStateCreate(ChainStateBase):
+    pass
+
+
+class ChainState(ChainStateBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChainStateFilter(CustomBaseModel):
+    network: Optional[str] = None
+
+
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
     CONVERSATION = "thread"
     INVALID = "invalid"
+
+    def __str__(self):
+        return self.value
+
+
+class ProposalType(str, Enum):
+    ACTION = "action"
+    CORE = "core"
 
     def __str__(self):
         return self.value
@@ -288,7 +318,11 @@ class ProposalBase(CustomBaseModel):
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
-    proposal_id: Optional[int] = None  # On-chain proposal ID
+    proposal_id: Optional[int] = None  # On-chain proposal ID if its an action proposal
+    proposal_contract: Optional[str] = (
+        None  # Contract address of the proposal if its a core contract proposal
+    )
+    type: Optional[ProposalType] = ProposalType.ACTION
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
@@ -305,6 +339,7 @@ class ProposalBase(CustomBaseModel):
     passed: Optional[bool] = None
     votes_against: Optional[str] = None  # String to handle large numbers
     votes_for: Optional[str] = None  # String to handle large numbers
+    bond: Optional[str] = None  # String to handle large numbers
 
 
 class ProposalCreate(ProposalBase):
@@ -329,6 +364,9 @@ class StepBase(CustomBaseModel):
     tool_output: Optional[str] = None
     thought: Optional[str] = None
     profile_id: Optional[UUID] = None
+    status: Optional[str] = (
+        None  # Add status field to track planning, processing, complete
+    )
 
 
 class StepCreate(StepBase):
@@ -533,11 +571,14 @@ class ProposalFilter(CustomBaseModel):
     passed: Optional[bool] = None
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
+    type: Optional[ProposalType] = None
+    proposal_contract: Optional[str] = None
 
 
 class StepFilter(CustomBaseModel):
     job_id: Optional[UUID] = None
     role: Optional[str] = None
+    status: Optional[str] = None  # Add status filter
 
 
 class TaskFilter(CustomBaseModel):
@@ -597,9 +638,9 @@ class XTweetFilter(CustomBaseModel):
 
 
 #
-# WALLET TOKENS
+# HOLDERS
 #
-class WalletTokenBase(CustomBaseModel):
+class HolderBase(CustomBaseModel):
     wallet_id: UUID
     token_id: UUID
     dao_id: UUID  # Direct reference to the DAO for easier queries
@@ -607,16 +648,16 @@ class WalletTokenBase(CustomBaseModel):
     updated_at: datetime = datetime.now()
 
 
-class WalletTokenCreate(WalletTokenBase):
+class HolderCreate(HolderBase):
     pass
 
 
-class WalletToken(WalletTokenBase):
+class Holder(HolderBase):
     id: UUID
     created_at: datetime
 
 
-class WalletTokenFilter(CustomBaseModel):
+class HolderFilter(CustomBaseModel):
     wallet_id: Optional[UUID] = None
     token_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
@@ -635,6 +676,8 @@ class VoteBase(CustomBaseModel):
     tx_id: Optional[str] = None
     address: Optional[str] = None
     amount: Optional[str] = None  # String to handle large token amounts
+    confidence: Optional[float] = None
+    prompt: Optional[str] = None
 
 
 class VoteCreate(VoteBase):
@@ -665,3 +708,33 @@ class AgentWithWalletTokenDTO(CustomBaseModel):
     token_amount: str
     dao_id: UUID
     dao_name: str
+
+
+#
+# AGENT PROMPTS
+#
+class PromptBase(CustomBaseModel):
+    """Base model for prompts."""
+
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    prompt_text: Optional[str] = None
+    is_active: Optional[bool] = True
+
+
+class PromptCreate(PromptBase):
+    pass
+
+
+class Prompt(PromptBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class PromptFilter(CustomBaseModel):
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    is_active: Optional[bool] = None

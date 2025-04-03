@@ -1,7 +1,7 @@
-"""PrePlan ReAct workflow functionality.
+"""Vector-enabled PrePlan ReAct workflow.
 
-This workflow first creates a plan based on the user's query, then executes
-the ReAct workflow to complete the task according to the plan.
+This workflow combines vector retrieval and planning capabilities
+to first retrieve relevant context, create a plan, then execute the ReAct workflow.
 """
 
 import asyncio
@@ -16,15 +16,23 @@ from typing import (
     Union,
 )
 
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
+from backend.factory import backend
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, ExecutionError, PlanningCapability
-from services.workflows.react import MessageProcessor, StreamingCallbackHandler
+from services.workflows.base import (
+    BaseWorkflow,
+    ExecutionError,
+    PlanningCapability,
+    VectorRetrievalCapability,
+)
+from services.workflows.react import StreamingCallbackHandler
 
 # Remove this import to avoid circular dependencies
 # from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
@@ -32,31 +40,48 @@ from services.workflows.react import MessageProcessor, StreamingCallbackHandler
 logger = configure_logger(__name__)
 
 
-class PreplanState(TypedDict):
-    """State for the PrePlan ReAct workflow."""
+class VectorPreplanState(TypedDict):
+    """State for the Vector PrePlan ReAct workflow, combining both capabilities."""
 
     messages: Annotated[list, add_messages]
+    vector_results: Optional[List[Document]]
     plan: Optional[str]
 
 
-class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
-    """PrePlan ReAct workflow implementation.
+class VectorPreplanReactWorkflow(
+    BaseWorkflow[VectorPreplanState], VectorRetrievalCapability, PlanningCapability
+):
+    """Workflow that combines vector retrieval and planning capabilities.
 
-    This workflow first creates a plan based on the user's query,
-    then executes the ReAct workflow to complete the task according to the plan.
+    This workflow:
+    1. Retrieves relevant context from multiple vector stores
+    2. Creates a plan based on the user's query and retrieved context
+    3. Executes the ReAct workflow with both context and plan
     """
 
     def __init__(
         self,
         callback_handler: StreamingCallbackHandler,
         tools: List[Any],
+        collection_names: Union[
+            str, List[str]
+        ],  # Modified to accept single or multiple collections
+        embeddings: Optional[Embeddings] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.callback_handler = callback_handler
         self.tools = tools
+        # Convert single collection to list for consistency
+        self.collection_names = (
+            [collection_names]
+            if isinstance(collection_names, str)
+            else collection_names
+        )
+        self.embeddings = embeddings or OpenAIEmbeddings()
         self.required_fields = ["messages"]
-        # Set decisive behavior flag
+
+        # Decisive behavior flag (from PreplanReactWorkflow)
         self.decisive_behavior = True
 
         # Create a new LLM instance with the callback handler
@@ -65,7 +90,7 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
         # Create a separate LLM for planning with streaming enabled
         self.planning_llm = ChatOpenAI(
             model="o3-mini",
-            streaming=True,  # Enable streaming for the planning LLM
+            streaming=True,
             callbacks=[callback_handler],
         )
 
@@ -81,12 +106,90 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
         self.tool_descriptions = None
 
     def _create_prompt(self) -> None:
-        """Not used in PrePlan ReAct workflow."""
+        """Not used in Vector PrePlan ReAct workflow."""
         pass
 
-    async def create_plan(self, query: str) -> str:
-        """Create a simple thought process plan based on the user's query."""
-        # Create a more decisive planning prompt
+    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
+        """Integrate vector retrieval and planning capabilities with a graph.
+
+        Args:
+            graph: The graph to integrate with
+            **kwargs: Additional arguments
+        """
+        # This method could be implemented to modify existing graphs with these capabilities
+        pass
+
+    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve relevant documents from multiple vector stores.
+
+        Args:
+            query: The query to search for
+            **kwargs: Additional arguments
+
+        Returns:
+            List of retrieved documents
+        """
+        try:
+            all_documents = []
+            limit_per_collection = kwargs.get(
+                "limit", 4
+            )  # Get 4 results from each collection
+
+            # Query each collection and gather results
+            for collection_name in self.collection_names:
+                try:
+                    # Query vectors using the backend
+                    vector_results = await backend.query_vectors(
+                        collection_name=collection_name,
+                        query_text=query,
+                        limit=limit_per_collection,
+                        embeddings=self.embeddings,
+                    )
+
+                    # Convert to LangChain Documents and add collection source
+                    documents = [
+                        Document(
+                            page_content=doc.get("page_content", ""),
+                            metadata={
+                                **doc.get("metadata", {}),
+                                "collection_source": collection_name,
+                            },
+                        )
+                        for doc in vector_results
+                    ]
+
+                    all_documents.extend(documents)
+                    logger.info(
+                        f"Retrieved {len(documents)} documents from collection {collection_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to retrieve from collection {collection_name}: {str(e)}"
+                    )
+                    continue  # Continue with other collections if one fails
+
+            logger.info(
+                f"Retrieved total of {len(all_documents)} documents from all collections"
+            )
+            return all_documents
+        except Exception as e:
+            logger.error(f"Vector store retrieval failed: {str(e)}")
+            return []
+
+    async def create_plan(
+        self, query: str, context_docs: List[Document] = None, **kwargs
+    ) -> str:
+        """Create a plan based on the user's query and vector retrieval results.
+
+        Args:
+            query: The user's query
+            context_docs: Optional retrieved context documents
+            **kwargs: Additional arguments
+
+        Returns:
+            Generated plan
+        """
+        # Create a more decisive planning prompt with context
         planning_prompt = f"""
         You are an AI assistant planning a decisive response to the user's query.
         
@@ -131,12 +234,13 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
         2. If user asks to list available DAOs: Use dao_list to retrieve current DAOs and present them clearly
         3. If user wants to create a proposal: Use dao_search to get the DAO details first, then assist with the proposal creation using the current contract addresses
         
-        Be decisive and action-oriented. Don't include phrases like "I would," "I could," or "I might." 
-        Instead, use phrases like "I will," "I am going to," and "I'll execute."
-        Don't ask for confirmation before taking actions - assume the user wants you to proceed.
-        
         User Query: {query}
         """
+
+        # Add vector context to the planning prompt if available
+        if context_docs:
+            context_str = "\n\n".join([doc.page_content for doc in context_docs])
+            planning_prompt += f"\n\nHere is additional context that may be helpful:\n\n{context_str}\n\nUse this context to inform your plan."
 
         # Add available tools to the planning prompt if available
         if hasattr(self, "tool_names") and self.tool_names:
@@ -146,7 +250,7 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
             planning_prompt += tool_info
 
         # Add tool descriptions if available
-        if hasattr(self, "tool_descriptions"):
+        if hasattr(self, "tool_descriptions") and self.tool_descriptions:
             planning_prompt += self.tool_descriptions
 
         # Create planning messages, including persona if available
@@ -160,7 +264,9 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
         planning_messages.append(HumanMessage(content=planning_prompt))
 
         try:
-            logger.info("Creating thought process notes for user query")
+            logger.info(
+                "Creating thought process notes for user query with vector context"
+            )
 
             # Configure custom callback for planning to properly mark planning tokens
             original_new_token = self.callback_handler.custom_on_llm_new_token
@@ -198,12 +304,14 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
             # Restore original callback
             self.callback_handler.custom_on_llm_new_token = original_new_token
 
-            logger.info("Thought process notes created successfully")
+            logger.info(
+                "Thought process notes created successfully with vector context"
+            )
             logger.debug(f"Notes content length: {len(plan)}")
 
-            # Use the new process_step method to emit the plan with a planning status
+            # Use the process_step method to emit the plan with a planning status
             await self.callback_handler.process_step(
-                content=plan, role="assistant", thought="Planning Phase"
+                content=plan, role="assistant", thought="Planning Phase with Context"
             )
 
             return plan
@@ -219,24 +327,62 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
             raise
 
     def _create_graph(self) -> StateGraph:
-        """Create the PrePlan ReAct workflow graph."""
-        logger.info("Creating PrePlan ReAct workflow graph")
+        """Create the Vector PrePlan ReAct workflow graph."""
+        logger.info("Creating Vector PrePlan ReAct workflow graph")
         tool_node = ToolNode(self.tools)
         logger.debug(f"Created tool node with {len(self.tools)} tools")
 
-        def should_continue(state: PreplanState) -> str:
+        def should_continue(state: VectorPreplanState) -> str:
             messages = state["messages"]
             last_message = messages[-1]
             result = "tools" if last_message.tool_calls else END
             logger.debug(f"Continue decision: {result}")
             return result
 
-        def call_model(state: PreplanState) -> Dict:
-            logger.debug("Calling model with current state")
+        async def retrieve_from_vector_store(state: VectorPreplanState) -> Dict:
+            """Retrieve relevant documents from vector store if not already present."""
+            # If vector_results are already in the state, use them
+            if state.get("vector_results") and len(state.get("vector_results")) > 0:
+                logger.info(
+                    f"Using {len(state.get('vector_results'))} documents already in state"
+                )
+                return {"vector_results": state.get("vector_results")}
+
+            # Otherwise, retrieve documents from the vector store
             messages = state["messages"]
+            # Get the last user message
+            last_user_message = None
+            for message in reversed(messages):
+                if isinstance(message, HumanMessage):
+                    last_user_message = message.content
+                    break
+
+            if not last_user_message:
+                logger.warning("No user message found for vector retrieval")
+                return {"vector_results": []}
+
+            logger.info(f"Retrieving documents for query: {last_user_message[:50]}...")
+            documents = await self.retrieve_from_vector_store(query=last_user_message)
+            logger.info(f"Retrieved {len(documents)} documents from vector store")
+            return {"vector_results": documents}
+
+        def call_model_with_context_and_plan(state: VectorPreplanState) -> Dict:
+            """Call model with both context and plan."""
+            messages = state["messages"]
+            vector_results = state.get("vector_results", [])
+            plan = state.get("plan")
+
+            # Add vector context to the system message if available
+            if vector_results:
+                context_str = "\n\n".join([doc.page_content for doc in vector_results])
+                context_message = SystemMessage(
+                    content=f"Here is additional context that may be helpful:\n\n{context_str}\n\n"
+                    "Use this context to inform your response if relevant."
+                )
+                messages = [context_message] + messages
 
             # Add the plan as a system message if it exists and hasn't been added yet
-            if state.get("plan") is not None and not any(
+            if plan is not None and not any(
                 isinstance(msg, SystemMessage) and "thought" in msg.content.lower()
                 for msg in messages
             ):
@@ -245,19 +391,21 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
                     content=f"""
                     Follow these decisive actions to address the user's query:
                     
-                    {state["plan"]}
+                    {plan}
                     
                     Execute these steps directly without asking for confirmation.
                     Be decisive and action-oriented in your responses.
                     """
                 )
-                messages = [plan_message] + messages
-            else:
-                logger.debug("No thought notes to add or notes already added")
+                # Add plan message after context message (if it exists)
+                if vector_results:
+                    messages = [messages[0], plan_message] + messages[1:]
+                else:
+                    messages = [plan_message] + messages
 
             # If decisive behavior is enabled and there's no plan-related system message,
             # add a decisive behavior system message
-            if getattr(self, "decisive_behavior", False) and not any(
+            elif getattr(self, "decisive_behavior", False) and not any(
                 isinstance(msg, SystemMessage) for msg in messages
             ):
                 logger.info("Adding decisive behavior instruction as system message")
@@ -267,43 +415,45 @@ class PreplanReactWorkflow(BaseWorkflow[PreplanState], PlanningCapability):
                 )
                 messages = [decisive_message] + messages
 
-            logger.debug(f"Invoking LLM with {len(messages)} messages")
-            response = self.llm.invoke(messages)
-            logger.debug("Received model response")
             logger.debug(
-                f"Response content length: {len(response.content) if hasattr(response, 'content') else 0}"
+                f"Calling model with {len(messages)} messages, "
+                f"{len(vector_results)} vector results, and "
+                f"{'a plan' if plan else 'no plan'}"
             )
+
+            response = self.llm.invoke(messages)
             return {"messages": [response]}
 
-        workflow = StateGraph(PreplanState)
-        logger.debug("Created StateGraph")
+        workflow = StateGraph(VectorPreplanState)
 
-        workflow.add_node("agent", call_model)
+        # Add nodes
+        workflow.add_node("vector_retrieval", retrieve_from_vector_store)
+        workflow.add_node("agent", call_model_with_context_and_plan)
         workflow.add_node("tools", tool_node)
-        workflow.add_edge(START, "agent")
+
+        # Set up the execution flow
+        workflow.add_edge(START, "vector_retrieval")
+        workflow.add_edge("vector_retrieval", "agent")
         workflow.add_conditional_edges("agent", should_continue)
         workflow.add_edge("tools", "agent")
-        logger.info("Graph setup complete")
 
+        logger.info("Vector PrePlan graph setup complete")
         return workflow
 
-    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
-        """Integrate planning capability with the graph.
 
-        Args:
-            graph: The graph to integrate with
-            **kwargs: Additional arguments
-        """
-        # Implementation would modify the graph to include planning step
-        # before the main execution flow
-        pass
+class VectorPreplanLangGraphService:
+    """Service for executing Vector PrePlan React LangGraph operations"""
 
+    def __init__(
+        self,
+        collection_names: Union[str, List[str]],
+        embeddings: Optional[Embeddings] = None,
+    ):
+        # Import here to avoid circular imports
+        from services.workflows.react import MessageProcessor
 
-class PreplanLangGraphService:
-    """Service for executing PrePlan LangGraph operations"""
-
-    def __init__(self):
-        # Initialize message processor here
+        self.collection_names = collection_names
+        self.embeddings = embeddings or OpenAIEmbeddings()
         self.message_processor = MessageProcessor()
 
     def setup_callback_handler(self, queue, loop):
@@ -331,7 +481,7 @@ class PreplanLangGraphService:
         tools_map: Optional[Dict] = None,
         **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a PrePlan React stream implementation.
+        """Execute a Vector PrePlan React stream implementation.
 
         Args:
             messages: Processed messages
@@ -355,13 +505,15 @@ class PreplanLangGraphService:
             callback_handler = self.setup_callback_handler(callback_queue, loop)
 
             # Create workflow using builder pattern
-            workflow_builder = (
-                WorkflowBuilder(PreplanReactWorkflow)
+            workflow = (
+                WorkflowBuilder(VectorPreplanReactWorkflow)
                 .with_callback_handler(callback_handler)
                 .with_tools(list(tools_map.values()) if tools_map else [])
+                .build(
+                    collection_names=self.collection_names,
+                    embeddings=self.embeddings,
+                )
             )
-
-            workflow = workflow_builder.build()
 
             # Store persona and tool information for planning
             if persona:
@@ -381,10 +533,19 @@ class PreplanLangGraphService:
                     tool_descriptions += f"- {name}: {description}\n"
                 workflow.tool_descriptions = tool_descriptions
 
+            # First retrieve relevant documents from vector store
+            logger.info(
+                f"Retrieving documents from vector store for query: {input_str[:50]}..."
+            )
+            documents = await workflow.retrieve_from_vector_store(query=input_str)
+            logger.info(f"Retrieved {len(documents)} documents from vector store")
+
+            # Create plan with vector context
             try:
                 # The thought notes will be streamed through callbacks
-                plan = await workflow.create_plan(input_str)
-
+                logger.info("Creating plan with vector context...")
+                plan = await workflow.create_plan(input_str, context_docs=documents)
+                logger.info(f"Plan created successfully with {len(plan)} characters")
             except Exception as e:
                 logger.error(f"Planning failed, continuing with execution: {str(e)}")
                 yield {
@@ -399,21 +560,14 @@ class PreplanLangGraphService:
             runnable = graph.compile()
             logger.info("Graph compiled successfully")
 
-            # Add the plan to the initial state
-            initial_state = {"messages": messages}
-            if plan is not None:
-                initial_state["plan"] = plan
-                logger.info("Added plan to initial state")
-            else:
-                logger.warning("No plan available for initial state")
-
-            # Set up configuration with callbacks
-            config = {"callbacks": [callback_handler]}
-            logger.debug("Configuration set up with callbacks")
-
             # Execute workflow with callbacks config
-            logger.info("Creating task to execute workflow")
-            task = asyncio.create_task(runnable.ainvoke(initial_state, config=config))
+            config = {"callbacks": [callback_handler]}
+            task = asyncio.create_task(
+                runnable.ainvoke(
+                    {"messages": messages, "vector_results": documents, "plan": plan},
+                    config=config,
+                )
+            )
 
             # Stream results
             async for chunk in self.stream_task_results(task, callback_queue):
@@ -421,9 +575,9 @@ class PreplanLangGraphService:
 
         except Exception as e:
             logger.error(
-                f"Failed to execute PrePlan ReAct stream: {str(e)}", exc_info=True
+                f"Failed to execute Vector PrePlan stream: {str(e)}", exc_info=True
             )
-            raise ExecutionError(f"PrePlan ReAct stream execution failed: {str(e)}")
+            raise ExecutionError(f"Vector PrePlan stream execution failed: {str(e)}")
 
     # Add execute_stream method to maintain the same interface as BaseWorkflowService
     async def execute_stream(
@@ -454,28 +608,40 @@ class PreplanLangGraphService:
         ):
             yield chunk
 
-    # Keep the old method for backward compatibility
-    async def execute_preplan_react_stream(
-        self,
-        history: List[Dict],
-        input_str: str,
-        persona: Optional[str] = None,
-        tools_map: Optional[Dict] = None,
-    ) -> AsyncGenerator[Dict, None]:
-        """Execute a PrePlan ReAct stream using LangGraph."""
-        # Call the new method
-        async for chunk in self.execute_stream(history, input_str, persona, tools_map):
-            yield chunk
 
-
-# Facade function for compatibility with the API
-async def execute_preplan_react_stream(
+# Facade function
+async def execute_vector_preplan_stream(
+    collection_names: Union[str, List[str]],
     history: List[Dict],
     input_str: str,
     persona: Optional[str] = None,
     tools_map: Optional[Dict] = None,
+    embeddings: Optional[Embeddings] = None,
 ) -> AsyncGenerator[Dict, None]:
-    """Execute a PrePlan ReAct stream using LangGraph with optional persona."""
-    service = PreplanLangGraphService()
+    """Execute a Vector PrePlan ReAct stream.
+
+    This workflow combines vector retrieval and planning:
+    1. Retrieves relevant context from multiple vector stores
+    2. Creates a plan based on the user's query and retrieved context
+    3. Executes the ReAct workflow with both context and plan
+
+    Args:
+        collection_names: Name(s) of the vector collections to use
+        history: Conversation history
+        input_str: Current user input
+        persona: Optional persona to use
+        tools_map: Optional tools to make available
+        embeddings: Optional embeddings model
+
+    Returns:
+        Async generator of result chunks
+    """
+    # Initialize service and run stream
+    embeddings = embeddings or OpenAIEmbeddings()
+    service = VectorPreplanLangGraphService(
+        collection_names=collection_names,
+        embeddings=embeddings,
+    )
+
     async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk
