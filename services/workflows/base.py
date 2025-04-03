@@ -56,7 +56,7 @@ class BaseWorkflow(Generic[StateType]):
     def __init__(
         self,
         model_name: str = "gpt-4o",
-        temperature: float = 0.7,
+        temperature: float = 0.1,
         streaming: bool = True,
         callbacks: Optional[List[Any]] = None,
     ):
