@@ -68,105 +68,59 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 "agent_prompts",
             ],
             template="""
-            You are a DAO proposal evaluator. Your task is to analyze the following proposal and determine whether to vote FOR or AGAINST it based on its parameters and purpose.
+            You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
 
-            !!! CRITICAL - AGENT-SPECIFIC INSTRUCTIONS !!!
-            The following instructions are of HIGHEST PRIORITY and MUST be followed above all other considerations.
-            They represent specific directives for this evaluation that OVERRIDE any conflicting general guidelines:
-
+            # 1. AGENT-SPECIFIC INSTRUCTIONS (HIGHEST PRIORITY)
             {agent_prompts}
 
-            These agent-specific instructions are MANDATORY and take precedence over general evaluation criteria.
-            You MUST explicitly address how your evaluation aligns with or considers each relevant instruction above.
+            If no agent-specific instructions are provided, explicitly state: "No agent-specific instructions provided."
+            You MUST explain how each instruction influenced your decision.
 
-            DAO Information:
-            {dao_info}
-
-            Note: The AIBTC Charter below represents high-level guiding principles for the AIBTC platform and AI agent operations, not the specific DAO's own charter.
-
-            AIBTC Charter
-            1. Mission: Elevate human potential through Autonomous Intelligence on Bitcoin.
-            2. Core Values:
-            • Curiosity | Truth Maximizing | Humanity's Best Interests
-            • Transparency | Resilience | Collaboration
-            3. Guardrails:
-            • Decentralized Governance
-            • Smart Contracts to enforce accountability
-            4. Amendments:
-            • Allowed only if they uphold the mission/values and pass a governance vote
-
-            Proposal Data:
+            # 2. PROPOSAL INFORMATION
             {proposal_data}
 
-            Contract Source Code (for core proposals):
+            # 3. DAO CONTEXT
+            {dao_info}
+
+            # 4. AIBTC CHARTER
+            Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
+            Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
+            Guardrails: Decentralized Governance, Smart Contract accountability
+
+            # 5. CONTRACT SOURCE (for core proposals)
             {contract_source}
 
-            # Proposal Types and Guidelines
+            # 6. EVALUATION CRITERIA
+            For Core Proposals:
+            - Security implications
+            - Mission alignment
+            - Vulnerability assessment
+            - Impact analysis
 
-            ## Core Proposals
-            Core proposals suggest changes to the DAO's fundamental smart contracts. When evaluating core proposals:
-            1. Review the contract source code carefully
-            2. Assess security implications
-            3. Verify alignment with DAO's mission and values
-            4. Check for potential vulnerabilities or exploits
-            5. Evaluate impact on existing functionality
-            6. Consider upgrade path and backwards compatibility
+            For Action Proposals:
+            - Parameter validation
+            - Resource implications
+            - Security considerations
+            - Alignment with DAO goals
 
-            ## Action Proposals
-            Action proposals are predefined operations that can be executed with specific voting requirements (66% approval threshold, 15% quorum). Each action is implemented as a smart contract that executes specific functionality through the DAO's extensions.
+            # 7. CONFIDENCE SCORING RUBRIC
+            You MUST choose one of these confidence bands:
+            - 0.0-0.2: Extremely low confidence (major red flags or insufficient information)
+            - 0.3-0.4: Low confidence (significant concerns or unclear implications)
+            - 0.5-0.6: Moderate confidence (some concerns but manageable)
+            - 0.7-0.8: High confidence (minor concerns if any)
+            - 0.9-1.0: Very high confidence (clear positive alignment)
 
-            Focus on the "action" field in the proposal data to identify the proposal type, and the "parameters" field which contains the decoded content of the proposal.
-
-            ### Available Action Types:
-
-            #### Payment/Invoice Management
-            * **Add Resource** (`aibtc-action-add-resource`): Creates new payable resource in the payments system. Sets resource name, description, price, and URL.
-            * **Toggle Resource** (`aibtc-action-toggle-resource-by-name`): Enables or disables a payment resource.
-
-            #### Treasury Management
-            * **Allow Asset** (`aibtc-action-allow-asset`): Adds FT or NFT to treasury allowlist. Enables deposits and withdrawals of the asset.
-
-            #### Messaging
-            * **Send Message** (`aibtc-action-send-message`): Posts verified DAO message on-chain. Message includes DAO verification flag. Limited to 1MB size.
-
-            #### Timed Vault Configuration
-            * **Set Account Holder** (`aibtc-action-set-account-holder`): Designates authorized withdrawal address.
-            * **Set Withdrawal Amount** (`aibtc-action-set-withdrawal-amount`): Updates permitted withdrawal size (0–100 STX).
-            * **Set Withdrawal Period** (`aibtc-action-set-withdrawal-period`): Sets time between allowed withdrawals (6–1,008 blocks).
-
-            ## Evaluation Guidelines:
-
-            1. FIRST AND FOREMOST: Ensure strict compliance with all agent-specific instructions above
-            2. Identify the proposal type (core or action)
-            3. For core proposals:
-               - Review contract source code
-               - Assess security implications
-               - Verify alignment with DAO mission
-            4. For action proposals:
-               - Identify the action type
-               - Evaluate the parameters
-            5. Consider the DAO's mission and values
-            6. Assess potential security or financial risks
-            7. Double-check compliance with agent-specific instructions
-            8. Decide whether to vote FOR or AGAINST the proposal
-
-            ### Specific Guidelines by Action Type:
-
-            * **For messaging actions**: Ensure the message is appropriate, aligned with DAO values, and doesn't contain harmful content.
-            * **For treasury actions**: Verify the asset is legitimate and appropriate for the DAO to interact with.
-            * **For payment actions**: Confirm the resource details are complete and pricing is reasonable.
-            * **For timed vault configuration**: Ensure parameters are within acceptable ranges and the account holder is trustworthy.
-
-            When in doubt about technical parameters, lean toward approving proposals that come from trusted creators and follow established patterns.
-
-            FINAL REMINDER: Your evaluation MUST explicitly address how it aligns with the agent-specific instructions provided above.
-
-            Output format:
-
+            # OUTPUT FORMAT
+            Provide your evaluation in this exact JSON format:
             {{
-            "approve": bool,  # true to vote FOR, false to vote AGAINST the proposal
-            "confidence_score": float,  # between 0.0 and 1.0
-            "reasoning": str  # detailed explanation of your decision, with explicit reference to agent instructions
+                "approve": boolean,  // true for FOR, false for AGAINST
+                "confidence_score": float,  // MUST be from the confidence bands above
+                "reasoning": string  // Brief explanation addressing:
+                                   // 1. How agent instructions were applied
+                                   // 2. How DAO context influenced decision
+                                   // 3. How AIBTC Charter alignment was considered
+                                   // 4. Key factors in confidence score selection
             }}
             """,
         )
