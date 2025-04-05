@@ -27,12 +27,14 @@ from .dao_ext_action_proposals import (
     ProposeActionToggleResourceTool,
     VoteOnActionProposalTool,
 )
-from .dao_ext_timed_vault import DepositSTXTool as TimedVaultDepositSTXTool
-from .dao_ext_timed_vault import GetAccountTermsTool, WithdrawSTXTool
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
     GetCurrentDaoCharterVersionTool,
     GetDaoCharterTool,
+)
+from .dao_ext_core_proposals import (
+    DeployCoreProposalTool,
+    GenerateCoreProposalTool,
 )
 from .dao_ext_payments_invoices import (
     GetInvoiceTool,
@@ -41,6 +43,8 @@ from .dao_ext_payments_invoices import (
     PayInvoiceByResourceNameTool,
     PayInvoiceTool,
 )
+from .dao_ext_timed_vault import DepositSTXTool as TimedVaultDepositSTXTool
+from .dao_ext_timed_vault import GetAccountTermsTool, WithdrawSTXTool
 from .dao_ext_treasury import GetAllowedAssetTool, IsAllowedAssetTool
 from .database import (
     AddScheduledTaskTool,
@@ -62,14 +66,16 @@ from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
-from .smartwallet import ApproveAssetTool, DeploySmartWalletTool, DepositFTTool
-from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .smartwallet import (
+    ApproveAssetTool,
+    DeploySmartWalletTool,
+    DepositFTTool,
     GetBalanceSTXTool,
     GetConfigurationTool,
     IsApprovedAssetTool,
     RevokeAssetTool,
 )
+from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
@@ -131,6 +137,8 @@ def initialize_tools(
         "contracts_get_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_deploy_dao": ContractDAODeployTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
+        "dao_coreproposals_generate_proposal": GenerateCoreProposalTool(wallet_id),
+        "dao_coreproposals_deploy_proposal": DeployCoreProposalTool(wallet_id),
         "dao_actionproposals_conclude_proposal": ConcludeActionProposalTool(wallet_id),
         "dao_actionproposals_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
         "dao_actionproposals_get_proposal": GetProposalTool(wallet_id),
