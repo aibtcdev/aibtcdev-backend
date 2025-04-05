@@ -9,6 +9,7 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
+    VoteBase,
     VoteCreate,
 )
 from config import config
@@ -109,37 +110,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Execute the proposal evaluation workflow
-            logger.info(f"Evaluating proposal {proposal.id} for DAO {dao.name}")
-
-            result = await evaluate_and_vote_on_proposal(
-                proposal_id=proposal.id,
-                wallet_id=wallet_id,
-                auto_vote=self.DEFAULT_AUTO_VOTE,
-                confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
-                dao_id=dao_id,
-            )
-
-            # Log the results
-            evaluation = result.get("evaluation", {})
-            approval = evaluation.get("approve", False)
-            confidence = evaluation.get("confidence_score", 0.0)
-            reasoning = evaluation.get("reasoning", "No reasoning provided")
-            formatted_prompt = result.get("formatted_prompt", "No prompt provided")
-            vote_created = False
-            vote_id = None
-
-            if result.get("auto_voted", False):
-                logger.info(
-                    f"Proposal {proposal.id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
-                    f"with confidence {confidence:.2f}"
-                )
-            else:
-                logger.info(
-                    f"Proposal {proposal.id} ({dao.name}): Evaluated but not auto-voted - "
-                    f"confidence {confidence:.2f} below threshold"
-                )
-
             # Get wallet information for the address
             wallet = backend.get_wallet(wallet_id) if wallet_id else None
             wallet_address = None
@@ -159,30 +129,76 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         f"No {network_type} address found for wallet {wallet_id}"
                     )
 
-            # Get transaction ID if available (will be None if not auto-voted)
-            tx_id = result.get("tx_id")
-
-            # Always create a vote record to store the evaluation results
-            vote_data = VoteCreate(
+            # Create initial vote record
+            initial_vote_data = VoteCreate(
                 wallet_id=wallet_id,
                 dao_id=dao_id,
                 agent_id=wallet.agent_id if wallet and wallet.agent_id else None,
-                answer=approval,
                 proposal_id=proposal_id,
+                address=wallet_address,
+            )
+
+            try:
+                vote = backend.create_vote(initial_vote_data)
+                vote_id = vote.id
+                logger.info(
+                    f"Created initial vote record {vote.id} for proposal {proposal_id}"
+                )
+            except Exception as vote_error:
+                logger.error(f"Failed to create initial vote record: {str(vote_error)}")
+                return {"success": False, "error": str(vote_error)}
+
+            # Execute the proposal evaluation workflow
+            logger.info(f"Evaluating proposal {proposal.id} for DAO {dao.name}")
+
+            result = await evaluate_and_vote_on_proposal(
+                proposal_id=proposal.id,
+                wallet_id=wallet_id,
+                auto_vote=self.DEFAULT_AUTO_VOTE,
+                confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
+                dao_id=dao_id,
+            )
+
+            # Log the results
+            evaluation = result.get("evaluation", {})
+            approval = evaluation.get("approve", False)
+            confidence = evaluation.get("confidence_score", 0.0)
+            reasoning = evaluation.get("reasoning", "No reasoning provided")
+            formatted_prompt = result.get("formatted_prompt", "No prompt provided")
+
+            if result.get("auto_voted", False):
+                logger.info(
+                    f"Proposal {proposal.id} ({dao.name}): Voted {'FOR' if approval else 'AGAINST'} "
+                    f"with confidence {confidence:.2f}"
+                )
+            else:
+                logger.info(
+                    f"Proposal {proposal.id} ({dao.name}): Evaluated but not auto-voted - "
+                    f"confidence {confidence:.2f} below threshold"
+                )
+
+            # Get transaction ID if available (will be None if not auto-voted)
+            tx_id = result.get("tx_id")
+
+            # Update the vote record with evaluation results
+            vote_update_data = VoteBase(
+                answer=approval,
                 prompt=formatted_prompt,
                 reasoning=reasoning,
                 tx_id=tx_id,
-                address=wallet_address,
                 confidence=confidence,
             )
 
             try:
-                vote = backend.create_vote(vote_data)
-                vote_created = True
-                vote_id = vote.id
-                logger.info(f"Created vote record {vote.id} for proposal {proposal_id}")
-            except Exception as vote_error:
-                logger.error(f"Failed to create vote record: {str(vote_error)}")
+                updated_vote = backend.update_vote(vote_id, vote_update_data)
+                if not updated_vote:
+                    logger.error(f"Failed to update vote record {vote_id}")
+                else:
+                    logger.info(
+                        f"Updated vote record {vote_id} with evaluation results"
+                    )
+            except Exception as update_error:
+                logger.error(f"Failed to update vote record: {str(update_error)}")
 
             logger.debug(f"Proposal {proposal.id} reasoning: {reasoning}")
 
@@ -194,7 +210,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 "success": True,
                 "auto_voted": result.get("auto_voted", False),
                 "approve": approval,
-                "vote_created": vote_created,
+                "vote_created": True,
                 "vote_id": vote_id,
             }
 
