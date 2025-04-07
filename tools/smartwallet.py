@@ -846,7 +846,7 @@ class SmartWalletWithdrawStxInput(BaseModel):
     )
 
 
-class SmartWalletWithdrawStxTool(BaseTool):
+class SmartWalletWithdrawSTXTool(BaseTool):
     name: str = "smartwallet_withdraw_stx"
     description: str = (
         "Withdraw STX from a smart wallet. "
@@ -1020,7 +1020,7 @@ class SmartWalletWithdrawFtInput(BaseModel):
     )
 
 
-class SmartWalletWithdrawFtTool(BaseTool):
+class SmartWalletWithdrawFTTool(BaseTool):
     name: str = "smartwallet_withdraw_ft"
     description: str = (
         "Withdraw fungible tokens from a smart wallet. "

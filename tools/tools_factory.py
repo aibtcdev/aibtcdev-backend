@@ -93,7 +93,6 @@ from .smartwallet import (
     SmartWalletWithdrawFTTool,
     SmartWalletWithdrawSTXTool,
 )
-from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
