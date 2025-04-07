@@ -32,6 +32,10 @@ from .dao_ext_charter import (
     GetCurrentDaoCharterVersionTool,
     GetDaoCharterTool,
 )
+from .dao_ext_core_proposals import (
+    DeployCoreProposalTool,
+    GenerateCoreProposalTool,
+)
 from .dao_ext_payments_invoices import (
     GetInvoiceTool,
     GetResourceByNameTool,
@@ -89,6 +93,7 @@ from .smartwallet import (
     SmartWalletWithdrawFTTool,
     SmartWalletWithdrawSTXTool,
 )
+from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
@@ -150,6 +155,8 @@ def initialize_tools(
         "contracts_get_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_deploy_dao": ContractDAODeployTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
+        "dao_coreproposals_generate_proposal": GenerateCoreProposalTool(wallet_id),
+        "dao_coreproposals_deploy_proposal": DeployCoreProposalTool(wallet_id),
         "dao_actionproposals_conclude_proposal": ConcludeActionProposalTool(wallet_id),
         "dao_actionproposals_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
         "dao_actionproposals_get_proposal": GetProposalTool(wallet_id),
