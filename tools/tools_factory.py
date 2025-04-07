@@ -67,13 +67,31 @@ from .lunarcrush import (
     SearchLunarCrushTool,
 )
 from .smartwallet import (
-    ApproveAssetTool,
-    DeploySmartWalletTool,
-    DepositFTTool,
-    GetBalanceSTXTool,
-    GetConfigurationTool,
-    IsApprovedAssetTool,
-    RevokeAssetTool,
+    SmartWalletApproveAssetTool,
+    SmartWalletConcludeActionProposalTool,
+    SmartWalletConcludeCoreProposalTool,
+    SmartWalletDeployMySmartWalletTool,
+    SmartWalletDeploySmartWalletTool,
+    SmartWalletDepositFTTool,
+    SmartWalletDepositSTXTool,
+    SmartWalletGenerateMySmartWalletTool,
+    SmartWalletGenerateSmartWalletTool,
+    SmartWalletGetBalanceSTXTool,
+    SmartWalletGetConfigurationTool,
+    SmartWalletIsApprovedAssetTool,
+    SmartWalletProxyCreateProposalTool,
+    SmartWalletProxyProposeActionAddResourceTool,
+    SmartWalletProxyProposeActionAllowAssetTool,
+    SmartWalletProxyProposeActionSendMessageTool,
+    SmartWalletProxyProposeActionSetAccountHolderTool,
+    SmartWalletProxyProposeActionSetWithdrawalAmountTool,
+    SmartWalletProxyProposeActionSetWithdrawalPeriodTool,
+    SmartWalletProxyProposeActionToggleResourceByNameTool,
+    SmartWalletRevokeAssetTool,
+    SmartWalletVoteOnActionProposalTool,
+    SmartWalletVoteOnCoreProposalTool,
+    SmartWalletWithdrawFTTool,
+    SmartWalletWithdrawSTXTool,
 )
 from .smartwallet import DepositSTXTool as SmartWalletDepositSTXTool
 from .telegram import SendTelegramNotificationTool
@@ -209,14 +227,61 @@ def initialize_tools(
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
-        "smartwallet_deploy_smart_wallet": DeploySmartWalletTool(wallet_id),
+        "smartwallet_deploy_smart_wallet": SmartWalletDeploySmartWalletTool(wallet_id),
+        "smartwallet_deploy_my_smart_wallet": SmartWalletDeployMySmartWalletTool(
+            wallet_id
+        ),
         "smartwallet_deposit_stx": SmartWalletDepositSTXTool(wallet_id),
-        "smartwallet_deposit_ft": DepositFTTool(wallet_id),
-        "smartwallet_approve_asset": ApproveAssetTool(wallet_id),
-        "smartwallet_revoke_asset": RevokeAssetTool(wallet_id),
-        "smartwallet_get_balance_stx": GetBalanceSTXTool(wallet_id),
-        "smartwallet_is_approved_asset": IsApprovedAssetTool(wallet_id),
-        "smartwallet_get_configuration": GetConfigurationTool(wallet_id),
+        "smartwallet_deposit_ft": SmartWalletDepositFTTool(wallet_id),
+        "smartwallet_approve_asset": SmartWalletApproveAssetTool(wallet_id),
+        "smartwallet_revoke_asset": SmartWalletRevokeAssetTool(wallet_id),
+        "smartwallet_get_balance_stx": SmartWalletGetBalanceSTXTool(wallet_id),
+        "smartwallet_is_approved_asset": SmartWalletIsApprovedAssetTool(wallet_id),
+        "smartwallet_get_configuration": SmartWalletGetConfigurationTool(wallet_id),
+        "smartwallet_generate_smart_wallet": SmartWalletGenerateSmartWalletTool(
+            wallet_id
+        ),
+        "smartwallet_generate_my_smart_wallet": SmartWalletGenerateMySmartWalletTool(
+            wallet_id
+        ),
+        "smartwallet_withdraw_stx": SmartWalletWithdrawSTXTool(wallet_id),
+        "smartwallet_withdraw_ft": SmartWalletWithdrawFTTool(wallet_id),
+        "smartwallet_proxy_create_proposal": SmartWalletProxyCreateProposalTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_send_message": SmartWalletProxyProposeActionSendMessageTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_add_resource": SmartWalletProxyProposeActionAddResourceTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_allow_asset": SmartWalletProxyProposeActionAllowAssetTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_toggle_resource_by_name": SmartWalletProxyProposeActionToggleResourceByNameTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_set_account_holder": SmartWalletProxyProposeActionSetAccountHolderTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_set_withdrawal_amount": SmartWalletProxyProposeActionSetWithdrawalAmountTool(
+            wallet_id
+        ),
+        "smartwallet_proxy_propose_action_set_withdrawal_period": SmartWalletProxyProposeActionSetWithdrawalPeriodTool(
+            wallet_id
+        ),
+        "smartwallet_vote_on_action_proposal": SmartWalletVoteOnActionProposalTool(
+            wallet_id
+        ),
+        "smartwallet_vote_on_core_proposal": SmartWalletVoteOnCoreProposalTool(
+            wallet_id
+        ),
+        "smartwallet_conclude_action_proposal": SmartWalletConcludeActionProposalTool(
+            wallet_id
+        ),
+        "smartwallet_conclude_core_proposal": SmartWalletConcludeCoreProposalTool(
+            wallet_id
+        ),
     }
 
     return tools
