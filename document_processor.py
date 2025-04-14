@@ -346,88 +346,6 @@ def extract_dao_documents() -> List[Document]:
                         )
                         documents.append(vote_doc)
 
-            # Get wallet tokens for this DAO
-            wallet_tokens = backend.list_wallet_tokens(WalletTokenFilter(dao_id=dao.id))
-            if wallet_tokens:
-                print(f"Found {len(wallet_tokens)} wallet tokens for DAO {dao.name}")
-
-                wallet_token_content = f"""
-                Token Holdings for DAO: {dao.name}
-                """
-
-                for wallet_token in wallet_tokens:
-                    # Get the wallet
-                    wallet = backend.get_wallet(wallet_token.wallet_id)
-                    if wallet:
-                        wallet_address = (
-                            wallet.mainnet_address
-                            or wallet.testnet_address
-                            or "Unknown"
-                        )
-
-                        # Get the token
-                        token = backend.get_token(wallet_token.token_id)
-                        token_name = token.name if token else "Unknown"
-                        token_symbol = token.symbol if token else "Unknown"
-
-                        wallet_token_content += f"""
-                        Wallet: {wallet_address}
-                        Token: {token_name} ({token_symbol})
-                        Amount: {wallet_token.amount}
-                        """
-
-                wallet_token_doc = Document(
-                    page_content=wallet_token_content,
-                    metadata={
-                        "type": "wallet_tokens",
-                        "dao_id": str(dao.id),
-                        "dao_name": dao.name or "Unnamed DAO",
-                        "source_type": "database",
-                        "entity_type": "wallet_tokens",
-                    },
-                )
-                documents.append(wallet_token_doc)
-
-            # Process token holders
-            holders = backend.list_holders(HolderFilter(dao_id=dao.id))
-            if holders:
-                print(f"Found {len(holders)} holders for DAO {dao.name}")
-
-                # Create content for token holders
-                holder_content = f"""
-                Token Holders for DAO {dao.name}
-                ===================================
-                """
-
-                for holder in holders:
-                    # Get wallet info
-                    wallet = backend.get_wallet(holder.wallet_id)
-                    if not wallet:
-                        continue
-
-                    # Get token info
-                    token = backend.get_token(holder.token_id)
-                    if not token:
-                        continue
-
-                    holder_content += f"""
-                    Wallet: {wallet.mainnet_address or wallet.testnet_address}
-                    Token: {token.name} ({token.symbol})
-                    Amount: {holder.amount}
-                    """
-
-                # Create document for token holders
-                holder_doc = Document(
-                    page_content=holder_content,
-                    metadata={
-                        "type": "holders",
-                        "dao_id": str(dao.id),
-                        "dao_name": dao.name,
-                        "entity_type": "holders",
-                    },
-                )
-                documents.append(holder_doc)
-
         # Split the documents if they are too large
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=4000,
@@ -626,7 +544,6 @@ async def main() -> None:
         "https://docs.stacks.co/reference/keywords",
         "https://docs.stacks.co/reference/types",
         "https://docs.stacks.co/reference/the-stack",
-        "https://raw.githubusercontent.com/aibtcdev/aibtcdev-docs/refs/heads/main/aibtc-daos/dao-extensions/README.md",
     ]
 
     # Example directories to process
