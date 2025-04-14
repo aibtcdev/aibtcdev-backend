@@ -4,6 +4,8 @@ import binascii
 from typing import Dict, List, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
+from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
@@ -72,6 +74,65 @@ class ProposalEvaluationWorkflow(
             "dao_collection",
         ]
         self.required_fields = ["proposal_id", "proposal_data"]
+        # Initialize embeddings
+        self.embeddings = OpenAIEmbeddings()
+
+    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve relevant documents from multiple vector stores.
+
+        Args:
+            query: The query to search for
+            **kwargs: Additional arguments
+
+        Returns:
+            List of retrieved documents
+        """
+        try:
+            all_documents = []
+            limit_per_collection = kwargs.get(
+                "limit", 4
+            )  # Get 4 results from each collection
+
+            # Query each collection and gather results
+            for collection_name in self.collection_names:
+                try:
+                    # Query vectors using the backend
+                    vector_results = await backend.query_vectors(
+                        collection_name=collection_name,
+                        query_text=query,
+                        limit=limit_per_collection,
+                        embeddings=self.embeddings,
+                    )
+
+                    # Convert to LangChain Documents and add collection source
+                    documents = [
+                        Document(
+                            page_content=doc.get("page_content", ""),
+                            metadata={
+                                **doc.get("metadata", {}),
+                                "collection_source": collection_name,
+                            },
+                        )
+                        for doc in vector_results
+                    ]
+
+                    all_documents.extend(documents)
+                    logger.info(
+                        f"Retrieved {len(documents)} documents from collection {collection_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to retrieve from collection {collection_name}: {str(e)}"
+                    )
+                    continue  # Continue with other collections if one fails
+
+            logger.info(
+                f"Retrieved total of {len(all_documents)} documents from all collections"
+            )
+            return all_documents
+        except Exception as e:
+            logger.error(f"Vector store retrieval failed: {str(e)}")
+            return []
 
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
