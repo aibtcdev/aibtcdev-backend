@@ -224,3 +224,89 @@ class TwitterService:
         except Exception as e:
             logger.error(f"Failed to get mentions: {str(e)}")
             return []
+
+    async def get_me(self) -> Optional[User]:
+        """
+        Get information about the authenticated user.
+
+        Returns:
+            User data if successful, None if failed
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+            response = self.client.get_me()
+            if isinstance(response, User):
+                return response
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get authenticated user info: {str(e)}")
+            return None
+
+    async def follow_user(self, target_username: str) -> bool:
+        """
+        Follow a user using their username. Uses the authenticated user as the follower.
+
+        Args:
+            target_username: Username of the account to follow (without @ symbol)
+
+        Returns:
+            True if successful, False if failed
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            # Get authenticated user's ID
+            me = await self.get_me()
+            if not me:
+                raise Exception("Failed to get authenticated user info")
+
+            # Get target user's ID
+            target_user = await self.get_user_by_username(target_username)
+            if not target_user:
+                raise Exception(f"Failed to get user info for {target_username}")
+
+            # Follow the user
+            response = self.client.follow_user(
+                user_id=me.id, target_user_id=target_user.id
+            )
+            logger.info(f"Successfully followed user: {target_username}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to follow user {target_username}: {str(e)}")
+            return False
+
+    async def unfollow_user(self, target_username: str) -> bool:
+        """
+        Unfollow a user using their username. Uses the authenticated user as the unfollower.
+
+        Args:
+            target_username: Username of the account to unfollow (without @ symbol)
+
+        Returns:
+            True if successful, False if failed
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            # Get authenticated user's ID
+            me = await self.get_me()
+            if not me:
+                raise Exception("Failed to get authenticated user info")
+
+            # Get target user's ID
+            target_user = await self.get_user_by_username(target_username)
+            if not target_user:
+                raise Exception(f"Failed to get user info for {target_username}")
+
+            # Unfollow the user
+            response = self.client.unfollow_user(
+                user_id=me.id, target_user_id=target_user.id
+            )
+            logger.info(f"Successfully unfollowed user: {target_username}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to unfollow user {target_username}: {str(e)}")
+            return False
