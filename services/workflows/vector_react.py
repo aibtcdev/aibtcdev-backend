@@ -352,21 +352,19 @@ class VectorLangGraphService:
 
 # Helper function for adding documents to vector store
 async def add_documents_to_vectors(
-    collection_names: Union[
-        str, List[str]
-    ],  # Modified to accept single or multiple collections
+    collection_name: str,  # Modified to only accept a single collection
     documents: List[Document],
     embeddings: Optional[Embeddings] = None,
 ) -> Dict[str, List[str]]:
-    """Add documents to vector collections.
+    """Add documents to vector collection.
 
     Args:
-        collection_names: Name(s) of the collections to add to
+        collection_name: Name of the collection to add to
         documents: List of LangChain Document objects
         embeddings: Optional embeddings model to use
 
     Returns:
-        Dictionary mapping collection names to lists of document IDs
+        Dictionary mapping collection name to list of document IDs
     """
     # Ensure embeddings model is provided
     if embeddings is None:
@@ -374,57 +372,50 @@ async def add_documents_to_vectors(
             "Embeddings model must be provided to add documents to vector store"
         )
 
-    # Convert single collection to list for consistency
-    collection_names = (
-        [collection_names] if isinstance(collection_names, str) else collection_names
-    )
-
-    # Store document IDs for each collection
+    # Store document IDs for the collection
     collection_doc_ids = {}
 
-    for collection_name in collection_names:
+    try:
+        # Ensure collection exists
         try:
-            # Ensure collection exists
-            try:
-                backend.get_vector_collection(collection_name)
-            except Exception:
-                # Create collection if it doesn't exist
-                embed_dim = 1536  # Default for OpenAI embeddings
-                if hasattr(embeddings, "embedding_dim"):
-                    embed_dim = embeddings.embedding_dim
-                backend.create_vector_collection(collection_name, dimensions=embed_dim)
+            backend.get_vector_collection(collection_name)
+        except Exception:
+            # Create collection if it doesn't exist
+            embed_dim = 1536  # Default for OpenAI embeddings
+            if hasattr(embeddings, "embedding_dim"):
+                embed_dim = embeddings.embedding_dim
+            backend.create_vector_collection(collection_name, dimensions=embed_dim)
 
-            # Extract texts for embedding
-            texts = [doc.page_content for doc in documents]
+        # Extract texts for embedding
+        texts = [doc.page_content for doc in documents]
 
-            # Generate embeddings for the texts
-            embedding_vectors = embeddings.embed_documents(texts)
+        # Generate embeddings for the texts
+        embedding_vectors = embeddings.embed_documents(texts)
 
-            # Prepare documents for storage with embeddings
-            docs_for_storage = [
-                {"page_content": doc.page_content, "embedding": embedding_vectors[i]}
-                for i, doc in enumerate(documents)
-            ]
+        # Prepare documents for storage with embeddings
+        docs_for_storage = [
+            {"page_content": doc.page_content, "embedding": embedding_vectors[i]}
+            for i, doc in enumerate(documents)
+        ]
 
-            # Prepare metadata
-            metadata_list = [doc.metadata for doc in documents]
+        # Prepare metadata
+        metadata_list = [doc.metadata for doc in documents]
 
-            # Add to vector store
-            ids = await backend.add_vectors(
-                collection_name=collection_name,
-                documents=docs_for_storage,
-                metadata=metadata_list,
-            )
+        # Add to vector store
+        ids = await backend.add_vectors(
+            collection_name=collection_name,
+            documents=docs_for_storage,
+            metadata=metadata_list,
+        )
 
-            collection_doc_ids[collection_name] = ids
-            logger.info(f"Added {len(ids)} documents to collection {collection_name}")
+        collection_doc_ids[collection_name] = ids
+        logger.info(f"Added {len(ids)} documents to collection {collection_name}")
 
-        except Exception as e:
-            logger.error(
-                f"Failed to add documents to collection {collection_name}: {str(e)}"
-            )
-            collection_doc_ids[collection_name] = []
-            continue  # Continue with other collections if one fails
+    except Exception as e:
+        logger.error(
+            f"Failed to add documents to collection {collection_name}: {str(e)}"
+        )
+        collection_doc_ids[collection_name] = []
 
     return collection_doc_ids
 

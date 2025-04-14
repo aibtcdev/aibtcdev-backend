@@ -7,10 +7,9 @@ processing them, and storing them in a vector collection for later retrieval.
 """
 
 import asyncio
-import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
 import dotenv
 from langchain_community.document_loaders import TextLoader, WebBaseLoader
@@ -20,21 +19,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.factory import backend
 from backend.models import (
-    DAO,
-    UUID,
-    ContractStatus,
-    DAOFilter,
-    Extension,
     ExtensionFilter,
-    HolderFilter,
-    Proposal,
     ProposalFilter,
-    Token,
     TokenFilter,
-    Vote,
     VoteFilter,
-    WalletToken,
-    WalletTokenFilter,
 )
 from services.workflows.vector_react import add_documents_to_vectors
 
@@ -570,7 +558,7 @@ async def main() -> None:
         knowledge_collection_name="knowledge_collection",  # Collection for URLs and files
         dao_collection_name="dao_collection",  # Collection for DAO database data
         recursive=True,
-        include_database=False,  # Include DAO data from the database
+        include_database=True,  # Include DAO data from the database
     )
 
 
