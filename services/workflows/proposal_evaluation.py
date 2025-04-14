@@ -16,8 +16,8 @@ from backend.models import (
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow
-from services.workflows.react import LangGraphService
+from services.workflows.base import BaseWorkflow, VectorRetrievalCapability
+from services.workflows.vector_react import VectorLangGraphService, VectorReactState
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -53,10 +53,25 @@ class EvaluationState(TypedDict):
     auto_vote: bool
     formatted_prompt: str
     agent_prompts: List[Dict]
+    vector_results: Optional[List[Dict]]  # Add vector results to state
 
 
-class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
+class ProposalEvaluationWorkflow(
+    BaseWorkflow[EvaluationState], VectorRetrievalCapability
+):
     """Workflow for evaluating DAO proposals and voting automatically."""
+
+    def __init__(
+        self,
+        collection_names: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.collection_names = collection_names or [
+            "knowledge_collection",
+            "dao_collection",
+        ]
+        self.required_fields = ["proposal_id", "proposal_data"]
 
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
@@ -66,6 +81,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 "dao_info",
                 "contract_source",
                 "agent_prompts",
+                "vector_context",
             ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
@@ -121,6 +137,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             • Cite relevant parts of the proposal, DAO mission, or prior actions
             • Use terms accurately — don't fake precision
             • Keep structure clean and easy to follow
+
+            # 9. VECTOR CONTEXT
+            {vector_context}
 
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
@@ -178,6 +197,35 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                             f"Invalid contract address format: {proposal_data['proposal_contract']}"
                         )
 
+                # Retrieve relevant context from vector store
+                try:
+                    # Create search query from proposal data
+                    search_query = f"Proposal type: {proposal_data.get('type')} - {proposal_data.get('parameters', '')}"
+
+                    # Use vector retrieval capability
+                    vector_results = await self.retrieve_from_vector_store(
+                        query=search_query, limit=5  # Get top 5 most relevant documents
+                    )
+
+                    # Update state with vector results
+                    state["vector_results"] = vector_results
+                    logger.info(
+                        f"Retrieved {len(vector_results)} relevant documents from vector store"
+                    )
+
+                    # Format vector context for prompt
+                    vector_context = "\n\n".join(
+                        [
+                            f"Related Context {i+1}:\n{doc.page_content}"
+                            for i, doc in enumerate(vector_results)
+                        ]
+                    )
+                except Exception as e:
+                    logger.error(f"Error retrieving from vector store: {str(e)}")
+                    vector_context = (
+                        "No additional context available from vector store."
+                    )
+
                 # Format prompt with state
                 self.logger.debug("Formatting evaluation prompt...")
 
@@ -203,13 +251,14 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 else:
                     logger.warning("No agent prompts found in state")
 
-                formatted_prompt = prompt.format(
+                formatted_prompt = self._create_prompt().format(
                     proposal_data=proposal_data,
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
+                    vector_context=vector_context,  # Add vector context to prompt
                 )
 
                 # Get evaluation from LLM
@@ -265,12 +314,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
                 return "skip_vote"
 
-        # Create voting node using ReAct pattern
+        # Create voting node using VectorReact workflow
         async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
-            """Vote on the proposal using ReAct workflow."""
+            """Vote on the proposal using VectorReact workflow."""
             try:
                 self.logger.debug(
-                    f"Setting up ReAct workflow to vote on proposal {state['proposal_id']}, vote={state['approve']}"
+                    f"Setting up VectorReact workflow to vote on proposal {state['proposal_id']}, vote={state['approve']}"
                 )
 
                 # Set up the voting tool
@@ -286,8 +335,10 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 Use the dao_action_vote_on_proposal tool to submit the vote.
                 """
 
-                # Create LangGraph service
-                service = LangGraphService()
+                # Create VectorLangGraph service with collections
+                service = VectorLangGraphService(
+                    collection_names=self.collection_names,
+                )
 
                 # History with system message only
                 history = [
@@ -297,20 +348,20 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                     }
                 ]
 
-                self.logger.debug("Executing ReAct workflow for voting...")
+                self.logger.debug("Executing VectorReact workflow for voting...")
 
                 # Collect response chunks
                 response_chunks = []
                 vote_result = None
 
-                # Execute the ReAct workflow
-                async for chunk in service.execute_react_stream(
+                # Execute the VectorReact workflow
+                async for chunk in service.execute_stream(
                     history=history,
                     input_str=vote_instruction,
                     tools_map=tools_map,
                 ):
                     response_chunks.append(chunk)
-                    self.logger.debug(f"ReAct chunk: {chunk}")
+                    self.logger.debug(f"VectorReact chunk: {chunk}")
 
                     # Extract tool results
                     if (
@@ -321,11 +372,16 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                             vote_result = chunk.get("output")
                             self.logger.info(f"Vote result: {vote_result}")
 
-                # Update state with vote result
+                # Update state with vote result and vector results
                 state["vote_result"] = {
                     "success": vote_result is not None,
                     "output": vote_result,
                 }
+                state["vector_results"] = [
+                    chunk.get("vector_results", [])
+                    for chunk in response_chunks
+                    if chunk.get("vector_results")
+                ]
 
                 return state
             except Exception as e:
@@ -613,6 +669,7 @@ async def evaluate_and_vote_on_proposal(
             "wallet_id": wallet_id,
             "confidence_threshold": confidence_threshold,
             "auto_vote": auto_vote,
+            "vector_results": None,  # Initialize vector results
         }
 
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
@@ -653,6 +710,7 @@ async def evaluate_and_vote_on_proposal(
             and result["confidence_score"] >= confidence_threshold,
             "tx_id": tx_id,
             "formatted_prompt": result["formatted_prompt"],
+            "vector_results": result["vector_results"],
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
@@ -708,6 +766,7 @@ async def debug_proposal_evaluation_workflow():
         "wallet_id": None,
         "confidence_threshold": 0.7,
         "auto_vote": False,
+        "vector_results": None,  # Initialize vector results
     }
 
     # Create the workflow and validate the state
