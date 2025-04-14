@@ -48,6 +48,11 @@ class ProposeActionAddResourceInput(BaseModel):
         description="Optional URL associated with the resource",
         examples=["https://www.example.com/resource"],
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Adding a new consultation resource for the DAO"],
+    )
 
 
 class ProposeActionAddResourceTool(BaseTool):
@@ -73,6 +78,7 @@ class ProposeActionAddResourceTool(BaseTool):
         resource_description: str,
         resource_price: int,
         resource_url: Optional[str] = None,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose adding a resource."""
@@ -90,6 +96,11 @@ class ProposeActionAddResourceTool(BaseTool):
 
         if resource_url:
             args.append(resource_url)
+        
+        if memo:
+            if not resource_url:
+                args.append("")  # Add empty URL if not provided but memo is
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -107,6 +118,7 @@ class ProposeActionAddResourceTool(BaseTool):
         resource_description: str,
         resource_price: int,
         resource_url: Optional[str] = None,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose adding a resource."""
@@ -118,6 +130,7 @@ class ProposeActionAddResourceTool(BaseTool):
             resource_description,
             resource_price,
             resource_url,
+            memo,
             **kwargs,
         )
 
@@ -130,6 +143,7 @@ class ProposeActionAddResourceTool(BaseTool):
         resource_description: str,
         resource_price: int,
         resource_url: Optional[str] = None,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -141,6 +155,7 @@ class ProposeActionAddResourceTool(BaseTool):
             resource_description,
             resource_price,
             resource_url,
+            memo,
             **kwargs,
         )
 
@@ -180,6 +195,11 @@ class ProposeActionAllowAssetInput(BaseModel):
             "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
         ],
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Allow new token for DAO treasury operations"],
+    )
 
 
 class ProposeActionAllowAssetTool(BaseTool):
@@ -202,6 +222,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         dao_token_contract_address_to_allow: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -214,6 +235,9 @@ class ProposeActionAllowAssetTool(BaseTool):
             dao_token_contract_address,
             dao_token_contract_address_to_allow,
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -228,6 +252,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         dao_token_contract_address_to_allow: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose allowing an asset."""
@@ -236,6 +261,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             dao_token_contract_address_to_allow,
+            memo,
             **kwargs,
         )
 
@@ -245,6 +271,7 @@ class ProposeActionAllowAssetTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         dao_token_contract_address_to_allow: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -253,6 +280,7 @@ class ProposeActionAllowAssetTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             dao_token_contract_address_to_allow,
+            memo,
             **kwargs,
         )
 
@@ -289,6 +317,11 @@ class ProposeActionSendMessageInput(BaseModel):
         description="Message to be sent through the DAO proposal system, verified to be from the DAO and posted to Twitter/X automatically if successful.",
         examples=["gm gm from the $FACES DAO!"],
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Sending a greeting message from our DAO"],
+    )
 
 
 class ProposeActionSendMessageTool(BaseTool):
@@ -311,6 +344,7 @@ class ProposeActionSendMessageTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         message: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
@@ -323,6 +357,9 @@ class ProposeActionSendMessageTool(BaseTool):
             dao_token_contract_address,
             message,
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -337,6 +374,7 @@ class ProposeActionSendMessageTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         message: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose sending a message."""
@@ -345,6 +383,7 @@ class ProposeActionSendMessageTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             message,
+            memo,
             **kwargs,
         )
 
@@ -354,6 +393,7 @@ class ProposeActionSendMessageTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         message: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -362,6 +402,7 @@ class ProposeActionSendMessageTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             message,
+            memo,
             **kwargs,
         )
 
@@ -402,6 +443,11 @@ class ProposeActionSetAccountHolderInput(BaseModel):
             "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract",
         ],
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Setting new account holder for DAO vault"],
+    )
 
 
 class ProposeActionSetAccountHolderTool(BaseTool):
@@ -424,6 +470,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         account_holder: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new account holder."""
@@ -436,6 +483,9 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             dao_token_contract_address,
             account_holder,
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -450,6 +500,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         account_holder: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new account holder."""
@@ -458,6 +509,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             account_holder,
+            memo,
             **kwargs,
         )
 
@@ -467,6 +519,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         account_holder: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -475,6 +528,7 @@ class ProposeActionSetAccountHolderTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             account_holder,
+            memo,
             **kwargs,
         )
 
@@ -511,6 +565,11 @@ class ProposeActionSetWithdrawalAmountInput(BaseModel):
         description="New withdrawal amount to set in microSTX",
         examples=["50000000"],  # 50 STX
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Updating withdrawal amount to 50 STX"],
+    )
 
 
 class ProposeActionSetWithdrawalAmountTool(BaseTool):
@@ -533,6 +592,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_amount: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal amount."""
@@ -545,6 +605,9 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             dao_token_contract_address,
             str(withdrawal_amount),
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -559,6 +622,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_amount: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal amount."""
@@ -567,6 +631,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             withdrawal_amount,
+            memo,
             **kwargs,
         )
 
@@ -576,6 +641,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_amount: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -584,6 +650,7 @@ class ProposeActionSetWithdrawalAmountTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             withdrawal_amount,
+            memo,
             **kwargs,
         )
 
@@ -620,6 +687,11 @@ class ProposeActionSetWithdrawalPeriodInput(BaseModel):
         description="New withdrawal period to set in Bitcoin blocks",
         examples=["144"],  # 1 day in BTC blocks
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Updating withdrawal period to 1 day (144 blocks)"],
+    )
 
 
 class ProposeActionSetWithdrawalPeriodTool(BaseTool):
@@ -642,6 +714,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_period: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal period."""
@@ -654,6 +727,9 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             dao_token_contract_address,
             str(withdrawal_period),
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -668,6 +744,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_period: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose setting a new withdrawal period."""
@@ -676,6 +753,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             withdrawal_period,
+            memo,
             **kwargs,
         )
 
@@ -685,6 +763,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         withdrawal_period: int,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -693,6 +772,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             withdrawal_period,
+            memo,
             **kwargs,
         )
 
@@ -914,6 +994,11 @@ class ProposeActionToggleResourceInput(BaseModel):
         description="Name of the resource to toggle",
         examples=["apiv1", "protected-content", "1hr consulting"],
     )
+    memo: Optional[str] = Field(
+        None,
+        description="Optional memo to include with the proposal",
+        examples=["Toggling availability of consulting resource"],
+    )
 
 
 class ProposeActionToggleResourceTool(BaseTool):
@@ -936,6 +1021,7 @@ class ProposeActionToggleResourceTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         resource_name: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
@@ -948,6 +1034,9 @@ class ProposeActionToggleResourceTool(BaseTool):
             dao_token_contract_address,
             resource_name,
         ]
+
+        if memo:
+            args.append(memo)
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -962,6 +1051,7 @@ class ProposeActionToggleResourceTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         resource_name: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to propose toggling a resource."""
@@ -970,6 +1060,7 @@ class ProposeActionToggleResourceTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             resource_name,
+            memo,
             **kwargs,
         )
 
@@ -979,6 +1070,7 @@ class ProposeActionToggleResourceTool(BaseTool):
         action_proposal_contract_to_execute: str,
         dao_token_contract_address: str,
         resource_name: str,
+        memo: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -987,6 +1079,7 @@ class ProposeActionToggleResourceTool(BaseTool):
             action_proposal_contract_to_execute,
             dao_token_contract_address,
             resource_name,
+            memo,
             **kwargs,
         )
 
