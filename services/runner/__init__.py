@@ -3,6 +3,10 @@
 from services.runner.base import BaseTask, JobContext, JobType
 from services.runner.job_manager import JobConfig, JobManager
 from services.runner.registry import JobRegistry, execute_runner_job
+from services.runner.tasks.agent_account_deployer import (
+    AgentAccountDeployerTask,
+    agent_account_deployer,
+)
 from services.runner.tasks.dao_proposal_concluder import (
     DAOProposalConcluderTask,
     dao_proposal_concluder,
@@ -13,10 +17,6 @@ from services.runner.tasks.dao_proposal_voter import (
 )
 from services.runner.tasks.dao_task import DAOTask, dao_task
 from services.runner.tasks.dao_tweet_task import DAOTweetTask, dao_tweet_task
-from services.runner.tasks.smart_wallet_deployer import (
-    SmartWalletDeployerTask,
-    smart_wallet_deployer,
-)
 from services.runner.tasks.tweet_task import TweetTask, tweet_task
 
 # Register tasks with the registry
@@ -25,7 +25,7 @@ JobRegistry.register(JobType.DAO_PROPOSAL_VOTE, DAOProposalVoterTask)
 JobRegistry.register(JobType.DAO_PROPOSAL_CONCLUDE, DAOProposalConcluderTask)
 JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
-JobRegistry.register(JobType.SMART_WALLET_DEPLOY, SmartWalletDeployerTask)
+JobRegistry.register(JobType.AGENT_ACCOUNT_DEPLOY, AgentAccountDeployerTask)
 
 __all__ = [
     "BaseTask",
@@ -45,6 +45,6 @@ __all__ = [
     "execute_runner_job",
     "DAOProposalConcluderTask",
     "dao_proposal_concluder",
-    "SmartWalletDeployerTask",
-    "smart_wallet_deployer",
+    "AgentAccountDeployerTask",
+    "agent_account_deployer",
 ]

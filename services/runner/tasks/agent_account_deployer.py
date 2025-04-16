@@ -1,4 +1,4 @@
-"""Smart wallet deployment task implementation."""
+"""Agent account deployment task implementation."""
 
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -19,21 +19,21 @@ logger = configure_logger(__name__)
 
 
 @dataclass
-class SmartWalletDeployResult(RunnerResult):
-    """Result of smart wallet deployment operation."""
+class AgentAccountDeployResult(RunnerResult):
+    """Result of agent account deployment operation."""
 
-    wallets_processed: int = 0
-    wallets_deployed: int = 0
+    accounts_processed: int = 0
+    accounts_deployed: int = 0
     errors: List[str] = None
 
     def __post_init__(self):
         self.errors = self.errors or []
 
 
-class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
-    """Task runner for deploying smart wallets."""
+class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
+    """Task runner for deploying agent accounts."""
 
-    QUEUE_TYPE = QueueMessageType.SMART_WALLET_DEPLOY
+    QUEUE_TYPE = QueueMessageType.AGENT_ACCOUNT_DEPLOY
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
@@ -42,18 +42,18 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
             pending_messages = await self.get_pending_messages()
             message_count = len(pending_messages)
             logger.debug(
-                f"Found {message_count} pending smart wallet deployment messages"
+                f"Found {message_count} pending agent account deployment messages"
             )
 
             if message_count == 0:
-                logger.info("No pending smart wallet deployment messages found")
+                logger.info("No pending agent account deployment messages found")
                 return False
 
             # Validate that at least one message has valid deployment data
             for message in pending_messages:
                 message_data = message.message or {}
                 if self._validate_message_data(message_data):
-                    logger.info("Found valid smart wallet deployment message")
+                    logger.info("Found valid agent account deployment message")
                     return True
 
             logger.warning("No valid deployment data found in pending messages")
@@ -61,7 +61,7 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
 
         except Exception as e:
             logger.error(
-                f"Error validating smart wallet deployment task: {str(e)}",
+                f"Error validating agent account deployment task: {str(e)}",
                 exc_info=True,
             )
             return False
@@ -76,11 +76,11 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
         return all(field in message_data for field in required_fields)
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single smart wallet deployment message."""
+        """Process a single agent account deployment message."""
         message_id = message.id
         message_data = message.message or {}
 
-        logger.debug(f"Processing smart wallet deployment message {message_id}")
+        logger.debug(f"Processing agent account deployment message {message_id}")
 
         try:
             # Validate message data
@@ -90,9 +90,9 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
                 return {"success": False, "error": error_msg}
 
             # Initialize the SmartWalletDeploySmartWalletTool
-            logger.debug("Preparing to deploy smart wallet")
+            logger.debug("Preparing to deploy agent account")
             deploy_tool = SmartWalletDeploySmartWalletTool(
-                wallet_id=config.scheduler.smart_wallet_deploy_runner_wallet_id
+                wallet_id=config.scheduler.agent_account_deploy_runner_wallet_id
             )
 
             # Execute the deployment
@@ -120,19 +120,21 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
         return backend.list_queue_messages(filters=filters)
 
-    async def _execute_impl(self, context: JobContext) -> List[SmartWalletDeployResult]:
-        """Run the smart wallet deployment task."""
+    async def _execute_impl(
+        self, context: JobContext
+    ) -> List[AgentAccountDeployResult]:
+        """Run the agent account deployment task."""
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
-        logger.debug(f"Found {message_count} pending smart wallet deployment messages")
+        logger.debug(f"Found {message_count} pending agent account deployment messages")
 
         if not pending_messages:
             return [
-                SmartWalletDeployResult(
+                AgentAccountDeployResult(
                     success=True,
                     message="No pending messages found",
-                    wallets_processed=0,
-                    wallets_deployed=0,
+                    accounts_processed=0,
+                    accounts_deployed=0,
                 )
             ]
 
@@ -157,15 +159,15 @@ class SmartWalletDeployerTask(BaseTask[SmartWalletDeployResult]):
         )
 
         return [
-            SmartWalletDeployResult(
+            AgentAccountDeployResult(
                 success=True,
-                message=f"Processed {processed_count} wallet(s), deployed {deployed_count} wallet(s)",
-                wallets_processed=processed_count,
-                wallets_deployed=deployed_count,
+                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s)",
+                accounts_processed=processed_count,
+                accounts_deployed=deployed_count,
                 errors=errors,
             )
         ]
 
 
 # Instantiate the task for use in the registry
-smart_wallet_deployer = SmartWalletDeployerTask()
+agent_account_deployer = AgentAccountDeployerTask()

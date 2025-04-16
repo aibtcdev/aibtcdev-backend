@@ -189,7 +189,7 @@ The application includes several background tasks that can be enabled/disabled v
   3. Post generated tweets
   4. Process DAO proposal votes
   5. Process DAO proposal conclusions
-  6. Process smart wallet deployments
+  6. Process agent account deployments
 - Tweet generation and posting
 - Social media integration tasks
 - Tweet analysis workflows
@@ -199,11 +199,11 @@ Each task runner can be configured with the following parameters:
 - `INTERVAL_SECONDS`: Time between task executions
 - `WALLET_ID`: (For blockchain operations) Wallet ID to use for transactions
 
-Example configuration for smart wallet deployment runner:
+Example configuration for agent account deployment runner:
 ```env
-AIBTC_SMART_WALLET_DEPLOY_RUNNER_ENABLED=false
-AIBTC_SMART_WALLET_DEPLOY_RUNNER_INTERVAL_SECONDS=60
-AIBTC_SMART_WALLET_DEPLOY_RUNNER_WALLET_ID="your-wallet-id"
+AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_ENABLED=false
+AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_INTERVAL_SECONDS=60
+AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_WALLET_ID="your-wallet-id"
 ```
 
 ## Dependencies

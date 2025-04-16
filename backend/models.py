@@ -68,7 +68,9 @@ class QueueMessageType(str, Enum):
     DAO_TWEET = "dao_tweet"
     DAO_PROPOSAL_VOTE = "dao_proposal_vote"
     DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
-    SMART_WALLET_DEPLOY = "smart_wallet_deploy"  # New type for smart wallet deployment
+    AGENT_ACCOUNT_DEPLOY = (
+        "agent_account_deploy"  # New type for agent account deployment
+    )
 
     def __str__(self):
         return self.value
