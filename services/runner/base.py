@@ -65,13 +65,14 @@ class RunnerConfig:
 
 
 class JobType(str, Enum):
-    """Enum for different types of jobs."""
+    """Types of jobs that can be run."""
 
-    DAO = QueueMessageType.DAO
-    DAO_TWEET = QueueMessageType.DAO_TWEET
-    TWEET = QueueMessageType.TWEET
-    DAO_PROPOSAL_VOTE = QueueMessageType.DAO_PROPOSAL_VOTE
-    DAO_PROPOSAL_CONCLUDE = QueueMessageType.DAO_PROPOSAL_CONCLUDE
+    DAO = "dao"
+    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
+    DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
+    DAO_TWEET = "dao_tweet"
+    TWEET = "tweet"
+    SMART_WALLET_DEPLOY = "smart_wallet_deploy"
 
     def __str__(self):
         return self.value

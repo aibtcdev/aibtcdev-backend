@@ -593,7 +593,7 @@ async def evaluate_and_vote_on_proposal(
     proposal_id: UUID,
     wallet_id: Optional[UUID] = None,
     auto_vote: bool = True,
-    confidence_threshold: float = 0.7,
+    confidence_threshold: float = 0.1,
     dao_id: Optional[UUID] = None,
 ) -> Dict:
     """Evaluate a proposal and automatically vote based on the evaluation.

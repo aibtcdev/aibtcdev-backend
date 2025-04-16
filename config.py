@@ -94,6 +94,15 @@ class SchedulerConfig:
     dao_proposal_conclude_runner_wallet_id: str = os.getenv(
         "AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_WALLET_ID", ""
     )
+    smart_wallet_deploy_runner_enabled: bool = (
+        os.getenv("AIBTC_SMART_WALLET_DEPLOY_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    smart_wallet_deploy_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_SMART_WALLET_DEPLOY_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    smart_wallet_deploy_runner_wallet_id: str = os.getenv(
+        "AIBTC_SMART_WALLET_DEPLOY_RUNNER_WALLET_ID", ""
+    )
 
 
 @dataclass
