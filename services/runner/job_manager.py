@@ -94,10 +94,10 @@ class JobManager:
                 JobType.DAO_PROPOSAL_CONCLUDE.value,
             ),
             (
-                "Smart Wallet Deploy Runner Service",
-                config.scheduler.smart_wallet_deploy_runner_enabled,
-                config.scheduler.smart_wallet_deploy_runner_interval_seconds,
-                JobType.SMART_WALLET_DEPLOY.value,
+                "Agent Account Deploy Runner Service",
+                config.scheduler.agent_account_deploy_runner_enabled,
+                config.scheduler.agent_account_deploy_runner_interval_seconds,
+                JobType.AGENT_ACCOUNT_DEPLOY.value,
             ),
         ]
 
