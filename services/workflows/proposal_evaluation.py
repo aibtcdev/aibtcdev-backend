@@ -13,6 +13,7 @@ from backend.factory import backend
 from backend.models import (
     UUID,
     Profile,
+    Prompt,
     PromptFilter,
     ProposalType,
     QueueMessageFilter,
@@ -69,9 +70,18 @@ class ProposalEvaluationWorkflow(
     def __init__(
         self,
         collection_names: Optional[List[str]] = None,
+        model_name: str = "gpt-4o",  # Add model_name parameter with default
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        # Get the model from the first active prompt if available
+        if "agent_prompts" in kwargs:
+            prompts = kwargs.get("agent_prompts", [])
+            if prompts and isinstance(prompts[0], Prompt):
+                model_name = prompts[0].model or model_name
+                # Remove prompts from kwargs since we've processed them
+                del kwargs["agent_prompts"]
+
+        super().__init__(model_name=model_name, **kwargs)
         self.collection_names = collection_names or [
             "knowledge_collection",
             "dao_collection",
@@ -244,25 +254,25 @@ class ProposalEvaluationWorkflow(
                             QueueMessageFilter(
                                 type=QueueMessageType.TWEET,
                                 dao_id=dao_id,
-                                is_processed=True
+                                is_processed=True,
                             )
                         )
                         # Sort by created_at and take last 5
                         sorted_messages = sorted(
-                            queue_messages,
-                            key=lambda x: x.created_at,
-                            reverse=True
+                            queue_messages, key=lambda x: x.created_at, reverse=True
                         )[:5]
-                        
+
                         recent_tweets = [
                             {
                                 "created_at": msg.created_at,
                                 "message": msg.message,
-                                "tweet_id": msg.tweet_id
+                                "tweet_id": msg.tweet_id,
                             }
                             for msg in sorted_messages
                         ]
-                        logger.info(f"Retrieved {len(recent_tweets)} recent tweets for DAO {dao_id}")
+                        logger.info(
+                            f"Retrieved {len(recent_tweets)} recent tweets for DAO {dao_id}"
+                        )
                     except Exception as e:
                         logger.error(f"Error fetching recent tweets: {str(e)}")
                         recent_tweets = []
@@ -362,10 +372,16 @@ class ProposalEvaluationWorkflow(
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
                     vector_context=vector_context,
-                    recent_tweets="\n".join([
-                        f"Tweet {i+1} ({tweet['created_at']}): {tweet['message'].get('text', 'No text available')}"
-                        for i, tweet in enumerate(recent_tweets)
-                    ]) if recent_tweets else "No recent tweets available."
+                    recent_tweets=(
+                        "\n".join(
+                            [
+                                f"Tweet {i+1} ({tweet['created_at']}): {tweet['message'].get('text', 'No text available')}"
+                                for i, tweet in enumerate(recent_tweets)
+                            ]
+                        )
+                        if recent_tweets
+                        else "No recent tweets available."
+                    ),
                 )
 
                 # Get evaluation from LLM
@@ -747,10 +763,8 @@ async def evaluate_and_vote_on_proposal(
             )
             logger.debug(f"Raw prompts from database: {prompts}")
 
-            # Extract prompt texts
-            agent_prompts = [p.prompt_text for p in prompts if p.prompt_text]
-            logger.debug(f"Extracted agent prompts: {agent_prompts}")
-
+            # Store the full Prompt objects
+            agent_prompts = prompts
             logger.info(
                 f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
             )
@@ -768,7 +782,9 @@ async def evaluate_and_vote_on_proposal(
             "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
             "dao_info": dao_info.model_dump() if dao_info else {},
-            "agent_prompts": agent_prompts,  # Add agent prompts to state
+            "agent_prompts": (
+                [p.prompt_text for p in agent_prompts] if agent_prompts else []
+            ),  # Extract prompt texts for state
             "approve": False,
             "confidence_score": 0.0,
             "reasoning": "",
@@ -783,7 +799,9 @@ async def evaluate_and_vote_on_proposal(
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
 
         # Create and run workflow
-        workflow = ProposalEvaluationWorkflow()
+        workflow = ProposalEvaluationWorkflow(
+            agent_prompts=agent_prompts
+        )  # Pass full Prompt objects
         if not workflow._validate_state(state):
             return {
                 "success": False,

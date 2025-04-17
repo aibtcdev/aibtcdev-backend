@@ -724,6 +724,7 @@ class PromptBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
     prompt_text: Optional[str] = None
     is_active: Optional[bool] = True
+    model: Optional[str] = "gpt-4o"
 
 
 class PromptCreate(PromptBase):
