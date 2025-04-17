@@ -70,24 +70,10 @@ class ProposalEvaluationWorkflow(
     def __init__(
         self,
         collection_names: Optional[List[str]] = None,
-        model_name: str = "gpt-4o",  # Add model_name parameter with default
-        temperature: Optional[float] = 0.1,  # Add temperature parameter with default
+        model_name: str = "gpt-4o",
+        temperature: Optional[float] = 0.1,
         **kwargs,
     ):
-        # Get the model and temperature from the first active prompt if available
-        if "agent_prompts" in kwargs:
-            prompts = kwargs.get("agent_prompts", [])
-            if prompts and isinstance(prompts[0], Prompt):
-                first_prompt = prompts[0]
-                model_name = first_prompt.model or model_name
-                temperature = (
-                    first_prompt.temperature
-                    if first_prompt.temperature is not None
-                    else temperature
-                )
-                # Remove prompts from kwargs since we've processed them
-                del kwargs["agent_prompts"]
-
         super().__init__(model_name=model_name, temperature=temperature, **kwargs)
         self.collection_names = collection_names or [
             "knowledge_collection",
@@ -757,6 +743,8 @@ async def evaluate_and_vote_on_proposal(
 
         # Get agent prompts
         agent_prompts = []
+        model_name = "gpt-4o"  # Default model
+        temperature = 0.1  # Default temperature
         try:
             logger.debug(
                 f"Fetching prompts for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
@@ -770,8 +758,20 @@ async def evaluate_and_vote_on_proposal(
             )
             logger.debug(f"Raw prompts from database: {prompts}")
 
-            # Store the full Prompt objects
+            # Store the full Prompt objects and get model settings from first prompt
             agent_prompts = prompts
+            if agent_prompts:
+                first_prompt = agent_prompts[0]
+                model_name = first_prompt.model or model_name
+                temperature = (
+                    first_prompt.temperature
+                    if first_prompt.temperature is not None
+                    else temperature
+                )
+                logger.debug(
+                    f"Using model={model_name}, temperature={temperature} from prompt"
+                )
+
             logger.info(
                 f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
             )
@@ -805,10 +805,10 @@ async def evaluate_and_vote_on_proposal(
 
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
 
-        # Create and run workflow
+        # Create and run workflow with model settings from prompt
         workflow = ProposalEvaluationWorkflow(
-            agent_prompts=agent_prompts
-        )  # Pass full Prompt objects
+            model_name=model_name, temperature=temperature
+        )
         if not workflow._validate_state(state):
             return {
                 "success": False,
