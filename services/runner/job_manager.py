@@ -93,6 +93,12 @@ class JobManager:
                 config.scheduler.dao_proposal_conclude_runner_interval_seconds,
                 JobType.DAO_PROPOSAL_CONCLUDE.value,
             ),
+            (
+                "Smart Wallet Deploy Runner Service",
+                config.scheduler.smart_wallet_deploy_runner_enabled,
+                config.scheduler.smart_wallet_deploy_runner_interval_seconds,
+                JobType.SMART_WALLET_DEPLOY.value,
+            ),
         ]
 
         # Add all runner jobs with common structure
