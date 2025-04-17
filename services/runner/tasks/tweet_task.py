@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Optional
 from uuid import UUID
+import uuid
+import requests
+import urllib.parse
+import io
+from cairosvg import svg2png
+from PIL import Image
 
 from backend.factory import backend
 from backend.models import (
@@ -167,10 +173,49 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
+    def fetch_svg(self, message: str, onchain: bool = False) -> bytes:
+        """
+        Fetch SVG image from BitcoinFaces API using the tweet message.
+        """
+        encoded_message = urllib.parse.quote(message)
+        url = f"https://bitcoinfaces.xyz/api/get-image?name={encoded_message}&onchain={str(onchain).lower()}"
+        headers = {'accept': 'image/svg+xml'}
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Error fetching SVG: {response.status_code}")
+        return response.content
+
+    def convert_svg_to_jpeg(self, svg_bytes: bytes) -> bytes:
+        """
+        Convert SVG bytes to JPEG bytes.
+        """
+        png_buffer = io.BytesIO()
+        svg2png(bytestring=svg_bytes, write_to=png_buffer)
+        png_buffer.seek(0)
+        with Image.open(png_buffer) as img:
+            rgb_img = img.convert("RGB")
+            jpeg_buffer = io.BytesIO()
+            rgb_img.save(jpeg_buffer, format="JPEG")
+            return jpeg_buffer.getvalue()
+
+    def upload_image_to_supabase(self, image_bytes: bytes, custom_file_name: str) -> str:
+        """
+        Upload the JPEG image to Supabase bucket.
+        """
+        bucket = "proposals_images"
+        file_path = f"{custom_file_name}.jpg"
+        response = backend.supabase_client.storage.from_(bucket).upload(
+            file_path, image_bytes, {"content-type": "image/jpeg"}
+        )
+        if response.get("error"):
+            raise Exception(f"Upload error: {response['error']}")
+        public_url_data = backend.supabase_client.storage.from_(bucket).get_public_url(file_path)
+        return public_url_data.get("publicUrl")
+
     async def _process_tweet_message(
         self, message: QueueMessage
     ) -> TweetProcessingResult:
-        """Process a single tweet message."""
+        """Process a single tweet message with image generation."""
         try:
             # Validate message first
             validation_result = await self._validate_message(message)
@@ -190,13 +235,21 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.info(f"Sending tweet for DAO {message.dao_id}")
             logger.debug(f"Tweet content: {tweet_text}")
 
-            # Prepare tweet parameters
-            tweet_params = {"text": tweet_text}
-            if message.tweet_id:
-                tweet_params["reply_in_reply_to_tweet_id"] = message.tweet_id
-
-            # Send tweet using Twitter service
-            tweet_response = await self.twitter_service._apost_tweet(**tweet_params)
+            # Generate and process image
+            svg_content = self.fetch_svg(tweet_text)
+            jpeg_image_bytes = self.convert_svg_to_jpeg(svg_content)
+            custom_file_name = str(uuid.uuid4())
+            supabase_image_url = self.upload_image_to_supabase(jpeg_image_bytes, custom_file_name)
+            
+            # Upload media to Twitter
+            media_id = await self.twitter_service.upload_media(jpeg_image_bytes)
+            
+            # Post tweet with media
+            tweet_response = await self.twitter_service._apost_tweet(
+                text=tweet_text,
+                media_ids=media_id,
+                reply_in_reply_to_tweet_id=message.tweet_id
+            )
 
             if not tweet_response:
                 return TweetProcessingResult(
@@ -209,14 +262,14 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.info(f"Successfully posted tweet {tweet_response.id}")
             logger.debug(f"Tweet ID: {tweet_response.id}")
 
-            # Discord Service
+            # Update Discord posting to include image
             try:
                 discord_service = create_discord_service()
-
                 if discord_service:
-                    discord_result = discord_service.send_message(tweet_text)
-                    logger.info(f"Discord message sent: {discord_result['success']}")
-
+                    discord_result = discord_service.send_message(
+                        tweet_text, image_url=supabase_image_url
+                    )
+                    logger.info(f"Discord message sent: {discord_result.get('success')}")
             except Exception as e:
                 logger.warning(f"Failed to send Discord message: {str(e)}")
 
