@@ -71,17 +71,24 @@ class ProposalEvaluationWorkflow(
         self,
         collection_names: Optional[List[str]] = None,
         model_name: str = "gpt-4o",  # Add model_name parameter with default
+        temperature: Optional[float] = 0.1,  # Add temperature parameter with default
         **kwargs,
     ):
-        # Get the model from the first active prompt if available
+        # Get the model and temperature from the first active prompt if available
         if "agent_prompts" in kwargs:
             prompts = kwargs.get("agent_prompts", [])
             if prompts and isinstance(prompts[0], Prompt):
-                model_name = prompts[0].model or model_name
+                first_prompt = prompts[0]
+                model_name = first_prompt.model or model_name
+                temperature = (
+                    first_prompt.temperature
+                    if first_prompt.temperature is not None
+                    else temperature
+                )
                 # Remove prompts from kwargs since we've processed them
                 del kwargs["agent_prompts"]
 
-        super().__init__(model_name=model_name, **kwargs)
+        super().__init__(model_name=model_name, temperature=temperature, **kwargs)
         self.collection_names = collection_names or [
             "knowledge_collection",
             "dao_collection",

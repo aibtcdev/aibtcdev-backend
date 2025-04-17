@@ -725,6 +725,7 @@ class PromptBase(CustomBaseModel):
     prompt_text: Optional[str] = None
     is_active: Optional[bool] = True
     model: Optional[str] = "gpt-4o"
+    temperature: Optional[float] = 0.1  # Add temperature field with default value
 
 
 class PromptCreate(PromptBase):
