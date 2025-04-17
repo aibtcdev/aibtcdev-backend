@@ -15,6 +15,8 @@ from backend.models import (
     Profile,
     PromptFilter,
     ProposalType,
+    QueueMessageFilter,
+    QueueMessageType,
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
@@ -56,6 +58,7 @@ class EvaluationState(TypedDict):
     formatted_prompt: str
     agent_prompts: List[Dict]
     vector_results: Optional[List[Dict]]  # Add vector results to state
+    recent_tweets: Optional[List[Dict]]  # Add field for recent tweets
 
 
 class ProposalEvaluationWorkflow(
@@ -143,6 +146,7 @@ class ProposalEvaluationWorkflow(
                 "contract_source",
                 "agent_prompts",
                 "vector_context",
+                "recent_tweets",  # Add recent_tweets to input variables
             ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
@@ -202,6 +206,9 @@ class ProposalEvaluationWorkflow(
             # 9. VECTOR CONTEXT
             {vector_context}
 
+            # 10. RECENT DAO TWEETS
+            {recent_tweets}
+
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
             {{
@@ -227,6 +234,41 @@ class ProposalEvaluationWorkflow(
             try:
                 # Get proposal data from state
                 proposal_data = state["proposal_data"]
+                dao_id = state.get("dao_info", {}).get("id")
+
+                # Fetch recent tweets from queue if dao_id exists
+                recent_tweets = []
+                if dao_id:
+                    try:
+                        queue_messages = await backend.list_queue_messages(
+                            QueueMessageFilter(
+                                type=QueueMessageType.TWEET,
+                                dao_id=dao_id,
+                                is_processed=True
+                            )
+                        )
+                        # Sort by created_at and take last 5
+                        sorted_messages = sorted(
+                            queue_messages,
+                            key=lambda x: x.created_at,
+                            reverse=True
+                        )[:5]
+                        
+                        recent_tweets = [
+                            {
+                                "created_at": msg.created_at,
+                                "message": msg.message,
+                                "tweet_id": msg.tweet_id
+                            }
+                            for msg in sorted_messages
+                        ]
+                        logger.info(f"Retrieved {len(recent_tweets)} recent tweets for DAO {dao_id}")
+                    except Exception as e:
+                        logger.error(f"Error fetching recent tweets: {str(e)}")
+                        recent_tweets = []
+
+                # Update state with recent tweets
+                state["recent_tweets"] = recent_tweets
 
                 # If this is a core proposal, fetch the contract source
                 contract_source = ""
@@ -319,7 +361,11 @@ class ProposalEvaluationWorkflow(
                     ),
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
-                    vector_context=vector_context,  # Add vector context to prompt
+                    vector_context=vector_context,
+                    recent_tweets="\n".join([
+                        f"Tweet {i+1} ({tweet['created_at']}): {tweet['message'].get('text', 'No text available')}"
+                        for i, tweet in enumerate(recent_tweets)
+                    ]) if recent_tweets else "No recent tweets available."
                 )
 
                 # Get evaluation from LLM
@@ -731,6 +777,7 @@ async def evaluate_and_vote_on_proposal(
             "confidence_threshold": confidence_threshold,
             "auto_vote": auto_vote,
             "vector_results": None,  # Initialize vector results
+            "recent_tweets": None,  # Initialize recent tweets
         }
 
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
@@ -772,6 +819,7 @@ async def evaluate_and_vote_on_proposal(
             "tx_id": tx_id,
             "formatted_prompt": result["formatted_prompt"],
             "vector_results": result["vector_results"],
+            "recent_tweets": result["recent_tweets"],
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
@@ -828,6 +876,7 @@ async def debug_proposal_evaluation_workflow():
         "confidence_threshold": 0.7,
         "auto_vote": False,
         "vector_results": None,  # Initialize vector results
+        "recent_tweets": None,  # Initialize recent tweets
     }
 
     # Create the workflow and validate the state
