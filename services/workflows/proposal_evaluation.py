@@ -21,7 +21,11 @@ from backend.models import (
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow, VectorRetrievalCapability
+from services.workflows.base import (
+    BaseWorkflow,
+    VectorRetrievalCapability,
+    WebSearchCapability,
+)
 from services.workflows.vector_react import VectorLangGraphService, VectorReactState
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
@@ -58,12 +62,13 @@ class EvaluationState(TypedDict):
     auto_vote: bool
     formatted_prompt: str
     agent_prompts: List[Dict]
-    vector_results: Optional[List[Dict]]  # Add vector results to state
-    recent_tweets: Optional[List[Dict]]  # Add field for recent tweets
+    vector_results: Optional[List[Dict]]
+    recent_tweets: Optional[List[Dict]]
+    web_search_results: Optional[List[Dict]]  # Add field for web search results
 
 
 class ProposalEvaluationWorkflow(
-    BaseWorkflow[EvaluationState], VectorRetrievalCapability
+    BaseWorkflow[EvaluationState], VectorRetrievalCapability, WebSearchCapability
 ):
     """Workflow for evaluating DAO proposals and voting automatically."""
 
@@ -149,7 +154,8 @@ class ProposalEvaluationWorkflow(
                 "contract_source",
                 "agent_prompts",
                 "vector_context",
-                "recent_tweets",  # Add recent_tweets to input variables
+                "recent_tweets",
+                "web_search_results",  # Add web search results to input variables
             ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
@@ -212,6 +218,9 @@ class ProposalEvaluationWorkflow(
             # 10. RECENT DAO TWEETS
             {recent_tweets}
 
+            # 11. WEB SEARCH RESULTS
+            {web_search_results}
+
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
             {{
@@ -238,6 +247,26 @@ class ProposalEvaluationWorkflow(
                 # Get proposal data from state
                 proposal_data = state["proposal_data"]
                 dao_id = state.get("dao_info", {}).get("id")
+
+                # Perform web search for relevant context
+                try:
+                    # Create search query from proposal data
+                    web_search_query = f"DAO proposal {proposal_data.get('type', 'unknown')} - {proposal_data.get('parameters', '')}"
+
+                    # Use web search capability
+                    web_search_results = await self.search_web(
+                        query=web_search_query,
+                        search_context_size="medium",  # Use medium context size for balanced results
+                    )
+
+                    # Update state with web search results
+                    state["web_search_results"] = web_search_results
+                    logger.info(
+                        f"Retrieved {len(web_search_results)} results from web search"
+                    )
+                except Exception as e:
+                    logger.error(f"Error performing web search: {str(e)}")
+                    state["web_search_results"] = []
 
                 # Fetch recent tweets from queue if dao_id exists
                 recent_tweets = []
@@ -357,6 +386,17 @@ class ProposalEvaluationWorkflow(
                 else:
                     logger.warning("No agent prompts found in state")
 
+                # Format web search results for prompt
+                web_search_content = "No relevant web search results found."
+                if state.get("web_search_results"):
+                    web_search_content = "\n\n".join(
+                        [
+                            f"Web Result {i+1}:\n{result['page_content']}\nSource: {result['metadata']['source_urls'][0]['url'] if result['metadata']['source_urls'] else 'Unknown'}"
+                            for i, result in enumerate(state["web_search_results"])
+                        ]
+                    )
+
+                # Update formatted prompt with web search results
                 formatted_prompt = self._create_prompt().format(
                     proposal_data=proposal_data,
                     dao_info=state.get(
@@ -375,6 +415,7 @@ class ProposalEvaluationWorkflow(
                         if recent_tweets
                         else "No recent tweets available."
                     ),
+                    web_search_results=web_search_content,
                 )
 
                 # Get evaluation from LLM
@@ -801,6 +842,7 @@ async def evaluate_and_vote_on_proposal(
             "auto_vote": auto_vote,
             "vector_results": None,  # Initialize vector results
             "recent_tweets": None,  # Initialize recent tweets
+            "web_search_results": None,  # Initialize web search results
         }
 
         logger.debug(f"State agent_prompts: {state['agent_prompts']}")
@@ -845,6 +887,7 @@ async def evaluate_and_vote_on_proposal(
             "formatted_prompt": result["formatted_prompt"],
             "vector_results": result["vector_results"],
             "recent_tweets": result["recent_tweets"],
+            "web_search_results": result["web_search_results"],
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
@@ -902,6 +945,7 @@ async def debug_proposal_evaluation_workflow():
         "auto_vote": False,
         "vector_results": None,  # Initialize vector results
         "recent_tweets": None,  # Initialize recent tweets
+        "web_search_results": None,  # Initialize web search results
     }
 
     # Create the workflow and validate the state
