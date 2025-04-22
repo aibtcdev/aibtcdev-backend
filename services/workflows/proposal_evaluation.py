@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from backend.factory import backend
 from backend.models import (
     UUID,
+    ExtensionFilter,
     Profile,
     Prompt,
     PromptFilter,
@@ -65,6 +66,7 @@ class EvaluationState(TypedDict):
     vector_results: Optional[List[Dict]]
     recent_tweets: Optional[List[Dict]]
     web_search_results: Optional[List[Dict]]  # Add field for web search results
+    treasury_balance: Optional[float]
 
 
 class ProposalEvaluationWorkflow(
@@ -151,11 +153,12 @@ class ProposalEvaluationWorkflow(
             input_variables=[
                 "proposal_data",
                 "dao_info",
+                "treasury_balance",
                 "contract_source",
                 "agent_prompts",
                 "vector_context",
                 "recent_tweets",
-                "web_search_results",  # Add web search results to input variables
+                "web_search_results",
             ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
@@ -172,15 +175,18 @@ class ProposalEvaluationWorkflow(
             # 3. DAO CONTEXT
             {dao_info}
 
-            # 4. AIBTC CHARTER
+            # 4. TREASURY INFORMATION
+            {treasury_balance}
+
+            # 5. AIBTC CHARTER
             Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
             Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
             Guardrails: Decentralized Governance, Smart Contract accountability
 
-            # 5. CONTRACT SOURCE (for core proposals)
+            # 6. CONTRACT SOURCE (for core proposals)
             {contract_source}
 
-            # 6. EVALUATION CRITERIA
+            # 7. EVALUATION CRITERIA
             For Core Proposals:
             - Security implications
             - Mission alignment
@@ -193,7 +199,7 @@ class ProposalEvaluationWorkflow(
             - Security considerations
             - Alignment with DAO goals
 
-            # 7. CONFIDENCE SCORING RUBRIC
+            # 8. CONFIDENCE SCORING RUBRIC
             You MUST choose one of these confidence bands:
             - 0.0-0.2: Extremely low confidence (major red flags or insufficient information)
             - 0.3-0.4: Low confidence (significant concerns or unclear implications)
@@ -201,7 +207,7 @@ class ProposalEvaluationWorkflow(
             - 0.7-0.8: High confidence (minor concerns if any)
             - 0.9-1.0: Very high confidence (clear positive alignment)
 
-            # 8. QUALITY STANDARDS
+            # 9. QUALITY STANDARDS
             Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
             • Be clear and specific — avoid vagueness or filler
             • Use a consistent tone, but reflect the DAO's personality if known
@@ -212,13 +218,13 @@ class ProposalEvaluationWorkflow(
             • Use terms accurately — don't fake precision
             • Keep structure clean and easy to follow
 
-            # 9. VECTOR CONTEXT
+            # 10. VECTOR CONTEXT
             {vector_context}
 
-            # 10. RECENT DAO TWEETS
+            # 11. RECENT DAO TWEETS
             {recent_tweets}
 
-            # 11. WEB SEARCH RESULTS
+            # 12. WEB SEARCH RESULTS
             {web_search_results}
 
             # OUTPUT FORMAT
@@ -402,6 +408,7 @@ class ProposalEvaluationWorkflow(
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
+                    treasury_balance=state.get("treasury_balance"),
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
                     vector_context=vector_context,
@@ -772,6 +779,31 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
+        # Get the treasury extension for the DAO
+        treasury_extension = None
+        try:
+            treasury_extensions = backend.list_extensions(
+                ExtensionFilter(dao_id=dao_info.id, type="EXTENSIONS_TREASURY")
+            )
+            if treasury_extensions:
+                treasury_extension = treasury_extensions[0]
+                logger.debug(
+                    f"Found treasury extension: {treasury_extension.contract_principal}"
+                )
+
+                # Get treasury balance from Hiro API
+                hiro_api = HiroApi()
+                treasury_balance = hiro_api.get_address_balance(
+                    treasury_extension.contract_principal
+                )
+                logger.debug(f"Treasury balance: {treasury_balance}")
+            else:
+                logger.warning(f"No treasury extension found for DAO {dao_info.id}")
+                treasury_balance = None
+        except Exception as e:
+            logger.error(f"Error getting treasury balance: {e}")
+            treasury_balance = None
+
         logger.debug(f"Using DAO: {dao_info.name} (ID: {dao_info.id})")
 
         # Get the wallet and agent information if available
@@ -830,6 +862,7 @@ async def evaluate_and_vote_on_proposal(
             "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
             "dao_info": dao_info.model_dump() if dao_info else {},
+            "treasury_balance": treasury_balance,
             "agent_prompts": (
                 [p.prompt_text for p in agent_prompts] if agent_prompts else []
             ),  # Extract prompt texts for state
@@ -888,6 +921,7 @@ async def evaluate_and_vote_on_proposal(
             "vector_results": result["vector_results"],
             "recent_tweets": result["recent_tweets"],
             "web_search_results": result["web_search_results"],
+            "treasury_balance": result.get("treasury_balance"),
         }
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
