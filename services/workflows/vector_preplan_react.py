@@ -31,6 +31,7 @@ from services.workflows.base import (
     ExecutionError,
     PlanningCapability,
     VectorRetrievalCapability,
+    WebSearchCapability,
 )
 from services.workflows.react import StreamingCallbackHandler
 
@@ -45,11 +46,15 @@ class VectorPreplanState(TypedDict):
 
     messages: Annotated[list, add_messages]
     vector_results: Optional[List[Document]]
+    web_search_results: Optional[List[Document]]  # Add web search results
     plan: Optional[str]
 
 
 class VectorPreplanReactWorkflow(
-    BaseWorkflow[VectorPreplanState], VectorRetrievalCapability, PlanningCapability
+    BaseWorkflow[VectorPreplanState],
+    VectorRetrievalCapability,
+    PlanningCapability,
+    WebSearchCapability,
 ):
     """Workflow that combines vector retrieval and planning capabilities.
 
@@ -339,18 +344,9 @@ class VectorPreplanReactWorkflow(
             logger.debug(f"Continue decision: {result}")
             return result
 
-        async def retrieve_from_vector_store(state: VectorPreplanState) -> Dict:
-            """Retrieve relevant documents from vector store if not already present."""
-            # If vector_results are already in the state, use them
-            if state.get("vector_results") and len(state.get("vector_results")) > 0:
-                logger.info(
-                    f"Using {len(state.get('vector_results'))} documents already in state"
-                )
-                return {"vector_results": state.get("vector_results")}
-
-            # Otherwise, retrieve documents from the vector store
+        async def retrieve_context(state: VectorPreplanState) -> Dict:
+            """Retrieve context from both vector store and web search."""
             messages = state["messages"]
-            # Get the last user message
             last_user_message = None
             for message in reversed(messages):
                 if isinstance(message, HumanMessage):
@@ -358,18 +354,30 @@ class VectorPreplanReactWorkflow(
                     break
 
             if not last_user_message:
-                logger.warning("No user message found for vector retrieval")
-                return {"vector_results": []}
+                logger.warning("No user message found for context retrieval")
+                return {"vector_results": [], "web_search_results": []}
 
-            logger.info(f"Retrieving documents for query: {last_user_message[:50]}...")
-            documents = await self.retrieve_from_vector_store(query=last_user_message)
-            logger.info(f"Retrieved {len(documents)} documents from vector store")
-            return {"vector_results": documents}
+            # Get vector results
+            vector_results = await self.retrieve_from_vector_store(
+                query=last_user_message
+            )
+            logger.info(f"Retrieved {len(vector_results)} documents from vector store")
+
+            # Get web search results
+            try:
+                web_results = await self.search_web(last_user_message)
+                logger.info(f"Retrieved {len(web_results)} web search results")
+            except Exception as e:
+                logger.error(f"Web search failed: {str(e)}")
+                web_results = []
+
+            return {"vector_results": vector_results, "web_search_results": web_results}
 
         def call_model_with_context_and_plan(state: VectorPreplanState) -> Dict:
-            """Call model with both context and plan."""
+            """Call model with context, plan, and web search results."""
             messages = state["messages"]
             vector_results = state.get("vector_results", [])
+            web_results = state.get("web_search_results", [])
             plan = state.get("plan")
 
             # Add vector context to the system message if available
@@ -380,6 +388,20 @@ class VectorPreplanReactWorkflow(
                     "Use this context to inform your response if relevant."
                 )
                 messages = [context_message] + messages
+
+            # Add web search results if available
+            if web_results:
+                web_context = "\n\n".join(
+                    [
+                        f"Web Search Result {i+1}:\n{result['page_content']}\nSource: {result['metadata'].get('source_urls', ['Unknown'])[0]}"
+                        for i, result in enumerate(web_results)
+                    ]
+                )
+                web_message = SystemMessage(
+                    content=f"Here are relevant web search results:\n\n{web_context}\n\n"
+                    "Consider this information in your response if relevant."
+                )
+                messages = [web_message] + messages
 
             # Add the plan as a system message if it exists and hasn't been added yet
             if plan is not None and not any(
@@ -397,11 +419,7 @@ class VectorPreplanReactWorkflow(
                     Be decisive and action-oriented in your responses.
                     """
                 )
-                # Add plan message after context message (if it exists)
-                if vector_results:
-                    messages = [messages[0], plan_message] + messages[1:]
-                else:
-                    messages = [plan_message] + messages
+                messages = [plan_message] + messages
 
             # If decisive behavior is enabled and there's no plan-related system message,
             # add a decisive behavior system message
@@ -417,7 +435,8 @@ class VectorPreplanReactWorkflow(
 
             logger.debug(
                 f"Calling model with {len(messages)} messages, "
-                f"{len(vector_results)} vector results, and "
+                f"{len(vector_results)} vector results, "
+                f"{len(web_results)} web results, and "
                 f"{'a plan' if plan else 'no plan'}"
             )
 
@@ -427,13 +446,13 @@ class VectorPreplanReactWorkflow(
         workflow = StateGraph(VectorPreplanState)
 
         # Add nodes
-        workflow.add_node("vector_retrieval", retrieve_from_vector_store)
+        workflow.add_node("context_retrieval", retrieve_context)
         workflow.add_node("agent", call_model_with_context_and_plan)
         workflow.add_node("tools", tool_node)
 
         # Set up the execution flow
-        workflow.add_edge(START, "vector_retrieval")
-        workflow.add_edge("vector_retrieval", "agent")
+        workflow.add_edge(START, "context_retrieval")
+        workflow.add_edge("context_retrieval", "agent")
         workflow.add_conditional_edges("agent", should_continue)
         workflow.add_edge("tools", "agent")
 
