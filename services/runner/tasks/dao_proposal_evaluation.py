@@ -126,6 +126,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
             formatted_prompt = result.get("formatted_prompt", "No prompt provided")
+            total_cost = result.get("token_costs", {}).get("total_cost", 0.0)
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
@@ -142,6 +143,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 reasoning=reasoning,
                 confidence=confidence,
                 prompt=formatted_prompt,
+                cost=total_cost,
             )
 
             # Create the vote record

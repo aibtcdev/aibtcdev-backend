@@ -685,6 +685,7 @@ class VoteBase(CustomBaseModel):
     confidence: Optional[float] = None
     prompt: Optional[str] = None
     voted: Optional[bool] = None
+    cost: Optional[float] = None
 
 
 class VoteCreate(VoteBase):
