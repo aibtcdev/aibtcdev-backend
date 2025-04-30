@@ -68,6 +68,9 @@ class QueueMessageType(str, Enum):
     DAO_TWEET = "dao_tweet"
     DAO_PROPOSAL_VOTE = "dao_proposal_vote"
     DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
+    DAO_PROPOSAL_EVALUATION = (
+        "dao_proposal_evaluation"  # New type for proposal evaluation
+    )
     AGENT_ACCOUNT_DEPLOY = (
         "agent_account_deploy"  # New type for agent account deployment
     )
@@ -681,6 +684,8 @@ class VoteBase(CustomBaseModel):
     amount: Optional[str] = None  # String to handle large token amounts
     confidence: Optional[float] = None
     prompt: Optional[str] = None
+    voted: Optional[bool] = None
+    cost: Optional[float] = None
 
 
 class VoteCreate(VoteBase):
@@ -699,6 +704,7 @@ class VoteFilter(CustomBaseModel):
     proposal_id: Optional[UUID] = None
     answer: Optional[bool] = None
     address: Optional[str] = None
+    voted: Optional[bool] = None
 
 
 # Add this to your backend interface class to get agents by tokens
@@ -724,7 +730,7 @@ class PromptBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
     prompt_text: Optional[str] = None
     is_active: Optional[bool] = True
-    model: Optional[str] = "gpt-4o"
+    model: Optional[str] = "gpt-4.1"
     temperature: Optional[float] = 0.1  # Add temperature field with default value
 
 

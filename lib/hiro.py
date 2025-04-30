@@ -250,7 +250,7 @@ class BaseHiroApi:
         self._request_times: List[float] = []
         self._cache = TTLCache(maxsize=100, ttl=300)  # Cache with 5-minute TTL
         self._session: Optional[aiohttp.ClientSession] = None
-        logger.info("Initialized API client with base URL: %s", self.base_url)
+        logger.debug("Initialized API client with base URL: %s", self.base_url)
 
     def _rate_limit(self) -> None:
         """Implement rate limiting."""
@@ -666,14 +666,14 @@ class HiroApi(BaseHiroApi):
     @cached(lambda self: self._cache)
     def get_token_holders(self, token: str) -> Dict[str, Any]:
         """Retrieve a list of token holders with caching."""
-        logger.info("Retrieving token holders for %s", token)
+        logger.debug("Retrieving token holders for %s", token)
         return self._make_request(
             "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
         )
 
     def get_address_balance(self, addr: str) -> Dict[str, Any]:
         """Retrieve wallet balance for an address."""
-        logger.info("Retrieving balance for address %s", addr)
+        logger.debug("Retrieving balance for address %s", addr)
         return self._make_request(
             "GET", f"{self.ENDPOINTS['addresses']}/{addr}/balances"
         )
@@ -816,19 +816,19 @@ class HiroApi(BaseHiroApi):
     @cached(lambda self: self._cache)
     def get_fee_rate(self) -> Dict[str, Any]:
         """Get current fee rate with caching."""
-        logger.info("Retrieving current fee rate")
+        logger.debug("Retrieving current fee rate")
         return self._make_request("GET", "/extended/v1/fee_rate")
 
     @cached(lambda self: self._cache)
     def get_stx_supply(self) -> Dict[str, Any]:
         """Get STX supply with caching."""
-        logger.info("Retrieving STX supply")
+        logger.debug("Retrieving STX supply")
         return self._make_request("GET", "/extended/v1/stx_supply")
 
     @cached(lambda self: self._cache)
     def get_stx_price(self) -> float:
         """Get the current STX price with caching."""
-        logger.info("Retrieving current STX price")
+        logger.debug("Retrieving current STX price")
         response = requests.get(
             "https://explorer.hiro.so/stxPrice", params={"blockBurnTime": "current"}
         )
@@ -838,7 +838,7 @@ class HiroApi(BaseHiroApi):
     # @cached(lambda self: self._cache)
     def get_current_block_height(self) -> int:
         """Get the current block height"""
-        logger.info("Retrieving current block height")
+        logger.debug("Retrieving current block height")
         logger.debug(f"Endpoint: {self.ENDPOINTS['blocks']}")
         response = self._make_request(
             method="GET",
@@ -850,20 +850,20 @@ class HiroApi(BaseHiroApi):
 
     def search(self, query_id: str) -> Dict[str, Any]:
         """Search for blocks, transactions, contracts, or addresses."""
-        logger.info("Performing search for query: %s", query_id)
+        logger.debug("Performing search for query: %s", query_id)
         return self._make_request("GET", f"{self.ENDPOINTS['search']}/{query_id}")
 
     # Async versions of selected methods
     async def aget_token_holders(self, token: str) -> Dict[str, Any]:
         """Async version of get_token_holders."""
-        logger.info("Async retrieving token holders for %s", token)
+        logger.debug("Async retrieving token holders for %s", token)
         return await self._amake_request(
             "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
         )
 
     async def aget_address_balance(self, addr: str) -> Dict[str, Any]:
         """Async version of get_address_balance."""
-        logger.info("Async retrieving balance for address %s", addr)
+        logger.debug("Async retrieving balance for address %s", addr)
         return await self._amake_request(
             "GET", f"{self.ENDPOINTS['addresses']}/{addr}/balances"
         )

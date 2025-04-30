@@ -5,10 +5,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 from langchain.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain.schema import Document
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.graph import Graph, StateGraph
 from openai import OpenAI
 
+from backend.factory import backend
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -54,7 +56,7 @@ class BaseWorkflow(Generic[StateType]):
 
     def __init__(
         self,
-        model_name: str = "gpt-4o",
+        model_name: str = "gpt-4.1",
         temperature: Optional[float] = 0.1,
         streaming: bool = True,
         callbacks: Optional[List[Any]] = None,
@@ -71,6 +73,7 @@ class BaseWorkflow(Generic[StateType]):
             temperature=temperature,
             model=model_name,
             streaming=streaming,
+            stream_usage=True,
             callbacks=callbacks or [],
         )
         self.logger = configure_logger(self.__class__.__name__)
@@ -122,6 +125,7 @@ class BaseWorkflow(Generic[StateType]):
             model=self.model_name,
             temperature=self.temperature,
             streaming=True,
+            stream_usage=True,
             callbacks=callbacks,
         )
 
@@ -272,8 +276,24 @@ class PlanningCapability(BaseWorkflowMixin):
 class VectorRetrievalCapability(BaseWorkflowMixin):
     """Mixin that adds vector retrieval capabilities to a workflow."""
 
-    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Any]:
-        """Retrieve relevant documents from vector store.
+    def __init__(self, *args, **kwargs):
+        """Initialize the vector retrieval capability."""
+        # Initialize parent class if it exists
+        super().__init__(*args, **kwargs) if hasattr(super(), "__init__") else None
+        # Initialize our attributes
+        self._init_vector_retrieval()
+
+    def _init_vector_retrieval(self) -> None:
+        """Initialize vector retrieval attributes if not already initialized."""
+        if not hasattr(self, "collection_names"):
+            self.collection_names = ["knowledge_collection", "dao_collection"]
+        if not hasattr(self, "embeddings"):
+            self.embeddings = OpenAIEmbeddings()
+        if not hasattr(self, "vector_results_cache"):
+            self.vector_results_cache = {}
+
+    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve relevant documents from multiple vector stores.
 
         Args:
             query: The query to search for
@@ -282,23 +302,111 @@ class VectorRetrievalCapability(BaseWorkflowMixin):
         Returns:
             List of retrieved documents
         """
-        raise NotImplementedError(
-            "VectorRetrievalCapability must implement retrieve_from_vector_store"
-        )
+        try:
+            # Ensure initialization
+            self._init_vector_retrieval()
+
+            # Check cache first
+            if query in self.vector_results_cache:
+                logger.debug(f"Using cached vector results for query: {query}")
+                return self.vector_results_cache[query]
+
+            all_documents = []
+            limit_per_collection = kwargs.get("limit", 4)
+            logger.debug(
+                f"Searching vector store: query={query} | limit_per_collection={limit_per_collection}"
+            )
+
+            # Query each collection and gather results
+            for collection_name in self.collection_names:
+                try:
+                    # Query vectors using the backend
+                    vector_results = await backend.query_vectors(
+                        collection_name=collection_name,
+                        query_text=query,
+                        limit=limit_per_collection,
+                        embeddings=self.embeddings,
+                    )
+
+                    # Convert to LangChain Documents and add collection source
+                    documents = [
+                        Document(
+                            page_content=doc.get("page_content", ""),
+                            metadata={
+                                **doc.get("metadata", {}),
+                                "collection_source": collection_name,
+                            },
+                        )
+                        for doc in vector_results
+                    ]
+
+                    all_documents.extend(documents)
+                    logger.debug(
+                        f"Retrieved {len(documents)} documents from collection {collection_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to retrieve from collection {collection_name}: {str(e)}",
+                        exc_info=True,
+                    )
+                    continue  # Continue with other collections if one fails
+
+            logger.debug(
+                f"Retrieved total of {len(all_documents)} documents from all collections"
+            )
+
+            # Cache the results
+            self.vector_results_cache[query] = all_documents
+
+            return all_documents
+        except Exception as e:
+            logger.error(f"Vector store retrieval failed: {str(e)}", exc_info=True)
+            return []
 
     def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
         """Integrate vector retrieval capability with a graph.
 
-        This adds the vector retrieval capability to the graph.
+        This adds the vector retrieval capability to the graph by adding a node
+        that can perform vector searches when needed.
 
         Args:
             graph: The graph to integrate with
-            **kwargs: Additional arguments specific to vector retrieval
+            **kwargs: Additional arguments specific to vector retrieval including:
+                     - collection_names: List of collection names to search
+                     - limit_per_collection: Number of results per collection
         """
-        # Implementation depends on specific graph structure
-        raise NotImplementedError(
-            "VectorRetrievalCapability must implement integrate_with_graph"
-        )
+        # Add vector search node
+        graph.add_node("vector_search", self.retrieve_from_vector_store)
+
+        # Add result processing node if needed
+        if "process_vector_results" not in graph.nodes:
+            graph.add_node("process_vector_results", self._process_vector_results)
+            graph.add_edge("vector_search", "process_vector_results")
+
+    async def _process_vector_results(
+        self, vector_results: List[Document], **kwargs
+    ) -> Dict[str, Any]:
+        """Process vector search results.
+
+        Args:
+            vector_results: Results from vector search
+            **kwargs: Additional processing arguments
+
+        Returns:
+            Processed results with metadata
+        """
+        return {
+            "results": vector_results,
+            "metadata": {
+                "num_vector_results": len(vector_results),
+                "collection_sources": list(
+                    set(
+                        doc.metadata.get("collection_source", "unknown")
+                        for doc in vector_results
+                    )
+                ),
+            },
+        }
 
 
 class WebSearchCapability(BaseWorkflowMixin):
@@ -349,10 +457,10 @@ class WebSearchCapability(BaseWorkflowMixin):
 
             # Make the API call
             response = self.client.responses.create(
-                model="gpt-4o", tools=[tool_config], input=query
+                model="gpt-4.1", tools=[tool_config], input=query
             )
 
-            logger.info(f"Web search response: {response}")
+            logger.debug(f"Web search response: {response}")
             # Process the response into our document format
             documents = []
 

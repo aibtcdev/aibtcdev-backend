@@ -70,6 +70,7 @@ class JobType(str, Enum):
     DAO = "dao"
     DAO_PROPOSAL_VOTE = "dao_proposal_vote"
     DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
+    DAO_PROPOSAL_EVALUATION = "dao_proposal_evaluation"
     DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
     AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
