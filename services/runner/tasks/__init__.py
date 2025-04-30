@@ -1,6 +1,7 @@
 """Task runners for scheduled and on-demand jobs."""
 
 from .dao_proposal_concluder import DAOProposalConcluderTask, dao_proposal_concluder
+from .dao_proposal_evaluation import DAOProposalEvaluationTask, dao_proposal_evaluation
 from .dao_proposal_voter import DAOProposalVoterTask, dao_proposal_voter
 from .dao_task import DAOTask, dao_task
 from .dao_tweet_task import DAOTweetTask, dao_tweet_task
@@ -17,4 +18,6 @@ __all__ = [
     "tweet_task",
     "DAOProposalConcluderTask",
     "dao_proposal_concluder",
+    "DAOProposalEvaluationTask",
+    "dao_proposal_evaluation",
 ]
