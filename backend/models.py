@@ -529,6 +529,7 @@ class QueueMessageFilter(CustomBaseModel):
     tweet_id: Optional[str] = None
     conversation_id: Optional[str] = None
     wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
 
 
 class AgentFilter(CustomBaseModel):
