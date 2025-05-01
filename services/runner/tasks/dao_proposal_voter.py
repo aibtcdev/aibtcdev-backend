@@ -157,10 +157,14 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 tx_id = vote_result.get("data", {}).get("txid")
                 if tx_id:
                     # Log the txid for debugging
+                    ## i need to get the address from the wallet that just voted
+                    wallet = backend.get_wallet(wallet_id)
+                    address = wallet.address
                     logger.debug(f"Found txid in response: {tx_id}")
                     vote_data = VoteBase(
                         tx_id=tx_id,
                         voted=True,
+                        address=address,
                     )
                     logger.debug(
                         f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"
