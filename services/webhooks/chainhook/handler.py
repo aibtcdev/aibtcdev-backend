@@ -2,7 +2,6 @@
 
 from typing import Any, Dict
 
-from backend.supabase import SupabaseBackend
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.chainhook.handlers.block_state_handler import BlockStateHandler
@@ -34,11 +33,10 @@ class ChainhookHandler(WebhookHandler):
     3. Post-processing - for handlers that need to perform cleanup after all blocks
     """
 
-    def __init__(self, supabase_backend: SupabaseBackend):
+    def __init__(self):
         """Initialize the handler with a logger and specialized handlers."""
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
-        self.supabase = supabase_backend
         # Initialize BlockStateHandler first as it needs to validate block heights
         self.block_state_handler = BlockStateHandler()
         self.handlers = [
