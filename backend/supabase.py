@@ -665,6 +665,9 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("conversation_id", filters.conversation_id)
             if filters.wallet_id is not None:
                 query = query.eq("wallet_id", filters.wallet_id)
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id)) 
+        
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]

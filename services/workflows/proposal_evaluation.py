@@ -237,6 +237,9 @@ class ProposalEvaluationWorkflow(
                 recent_tweets = []
                 if dao_id:
                     try:
+                        # Add debug logging for dao_id
+                        self.logger.debug(f"Fetching tweets for DAO ID: {dao_id}")
+                        
                         queue_messages = backend.list_queue_messages(
                             QueueMessageFilter(
                                 type=QueueMessageType.TWEET,
@@ -244,15 +247,19 @@ class ProposalEvaluationWorkflow(
                                 is_processed=True,
                             )
                         )
+                        # Log the number of messages found
+                        self.logger.debug(f"Found {len(queue_messages)} queue messages")
+                        
                         # Sort by created_at and take last 5
                         sorted_messages = sorted(
                             queue_messages, key=lambda x: x.created_at, reverse=True
                         )[:5]
+                        self.logger.debug(f"After sorting, have {len(sorted_messages)} messages")
 
                         recent_tweets = [
                             {
                                 "created_at": msg.created_at,
-                                "message": msg.message,
+                                "message": msg.message.get('message', 'No text available') if isinstance(msg.message, dict) else msg.message,
                                 "tweet_id": msg.tweet_id,
                             }
                             for msg in sorted_messages
@@ -387,7 +394,7 @@ class ProposalEvaluationWorkflow(
                     recent_tweets=(
                         "\n".join(
                             [
-                                f"Tweet {i+1} ({tweet['created_at']}): {tweet['message'].get('text', 'No text available')}"
+                                f"Tweet {i+1} ({tweet['created_at']}): {tweet['message']}"
                                 for i, tweet in enumerate(recent_tweets)
                             ]
                         )
