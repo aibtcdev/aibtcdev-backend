@@ -37,6 +37,8 @@ class ChainhookHandler(WebhookHandler):
         """Initialize the handler with a logger and specialized handlers."""
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
+        # Initialize BlockStateHandler first as it needs to validate block heights
+        self.block_state_handler = BlockStateHandler()
         self.handlers = [
             ContractMessageHandler(),
             BuyEventHandler(),
@@ -45,7 +47,7 @@ class ChainhookHandler(WebhookHandler):
             DAOProposalBurnHeightHandler(),
             DAOVoteHandler(),
             DAOProposalConclusionHandler(),
-            BlockStateHandler(),
+            self.block_state_handler,  # Add to regular handlers list too for post-processing
         ]
 
     async def handle(self, parsed_data: ChainHookData) -> Dict[str, Any]:
@@ -62,7 +64,8 @@ class ChainhookHandler(WebhookHandler):
                 f"Processing chainhook webhook with {len(parsed_data.apply)} apply blocks"
             )
 
-            # Set chainhook data for all handlers
+            # Set chainhook data for all handlers including block state handler
+            self.block_state_handler.set_chainhook_data(parsed_data)
             for handler in self.handlers:
                 handler.set_chainhook_data(parsed_data)
 
@@ -73,9 +76,37 @@ class ChainhookHandler(WebhookHandler):
                     f"(height: {apply.block_identifier.index})"
                 )
 
-                # Process block-level handlers first
+                # First, process with BlockStateHandler to update/validate chain state
+                if self.block_state_handler.can_handle_block(apply):
+                    await self.block_state_handler.handle_block(apply)
+
+                # Check if BlockStateHandler successfully processed *this* block.
+                # This implies the block was newer than the DB state AND the DB update succeeded.
+                # We check if the handler's internal state now matches this block's height.
+                block_processed_by_state_handler = (
+                    self.block_state_handler.latest_chain_state is not None
+                    and self.block_state_handler.latest_chain_state.block_height
+                    == apply.block_identifier.index
+                )
+
+                if not block_processed_by_state_handler:
+                    self.logger.warning(
+                        f"Block {apply.block_identifier.index} was not processed by BlockStateHandler "
+                        f"(likely older than current DB state or failed update). Skipping other handlers for this block."
+                    )
+                    continue  # Skip to the next block in the webhook payload
+
+                # If BlockStateHandler processed it, proceed with other handlers for this block
+                self.logger.debug(
+                    f"Block {apply.block_identifier.index} validated by BlockStateHandler, proceeding."
+                )
+
+                # Process other block-level handlers
                 for handler in self.handlers:
-                    if handler.can_handle_block(apply):
+                    if (
+                        handler != self.block_state_handler
+                        and handler.can_handle_block(apply)
+                    ):
                         self.logger.debug(
                             f"Using handler {handler.__class__.__name__} for block-level processing"
                         )

@@ -94,6 +94,26 @@ class SchedulerConfig:
     dao_proposal_conclude_runner_wallet_id: str = os.getenv(
         "AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_WALLET_ID", ""
     )
+    dao_proposal_evaluation_runner_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_RUNNER_ENABLED", "false").lower()
+        == "true"
+    )
+    dao_proposal_evaluation_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    agent_account_deploy_runner_enabled: bool = (
+        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_ENABLED", "false").lower()
+        == "true"
+    )
+    agent_account_deploy_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_INTERVAL_SECONDS", "60")
+    )
+    agent_account_deploy_runner_wallet_id: str = os.getenv(
+        "AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_WALLET_ID", ""
+    )
+    dao_proposal_vote_delay_blocks: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "2")
+    )
 
 
 @dataclass

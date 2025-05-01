@@ -3,9 +3,17 @@
 from services.runner.base import BaseTask, JobContext, JobType
 from services.runner.job_manager import JobConfig, JobManager
 from services.runner.registry import JobRegistry, execute_runner_job
+from services.runner.tasks.agent_account_deployer import (
+    AgentAccountDeployerTask,
+    agent_account_deployer,
+)
 from services.runner.tasks.dao_proposal_concluder import (
     DAOProposalConcluderTask,
     dao_proposal_concluder,
+)
+from services.runner.tasks.dao_proposal_evaluation import (
+    DAOProposalEvaluationTask,
+    dao_proposal_evaluation,
 )
 from services.runner.tasks.dao_proposal_voter import (
     DAOProposalVoterTask,
@@ -19,8 +27,10 @@ from services.runner.tasks.tweet_task import TweetTask, tweet_task
 JobRegistry.register(JobType.DAO, DAOTask)
 JobRegistry.register(JobType.DAO_PROPOSAL_VOTE, DAOProposalVoterTask)
 JobRegistry.register(JobType.DAO_PROPOSAL_CONCLUDE, DAOProposalConcluderTask)
+JobRegistry.register(JobType.DAO_PROPOSAL_EVALUATION, DAOProposalEvaluationTask)
 JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
+JobRegistry.register(JobType.AGENT_ACCOUNT_DEPLOY, AgentAccountDeployerTask)
 
 __all__ = [
     "BaseTask",
@@ -40,4 +50,8 @@ __all__ = [
     "execute_runner_job",
     "DAOProposalConcluderTask",
     "dao_proposal_concluder",
+    "DAOProposalEvaluationTask",
+    "dao_proposal_evaluation",
+    "AgentAccountDeployerTask",
+    "agent_account_deployer",
 ]

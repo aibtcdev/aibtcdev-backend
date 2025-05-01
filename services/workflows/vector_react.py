@@ -49,14 +49,21 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapabil
         self,
         callback_handler: StreamingCallbackHandler,
         tools: List[Any],
-        collection_name: str,
+        collection_names: Union[
+            str, List[str]
+        ],  # Modified to accept single or multiple collections
         embeddings: Optional[Embeddings] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.callback_handler = callback_handler
         self.tools = tools
-        self.collection_name = collection_name
+        # Convert single collection to list for consistency
+        self.collection_names = (
+            [collection_names]
+            if isinstance(collection_names, str)
+            else collection_names
+        )
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.required_fields = ["messages"]
 
@@ -68,7 +75,7 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapabil
         pass
 
     async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
-        """Retrieve relevant documents from vector store.
+        """Retrieve relevant documents from multiple vector stores.
 
         Args:
             query: The query to search for
@@ -78,25 +85,48 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapabil
             List of retrieved documents
         """
         try:
-            # Query vectors using the backend
-            vector_results = await backend.query_vectors(
-                collection_name=self.collection_name,
-                query_text=query,
-                limit=kwargs.get("limit", 4),
-                embeddings=self.embeddings,
+            all_documents = []
+            limit_per_collection = kwargs.get(
+                "limit", 4
+            )  # Get 4 results from each collection
+
+            # Query each collection and gather results
+            for collection_name in self.collection_names:
+                try:
+                    # Query vectors using the backend
+                    vector_results = await backend.query_vectors(
+                        collection_name=collection_name,
+                        query_text=query,
+                        limit=limit_per_collection,
+                        embeddings=self.embeddings,
+                    )
+
+                    # Convert to LangChain Documents and add collection source
+                    documents = [
+                        Document(
+                            page_content=doc.get("page_content", ""),
+                            metadata={
+                                **doc.get("metadata", {}),
+                                "collection_source": collection_name,
+                            },
+                        )
+                        for doc in vector_results
+                    ]
+
+                    all_documents.extend(documents)
+                    logger.info(
+                        f"Retrieved {len(documents)} documents from collection {collection_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to retrieve from collection {collection_name}: {str(e)}"
+                    )
+                    continue  # Continue with other collections if one fails
+
+            logger.info(
+                f"Retrieved total of {len(all_documents)} documents from all collections"
             )
-
-            # Convert to LangChain Documents
-            documents = [
-                Document(
-                    page_content=doc.get("page_content", ""),
-                    metadata=doc.get("metadata", {}),
-                )
-                for doc in vector_results
-            ]
-
-            logger.info(f"Retrieved {len(documents)} documents from vector store")
-            return documents
+            return all_documents
         except Exception as e:
             logger.error(f"Vector store retrieval failed: {str(e)}")
             return []
@@ -182,11 +212,17 @@ class VectorReactWorkflow(BaseWorkflow[VectorReactState], VectorRetrievalCapabil
 class VectorLangGraphService:
     """Service for executing VectorReact LangGraph operations"""
 
-    def __init__(self, collection_name: str, embeddings: Optional[Embeddings] = None):
+    def __init__(
+        self,
+        collection_names: Union[
+            str, List[str]
+        ],  # Modified to accept single or multiple collections
+        embeddings: Optional[Embeddings] = None,
+    ):
         # Import here to avoid circular imports
         from services.workflows.react import MessageProcessor
 
-        self.collection_name = collection_name
+        self.collection_names = collection_names
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.message_processor = MessageProcessor()
 
@@ -244,7 +280,7 @@ class VectorLangGraphService:
                 .with_callback_handler(callback_handler)
                 .with_tools(list(tools_map.values()) if tools_map else [])
                 .build(
-                    collection_name=self.collection_name,
+                    collection_names=self.collection_names,
                     embeddings=self.embeddings,
                 )
             )
@@ -316,10 +352,10 @@ class VectorLangGraphService:
 
 # Helper function for adding documents to vector store
 async def add_documents_to_vectors(
-    collection_name: str,
+    collection_name: str,  # Modified to only accept a single collection
     documents: List[Document],
     embeddings: Optional[Embeddings] = None,
-) -> List[str]:
+) -> Dict[str, List[str]]:
     """Add documents to vector collection.
 
     Args:
@@ -328,7 +364,7 @@ async def add_documents_to_vectors(
         embeddings: Optional embeddings model to use
 
     Returns:
-        List of document IDs
+        Dictionary mapping collection name to list of document IDs
     """
     # Ensure embeddings model is provided
     if embeddings is None:
@@ -336,44 +372,59 @@ async def add_documents_to_vectors(
             "Embeddings model must be provided to add documents to vector store"
         )
 
-    # Ensure collection exists
+    # Store document IDs for the collection
+    collection_doc_ids = {}
+
     try:
-        backend.get_vector_collection(collection_name)
-    except Exception:
-        # Create collection if it doesn't exist
-        embed_dim = 1536  # Default for OpenAI embeddings
-        if hasattr(embeddings, "embedding_dim"):
-            embed_dim = embeddings.embedding_dim
-        backend.create_vector_collection(collection_name, dimensions=embed_dim)
+        # Ensure collection exists
+        try:
+            backend.get_vector_collection(collection_name)
+        except Exception:
+            # Create collection if it doesn't exist
+            embed_dim = 1536  # Default for OpenAI embeddings
+            if hasattr(embeddings, "embedding_dim"):
+                embed_dim = embeddings.embedding_dim
+            backend.create_vector_collection(collection_name, dimensions=embed_dim)
 
-    # Extract texts for embedding
-    texts = [doc.page_content for doc in documents]
+        # Extract texts for embedding
+        texts = [doc.page_content for doc in documents]
 
-    # Generate embeddings for the texts
-    embedding_vectors = embeddings.embed_documents(texts)
+        # Generate embeddings for the texts
+        embedding_vectors = embeddings.embed_documents(texts)
 
-    # Prepare documents for storage with embeddings
-    docs_for_storage = [
-        {"page_content": doc.page_content, "embedding": embedding_vectors[i]}
-        for i, doc in enumerate(documents)
-    ]
+        # Prepare documents for storage with embeddings
+        docs_for_storage = [
+            {"page_content": doc.page_content, "embedding": embedding_vectors[i]}
+            for i, doc in enumerate(documents)
+        ]
 
-    # Prepare metadata
-    metadata_list = [doc.metadata for doc in documents]
+        # Prepare metadata
+        metadata_list = [doc.metadata for doc in documents]
 
-    # Add to vector store
-    ids = await backend.add_vectors(
-        collection_name=collection_name,
-        documents=docs_for_storage,
-        metadata=metadata_list,
-    )
+        # Add to vector store
+        ids = await backend.add_vectors(
+            collection_name=collection_name,
+            documents=docs_for_storage,
+            metadata=metadata_list,
+        )
 
-    return ids
+        collection_doc_ids[collection_name] = ids
+        logger.info(f"Added {len(ids)} documents to collection {collection_name}")
+
+    except Exception as e:
+        logger.error(
+            f"Failed to add documents to collection {collection_name}: {str(e)}"
+        )
+        collection_doc_ids[collection_name] = []
+
+    return collection_doc_ids
 
 
 # Facade function for backward compatibility
 async def execute_vector_langgraph_stream(
-    collection_name: str,
+    collection_names: Union[
+        str, List[str]
+    ],  # Modified to accept single or multiple collections
     history: List[Dict],
     input_str: str,
     persona: Optional[str] = None,
@@ -384,7 +435,7 @@ async def execute_vector_langgraph_stream(
     # Initialize service and run stream
     embeddings = embeddings or OpenAIEmbeddings()
     service = VectorLangGraphService(
-        collection_name=collection_name,
+        collection_names=collection_names,
         embeddings=embeddings,
     )
 

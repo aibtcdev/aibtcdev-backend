@@ -93,6 +93,18 @@ class JobManager:
                 config.scheduler.dao_proposal_conclude_runner_interval_seconds,
                 JobType.DAO_PROPOSAL_CONCLUDE.value,
             ),
+            (
+                "DAO Proposal Evaluation Runner Service",
+                config.scheduler.dao_proposal_evaluation_runner_enabled,
+                config.scheduler.dao_proposal_evaluation_runner_interval_seconds,
+                JobType.DAO_PROPOSAL_EVALUATION.value,
+            ),
+            (
+                "Agent Account Deploy Runner Service",
+                config.scheduler.agent_account_deploy_runner_enabled,
+                config.scheduler.agent_account_deploy_runner_interval_seconds,
+                JobType.AGENT_ACCOUNT_DEPLOY.value,
+            ),
         ]
 
         # Add all runner jobs with common structure

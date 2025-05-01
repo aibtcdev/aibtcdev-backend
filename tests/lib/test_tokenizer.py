@@ -22,7 +22,7 @@ def sample_messages() -> List[Dict[str, Any]]:
 def test_trimmer_initialization() -> None:
     """Test Trimmer initialization with default and custom parameters."""
     default_trimmer = Trimmer()
-    assert default_trimmer.token_model == "gpt-4o"
+    assert default_trimmer.token_model == "gpt-4.1"
     assert default_trimmer.maxsize == 50000
     assert default_trimmer.margin == 500
 

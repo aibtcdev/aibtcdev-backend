@@ -3,21 +3,31 @@
 import binascii
 from typing import Dict, List, Optional, TypedDict
 
+from langchain.callbacks.base import BaseCallbackHandler
 from langchain.prompts import PromptTemplate
+from langchain_core.documents import Document
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
 from backend.factory import backend
 from backend.models import (
     UUID,
+    ExtensionFilter,
     Profile,
+    Prompt,
     PromptFilter,
     ProposalType,
+    QueueMessageFilter,
+    QueueMessageType,
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
-from services.workflows.base import BaseWorkflow
-from services.workflows.react import LangGraphService
+from services.workflows.base import (
+    BaseWorkflow,
+    VectorRetrievalCapability,
+    WebSearchCapability,
+)
+from services.workflows.vector_react import VectorLangGraphService, VectorReactState
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -53,10 +63,43 @@ class EvaluationState(TypedDict):
     auto_vote: bool
     formatted_prompt: str
     agent_prompts: List[Dict]
+    vector_results: Optional[List[Dict]]
+    recent_tweets: Optional[List[Dict]]
+    web_search_results: Optional[List[Dict]]  # Add field for web search results
+    treasury_balance: Optional[float]
+    token_usage: Optional[Dict]  # Add field for token usage tracking
+    model_info: Optional[Dict]  # Add field for model information
 
 
-class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
+class ProposalEvaluationWorkflow(
+    BaseWorkflow[EvaluationState], VectorRetrievalCapability, WebSearchCapability
+):
     """Workflow for evaluating DAO proposals and voting automatically."""
+
+    def __init__(
+        self,
+        collection_names: Optional[List[str]] = None,
+        model_name: str = "gpt-4.1",
+        temperature: Optional[float] = 0.1,
+        **kwargs,
+    ):
+        """Initialize the workflow.
+
+        Args:
+            collection_names: Optional list of collection names to search
+            model_name: The model to use for evaluation
+            temperature: Optional temperature setting for the model
+            **kwargs: Additional arguments passed to parent
+        """
+        super().__init__(model_name=model_name, temperature=temperature, **kwargs)
+        self.collection_names = collection_names or [
+            "knowledge_collection",
+            "dao_collection",
+        ]
+        self.required_fields = ["proposal_id", "proposal_data"]
+        self.logger.debug(
+            f"Initialized workflow: collections={self.collection_names} | model={model_name} | temperature={temperature}"
+        )
 
     def _create_prompt(self) -> PromptTemplate:
         """Create the evaluation prompt template."""
@@ -64,8 +107,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             input_variables=[
                 "proposal_data",
                 "dao_info",
+                "treasury_balance",
                 "contract_source",
                 "agent_prompts",
+                "vector_context",
+                "recent_tweets",
+                "web_search_results",
             ],
             template="""
             You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
@@ -82,15 +129,18 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             # 3. DAO CONTEXT
             {dao_info}
 
-            # 4. AIBTC CHARTER
+            # 4. TREASURY INFORMATION
+            {treasury_balance}
+
+            # 5. AIBTC CHARTER
             Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
             Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
             Guardrails: Decentralized Governance, Smart Contract accountability
 
-            # 5. CONTRACT SOURCE (for core proposals)
+            # 6. CONTRACT SOURCE (for core proposals)
             {contract_source}
 
-            # 6. EVALUATION CRITERIA
+            # 7. EVALUATION CRITERIA
             For Core Proposals:
             - Security implications
             - Mission alignment
@@ -103,7 +153,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             - Security considerations
             - Alignment with DAO goals
 
-            # 7. CONFIDENCE SCORING RUBRIC
+            # 8. CONFIDENCE SCORING RUBRIC
             You MUST choose one of these confidence bands:
             - 0.0-0.2: Extremely low confidence (major red flags or insufficient information)
             - 0.3-0.4: Low confidence (significant concerns or unclear implications)
@@ -111,7 +161,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             - 0.7-0.8: High confidence (minor concerns if any)
             - 0.9-1.0: Very high confidence (clear positive alignment)
 
-            # 8. QUALITY STANDARDS
+            # 9. QUALITY STANDARDS
             Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
             • Be clear and specific — avoid vagueness or filler
             • Use a consistent tone, but reflect the DAO's personality if known
@@ -121,6 +171,15 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             • Cite relevant parts of the proposal, DAO mission, or prior actions
             • Use terms accurately — don't fake precision
             • Keep structure clean and easy to follow
+
+            # 10. VECTOR CONTEXT
+            {vector_context}
+
+            # 11. RECENT DAO TWEETS
+            {recent_tweets}
+
+            # 12. WEB SEARCH RESULTS
+            {web_search_results}
 
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
@@ -147,6 +206,76 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             try:
                 # Get proposal data from state
                 proposal_data = state["proposal_data"]
+                dao_id = state.get("dao_info", {}).get("id")
+
+                # Perform web search for relevant context
+                try:
+                    # Create search query from proposal data
+                    web_search_query = f"DAO proposal {proposal_data.get('type', 'unknown')} - {proposal_data.get('parameters', '')}"
+
+                    # Use web search capability
+                    web_search_results = await self.search_web(
+                        query=web_search_query,
+                        search_context_size="medium",  # Use medium context size for balanced results
+                    )
+
+                    # Update state with web search results
+                    state["web_search_results"] = web_search_results
+                    self.logger.debug(
+                        f"Web search query: {web_search_query} | Results count: {len(web_search_results)}"
+                    )
+                    self.logger.debug(
+                        f"Retrieved {len(web_search_results)} web search results"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to perform web search: {str(e)}", exc_info=True
+                    )
+                    state["web_search_results"] = []
+
+                # Fetch recent tweets from queue if dao_id exists
+                recent_tweets = []
+                if dao_id:
+                    try:
+                        # Add debug logging for dao_id
+                        self.logger.debug(f"Fetching tweets for DAO ID: {dao_id}")
+                        
+                        queue_messages = backend.list_queue_messages(
+                            QueueMessageFilter(
+                                type=QueueMessageType.TWEET,
+                                dao_id=dao_id,
+                                is_processed=True,
+                            )
+                        )
+                        # Log the number of messages found
+                        self.logger.debug(f"Found {len(queue_messages)} queue messages")
+                        
+                        # Sort by created_at and take last 5
+                        sorted_messages = sorted(
+                            queue_messages, key=lambda x: x.created_at, reverse=True
+                        )[:5]
+                        self.logger.debug(f"After sorting, have {len(sorted_messages)} messages")
+
+                        recent_tweets = [
+                            {
+                                "created_at": msg.created_at,
+                                "message": msg.message.get('message', 'No text available') if isinstance(msg.message, dict) else msg.message,
+                                "tweet_id": msg.tweet_id,
+                            }
+                            for msg in sorted_messages
+                        ]
+                        self.logger.debug(f"Retrieved tweets: {recent_tweets}")
+                        self.logger.debug(
+                            f"Found {len(recent_tweets)} recent tweets for DAO {dao_id}"
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to fetch recent tweets: {str(e)}", exc_info=True
+                        )
+                        recent_tweets = []
+
+                # Update state with recent tweets
+                state["recent_tweets"] = recent_tweets
 
                 # If this is a core proposal, fetch the contract source
                 contract_source = ""
@@ -167,67 +296,172 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                             )
                             if "source" in result:
                                 contract_source = result["source"]
+                                self.logger.debug(
+                                    f"Retrieved contract source for {contract_address}.{contract_name}"
+                                )
                             else:
-                                logger.warning(
-                                    f"Could not find source code in API response: {result}"
+                                self.logger.warning(
+                                    f"Contract source not found in API response: {result}"
                                 )
                         except Exception as e:
-                            logger.error(f"Error fetching contract source: {str(e)}")
+                            self.logger.error(
+                                f"Failed to fetch contract source: {str(e)}",
+                                exc_info=True,
+                            )
                     else:
-                        logger.warning(
+                        self.logger.warning(
                             f"Invalid contract address format: {proposal_data['proposal_contract']}"
                         )
 
+                # Retrieve relevant context from vector store
+                try:
+                    # Create search query from proposal data
+                    search_query = f"Proposal type: {proposal_data.get('type')} - {proposal_data.get('parameters', '')}"
+
+                    # Use vector retrieval capability
+                    vector_results = await self.retrieve_from_vector_store(
+                        query=search_query, limit=5  # Get top 5 most relevant documents
+                    )
+
+                    # Update state with vector results
+                    state["vector_results"] = vector_results
+                    self.logger.debug(
+                        f"Searching vector store with query: {search_query} | Collection count: {len(self.collection_names)}"
+                    )
+                    self.logger.debug(f"Vector search results: {vector_results}")
+                    self.logger.debug(
+                        f"Retrieved {len(vector_results)} relevant documents from vector store"
+                    )
+
+                    # Format vector context for prompt
+                    vector_context = "\n\n".join(
+                        [
+                            f"Related Context {i+1}:\n{doc.page_content}"
+                            for i, doc in enumerate(vector_results)
+                        ]
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to retrieve from vector store: {str(e)}", exc_info=True
+                    )
+                    vector_context = (
+                        "No additional context available from vector store."
+                    )
+
                 # Format prompt with state
-                self.logger.debug("Formatting evaluation prompt...")
+                self.logger.debug("Preparing evaluation prompt...")
 
                 # Format agent prompts as a string
                 agent_prompts_str = "No agent-specific instructions available."
                 if state.get("agent_prompts"):
-                    logger.debug(
-                        f"Raw agent prompts from state: {state['agent_prompts']}"
-                    )
+                    self.logger.debug(f"Raw agent prompts: {state['agent_prompts']}")
                     if (
                         isinstance(state["agent_prompts"], list)
                         and state["agent_prompts"]
                     ):
                         # Just use the prompt text directly since that's what we're storing
                         agent_prompts_str = "\n\n".join(state["agent_prompts"])
-                        logger.debug(
-                            f"Formatted agent prompts string: {agent_prompts_str}"
+                        self.logger.debug(
+                            f"Formatted agent prompts: {agent_prompts_str}"
                         )
                     else:
-                        logger.warning(
-                            f"Invalid agent prompts format in state: {type(state['agent_prompts'])}"
+                        self.logger.warning(
+                            f"Invalid agent prompts format: {type(state['agent_prompts'])}"
                         )
                 else:
-                    logger.warning("No agent prompts found in state")
+                    self.logger.debug("No agent prompts found in state")
 
-                formatted_prompt = prompt.format(
+                # Format web search results for prompt
+                web_search_content = "No relevant web search results found."
+                if state.get("web_search_results"):
+                    web_search_content = "\n\n".join(
+                        [
+                            f"Web Result {i+1}:\n{result['page_content']}\nSource: {result['metadata']['source_urls'][0]['url'] if result['metadata']['source_urls'] else 'Unknown'}"
+                            for i, result in enumerate(state["web_search_results"])
+                        ]
+                    )
+
+                # Update formatted prompt with web search results
+                formatted_prompt = self._create_prompt().format(
                     proposal_data=proposal_data,
                     dao_info=state.get(
                         "dao_info", "No additional DAO information available."
                     ),
+                    treasury_balance=state.get("treasury_balance"),
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
+                    vector_context=vector_context,
+                    recent_tweets=(
+                        "\n".join(
+                            [
+                                f"Tweet {i+1} ({tweet['created_at']}): {tweet['message']}"
+                                for i, tweet in enumerate(recent_tweets)
+                            ]
+                        )
+                        if recent_tweets
+                        else "No recent tweets available."
+                    ),
+                    web_search_results=web_search_content,
                 )
 
                 # Get evaluation from LLM
-                self.logger.debug("Invoking LLM for evaluation...")
+                self.logger.debug("Starting LLM evaluation...")
                 structured_output = self.llm.with_structured_output(
                     ProposalEvaluationOutput,
+                    include_raw=True,  # Include raw response to get token usage
                 )
+
+                # Invoke LLM with formatted prompt
                 result = structured_output.invoke(formatted_prompt)
-                self.logger.debug(f"LLM evaluation result: {result}")
+
+                # Extract the parsed result and token usage from raw response
+                self.logger.debug(
+                    f"Raw LLM result structure: {type(result).__name__} | Has parsed: {'parsed' in result if isinstance(result, dict) else False}"
+                )
+                parsed_result = result["parsed"] if isinstance(result, dict) else result
+                model_info = {"name": self.model_name, "temperature": self.temperature}
+
+                if isinstance(result, dict) and "raw" in result:
+                    raw_msg = result["raw"]
+                    # Extract token usage
+                    if hasattr(raw_msg, "usage_metadata"):
+                        token_usage = raw_msg.usage_metadata
+                        self.logger.debug(
+                            f"Token usage details: input={token_usage.get('input_tokens', 0)} | output={token_usage.get('output_tokens', 0)} | total={token_usage.get('total_tokens', 0)}"
+                        )
+                    else:
+                        self.logger.warning("No usage_metadata found in raw response")
+                        token_usage = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                        }
+                else:
+                    self.logger.warning("No raw response available")
+                    token_usage = {
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                    }
+
+                self.logger.debug(f"Parsed evaluation result: {parsed_result}")
 
                 # Update state
                 state["formatted_prompt"] = formatted_prompt
-                state["approve"] = result.approve
-                state["confidence_score"] = result.confidence_score
-                state["reasoning"] = result.reasoning
-                self.logger.info(
-                    f"Evaluation complete: approve={result.approve}, confidence={result.confidence_score}"
+                state["approve"] = parsed_result.approve
+                state["confidence_score"] = parsed_result.confidence_score
+                state["reasoning"] = parsed_result.reasoning
+                state["token_usage"] = token_usage
+                state["model_info"] = model_info
+
+                # Calculate token costs
+                token_costs = calculate_token_cost(token_usage, model_info["name"])
+
+                # Log final evaluation summary
+                self.logger.debug(
+                    f"Evaluation complete: Decision={'APPROVE' if parsed_result.approve else 'REJECT'} | Confidence={parsed_result.confidence_score:.2f} | Model={model_info['name']} (temp={model_info['temperature']}) | Tokens={token_usage} | Cost=${token_costs['total_cost']:.4f}"
                 )
+                self.logger.debug(f"Full reasoning: {parsed_result.reasoning}")
 
                 return state
             except Exception as e:
@@ -244,20 +478,20 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             """Decide whether to vote based on confidence threshold."""
             try:
                 self.logger.debug(
-                    f"Deciding whether to vote: auto_vote={state['auto_vote']}, confidence={state['confidence_score']}, threshold={state['confidence_threshold']}"
+                    f"Deciding vote: auto_vote={state['auto_vote']} | confidence={state['confidence_score']} | threshold={state['confidence_threshold']}"
                 )
 
                 if not state["auto_vote"]:
-                    self.logger.info("Auto-vote is disabled, skipping vote")
+                    self.logger.debug("Auto-vote is disabled, skipping vote")
                     return "skip_vote"
 
                 if state["confidence_score"] >= state["confidence_threshold"]:
-                    self.logger.info(
+                    self.logger.debug(
                         f"Confidence score {state['confidence_score']} meets threshold {state['confidence_threshold']}, proceeding to vote"
                     )
                     return "vote"
                 else:
-                    self.logger.info(
+                    self.logger.debug(
                         f"Confidence score {state['confidence_score']} below threshold {state['confidence_threshold']}, skipping vote"
                     )
                     return "skip_vote"
@@ -265,12 +499,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
                 return "skip_vote"
 
-        # Create voting node using ReAct pattern
+        # Create voting node using VectorReact workflow
         async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
-            """Vote on the proposal using ReAct workflow."""
+            """Vote on the proposal using VectorReact workflow."""
             try:
                 self.logger.debug(
-                    f"Setting up ReAct workflow to vote on proposal {state['proposal_id']}, vote={state['approve']}"
+                    f"Setting up VectorReact workflow: proposal_id={state['proposal_id']} | vote={state['approve']}"
                 )
 
                 # Set up the voting tool
@@ -278,16 +512,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                 tools_map = {"dao_action_vote_on_proposal": vote_tool}
 
                 # Create a user input message that instructs the LLM what to do
-                vote_instruction = f"""
-                I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}.
-                
-                Please vote {"FOR" if state['approve'] else "AGAINST"} the proposal.
-                
-                Use the dao_action_vote_on_proposal tool to submit the vote.
-                """
+                vote_instruction = f"I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}. Please vote {'FOR' if state['approve'] else 'AGAINST'} the proposal. Use the dao_action_vote_on_proposal tool to submit the vote."
 
-                # Create LangGraph service
-                service = LangGraphService()
+                # Create VectorLangGraph service with collections
+                service = VectorLangGraphService(
+                    collection_names=self.collection_names,
+                )
 
                 # History with system message only
                 history = [
@@ -297,20 +527,20 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                     }
                 ]
 
-                self.logger.debug("Executing ReAct workflow for voting...")
+                self.logger.debug("Executing VectorReact workflow for voting...")
 
                 # Collect response chunks
                 response_chunks = []
                 vote_result = None
 
-                # Execute the ReAct workflow
-                async for chunk in service.execute_react_stream(
+                # Execute the VectorReact workflow
+                async for chunk in service.execute_stream(
                     history=history,
                     input_str=vote_instruction,
                     tools_map=tools_map,
                 ):
                     response_chunks.append(chunk)
-                    self.logger.debug(f"ReAct chunk: {chunk}")
+                    self.logger.debug(f"VectorReact chunk: {chunk}")
 
                     # Extract tool results
                     if (
@@ -319,13 +549,18 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
                     ):
                         if "output" in chunk:
                             vote_result = chunk.get("output")
-                            self.logger.info(f"Vote result: {vote_result}")
+                            self.logger.debug(f"Vote result: {vote_result}")
 
-                # Update state with vote result
+                # Update state with vote result and vector results
                 state["vote_result"] = {
                     "success": vote_result is not None,
                     "output": vote_result,
                 }
+                state["vector_results"] = [
+                    chunk.get("vector_results", [])
+                    for chunk in response_chunks
+                    if chunk.get("vector_results")
+                ]
 
                 return state
             except Exception as e:
@@ -340,13 +575,12 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         async def skip_voting(state: EvaluationState) -> EvaluationState:
             """Skip voting and just return the evaluation."""
             try:
-                self.logger.debug("Skipping voting step")
+                self.logger.debug("Vote skipped: reason=threshold_or_setting")
                 state["vote_result"] = {
                     "success": True,
                     "message": "Voting skipped due to confidence threshold or auto_vote setting",
                     "data": None,
                 }
-                self.logger.info("Vote skipped as requested")
                 return state
             except Exception as e:
                 self.logger.error(f"Error in skip_voting: {str(e)}", exc_info=True)
@@ -385,7 +619,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
         required_fields = ["proposal_id", "proposal_data"]
 
         # Log the state for debugging
-        self.logger.debug(f"Validating state: {state}")
+        self.logger.debug(
+            f"Validating state: proposal_id={state.get('proposal_id')} | proposal_type={state.get('proposal_data', {}).get('type', 'unknown')}"
+        )
 
         # Check all fields and log problems
         for field in required_fields:
@@ -419,6 +655,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[EvaluationState]):
             self.logger.error(f"Invalid proposal type: {proposal_type}")
             return False
 
+        self.logger.debug("State validation successful")
         return True
 
 
@@ -436,9 +673,7 @@ def get_proposal_evaluation_tools(
     """
     # Initialize all tools
     all_tools = initialize_tools(profile=profile, agent_id=agent_id)
-
-    # Log all available tools for debugging
-    logger.debug(f"All available tools: {', '.join(all_tools.keys())}")
+    logger.debug(f"Available tools: {', '.join(all_tools.keys())}")
 
     # Filter to only include the tools we need
     required_tools = [
@@ -451,7 +686,7 @@ def get_proposal_evaluation_tools(
     ]
 
     filtered_tools = filter_tools_by_names(required_tools, all_tools)
-    logger.debug(f"Filtered tools: {', '.join(filtered_tools.keys())}")
+    logger.debug(f"Using tools: {', '.join(filtered_tools.keys())}")
 
     return filtered_tools
 
@@ -467,9 +702,95 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
         decoded_string = decoded_bytes.decode(
             "utf-8", errors="ignore"
         )  # Decode as UTF-8
+        logger.debug(f"Successfully decoded hex string: {hex_string[:20]}...")
         return decoded_string
-    except (binascii.Error, UnicodeDecodeError):
+    except (binascii.Error, UnicodeDecodeError) as e:
+        logger.warning(f"Failed to decode hex string: {str(e)}")
         return None  # Return None if decoding fails
+
+
+def calculate_token_cost(
+    token_usage: Dict[str, int], model_name: str
+) -> Dict[str, float]:
+    """Calculate the cost of token usage based on current pricing.
+
+    Args:
+        token_usage: Dictionary containing input_tokens and output_tokens
+        model_name: Name of the model used
+
+    Returns:
+        Dictionary containing cost breakdown and total cost
+    """
+    # Current pricing per million tokens (as of August 2024)
+    MODEL_PRICES = {
+        "gpt-4o": {
+            "input": 2.50,  # $2.50 per million input tokens
+            "output": 10.00,  # $10.00 per million output tokens
+        },
+        "gpt-4.1": {
+            "input": 2.00,  # $2.00 per million input tokens
+            "output": 8.00,  # $8.00 per million output tokens
+        },
+        "gpt-4.1-mini": {
+            "input": 0.40,  # $0.40 per million input tokens
+            "output": 1.60,  # $1.60 per million output tokens
+        },
+        "gpt-4.1-nano": {
+            "input": 0.10,  # $0.10 per million input tokens
+            "output": 0.40,  # $0.40 per million output tokens
+        },
+        # Default to gpt-4.1 pricing if model not found
+        "default": {
+            "input": 2.00,
+            "output": 8.00,
+        },
+    }
+
+    # Get pricing for the model, default to gpt-4.1 pricing if not found
+    model_prices = MODEL_PRICES.get(model_name.lower(), MODEL_PRICES["default"])
+
+    # Extract token counts, ensuring we get integers and handle None values
+    try:
+        input_tokens = int(token_usage.get("input_tokens", 0))
+        output_tokens = int(token_usage.get("output_tokens", 0))
+    except (TypeError, ValueError) as e:
+        logger.error(f"Error converting token counts to integers: {str(e)}")
+        input_tokens = 0
+        output_tokens = 0
+
+    # Calculate costs with more precision
+    input_cost = (input_tokens / 1_000_000.0) * model_prices["input"]
+    output_cost = (output_tokens / 1_000_000.0) * model_prices["output"]
+    total_cost = input_cost + output_cost
+
+    # Create detailed token usage breakdown
+    token_details = {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+        "model_name": model_name,
+        "input_price_per_million": model_prices["input"],
+        "output_price_per_million": model_prices["output"],
+    }
+
+    # Add token details if available
+    if "input_token_details" in token_usage:
+        token_details["input_token_details"] = token_usage["input_token_details"]
+    if "output_token_details" in token_usage:
+        token_details["output_token_details"] = token_usage["output_token_details"]
+
+    # Debug logging with more detail
+    logger.debug(
+        f"Cost calculation details: Model={model_name} | Input={input_tokens} tokens * ${model_prices['input']}/1M = ${input_cost:.6f} | Output={output_tokens} tokens * ${model_prices['output']}/1M = ${output_cost:.6f} | Total=${total_cost:.6f} | Token details={token_details}"
+    )
+
+    return {
+        "input_cost": round(input_cost, 6),
+        "output_cost": round(output_cost, 6),
+        "total_cost": round(total_cost, 6),
+        "currency": "USD",
+        "details": token_details,
+    }
 
 
 async def evaluate_and_vote_on_proposal(
@@ -491,7 +812,9 @@ async def evaluate_and_vote_on_proposal(
     Returns:
         Dictionary containing the evaluation results and voting outcome
     """
-    logger.info(f"Starting proposal evaluation for proposal {proposal_id}")
+    logger.debug(
+        f"Starting proposal evaluation: proposal_id={proposal_id} | auto_vote={auto_vote} | confidence_threshold={confidence_threshold}"
+    )
 
     try:
         # Get proposal data directly from the database
@@ -504,7 +827,9 @@ async def evaluate_and_vote_on_proposal(
         # Decode parameters if they exist
         decoded_parameters = decode_hex_parameters(proposal_data.parameters)
         if decoded_parameters:
-            logger.debug(f"Decoded parameters: {decoded_parameters}")
+            logger.debug(
+                f"Decoded proposal parameters: length={len(decoded_parameters) if decoded_parameters else 0}"
+            )
 
         # Convert proposal data to dictionary and ensure parameters exist
         proposal_dict = {
@@ -542,7 +867,9 @@ async def evaluate_and_vote_on_proposal(
         # Get DAO info based on provided dao_id or from proposal
         dao_info = None
         if dao_id:
-            logger.debug(f"Using provided DAO ID: {dao_id}")
+            logger.debug(
+                f"Using provided DAO ID: {dao_id} | Found={dao_info is not None}"
+            )
             dao_info = backend.get_dao(dao_id)
             if not dao_info:
                 logger.warning(
@@ -551,7 +878,9 @@ async def evaluate_and_vote_on_proposal(
 
         # If dao_info is still None, try to get it from proposal's dao_id
         if not dao_info and proposal_data.dao_id:
-            logger.debug(f"Using proposal's DAO ID: {proposal_data.dao_id}")
+            logger.debug(
+                f"Using proposal's DAO ID: {proposal_data.dao_id} | Found={dao_info is not None}"
+            )
             dao_info = backend.get_dao(proposal_data.dao_id)
 
         if not dao_info:
@@ -559,7 +888,34 @@ async def evaluate_and_vote_on_proposal(
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        logger.debug(f"Using DAO: {dao_info.name} (ID: {dao_info.id})")
+        # Get the treasury extension for the DAO
+        treasury_extension = None
+        try:
+            treasury_extensions = backend.list_extensions(
+                ExtensionFilter(dao_id=dao_info.id, type="EXTENSIONS_TREASURY")
+            )
+            if treasury_extensions:
+                treasury_extension = treasury_extensions[0]
+                logger.debug(
+                    f"Found treasury extension: contract_principal={treasury_extension.contract_principal}"
+                )
+
+                # Get treasury balance from Hiro API
+                hiro_api = HiroApi()
+                treasury_balance = hiro_api.get_address_balance(
+                    treasury_extension.contract_principal
+                )
+                logger.debug(f"Treasury balance retrieved: balance={treasury_balance}")
+            else:
+                logger.warning(f"No treasury extension found for DAO {dao_info.id}")
+                treasury_balance = None
+        except Exception as e:
+            logger.error(f"Failed to get treasury balance: {str(e)}", exc_info=True)
+            treasury_balance = None
+
+        logger.debug(
+            f"Processing proposal for DAO: {dao_info.name} (ID: {dao_info.id})"
+        )
 
         # Get the wallet and agent information if available
         agent_id = None
@@ -567,10 +923,12 @@ async def evaluate_and_vote_on_proposal(
             wallet = backend.get_wallet(wallet_id)
             if wallet and wallet.agent_id:
                 agent_id = wallet.agent_id
-                logger.debug(f"Found agent ID {agent_id} for wallet {wallet_id}")
+                logger.debug(f"Using agent ID {agent_id} for wallet {wallet_id}")
 
         # Get agent prompts
         agent_prompts = []
+        model_name = "gpt-4.1"  # Default model
+        temperature = 0.1  # Default temperature
         try:
             logger.debug(
                 f"Fetching prompts for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
@@ -582,21 +940,27 @@ async def evaluate_and_vote_on_proposal(
                     is_active=True,
                 )
             )
-            logger.debug(f"Raw prompts from database: {prompts}")
+            logger.debug(f"Retrieved prompts: {prompts}")
 
-            # Extract prompt texts
-            agent_prompts = [p.prompt_text for p in prompts if p.prompt_text]
-            logger.debug(f"Extracted agent prompts: {agent_prompts}")
-
-            logger.info(
-                f"Found {len(agent_prompts)} active prompts for agent {agent_id}"
-            )
-            if not agent_prompts:
+            # Store the full Prompt objects and get model settings from first prompt
+            agent_prompts = prompts
+            if agent_prompts:
+                first_prompt = agent_prompts[0]
+                model_name = first_prompt.model or model_name
+                temperature = (
+                    first_prompt.temperature
+                    if first_prompt.temperature is not None
+                    else temperature
+                )
+                logger.debug(
+                    f"Using model configuration: {model_name} (temperature={temperature})"
+                )
+            else:
                 logger.warning(
                     f"No active prompts found for agent_id={agent_id}, dao_id={proposal_data.dao_id}"
                 )
         except Exception as e:
-            logger.error(f"Error getting agent prompts: {e}", exc_info=True)
+            logger.error(f"Failed to get agent prompts: {str(e)}", exc_info=True)
 
         # Initialize state
         state = {
@@ -605,7 +969,10 @@ async def evaluate_and_vote_on_proposal(
             "proposal_id": proposal_dict["proposal_id"],
             "proposal_data": proposal_dict,
             "dao_info": dao_info.model_dump() if dao_info else {},
-            "agent_prompts": agent_prompts,  # Add agent prompts to state
+            "treasury_balance": treasury_balance,
+            "agent_prompts": (
+                [p.prompt_text for p in agent_prompts] if agent_prompts else []
+            ),
             "approve": False,
             "confidence_score": 0.0,
             "reasoning": "",
@@ -613,19 +980,35 @@ async def evaluate_and_vote_on_proposal(
             "wallet_id": wallet_id,
             "confidence_threshold": confidence_threshold,
             "auto_vote": auto_vote,
+            "vector_results": None,
+            "recent_tweets": None,
+            "web_search_results": None,
+            "token_usage": None,
+            "model_info": {
+                "name": "unknown",
+                "temperature": None,
+            },
         }
 
-        logger.debug(f"State agent_prompts: {state['agent_prompts']}")
+        logger.debug(
+            f"Agent prompts count: {len(state['agent_prompts'] or [])} | Has prompts: {bool(state['agent_prompts'])}"
+        )
 
-        # Create and run workflow
-        workflow = ProposalEvaluationWorkflow()
+        # Create and run workflow with model settings from prompt
+        workflow = ProposalEvaluationWorkflow(
+            model_name=model_name, temperature=temperature
+        )
         if not workflow._validate_state(state):
+            error_msg = "Invalid workflow state"
+            logger.error(error_msg)
             return {
                 "success": False,
-                "error": "Invalid workflow state",
+                "error": error_msg,
             }
 
+        logger.debug("Starting workflow execution...")
         result = await workflow.execute(state)
+        logger.debug("Workflow execution completed")
 
         # Extract transaction ID from vote result if available
         tx_id = None
@@ -639,9 +1022,11 @@ async def evaluate_and_vote_on_proposal(
                         parts = line.split(":")
                         if len(parts) > 1:
                             tx_id = parts[1].strip()
+                            logger.debug(f"Transaction ID extracted: {tx_id}")
                             break
 
-        return {
+        # Prepare final result
+        final_result = {
             "success": True,
             "evaluation": {
                 "approve": result["approve"],
@@ -653,12 +1038,42 @@ async def evaluate_and_vote_on_proposal(
             and result["confidence_score"] >= confidence_threshold,
             "tx_id": tx_id,
             "formatted_prompt": result["formatted_prompt"],
+            "vector_results": result["vector_results"],
+            "recent_tweets": result["recent_tweets"],
+            "web_search_results": result["web_search_results"],
+            "treasury_balance": result.get("treasury_balance"),
+            "token_usage": result.get(
+                "token_usage",
+                {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+            ),
+            "model_info": result.get(
+                "model_info", {"name": "unknown", "temperature": None}
+            ),
         }
+
+        # Calculate token costs
+        token_costs = calculate_token_cost(
+            final_result["token_usage"], final_result["model_info"]["name"]
+        )
+        final_result["token_costs"] = token_costs
+
+        # For the example token usage shown:
+        # Input: 7425 tokens * ($2.50/1M) = $0.0186
+        # Output: 312 tokens * ($10.00/1M) = $0.0031
+        # Total: $0.0217
+
+        logger.debug(
+            f"Proposal evaluation completed: Success={final_result['success']} | Decision={'APPROVE' if final_result['evaluation']['approve'] else 'REJECT'} | Confidence={final_result['evaluation']['confidence_score']:.2f} | Auto-voted={final_result['auto_voted']} | Transaction={tx_id or 'None'} | Model={final_result['model_info']['name']} | Token Usage={final_result['token_usage']} | Cost (USD)=${token_costs['total_cost']:.4f} (Input=${token_costs['input_cost']:.4f} for {token_costs['details']['input_tokens']} tokens, Output=${token_costs['output_cost']:.4f} for {token_costs['details']['output_tokens']} tokens)"
+        )
+        logger.debug(f"Full evaluation result: {final_result}")
+
+        return final_result
     except Exception as e:
-        logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}", exc_info=True)
+        error_msg = f"Unexpected error in evaluate_and_vote_on_proposal: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return {
             "success": False,
-            "error": f"Unexpected error: {str(e)}",
+            "error": error_msg,
         }
 
 
@@ -675,52 +1090,22 @@ async def evaluate_proposal_only(
     Returns:
         Dictionary containing the evaluation results
     """
+    logger.debug(f"Starting proposal-only evaluation: proposal_id={proposal_id}")
+
     result = await evaluate_and_vote_on_proposal(
         proposal_id=proposal_id,
         wallet_id=wallet_id,
-        auto_vote=True,
+        auto_vote=False,
     )
 
-    # Remove vote_result from the response
+    # Remove vote-related fields from the response
+    logger.debug("Removing vote-related fields from response")
     if "vote_result" in result:
         del result["vote_result"]
     if "auto_voted" in result:
         del result["auto_voted"]
+    if "tx_id" in result:
+        del result["tx_id"]
 
+    logger.debug("Proposal-only evaluation completed")
     return result
-
-
-async def debug_proposal_evaluation_workflow():
-    """Debug function to test the workflow with a mock state."""
-    logger.setLevel("DEBUG")
-
-    # Create a mock state with valid required fields
-    mock_state = {
-        "action_proposals_contract": "test-contract",
-        "action_proposals_voting_extension": "test-voting-extension",
-        "proposal_id": 1,
-        "proposal_data": {"title": "Test Proposal", "description": "Test Description"},
-        "dao_info": {"name": "Test DAO"},
-        "approve": False,
-        "confidence_score": 0.0,
-        "reasoning": "",
-        "vote_result": None,
-        "wallet_id": None,
-        "confidence_threshold": 0.7,
-        "auto_vote": False,
-    }
-
-    # Create the workflow and validate the state
-    workflow = ProposalEvaluationWorkflow()
-    is_valid = workflow._validate_state(mock_state)
-    logger.info(f"Mock state validation result: {is_valid}")
-
-    # Try to execute with the mock state
-    if is_valid:
-        try:
-            result = await workflow.execute(mock_state)
-            logger.info(f"Workflow execution result: {result}")
-        except Exception as e:
-            logger.error(f"Workflow execution failed: {str(e)}", exc_info=True)
-
-    return is_valid

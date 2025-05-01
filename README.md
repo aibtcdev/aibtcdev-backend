@@ -2,7 +2,16 @@
 
 ## Overview
 
-aibtcdev-backend is a FastAPI-based backend service that provides API endpoints for chat functionality, tools, and webhooks. It integrates with various external services including OpenAI, Twitter, Telegram, and blockchain-related APIs.
+aibtcdev-backend is a sophisticated FastAPI-based backend service that powers AI-driven interactions with Bitcoin and Stacks blockchain technologies. The service provides:
+
+1. Real-time chat functionality with AI agents via WebSocket
+2. Automated DAO management and monitoring
+3. Social media integration (Twitter, Telegram, Discord)
+4. Blockchain interaction capabilities (Stacks, Bitcoin)
+5. Market data analysis and reporting
+6. Document processing and vector search capabilities
+
+The system is designed to be modular, scalable, and easily configurable through environment variables.
 
 ## Disclaimer
 
@@ -11,59 +20,84 @@ aibtc.dev is not liable for any lost, locked, or mistakenly sent funds. This is 
 ## Prerequisites
 
 - Python 3.13
-- [Bun](https://bun.sh/) (for running TypeScript scripts)
+- [Bun](https://bun.sh/) (for TypeScript tools)
 - Git
 - Conda (recommended for development) or Docker
-
-## Features
-
-- FastAPI-based REST API
-- WebSocket support for real-time communication
-- Integration with multiple external services:
-  - Supabase for database and storage
-  - OpenAI for AI capabilities
-  - Twitter API for social media integration
-  - Telegram Bot API
-  - Blockchain APIs (Hiro, Alex, Velar)
-  - Market data APIs (LunarCrush, CMC)
-- Background task scheduling system
-- CORS support for multiple frontend environments
-- Comprehensive logging system
-- Workflow automation for tweet analysis and generation
+- Node.js and npm (for agent tools)
 
 ## Project Structure
 
-The project is organized into several key directories:
+```
+aibtcdev-backend/
+├── api/                    # FastAPI endpoint definitions
+│   ├── chat.py            # WebSocket chat endpoints
+│   ├── tools.py           # Tool endpoints
+│   ├── webhooks.py        # Webhook handlers
+│   └── dependencies.py    # API dependencies
+├── services/              # Core business logic
+│   ├── workflows/         # Workflow implementations
+│   ├── runner/           # Background task runners
+│   ├── webhooks/         # Webhook processors
+│   ├── discord/          # Discord integration
+│   ├── chat.py           # Chat service
+│   ├── daos.py           # DAO operations
+│   ├── schedule.py       # Task scheduling
+│   ├── startup.py        # App lifecycle management
+│   ├── twitter.py        # Twitter integration
+│   ├── bot.py            # Telegram bot
+│   └── websocket.py      # WebSocket management
+├── backend/              # Database and storage
+├── tools/                # AI agent tools
+├── lib/                  # Shared utilities
+├── tests/                # Test suite
+├── docs/                 # Documentation
+├── examples/             # Usage examples
+└── agent-tools-ts/       # TypeScript-based agent tools
+```
 
-- `api/`: Contains API endpoint definitions
-  - `chat.py`: WebSocket chat endpoints
-  - `tools.py`: Available tools endpoints
-  - `webhooks.py`: Webhook handling endpoints
+## Key Features
 
-- `backend/`: Database abstraction and models
-  - `abstract.py`: Abstract base classes for database operations
-  - `factory.py`: Factory pattern for database backend creation
-  - `models.py`: Data models
-  - `supabase.py`: Supabase-specific implementation
+### 1. AI Chat System
+- Real-time WebSocket-based chat
+- AI agent integration with OpenAI
+- Context-aware conversations
+- Document-based knowledge integration
+- Vector search capabilities
 
-- `services/`: Core business logic and integrations
-  - `bot.py`: Telegram bot integration
-  - `chat.py`: Chat handling services
-  - `daos.py`: DAO processing services
-  - `schedule.py`: Scheduling services
-  - `startup.py`: Application startup and shutdown services
-  - `twitter.py`: Twitter integration services
-  - `workflows/`: Workflow implementations
-    - `base.py`: Base workflow classes
-    - `react.py`: ReAct workflow implementation
-    - `tweet_analysis.py`: Tweet analysis workflow
-    - `tweet_generator.py`: Tweet generation workflow
+### 2. DAO Management
+- Automated DAO deployment monitoring
+- Proposal creation and tracking
+- Vote processing
+- Automated conclusion handling
+- Tweet generation for DAO events
 
-- `tools/`: Tool implementations for agent use
+### 3. Social Media Integration
+- Twitter automation and monitoring
+- Telegram bot integration
+- Discord notifications
+- Automated content generation
+- Social engagement tracking
 
-- `lib/`: Shared utilities and libraries
+### 4. Blockchain Integration
+- Stacks blockchain interaction
+- Bitcoin network monitoring
+- Multiple API integrations:
+  - Hiro
+  - Alex
+  - Velar
+  - Platform API
 
-- `agent-tools-ts/`: TypeScript tools for agent integration
+### 5. Market Analysis
+- LunarCrush integration
+- CoinMarketCap data processing
+- Market trend analysis
+- Automated reporting
+
+### 6. Background Processing
+- Scheduled task management
+- Event-driven processing
+- Multi-threaded task execution
+- Failure recovery and retry logic
 
 ## Installation
 
@@ -83,93 +117,61 @@ git submodule update --remote
 cp .env.example .env
 ```
 
-2. Configure the following key sections in your `.env` file:
-- Core Application Settings
-- Database Configuration (Supabase)
-- External API Endpoints & Keys
-- Task Scheduling Configuration
-- Social Media Integration
-- Additional Tools & Services
+2. Configure your environment variables by following the [Configuration Guide](CONFIG.md)
 
 ### 3. Development Setup (Conda Recommended)
 
-1. Install Miniconda:
 ```bash
-# On macOS
+# Install Miniconda
 brew install miniconda
 
 # Initialize conda
 conda init "$(basename "${SHELL}")"
 # Restart your terminal
-```
 
-2. Create and activate the environment:
-```bash
+# Create and activate environment
 conda create --name aibackend python=3.12
 conda activate aibackend
-```
 
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-4. Set up TypeScript tools:
-```bash
+# Set up TypeScript tools
 cd agent-tools-ts/
 bun install
 cd ..
 ```
 
-### 4. Alternative: Docker Setup
+### 4. Docker Setup
 
 ```bash
 docker build -t aibtcdev-backend .
 docker run -p 8000:8000 --env-file .env aibtcdev-backend
 ```
 
-## API Endpoints
+## API Documentation
 
-The service exposes the following endpoints:
+### WebSocket Endpoints (`/chat`)
+- `/chat/ws`: Real-time chat communication
+  - Supports message history
+  - AI agent integration
+  - Context management
+  - Document processing
 
-### Chat Endpoints (`/chat`)
-- `/chat/ws` - WebSocket endpoint for real-time chat communication
-  - Supports message history retrieval
-  - Real-time message processing
-  - Supports agent-based conversations
-  - Maintains thread-based chat history
-
-### Tools Endpoints (`/tools`)
-- `/tools/available` - Get list of available tools and their descriptions
-  - Returns tool information including:
-    - Tool ID and name
-    - Description
-    - Category
-    - Required parameters
+### Tool Endpoints (`/tools`)
+- `/tools/available`: Available tool listing
+- `/tools/execute`: Tool execution endpoint
+- Custom tool integration support
 
 ### Webhook Endpoints (`/webhooks`)
-- `/webhooks/chainhook` - Handle blockchain-related webhook events
-- `/webhooks/github` - Process GitHub webhook events
+- `/webhooks/chainhook`: Blockchain event processing
+- `/webhooks/github`: GitHub integration
+- `/webhooks/discord`: Discord notifications
 
 ### Bot Endpoints (`/bot`)
-- `/bot/telegram/test` - Test Telegram bot integration
-  - Send test messages to verified users
-  - Requires user profile verification
-
-All endpoints require proper authentication and most endpoints use profile verification middleware to ensure secure access to the API.
-
-For detailed API documentation including request/response schemas, visit `/docs` when running the server.
-
-## Configuration
-
-The application uses a hierarchical configuration system defined in `config.py`, including:
-
-- DatabaseConfig: Supabase connection settings
-- TwitterConfig: Twitter API integration settings
-- TelegramConfig: Telegram bot settings
-- SchedulerConfig: Background task scheduling
-- APIConfig: External API endpoints and keys
-- NetworkConfig: Network-specific settings (testnet/mainnet)
+- `/bot/telegram`: Telegram bot integration
+- User verification and management
+- Command processing
 
 ## Development
 
@@ -179,45 +181,65 @@ The application uses a hierarchical configuration system defined in `config.py`,
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Background Tasks
+### Code Style
 
-The application includes several background tasks that can be enabled/disabled via environment variables:
-- Schedule synchronization
-- DAO processing pipeline
-- Tweet generation and posting
-- Social media integration tasks
-- Tweet analysis workflows
+The project uses ruff for code formatting and linting. Configuration is in `ruff.toml`.
 
-## Dependencies
+### Testing
 
-Key dependencies include:
-- APScheduler: For scheduling background tasks
-- FastAPI: Web framework
-- LangChain & LangGraph: For AI agent workflows
-- OpenAI: For AI capabilities
-- Supabase: For database and storage
-- python-twitter-v2: For Twitter integration
-- python-telegram-bot: For Telegram integration
+```bash
+pytest tests/
+```
+
+### Documentation
+
+API documentation is available at `/docs` when running the server.
 
 ## Contributing
 
-1. Branch protection is enabled on `main`
-2. Auto-deployment is configured for updates
-3. Pull requests require one approval
-4. Please ensure all tests pass before submitting a PR
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests
+5. Submit a pull request
+
+Guidelines:
+- Follow the Python code style guide
+- Add tests for new features
+- Update documentation as needed
+- Keep pull requests focused and atomic
 
 ## Troubleshooting
 
-### OpenAI Rate Limits
-- Check your current tier limits at https://platform.openai.com/settings/organization/limits
-- TPM (Tokens Per Minute) limits:
-  - Tier 1: 200,000 TPM
-  - Tier 2: 2,000,000 TPM
+### Common Issues
+
+1. OpenAI Rate Limits
+   - Check limits at https://platform.openai.com/settings/organization/limits
+   - TPM (Tokens Per Minute) limits:
+     - Tier 1: 200,000 TPM
+     - Tier 2: 2,000,000 TPM
+
+2. WebSocket Connection Issues
+   - Check network connectivity
+   - Verify authentication tokens
+   - Check server logs for details
+
+3. Database Connection Issues
+   - Verify Supabase credentials
+   - Check network access to database
+   - Verify connection string format
+
+## Support
+
+For support:
+1. Check the documentation
+2. Search existing issues
+3. Create a new issue with:
+   - Clear description
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details
 
 ## License
 
 [License Information]
-
-## Support
-
-[Support Information]

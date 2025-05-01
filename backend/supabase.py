@@ -227,7 +227,9 @@ class SupabaseBackend(AbstractBackend):
         try:
             # Upsert records
             collection.upsert(records=records)
-            logger.info(f"Added {len(records)} vectors to collection {collection_name}")
+            logger.debug(
+                f"Added {len(records)} vectors to collection {collection_name}"
+            )
             return record_ids
         except Exception as e:
             logger.error(
@@ -298,7 +300,7 @@ class SupabaseBackend(AbstractBackend):
 
                 documents.append(doc)
 
-            logger.info(
+            logger.debug(
                 f"Found {len(documents)} relevant documents for query in {collection_name}"
             )
             return documents
@@ -663,6 +665,9 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("conversation_id", filters.conversation_id)
             if filters.wallet_id is not None:
                 query = query.eq("wallet_id", filters.wallet_id)
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]
@@ -1573,6 +1578,14 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("answer", filters.answer)
             if filters.address is not None:
                 query = query.eq("address", filters.address)
+            if filters.voted is not None:
+                query = query.eq("voted", filters.voted)
+            if filters.model is not None:
+                query = query.eq("model", filters.model)
+            if filters.tx_id is not None:
+                query = query.eq("tx_id", filters.tx_id)
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]
