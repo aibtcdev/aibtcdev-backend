@@ -76,19 +76,32 @@ class ChainhookHandler(WebhookHandler):
                     f"(height: {apply.block_identifier.index})"
                 )
 
-                # First validate block height with BlockStateHandler
+                # First, process with BlockStateHandler to update/validate chain state
                 if self.block_state_handler.can_handle_block(apply):
-                    # Let BlockStateHandler determine if this block should be processed
                     await self.block_state_handler.handle_block(apply)
-                    # If BlockStateHandler returns without updating state, skip this block
-                    if not self.block_state_handler.latest_chain_state or (
-                        self.block_state_handler.latest_chain_state.block_height
-                        != apply.block_identifier.index
-                    ):
-                        # Block was not processed by BlockStateHandler, so skip it
-                        continue
 
-                # Process block-level handlers
+                # Check if BlockStateHandler successfully processed *this* block.
+                # This implies the block was newer than the DB state AND the DB update succeeded.
+                # We check if the handler's internal state now matches this block's height.
+                block_processed_by_state_handler = (
+                    self.block_state_handler.latest_chain_state is not None
+                    and self.block_state_handler.latest_chain_state.block_height
+                    == apply.block_identifier.index
+                )
+
+                if not block_processed_by_state_handler:
+                    self.logger.warning(
+                        f"Block {apply.block_identifier.index} was not processed by BlockStateHandler "
+                        f"(likely older than current DB state or failed update). Skipping other handlers for this block."
+                    )
+                    continue  # Skip to the next block in the webhook payload
+
+                # If BlockStateHandler processed it, proceed with other handlers for this block
+                self.logger.debug(
+                    f"Block {apply.block_identifier.index} validated by BlockStateHandler, proceeding."
+                )
+
+                # Process other block-level handlers
                 for handler in self.handlers:
                     if (
                         handler != self.block_state_handler
