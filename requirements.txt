@@ -7,7 +7,7 @@ langchain_openai==0.3.12
 langchain_text_splitters==0.3.8
 langgraph==0.4.1
 openai==1.76.2
-pgvector==0.4.1
+pgvector==0.3.6
 psycopg2==2.9.10
 pydantic==2.11.3
 python-dotenv==1.1.0
