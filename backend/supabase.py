@@ -666,8 +666,8 @@ class SupabaseBackend(AbstractBackend):
             if filters.wallet_id is not None:
                 query = query.eq("wallet_id", filters.wallet_id)
             if filters.dao_id is not None:
-                query = query.eq("dao_id", str(filters.dao_id)) 
-        
+                query = query.eq("dao_id", str(filters.dao_id))
+
         response = query.execute()
         data = response.data or []
         return [QueueMessage(**row) for row in data]
@@ -1584,6 +1584,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("model", filters.model)
             if filters.tx_id is not None:
                 query = query.eq("tx_id", filters.tx_id)
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]

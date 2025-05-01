@@ -135,6 +135,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 f"{'FOR' if approval else 'AGAINST'} with confidence {confidence:.2f}"
             )
 
+            wallet = backend.get_wallet(wallet_id)
+
             # Create a vote record with the evaluation results
             vote_data = VoteCreate(
                 wallet_id=wallet_id,
@@ -147,6 +149,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 prompt=formatted_prompt,
                 cost=total_cost,
                 model=model,
+                profile_id=wallet.profile_id,
             )
 
             # Create the vote record

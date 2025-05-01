@@ -202,6 +202,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     tx_id=tx_id,
                     voted=True,
                     address=address,
+                    profile_id=wallet.profile_id,
                 )
                 logger.debug(
                     f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"

@@ -688,6 +688,7 @@ class VoteBase(CustomBaseModel):
     voted: Optional[bool] = None
     cost: Optional[float] = None
     model: Optional[str] = None
+    profile_id: Optional[UUID] = None
 
 
 class VoteCreate(VoteBase):
@@ -709,6 +710,7 @@ class VoteFilter(CustomBaseModel):
     voted: Optional[bool] = None
     model: Optional[str] = None
     tx_id: Optional[str] = None
+    profile_id: Optional[UUID] = None
 
 
 # Add this to your backend interface class to get agents by tokens
