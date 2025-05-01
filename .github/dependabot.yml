@@ -14,3 +14,6 @@ updates:
       dev-dependencies:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "pgvector"
+        versions: [">=0.3.1"]
