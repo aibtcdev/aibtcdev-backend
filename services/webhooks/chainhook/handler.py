@@ -78,17 +78,14 @@ class ChainhookHandler(WebhookHandler):
 
                 # First validate block height with BlockStateHandler
                 if self.block_state_handler.can_handle_block(apply):
+                    # Let BlockStateHandler determine if this block should be processed
                     await self.block_state_handler.handle_block(apply)
-                    # If block height is lower than current state, BlockStateHandler will log and return
-                    # Check if we should continue processing
+                    # If BlockStateHandler returns without updating state, skip this block
                     if not self.block_state_handler.latest_chain_state or (
-                        apply.block_identifier.index
-                        <= self.block_state_handler.latest_chain_state.block_height
+                        self.block_state_handler.latest_chain_state.block_height
+                        != apply.block_identifier.index
                     ):
-                        self.logger.warning(
-                            f"Skipping further processing for block {apply.block_identifier.index} "
-                            f"as it's not newer than our latest recorded state"
-                        )
+                        # Block was not processed by BlockStateHandler, so skip it
                         continue
 
                 # Process block-level handlers
