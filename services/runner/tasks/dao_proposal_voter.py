@@ -153,8 +153,8 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                # Update the vote record with the transaction ID and voted status
-                tx_id = vote_result.get("data", {}).get("txid")
+                # Get the transaction ID from the nested data structure
+                tx_id = vote_result.get("output", {}).get("data", {}).get("txid")
                 if tx_id:
                     # Log the txid for debugging
                     ## i need to get the address from the wallet that just voted

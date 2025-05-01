@@ -94,7 +94,7 @@ class VectorPreplanReactWorkflow(
 
         # Create a separate LLM for planning with streaming enabled
         self.planning_llm = ChatOpenAI(
-            model="o3-mini",
+            model="o4-mini",
             streaming=True,
             callbacks=[callback_handler],
         )
