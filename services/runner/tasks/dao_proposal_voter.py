@@ -13,6 +13,7 @@ from backend.models import (
     VoteBase,
     VoteFilter,
 )
+from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
@@ -189,9 +190,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     continue
 
                 # Log the txid for debugging
-                ## i need to get the address from the wallet that just voted
+                ## Get the correct address based on network configuration
                 wallet = backend.get_wallet(wallet_id)
-                address = wallet.address
+                address = (
+                    wallet.mainnet_address
+                    if config.network.network == "mainnet"
+                    else wallet.testnet_address
+                )
                 logger.debug(f"Found txid in response: {tx_id}")
                 vote_data = VoteBase(
                     tx_id=tx_id,
