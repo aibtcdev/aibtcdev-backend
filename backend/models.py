@@ -686,6 +686,7 @@ class VoteBase(CustomBaseModel):
     prompt: Optional[str] = None
     voted: Optional[bool] = None
     cost: Optional[float] = None
+    model: Optional[str] = None
 
 
 class VoteCreate(VoteBase):
@@ -705,6 +706,7 @@ class VoteFilter(CustomBaseModel):
     answer: Optional[bool] = None
     address: Optional[str] = None
     voted: Optional[bool] = None
+    model: Optional[str] = None
 
 
 # Add this to your backend interface class to get agents by tokens
