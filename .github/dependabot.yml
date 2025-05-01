@@ -10,3 +10,10 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "staging"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "pgvector"
+        versions: [">=0.3.1"]
