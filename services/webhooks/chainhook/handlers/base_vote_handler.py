@@ -1,6 +1,6 @@
 """Base handler for DAO proposal votes."""
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from backend.factory import backend
 from backend.models import ProposalFilter, VoteBase, VoteCreate, VoteFilter
@@ -150,17 +150,34 @@ class BaseVoteHandler(ChainhookEventHandler):
             )
             return
 
-        # Find existing votes for this proposal and voter
-        votes = backend.list_votes(
+        # Find existing votes using two different filter criteria
+        votes: List[VoteBase] = []
+
+        # Search by proposal_id and voter address
+        address_votes = backend.list_votes(
             filters=VoteFilter(
                 proposal_id=proposal.id,
                 address=voter_address,
             )
         )
+        votes.extend(address_votes)
+
+        # Search by proposal_id and transaction ID
+        if tx_id:
+            tx_votes = backend.list_votes(
+                filters=VoteFilter(
+                    proposal_id=proposal.id,
+                    tx_id=tx_id,
+                )
+            )
+            # Add only unique votes that aren't already in the list
+            for vote in tx_votes:
+                if vote not in votes:
+                    votes.append(vote)
 
         if votes:
             # Update existing vote with transaction ID and amount
-            vote = votes[0]
+            vote = votes[0]  # Use the first vote found
             self.logger.info(
                 f"Updating existing vote {vote.id} with tx_id: {tx_id} and amount: {amount}"
             )

@@ -112,7 +112,7 @@ class SchedulerConfig:
         "AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_WALLET_ID", ""
     )
     dao_proposal_vote_delay_blocks: int = int(
-        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "10")
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "2")
     )
 
 

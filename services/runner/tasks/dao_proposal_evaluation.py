@@ -7,6 +7,7 @@ from backend.factory import backend
 from backend.models import (
     QueueMessage,
     QueueMessageBase,
+    QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
     VoteBase,
@@ -127,6 +128,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             reasoning = evaluation.get("reasoning", "No reasoning provided")
             formatted_prompt = result.get("formatted_prompt", "No prompt provided")
             total_cost = result.get("token_costs", {}).get("total_cost", 0.0)
+            model = result.get("model_info", {}).get("name", "Unknown")
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
@@ -144,6 +146,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 confidence=confidence,
                 prompt=formatted_prompt,
                 cost=total_cost,
+                model=model,
             )
 
             # Create the vote record
@@ -158,7 +161,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             vote_message_data = {"proposal_id": proposal_id, "vote_id": str(vote.id)}
 
             vote_message = backend.create_queue_message(
-                QueueMessage(
+                QueueMessageCreate(
                     type=QueueMessageType.DAO_PROPOSAL_VOTE,
                     message=vote_message_data,
                     dao_id=dao_id,

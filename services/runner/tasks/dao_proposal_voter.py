@@ -1,5 +1,6 @@
 """DAO proposal voter task implementation."""
 
+import json
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -12,6 +13,7 @@ from backend.models import (
     VoteBase,
     VoteFilter,
 )
+from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
@@ -140,7 +142,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             for vote in unvoted_votes:
                 # Submit the vote
                 vote_result = await voting_tool._arun(
-                    action_proposals_voting_extension=proposal.action,
+                    action_proposals_voting_extension=proposal.contract_principal,
                     proposal_id=proposal.proposal_id,
                     vote=vote.answer,
                 )
@@ -153,25 +155,95 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                # Update the vote record with the transaction ID and voted status
-                tx_id = vote_result.get("data", {}).get("txid")
-                if tx_id:
-                    vote_data = VoteBase(
-                        tx_id=tx_id,
-                        voted=True,
+                try:
+                    # Parse the output JSON string
+                    output_data = (
+                        json.loads(vote_result["output"])
+                        if isinstance(vote_result["output"], str)
+                        else vote_result["output"]
                     )
-                    backend.update_vote(vote.id, vote_data)
-                    logger.info(
-                        f"Updated vote {vote.id} with transaction ID {tx_id} and marked as voted"
-                    )
+                    # Get the transaction ID from the nested data structure
+                    tx_id = output_data.get("data", {}).get("txid")
+
+                    if not tx_id:
+                        logger.warning(f"No txid found in parsed output: {output_data}")
+                        results.append(
+                            {
+                                "success": False,
+                                "error": "No transaction ID found in response",
+                                "vote_id": vote.id,
+                                "vote_result": vote_result,
+                            }
+                        )
+                        continue
+
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.error(f"Error parsing vote result output: {str(e)}")
                     results.append(
                         {
-                            "success": True,
+                            "success": False,
+                            "error": f"Failed to parse vote result: {str(e)}",
                             "vote_id": vote.id,
-                            "tx_id": tx_id,
                             "vote_result": vote_result,
                         }
                     )
+                    continue
+
+                # Log the txid for debugging
+                ## Get the correct address based on network configuration
+                wallet = backend.get_wallet(wallet_id)
+                address = (
+                    wallet.mainnet_address
+                    if config.network.network == "mainnet"
+                    else wallet.testnet_address
+                )
+                logger.debug(f"Found txid in response: {tx_id}")
+                vote_data = VoteBase(
+                    tx_id=tx_id,
+                    voted=True,
+                    address=address,
+                )
+                logger.debug(
+                    f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"
+                )
+                try:
+                    # Log the current vote state before update
+                    current_vote = backend.get_vote(vote.id)
+                    logger.debug(
+                        f"Current vote state before update: {current_vote.model_dump() if current_vote else None}"
+                    )
+
+                    updated_vote = backend.update_vote(vote.id, vote_data)
+                    if updated_vote:
+                        logger.info(
+                            f"Successfully updated vote {vote.id} with transaction ID {tx_id} and marked as voted"
+                        )
+                        logger.debug(f"Updated vote state: {updated_vote.model_dump()}")
+                    else:
+                        logger.error(
+                            f"Failed to update vote {vote.id} - update_vote returned None"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error updating vote {vote.id}: {str(e)}", exc_info=True
+                    )
+                    results.append(
+                        {
+                            "success": False,
+                            "error": f"Failed to update vote: {str(e)}",
+                            "vote_id": vote.id,
+                            "vote_result": vote_result,
+                        }
+                    )
+                    continue
+                results.append(
+                    {
+                        "success": True,
+                        "vote_id": vote.id,
+                        "tx_id": tx_id,
+                        "vote_result": vote_result,
+                    }
+                )
 
             # Mark the message as processed if all votes were handled
             if all(result["success"] for result in results):
