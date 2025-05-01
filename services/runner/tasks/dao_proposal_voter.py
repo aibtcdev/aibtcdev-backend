@@ -156,19 +156,62 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 # Update the vote record with the transaction ID and voted status
                 tx_id = vote_result.get("data", {}).get("txid")
                 if tx_id:
+                    # Log the txid for debugging
+                    logger.debug(f"Found txid in response: {tx_id}")
                     vote_data = VoteBase(
                         tx_id=tx_id,
                         voted=True,
                     )
-                    backend.update_vote(vote.id, vote_data)
-                    logger.info(
-                        f"Updated vote {vote.id} with transaction ID {tx_id} and marked as voted"
+                    logger.debug(
+                        f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"
                     )
+                    try:
+                        # Log the current vote state before update
+                        current_vote = backend.get_vote(vote.id)
+                        logger.debug(
+                            f"Current vote state before update: {current_vote.model_dump() if current_vote else None}"
+                        )
+
+                        updated_vote = backend.update_vote(vote.id, vote_data)
+                        if updated_vote:
+                            logger.info(
+                                f"Successfully updated vote {vote.id} with transaction ID {tx_id} and marked as voted"
+                            )
+                            logger.debug(
+                                f"Updated vote state: {updated_vote.model_dump()}"
+                            )
+                        else:
+                            logger.error(
+                                f"Failed to update vote {vote.id} - update_vote returned None"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Error updating vote {vote.id}: {str(e)}", exc_info=True
+                        )
+                        results.append(
+                            {
+                                "success": False,
+                                "error": f"Failed to update vote: {str(e)}",
+                                "vote_id": vote.id,
+                                "vote_result": vote_result,
+                            }
+                        )
+                        continue
                     results.append(
                         {
                             "success": True,
                             "vote_id": vote.id,
                             "tx_id": tx_id,
+                            "vote_result": vote_result,
+                        }
+                    )
+                else:
+                    logger.warning(f"No txid found in vote result: {vote_result}")
+                    results.append(
+                        {
+                            "success": False,
+                            "error": "No transaction ID found in response",
+                            "vote_id": vote.id,
                             "vote_result": vote_result,
                         }
                     )
