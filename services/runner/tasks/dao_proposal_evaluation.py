@@ -7,6 +7,7 @@ from backend.factory import backend
 from backend.models import (
     QueueMessage,
     QueueMessageBase,
+    QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
     VoteBase,
@@ -158,7 +159,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             vote_message_data = {"proposal_id": proposal_id, "vote_id": str(vote.id)}
 
             vote_message = backend.create_queue_message(
-                QueueMessage(
+                QueueMessageCreate(
                     type=QueueMessageType.DAO_PROPOSAL_VOTE,
                     message=vote_message_data,
                     dao_id=dao_id,
