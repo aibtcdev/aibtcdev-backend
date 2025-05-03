@@ -24,7 +24,7 @@ from backend.models import (
     TokenFilter,
     VoteFilter,
 )
-from services.workflows.vector_react import add_documents_to_vectors
+from services.workflows.chat import add_documents_to_vectors
 
 # Load environment variables
 dotenv.load_dotenv()

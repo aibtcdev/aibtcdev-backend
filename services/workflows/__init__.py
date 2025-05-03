@@ -6,20 +6,21 @@ from services.workflows.base import (
     BaseWorkflowMixin,
     ExecutionError,
     LangGraphError,
-    PlanningCapability,
+    MessageContent,
+    MessageProcessor,
     StateType,
+    StreamingCallbackHandler,
     StreamingError,
     ValidationError,
-    VectorRetrievalCapability,
 )
 
-# Enhanced ReAct workflow variants
-from services.workflows.preplan_react import (
-    PreplanLangGraphService,
-    PreplanReactWorkflow,
-    PreplanState,
-    execute_preplan_react_stream,
+# Remove all imports from deleted files and import from chat.py
+from services.workflows.chat import (
+    ChatService,
+    ChatWorkflow,
+    execute_chat_stream,
 )
+from services.workflows.planning_mixin import PlanningCapability
 
 # Special purpose workflows
 from services.workflows.proposal_evaluation import (
@@ -30,15 +31,6 @@ from services.workflows.proposal_evaluation import (
 
 # Core messaging and streaming components
 # Core ReAct workflow components
-from services.workflows.react import (
-    LangGraphService,
-    MessageContent,
-    MessageProcessor,
-    ReactState,
-    ReactWorkflow,
-    StreamingCallbackHandler,
-    execute_langgraph_stream,
-)
 from services.workflows.tweet_analysis import (
     TweetAnalysisWorkflow,
     analyze_tweet,
@@ -47,19 +39,11 @@ from services.workflows.tweet_generator import (
     TweetGeneratorWorkflow,
     generate_dao_tweet,
 )
-from services.workflows.vector_preplan_react import (
-    VectorPreplanLangGraphService,
-    VectorPreplanReactWorkflow,
-    VectorPreplanState,
-    execute_vector_preplan_stream,
-)
-from services.workflows.vector_react import (
-    VectorLangGraphService,
-    VectorReactState,
-    VectorReactWorkflow,
+from services.workflows.vector_mixin import (
+    VectorRetrievalCapability,
     add_documents_to_vectors,
-    execute_vector_langgraph_stream,
 )
+from services.workflows.web_search_mixin import WebSearchCapability
 
 # Workflow service and factory
 from services.workflows.workflow_service import (
@@ -76,7 +60,6 @@ __all__ = [
     "BaseWorkflowMixin",
     "ExecutionError",
     "LangGraphError",
-    "PlanningCapability",
     "StateType",
     "StreamingError",
     "ValidationError",
@@ -96,22 +79,6 @@ __all__ = [
     "ReactState",
     "ReactWorkflow",
     "execute_langgraph_stream",
-    # PrePlan ReAct workflow
-    "PreplanLangGraphService",
-    "PreplanReactWorkflow",
-    "PreplanState",
-    "execute_preplan_react_stream",
-    # Vector ReAct workflow
-    "VectorLangGraphService",
-    "VectorReactState",
-    "VectorReactWorkflow",
-    "add_documents_to_vectors",
-    "execute_vector_langgraph_stream",
-    # Vector PrePlan ReAct workflow
-    "VectorPreplanLangGraphService",
-    "VectorPreplanReactWorkflow",
-    "VectorPreplanState",
-    "execute_vector_preplan_stream",
     # Special purpose workflows
     "ProposalEvaluationWorkflow",
     "TweetAnalysisWorkflow",
@@ -120,4 +87,12 @@ __all__ = [
     "evaluate_and_vote_on_proposal",
     "evaluate_proposal_only",
     "generate_dao_tweet",
+    # Chat workflow
+    "ChatService",
+    "ChatWorkflow",
+    "execute_chat_stream",
+    # Mixins
+    "PlanningCapability",
+    "WebSearchCapability",
+    "add_documents_to_vectors",
 ]

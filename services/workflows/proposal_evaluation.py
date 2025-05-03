@@ -3,9 +3,7 @@
 import binascii
 from typing import Dict, List, Optional, TypedDict
 
-from langchain.callbacks.base import BaseCallbackHandler
 from langchain.prompts import PromptTemplate
-from langchain_core.documents import Document
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
@@ -14,7 +12,6 @@ from backend.models import (
     UUID,
     ExtensionFilter,
     Profile,
-    Prompt,
     PromptFilter,
     ProposalType,
     QueueMessageFilter,
@@ -24,10 +21,10 @@ from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from services.workflows.base import (
     BaseWorkflow,
-    VectorRetrievalCapability,
-    WebSearchCapability,
 )
-from services.workflows.vector_react import VectorLangGraphService, VectorReactState
+from services.workflows.chat import ChatService
+from services.workflows.vector_mixin import VectorRetrievalCapability
+from services.workflows.web_search_mixin import WebSearchCapability
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -239,7 +236,7 @@ class ProposalEvaluationWorkflow(
                     try:
                         # Add debug logging for dao_id
                         self.logger.debug(f"Fetching tweets for DAO ID: {dao_id}")
-                        
+
                         queue_messages = backend.list_queue_messages(
                             QueueMessageFilter(
                                 type=QueueMessageType.TWEET,
@@ -249,17 +246,23 @@ class ProposalEvaluationWorkflow(
                         )
                         # Log the number of messages found
                         self.logger.debug(f"Found {len(queue_messages)} queue messages")
-                        
+
                         # Sort by created_at and take last 5
                         sorted_messages = sorted(
                             queue_messages, key=lambda x: x.created_at, reverse=True
                         )[:5]
-                        self.logger.debug(f"After sorting, have {len(sorted_messages)} messages")
+                        self.logger.debug(
+                            f"After sorting, have {len(sorted_messages)} messages"
+                        )
 
                         recent_tweets = [
                             {
                                 "created_at": msg.created_at,
-                                "message": msg.message.get('message', 'No text available') if isinstance(msg.message, dict) else msg.message,
+                                "message": (
+                                    msg.message.get("message", "No text available")
+                                    if isinstance(msg.message, dict)
+                                    else msg.message
+                                ),
                                 "tweet_id": msg.tweet_id,
                             }
                             for msg in sorted_messages
@@ -515,7 +518,7 @@ class ProposalEvaluationWorkflow(
                 vote_instruction = f"I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}. Please vote {'FOR' if state['approve'] else 'AGAINST'} the proposal. Use the dao_action_vote_on_proposal tool to submit the vote."
 
                 # Create VectorLangGraph service with collections
-                service = VectorLangGraphService(
+                service = ChatService(
                     collection_names=self.collection_names,
                 )
 

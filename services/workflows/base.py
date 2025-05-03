@@ -1,16 +1,19 @@
 """Base workflow functionality and shared components for all workflow types."""
 
+import asyncio
+import datetime
 import json
+import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 from langchain.prompts import PromptTemplate
-from langchain.schema import Document
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 from langgraph.graph import Graph, StateGraph
-from openai import OpenAI
 
-from backend.factory import backend
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -242,333 +245,361 @@ class BaseWorkflowMixin(ABC):
         pass
 
 
-class PlanningCapability(BaseWorkflowMixin):
-    """Mixin that adds planning capabilities to a workflow."""
+@dataclass
+class MessageContent:
+    """Data class for message content"""
 
-    async def create_plan(self, query: str, **kwargs) -> str:
-        """Create a plan based on the user's query.
+    role: str
+    content: str
+    tool_calls: Optional[List[Dict]] = None
 
-        Args:
-            query: The user's query to plan for
-            **kwargs: Additional arguments (callback_handler, etc.)
-
-        Returns:
-            The generated plan
-        """
-        raise NotImplementedError("PlanningCapability must implement create_plan")
-
-    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
-        """Integrate planning capability with a graph.
-
-        This adds the planning capability to the graph by modifying
-        the entry point to first create a plan.
-
-        Args:
-            graph: The graph to integrate with
-            **kwargs: Additional arguments specific to planning
-        """
-        # Implementation depends on specific graph structure
-        raise NotImplementedError(
-            "PlanningCapability must implement integrate_with_graph"
+    @classmethod
+    def from_dict(cls, data: Dict) -> "MessageContent":
+        """Create MessageContent from dictionary"""
+        return cls(
+            role=data.get("role", ""),
+            content=data.get("content", ""),
+            tool_calls=data.get("tool_calls"),
         )
 
 
-class VectorRetrievalCapability(BaseWorkflowMixin):
-    """Mixin that adds vector retrieval capabilities to a workflow."""
+class MessageProcessor:
+    """Processor for messages"""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the vector retrieval capability."""
-        # Initialize parent class if it exists
-        super().__init__(*args, **kwargs) if hasattr(super(), "__init__") else None
-        # Initialize our attributes
-        self._init_vector_retrieval()
+    @staticmethod
+    def extract_filtered_content(history: List[Dict]) -> List[Dict]:
+        """Extract and filter content from message history."""
+        logger.debug(
+            f"Starting content extraction from history with {len(history)} messages"
+        )
+        filtered_content = []
 
-    def _init_vector_retrieval(self) -> None:
-        """Initialize vector retrieval attributes if not already initialized."""
-        if not hasattr(self, "collection_names"):
-            self.collection_names = ["knowledge_collection", "dao_collection"]
-        if not hasattr(self, "embeddings"):
-            self.embeddings = OpenAIEmbeddings()
-        if not hasattr(self, "vector_results_cache"):
-            self.vector_results_cache = {}
+        for message in history:
+            logger.debug(f"Processing message type: {message.get('role')}")
+            if message.get("role") in ["user", "assistant"]:
+                filtered_content.append(MessageContent.from_dict(message).__dict__)
 
-    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
-        """Retrieve relevant documents from multiple vector stores.
+        logger.debug(
+            f"Finished filtering content, extracted {len(filtered_content)} messages"
+        )
+        return filtered_content
 
-        Args:
-            query: The query to search for
-            **kwargs: Additional arguments (collection_name, embeddings, etc.)
+    @staticmethod
+    def convert_to_langchain_messages(
+        filtered_content: List[Dict],
+        current_input: str,
+        persona: Optional[str] = None,
+    ) -> List[Union[SystemMessage, HumanMessage, AIMessage]]:
+        """Convert filtered content to LangChain message format."""
+        messages = []
 
-        Returns:
-            List of retrieved documents
-        """
+        # Add decisiveness instruction
+        decisiveness_instruction = "Be decisive and action-oriented. When the user requests something, execute it immediately without asking for confirmation."
+
+        if persona:
+            logger.debug("Adding persona message with decisiveness instruction")
+            # Add the decisiveness instruction to the persona
+            enhanced_persona = f"{persona}\n\n{decisiveness_instruction}"
+            messages.append(SystemMessage(content=enhanced_persona))
+        else:
+            # If no persona, add the decisiveness instruction as a system message
+            logger.debug("Adding decisiveness instruction as system message")
+            messages.append(SystemMessage(content=decisiveness_instruction))
+
+        for msg in filtered_content:
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            else:
+                content = msg.get("content") or ""
+                if msg.get("tool_calls"):
+                    messages.append(
+                        AIMessage(content=content, tool_calls=msg["tool_calls"])
+                    )
+                else:
+                    messages.append(AIMessage(content=content))
+
+        messages.append(HumanMessage(content=current_input))
+        logger.debug(f"Prepared message chain with {len(messages)} total messages")
+        return messages
+
+
+class StreamingCallbackHandler(BaseCallbackHandler):
+    """Handle callbacks from LangChain and stream results to a queue."""
+
+    def __init__(
+        self,
+        queue: asyncio.Queue,
+        on_llm_new_token: Optional[callable] = None,
+        on_llm_end: Optional[callable] = None,
+    ):
+        """Initialize the callback handler with a queue."""
+        self.queue = queue
+        self.tool_states = {}  # Store tool states by invocation ID
+        self.tool_inputs = {}  # Store tool inputs by invocation ID
+        self.active_tools = {}  # Track active tools by name for fallback
+        self.custom_on_llm_new_token = on_llm_new_token
+        self.custom_on_llm_end = on_llm_end
+        # Track the current execution phase
+        self.current_phase = "processing"  # Default phase is processing
+
+    def _ensure_loop(self) -> asyncio.AbstractEventLoop:
+        """Get the current event loop or create a new one if necessary."""
         try:
-            # Ensure initialization
-            self._init_vector_retrieval()
+            loop = asyncio.get_running_loop()
+            return loop
+        except RuntimeError:
+            logger.debug("No running event loop found. Creating a new one.")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
 
-            # Check cache first
-            if query in self.vector_results_cache:
-                logger.debug(f"Using cached vector results for query: {query}")
-                return self.vector_results_cache[query]
-
-            all_documents = []
-            limit_per_collection = kwargs.get("limit", 4)
-            logger.debug(
-                f"Searching vector store: query={query} | limit_per_collection={limit_per_collection}"
-            )
-
-            # Query each collection and gather results
-            for collection_name in self.collection_names:
-                try:
-                    # Query vectors using the backend
-                    vector_results = await backend.query_vectors(
-                        collection_name=collection_name,
-                        query_text=query,
-                        limit=limit_per_collection,
-                        embeddings=self.embeddings,
-                    )
-
-                    # Convert to LangChain Documents and add collection source
-                    documents = [
-                        Document(
-                            page_content=doc.get("page_content", ""),
-                            metadata={
-                                **doc.get("metadata", {}),
-                                "collection_source": collection_name,
-                            },
-                        )
-                        for doc in vector_results
-                    ]
-
-                    all_documents.extend(documents)
-                    logger.debug(
-                        f"Retrieved {len(documents)} documents from collection {collection_name}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to retrieve from collection {collection_name}: {str(e)}",
-                        exc_info=True,
-                    )
-                    continue  # Continue with other collections if one fails
-
-            logger.debug(
-                f"Retrieved total of {len(all_documents)} documents from all collections"
-            )
-
-            # Cache the results
-            self.vector_results_cache[query] = all_documents
-
-            return all_documents
+    async def _async_put_to_queue(self, item: Dict) -> None:
+        """Put an item in the queue asynchronously."""
+        try:
+            await self.queue.put(item)
         except Exception as e:
-            logger.error(f"Vector store retrieval failed: {str(e)}", exc_info=True)
-            return []
+            logger.error(f"Failed to put item in queue: {str(e)}")
+            raise StreamingError(f"Queue operation failed: {str(e)}")
 
-    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
-        """Integrate vector retrieval capability with a graph.
+    def _put_to_queue(self, item: Dict) -> None:
+        """Put an item in the queue, handling event loop considerations."""
+        try:
+            loop = self._ensure_loop()
+            if loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._async_put_to_queue(item), loop
+                )
+                future.result()
+            else:
+                loop.run_until_complete(self._async_put_to_queue(item))
+        except Exception as e:
+            logger.error(f"Failed to put item in queue: {str(e)}")
+            raise StreamingError(f"Queue operation failed: {str(e)}")
 
-        This adds the vector retrieval capability to the graph by adding a node
-        that can perform vector searches when needed.
-
-        Args:
-            graph: The graph to integrate with
-            **kwargs: Additional arguments specific to vector retrieval including:
-                     - collection_names: List of collection names to search
-                     - limit_per_collection: Number of results per collection
-        """
-        # Add vector search node
-        graph.add_node("vector_search", self.retrieve_from_vector_store)
-
-        # Add result processing node if needed
-        if "process_vector_results" not in graph.nodes:
-            graph.add_node("process_vector_results", self._process_vector_results)
-            graph.add_edge("vector_search", "process_vector_results")
-
-    async def _process_vector_results(
-        self, vector_results: List[Document], **kwargs
-    ) -> Dict[str, Any]:
-        """Process vector search results.
-
-        Args:
-            vector_results: Results from vector search
-            **kwargs: Additional processing arguments
+    def _get_tool_info(
+        self, invocation_id: Optional[str], tool_name: Optional[str] = None
+    ) -> Optional[tuple]:
+        """Get tool information using either invocation_id or tool_name.
 
         Returns:
-            Processed results with metadata
+            Optional[tuple]: (tool_name, tool_input, invocation_id) if found, None otherwise
         """
-        return {
-            "results": vector_results,
-            "metadata": {
-                "num_vector_results": len(vector_results),
-                "collection_sources": list(
-                    set(
-                        doc.metadata.get("collection_source", "unknown")
-                        for doc in vector_results
-                    )
-                ),
-            },
-        }
+        if invocation_id and invocation_id in self.tool_states:
+            return (
+                self.tool_states[invocation_id],
+                self.tool_inputs.get(invocation_id, ""),
+                invocation_id,
+            )
+        elif tool_name and tool_name in self.active_tools:
+            active_info = self.active_tools[tool_name]
+            return (tool_name, active_info["input"], active_info["invocation_id"])
+        return None
 
-
-class WebSearchCapability(BaseWorkflowMixin):
-    """Mixin that adds web search capabilities to a workflow using OpenAI Responses API."""
-
-    def __init__(self, *args, **kwargs):
-        """Initialize the web search capability."""
-        # Initialize parent class if it exists
-        super().__init__(*args, **kwargs) if hasattr(super(), "__init__") else None
-        # Initialize our attributes
-        self._init_web_search()
-
-    def _init_web_search(self) -> None:
-        """Initialize web search attributes if not already initialized."""
-        if not hasattr(self, "search_results_cache"):
-            self.search_results_cache = {}
-        if not hasattr(self, "client"):
-            self.client = OpenAI()
-
-    async def search_web(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        """Search the web using OpenAI Responses API.
+    async def process_step(
+        self, content: str, role: str = "assistant", thought: Optional[str] = None
+    ) -> None:
+        """Process a planning step and queue it with the planning status.
 
         Args:
-            query: The search query
-            **kwargs: Additional search parameters like user_location and search_context_size
-
-        Returns:
-            List of search results with content and metadata
+            content: The planning step content
+            role: The role associated with the step (usually assistant)
+            thought: Optional thought process notes
         """
         try:
-            # Ensure initialization
-            self._init_web_search()
-
-            # Check cache first
-            if query in self.search_results_cache:
-                logger.info(f"Using cached results for query: {query}")
-                return self.search_results_cache[query]
-
-            # Configure web search tool
-            tool_config = {
-                "type": "web_search_preview",
-                "search_context_size": kwargs.get("search_context_size", "medium"),
+            # Create step message with explicit planning status
+            current_time = datetime.datetime.now().isoformat()
+            step_message = {
+                "type": "step",
+                "status": "planning",  # Explicitly mark as planning phase
+                "content": content,
+                "role": role,
+                "thought": thought
+                or "Planning Phase",  # Default to Planning Phase if thought is not provided
+                "created_at": current_time,
+                "planning_only": True,  # Mark this content as planning-only to prevent duplication
             }
 
-            # Add user location if provided
-            if "user_location" in kwargs:
-                tool_config["user_location"] = kwargs["user_location"]
+            logger.debug(f"Queuing planning step message with length: {len(content)}")
+            await self._async_put_to_queue(step_message)
+        except Exception as e:
+            logger.error(f"Failed to process planning step: {str(e)}")
+            raise StreamingError(f"Planning step processing failed: {str(e)}")
 
-            # Make the API call
-            response = self.client.responses.create(
-                model="gpt-4.1", tools=[tool_config], input=query
+    def on_tool_start(self, serialized: Dict, input_str: str, **kwargs) -> None:
+        """Run when tool starts running."""
+        tool_name = serialized.get("name")
+        if not tool_name:
+            logger.warning("Tool start called without tool name")
+            return
+
+        invocation_id = kwargs.get("invocation_id", str(uuid.uuid4()))
+
+        # Store in both tracking systems
+        self.tool_states[invocation_id] = tool_name
+        self.tool_inputs[invocation_id] = input_str
+        self.active_tools[tool_name] = {
+            "invocation_id": invocation_id,
+            "input": input_str,
+            "start_time": datetime.datetime.now(),
+        }
+
+        logger.info(
+            f"Tool started: {tool_name} (ID: {invocation_id}) with input: {input_str[:100]}..."
+        )
+
+    def on_tool_end(self, output: str, **kwargs) -> None:
+        """Run when tool ends running."""
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
+
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
+
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
+            if hasattr(output, "content"):
+                output = output.content
+
+            self._put_to_queue(
+                {
+                    "type": "tool",
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": str(output),
+                    "status": "processing",  # Use "processing" status for tool end
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+            logger.info(
+                f"Tool {tool_name} (ID: {used_invocation_id}) completed with output length: {len(str(output))}"
             )
 
-            logger.debug(f"Web search response: {response}")
-            # Process the response into our document format
-            documents = []
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool end called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
 
-            # Access the output text directly
-            if hasattr(response, "output_text"):
-                text_content = response.output_text
-                source_urls = []
+    def on_tool_error(self, error: Exception, **kwargs) -> None:
+        """Run when tool errors."""
+        invocation_id = kwargs.get("invocation_id")
+        tool_name = kwargs.get("name")  # Try to get tool name from kwargs
 
-                # Try to extract citations if available
-                if hasattr(response, "citations"):
-                    source_urls = [
-                        {
-                            "url": citation.url,
-                            "title": getattr(citation, "title", ""),
-                            "start_index": getattr(citation, "start_index", 0),
-                            "end_index": getattr(citation, "end_index", 0),
-                        }
-                        for citation in response.citations
-                        if hasattr(citation, "url")
-                    ]
+        # Try to get tool info from either source
+        tool_info = self._get_tool_info(invocation_id, tool_name)
 
-                # Ensure we always have at least one URL entry
-                if not source_urls:
-                    source_urls = [
-                        {
-                            "url": "No source URL available",
-                            "title": "Generated Response",
-                            "start_index": 0,
-                            "end_index": len(text_content),
-                        }
-                    ]
-
-                # Create document with content
-                doc = {
-                    "page_content": text_content,
-                    "metadata": {
-                        "type": "web_search_result",
-                        "source_urls": source_urls,
-                        "query": query,
-                        "timestamp": None,
-                    },
-                }
-                documents.append(doc)
-
-            # Cache the results
-            self.search_results_cache[query] = documents
-
-            logger.info(f"Web search completed with {len(documents)} results")
-            return documents
-
-        except Exception as e:
-            logger.error(f"Web search failed: {str(e)}")
-            # Return a list with one empty result to prevent downstream errors
-            return [
+        if tool_info:
+            tool_name, tool_input, used_invocation_id = tool_info
+            self._put_to_queue(
                 {
-                    "page_content": "Web search failed to return results.",
-                    "metadata": {
-                        "type": "web_search_result",
-                        "source_urls": [
-                            {
-                                "url": "Error occurred during web search",
-                                "title": "Error",
-                                "start_index": 0,
-                                "end_index": 0,
-                            }
-                        ],
-                        "query": query,
-                        "timestamp": None,
-                    },
+                    "type": "tool",
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output": f"Error: {str(error)}",
+                    "status": "error",
+                    "created_at": datetime.datetime.now().isoformat(),
                 }
-            ]
+            )
+            logger.error(
+                f"Tool {tool_name} (ID: {used_invocation_id}) failed with error: {str(error)}",
+                exc_info=True,
+            )
 
-    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
-        """Integrate web search capability with a graph.
+            # Clean up tracking
+            if used_invocation_id in self.tool_states:
+                del self.tool_states[used_invocation_id]
+                del self.tool_inputs[used_invocation_id]
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+        else:
+            logger.warning(
+                f"Tool error called with unknown invocation ID: {invocation_id} and tool name: {tool_name}"
+            )
 
-        This adds the web search capability to the graph by adding a node
-        that can perform web searches when needed.
+    def on_llm_start(self, *args, **kwargs) -> None:
+        """Run when LLM starts running."""
+        logger.info("LLM processing started")
 
-        Args:
-            graph: The graph to integrate with
-            **kwargs: Additional arguments specific to web search including:
-                     - search_context_size: "low", "medium", or "high"
-                     - user_location: dict with type, country, city, region
-        """
-        # Add web search node
-        graph.add_node("web_search", self.search_web)
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        """Run on new token."""
+        # Check if we have planning_only in the kwargs
+        planning_only = kwargs.get("planning_only", False)
 
-        # Add result processing node if needed
-        if "process_results" not in graph.nodes:
-            graph.add_node("process_results", self._process_results)
-            graph.add_edge("web_search", "process_results")
+        # Handle custom token processing if provided
+        if self.custom_on_llm_new_token:
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_new_token):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_new_token(token, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_new_token(token, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom token handler: {str(e)}", exc_info=True)
 
-    async def _process_results(
-        self, web_results: List[Dict[str, Any]], **kwargs
-    ) -> Dict[str, Any]:
-        """Process web search results.
+        # Log token information with phase information
+        phase = "planning" if planning_only else "processing"
+        logger.debug(f"Received new token (length: {len(token)}, phase: {phase})")
 
-        Args:
-            web_results: Results from web search
-            **kwargs: Additional processing arguments
+    def on_llm_end(self, response, **kwargs) -> None:
+        """Run when LLM ends running."""
+        logger.info("LLM processing completed")
 
-        Returns:
-            Processed results with metadata
-        """
-        return {
-            "results": web_results,
-            "metadata": {
-                "num_web_results": len(web_results),
-                "source_types": ["web_search"],
-            },
-        }
+        # Queue an end message with complete status
+        try:
+            self._put_to_queue(
+                {
+                    "type": "token",
+                    "status": "complete",
+                    "content": "",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue completion message: {str(e)}")
+
+        # Handle custom end processing if provided
+        if self.custom_on_llm_end:
+            try:
+                # Check if it's a coroutine function and handle accordingly
+                if asyncio.iscoroutinefunction(self.custom_on_llm_end):
+                    # For coroutines, we need to schedule it to run without awaiting
+                    loop = self._ensure_loop()
+                    # Create the coroutine object without calling it
+                    coro = self.custom_on_llm_end(response, **kwargs)
+                    # Schedule it to run in the event loop
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    # Regular function call
+                    self.custom_on_llm_end(response, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in custom end handler: {str(e)}", exc_info=True)
+
+    def on_llm_error(self, error: Exception, **kwargs) -> None:
+        """Run when LLM errors."""
+        logger.error(f"LLM error occurred: {str(error)}", exc_info=True)
+
+        # Send error status
+        try:
+            self._put_to_queue(
+                {
+                    "type": "token",
+                    "status": "error",
+                    "content": f"Error: {str(error)}",
+                    "created_at": datetime.datetime.now().isoformat(),
+                }
+            )
+        except Exception:
+            pass  # Don't raise another error if this fails
+
+        raise ExecutionError("LLM processing failed", {"error": str(error)})

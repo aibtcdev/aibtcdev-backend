@@ -16,12 +16,11 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from lib.logger import configure_logger
 from services.workflows.base import ExecutionError, StreamingError
-from services.workflows.react import (
-    LangGraphService,
+from services.workflows.chat import (
+    ChatService,
     MessageProcessor,
     StreamingCallbackHandler,
 )
-from services.workflows.vector_react import VectorLangGraphService
 
 logger = configure_logger(__name__)
 
@@ -508,64 +507,36 @@ class WorkflowBuilder:
 
 
 class WorkflowFactory:
-    """Factory for creating workflow service instances."""
+    """Factory for creating workflow service instances. Only ChatService is used."""
 
     @classmethod
     def create_workflow_service(
         cls,
-        workflow_type: str = "react",
+        workflow_type: str = "chat",
         vector_collections: Optional[Union[str, List[str]]] = None,
         embeddings: Optional[Embeddings] = None,
         **kwargs,
     ) -> WorkflowService:
-        """Create a workflow service instance based on the workflow type.
+        """Create a workflow service instance. Always returns ChatService.
 
         Args:
-            workflow_type: Type of workflow to create ("react", "preplan", "vector", "vector_preplan")
+            workflow_type: Type of workflow to create (ignored, always uses ChatService)
             vector_collections: Vector collection name(s) for vector workflows
             embeddings: Embeddings model for vector workflows
             **kwargs: Additional parameters to pass to the service
 
         Returns:
-            An instance of a WorkflowService implementation
+            An instance of ChatService
         """
-        # Import service classes here to avoid circular imports
-        from services.workflows.preplan_react import PreplanLangGraphService
-        from services.workflows.vector_preplan_react import (
-            VectorPreplanLangGraphService,
-        )
-
-        # Map workflow types to their service classes
-        service_map = {
-            "react": LangGraphService,
-            "preplan": PreplanLangGraphService,
-            "vector": VectorLangGraphService,
-            "vector_preplan": VectorPreplanLangGraphService,
-        }
-
-        if workflow_type not in service_map:
-            raise ValueError(f"Unsupported workflow type: {workflow_type}")
-
-        service_class = service_map[workflow_type]
-
-        # Handle vector-based workflow special cases
-        if workflow_type in ["vector", "vector_preplan"]:
-            if not vector_collections:
-                raise ValueError(
-                    f"Vector collection name(s) required for {workflow_type} workflow"
-                )
-
+        if vector_collections is not None:
             if not embeddings:
                 embeddings = OpenAIEmbeddings()
-
-            return service_class(
+            return ChatService(
                 collection_names=vector_collections,
                 embeddings=embeddings,
                 **kwargs,
             )
-
-        # For other workflow types
-        return service_class(**kwargs)
+        return ChatService(**kwargs)
 
 
 async def execute_workflow_stream(
@@ -578,10 +549,10 @@ async def execute_workflow_stream(
     embeddings: Optional[Embeddings] = None,
     **kwargs,
 ) -> AsyncGenerator[Dict, None]:
-    """Unified interface for executing any workflow stream.
+    """Unified interface for executing any workflow stream. Uses ChatService for all workflows.
 
     Args:
-        workflow_type: Type of workflow to execute
+        workflow_type: Type of workflow to execute (ignored)
         history: Conversation history
         input_str: Current user input
         persona: Optional persona to use
@@ -599,8 +570,6 @@ async def execute_workflow_stream(
         embeddings=embeddings,
         **kwargs,
     )
-
-    # Execute the stream through the service's execute_stream method
     async for chunk in service.execute_stream(
         history=history,
         input_str=input_str,
