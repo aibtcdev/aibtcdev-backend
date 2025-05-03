@@ -1,8 +1,11 @@
 """Proposal evaluation workflow."""
 
+import asyncio
 from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
@@ -21,7 +24,8 @@ from lib.logger import configure_logger
 from services.workflows.base import (
     BaseWorkflow,
 )
-from services.workflows.chat import ChatService
+from services.workflows.chat import ChatService, StreamingCallbackHandler
+from services.workflows.planning_mixin import PlanningCapability
 from services.workflows.utils import calculate_token_cost, decode_hex_parameters
 from services.workflows.vector_mixin import VectorRetrievalCapability
 from services.workflows.web_search_mixin import WebSearchCapability
@@ -67,10 +71,14 @@ class EvaluationState(TypedDict):
     token_usage: Optional[Dict]  # Add field for token usage tracking
     model_info: Optional[Dict]  # Add field for model information
     contract_source: Optional[str]  # Added field to store contract source
+    plan: Optional[str]  # Added field to store the evaluation plan
 
 
 class ProposalEvaluationWorkflow(
-    BaseWorkflow[EvaluationState], VectorRetrievalCapability, WebSearchCapability
+    BaseWorkflow[EvaluationState],
+    VectorRetrievalCapability,
+    WebSearchCapability,
+    PlanningCapability,
 ):
     """Workflow for evaluating DAO proposals and voting automatically."""
 
@@ -89,7 +97,21 @@ class ProposalEvaluationWorkflow(
             temperature: Optional temperature setting for the model
             **kwargs: Additional arguments passed to parent
         """
+        # Initialize planning LLM
+        planning_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.0, streaming=True)
+
+        # Create callback handler for planning with queue
+        callback_handler = StreamingCallbackHandler(queue=asyncio.Queue())
+
+        # Initialize all parent classes including PlanningCapability
         super().__init__(model_name=model_name, temperature=temperature, **kwargs)
+        PlanningCapability.__init__(
+            self,
+            callback_handler=callback_handler,
+            planning_llm=planning_llm,
+            persona="You are a DAO proposal evaluation planner, focused on creating structured evaluation plans.",
+        )
+
         self.collection_names = collection_names or [
             "knowledge_collection",
             "dao_collection",
@@ -625,18 +647,64 @@ class ProposalEvaluationWorkflow(
                 }
                 return state
 
+        # --- Planning Node --- #
+        async def plan_evaluation(state: EvaluationState) -> EvaluationState:
+            """Generate a plan for evaluating the proposal using the PlanningCapability mixin."""
+            try:
+                self.logger.debug(
+                    "Generating evaluation plan using PlanningCapability..."
+                )
+
+                # Construct initial context for planning
+                initial_context = (
+                    f"Proposal ID: {state['proposal_id']}\n"
+                    f"DAO ID: {state.get('dao_id')}\n"
+                    f"Agent ID: {state.get('agent_id')}\n"
+                    f"Auto-Vote Enabled: {state.get('auto_vote')}"
+                )
+
+                # Create planning query
+                planning_query = (
+                    f"Create a detailed plan for evaluating the following DAO proposal:\n\n"
+                    f"{initial_context}\n\n"
+                    f"The plan should cover:\n"
+                    f"1. Data gathering (proposal details, DAO context, treasury info)\n"
+                    f"2. Analysis approach (including use of vector search and web search)\n"
+                    f"3. Evaluation criteria and decision making process\n"
+                    f"4. Voting execution strategy (if auto-vote is enabled)"
+                )
+
+                # Use the mixin's create_plan method
+                plan = await self.create_plan(
+                    query=planning_query, context_docs=state.get("vector_results", [])
+                )
+
+                state["plan"] = plan
+                self.logger.info("Evaluation plan generated using PlanningCapability.")
+                self.logger.debug(f"Generated Plan:\n{plan}")
+                return state
+
+            except Exception as e:
+                self.logger.error(f"Error generating plan: {str(e)}", exc_info=True)
+                state["plan"] = f"Error generating plan: {str(e)}"
+                return state
+
         # Create the graph
         workflow = StateGraph(EvaluationState)
 
         # Add nodes
+        workflow.add_node("plan_evaluation", plan_evaluation)  # New planning node
         workflow.add_node("fetch_context", fetch_context)
         workflow.add_node("format_prompt", format_evaluation_prompt)
-        workflow.add_node("evaluate", call_evaluation_llm)
+        workflow.add_node(
+            "evaluate", call_evaluation_llm
+        )  # Renamed from evaluate_proposal
         workflow.add_node("vote", vote_on_proposal)
         workflow.add_node("skip_vote", skip_voting)
 
         # Set up the conditional branching
-        workflow.set_entry_point("fetch_context")
+        workflow.set_entry_point("plan_evaluation")  # Start with planning
+        workflow.add_edge("plan_evaluation", "fetch_context")  # Plan -> Fetch
         workflow.add_edge("fetch_context", "format_prompt")
         workflow.add_edge("format_prompt", "evaluate")
         workflow.add_conditional_edges(
@@ -797,6 +865,7 @@ async def evaluate_and_vote_on_proposal(
             "web_search_results": None,
             "token_usage": None,
             "model_info": None,
+            "plan": None,
         }
 
         # Create and run workflow with model settings from prompt
