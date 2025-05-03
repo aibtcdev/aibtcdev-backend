@@ -97,6 +97,9 @@ async def test_proposal_evaluation_workflow():
         # Create a test proposal
         proposal_id = await create_test_proposal(dao_id)
 
+        # Use a consistent test wallet ID
+        test_wallet_id = UUID("532fd36b-8a9d-4fdd-82d2-25ddcf007488")
+
         # Test scenarios
         scenarios = [
             {
@@ -107,7 +110,7 @@ async def test_proposal_evaluation_workflow():
             },
             {
                 "name": "Auto-vote Enabled",
-                "auto_vote": False,  # Fixed: Changed to True for auto-vote scenario
+                "auto_vote": True,  # Corrected: Changed to True for auto-vote scenario
                 "confidence_threshold": 0.7,
                 "description": "Testing proposal evaluation with auto-voting",
             },
@@ -128,6 +131,7 @@ async def test_proposal_evaluation_workflow():
                 if scenario["auto_vote"]:
                     result = await evaluate_and_vote_on_proposal(
                         proposal_id=proposal_id,
+                        wallet_id=test_wallet_id,  # Add wallet_id for auto-vote scenarios
                         auto_vote=scenario["auto_vote"],
                         confidence_threshold=scenario["confidence_threshold"],
                         dao_id=dao_id,
@@ -135,7 +139,7 @@ async def test_proposal_evaluation_workflow():
                 else:
                     result = await evaluate_proposal_only(
                         proposal_id=proposal_id,
-                        wallet_id=UUID("532fd36b-8a9d-4fdd-82d2-25ddcf007488"),
+                        wallet_id=test_wallet_id,  # Use the same consistent wallet ID
                     )
 
                 # Print the results
