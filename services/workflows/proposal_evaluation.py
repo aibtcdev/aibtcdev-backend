@@ -1,8 +1,10 @@
 """Proposal evaluation workflow."""
 
 import asyncio
-from typing import Any, Dict, List, Optional, TypedDict
+import base64
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
+import httpx
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -26,7 +28,11 @@ from services.workflows.base import (
 )
 from services.workflows.chat import ChatService, StreamingCallbackHandler
 from services.workflows.planning_mixin import PlanningCapability
-from services.workflows.utils import calculate_token_cost, decode_hex_parameters
+from services.workflows.utils import (
+    calculate_token_cost,
+    decode_hex_parameters,
+    extract_image_urls,
+)
 from services.workflows.vector_mixin import VectorRetrievalCapability
 from services.workflows.web_search_mixin import WebSearchCapability
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
@@ -70,6 +76,7 @@ class EvaluationState(TypedDict):
     treasury_balance: Optional[float]
     contract_source: Optional[str]
     plan: Optional[str]
+    proposal_images: Optional[List[Dict]]  # Store encoded images for LLM
     # Token usage tracking per step
     planning_token_usage: Optional[Dict]
     web_search_token_usage: Optional[Dict]
@@ -156,6 +163,14 @@ class ProposalEvaluationWorkflow(
             # 2. PROPOSAL INFORMATION
             {proposal_data}
 
+            Note: If any images are provided with the proposal, they will be shown after this prompt.
+            You should analyze any provided images in the context of the proposal and include your observations
+            in your evaluation. Consider aspects such as:
+            - Image content and relevance to the proposal
+            - Any visual evidence supporting or contradicting the proposal
+            - Quality and authenticity of the images
+            - Potential security or privacy concerns in the images
+
             # 3. DAO CONTEXT
             {dao_info}
 
@@ -201,6 +216,7 @@ class ProposalEvaluationWorkflow(
             • Cite relevant parts of the proposal, DAO mission, or prior actions
             • Use terms accurately — don't fake precision
             • Keep structure clean and easy to follow
+            • Include analysis of any provided images and their implications
 
             # 10. VECTOR CONTEXT
             {vector_context}
@@ -221,6 +237,7 @@ class ProposalEvaluationWorkflow(
                                    // 2. How DAO context influenced decision
                                    // 3. How AIBTC Charter alignment was considered
                                    // 4. Key factors in confidence score selection
+                                   // 5. Analysis of any provided images
                                    // Must be clear, precise, and well-structured
             }}
             """,
@@ -245,6 +262,42 @@ class ProposalEvaluationWorkflow(
 
                 # Decode parameters if they exist
                 decoded_parameters = decode_hex_parameters(proposal_data.parameters)
+                image_urls = extract_image_urls(decoded_parameters)
+
+                # Process and encode images
+                proposal_images = []
+                for url in image_urls:
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            response = await client.get(url, timeout=10.0)
+                            if response.status_code == 200:
+                                image_data = base64.b64encode(response.content).decode(
+                                    "utf-8"
+                                )
+                                # Determine MIME type based on URL extension
+                                mime_type = (
+                                    "image/jpeg"
+                                    if url.lower().endswith((".jpg", ".jpeg"))
+                                    else "image/png"
+                                )
+                                proposal_images.append(
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:{mime_type};base64,{image_data}"
+                                        },
+                                    }
+                                )
+                            else:
+                                logger.warning(
+                                    f"Failed to fetch image: {url} (status {response.status_code})"
+                                )
+                    except Exception as e:
+                        logger.error(
+                            f"Error fetching image {url}: {str(e)}", exc_info=True
+                        )
+
+                state["proposal_images"] = proposal_images
 
                 # Convert proposal data to dictionary
                 proposal_dict = {
@@ -484,16 +537,20 @@ class ProposalEvaluationWorkflow(
             if "reasoning" in state and "Error" in state["reasoning"]:
                 return state  # Skip if previous steps failed
             try:
+                # Prepare message content with text and images
+                message_content = [{"type": "text", "text": state["formatted_prompt"]}]
+
+                # Add any proposal images if they exist
+                if state.get("proposal_images"):
+                    message_content.extend(state["proposal_images"])
+
+                # Create the message for the LLM
+                message = HumanMessage(content=message_content)
+
                 structured_output = self.llm.with_structured_output(
                     ProposalEvaluationOutput, include_raw=True
                 )
-                result: Dict[str, Any] = await structured_output.ainvoke(
-                    state["formatted_prompt"]
-                )
-
-                result: Dict[str, Any] = await structured_output.ainvoke(
-                    state["formatted_prompt"]
-                )
+                result: Dict[str, Any] = await structured_output.ainvoke([message])
 
                 parsed_result = result.get("parsed")
                 if not isinstance(parsed_result, ProposalEvaluationOutput):

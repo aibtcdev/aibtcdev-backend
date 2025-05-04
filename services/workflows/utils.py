@@ -2,9 +2,28 @@
 
 import binascii
 import logging
+import re
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def extract_image_urls(text):
+    """
+    Extracts image URLs from a string.
+
+    Args:
+        text: The input string to search for image URLs.
+
+    Returns:
+        A list of image URLs found in the string.
+    """
+    image_url_pattern = re.compile(
+        r"\bhttps?://[^\s<>\"]+?\.(?:png|jpg|jpeg|gif|webp)(?:\b|(?=\s|$))",
+        re.IGNORECASE,
+    )
+    image_urls = re.findall(image_url_pattern, text)
+    return image_urls
 
 
 def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:

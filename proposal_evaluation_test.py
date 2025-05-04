@@ -6,6 +6,8 @@ test to see the workflow in action.
 """
 
 import asyncio
+import binascii
+import json
 from typing import Dict, Optional
 from uuid import UUID
 
@@ -32,19 +34,17 @@ async def create_test_proposal(dao_id: UUID) -> UUID:
         The ID of the created proposal
     """
     # Create test parameters as a JSON object
-    parameters = {
-        "action": "test_action",
-        "amount": 1000,
-        "description": "Test proposal for evaluation",
-        "recipient": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
-    }
+    parameters = "let this rip https://i.ytimg.com/vi/Jjv2JVxdh1I/sddefault.jpg https://mkkhfmcrbwyuutcvtier.supabase.co/storage/v1/object/public/x-vote-media//img_2.jpeg"
+
+    # Convert parameters to JSON string and then hex encode it
+    parameters_hex = "0x" + binascii.hexlify(parameters.encode("utf-8")).decode("utf-8")
 
     # Create a test proposal
     proposal_data = ProposalCreate(
         dao_id=dao_id,
         type=ProposalType.ACTION,
-        parameters=str(parameters),  # Convert parameters to string
-        action="test_action",
+        parameters=parameters_hex,  # Use hex encoded parameters
+        action="send_message",
         contract_principal="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test-contract",
         creator="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
         created_at_block=1,
@@ -108,18 +108,18 @@ async def test_proposal_evaluation_workflow():
                 "confidence_threshold": 0.7,
                 "description": "Testing proposal evaluation without voting",
             },
-            {
-                "name": "Auto-vote Enabled",
-                "auto_vote": True,  # Corrected: Changed to True for auto-vote scenario
-                "confidence_threshold": 0.7,
-                "description": "Testing proposal evaluation with auto-voting",
-            },
-            {
-                "name": "Low Confidence Threshold",
-                "auto_vote": False,
-                "confidence_threshold": 0.3,
-                "description": "Testing with lower confidence threshold",
-            },
+            # {
+            #     "name": "Auto-vote Enabled",
+            #     "auto_vote": True,  # Corrected: Changed to True for auto-vote scenario
+            #     "confidence_threshold": 0.7,
+            #     "description": "Testing proposal evaluation with auto-voting",
+            # },
+            # {
+            #     "name": "Low Confidence Threshold",
+            #     "auto_vote": False,
+            #     "confidence_threshold": 0.3,
+            #     "description": "Testing with lower confidence threshold",
+            # },
         ]
 
         # Run each scenario

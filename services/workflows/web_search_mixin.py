@@ -71,9 +71,9 @@ class WebSearchCapability(BaseWorkflowMixin):
             # Extract token usage
             token_usage = getattr(response, "usage", {})
             standardized_usage = {
-                "input_tokens": token_usage.get("input_tokens", 0),
-                "output_tokens": token_usage.get("output_tokens", 0),
-                "total_tokens": token_usage.get("total_tokens", 0),
+                "input_tokens": getattr(token_usage, "input_tokens", 0),
+                "output_tokens": getattr(token_usage, "output_tokens", 0),
+                "total_tokens": getattr(token_usage, "total_tokens", 0),
             }
             logger.debug(f"Web search token_usage: {standardized_usage}")
 
