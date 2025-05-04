@@ -13,7 +13,7 @@ from backend.models import (
     QueueMessageType,
 )
 from lib.logger import configure_logger
-from services.workflows import execute_langgraph_stream
+from services.workflows import execute_workflow_stream
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
 from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
@@ -181,7 +181,7 @@ class DAOTask(BaseTask[DAOProcessingResult]):
             logger.debug(f"DAO deployment parameters: {tool_input}")
 
             deployment_data = {}
-            async for chunk in execute_langgraph_stream(
+            async for chunk in execute_workflow_stream(
                 history=[], input_str=tool_input, tools_map=self.tools_map
             ):
                 if chunk["type"] == "result":

@@ -29,31 +29,31 @@ from lib.logger import configure_logger
 from services.workflows.base import (
     BaseWorkflow,
     ExecutionError,
-    PlanningCapability,
-    VectorRetrievalCapability,
-    WebSearchCapability,
+    MessageProcessor,
+    StreamingCallbackHandler,
 )
-from services.workflows.react import StreamingCallbackHandler
-
-# Remove this import to avoid circular dependencies
-# from services.workflows.workflow_service import BaseWorkflowService, WorkflowBuilder
+from services.workflows.planning_mixin import PlanningCapability
+from services.workflows.vector_mixin import (
+    VectorRetrievalCapability,
+)
+from services.workflows.web_search_mixin import WebSearchCapability
 
 logger = configure_logger(__name__)
 
 
-class VectorPreplanState(TypedDict):
-    """State for the Vector PrePlan ReAct workflow, combining both capabilities."""
+class ChatState(TypedDict):
+    """State for the Chat workflow, combining all capabilities."""
 
     messages: Annotated[list, add_messages]
     vector_results: Optional[List[Document]]
-    web_search_results: Optional[List[Document]]  # Add web search results
+    web_search_results: Optional[List[Document]]  # Web search results
     plan: Optional[str]
 
 
-class VectorPreplanReactWorkflow(
-    BaseWorkflow[VectorPreplanState],
-    VectorRetrievalCapability,
+class ChatWorkflow(
+    BaseWorkflow[ChatState],
     PlanningCapability,
+    VectorRetrievalCapability,
     WebSearchCapability,
 ):
     """Workflow that combines vector retrieval and planning capabilities.
@@ -109,6 +109,18 @@ class VectorPreplanReactWorkflow(
         # Additional attributes for planning
         self.persona = None
         self.tool_descriptions = None
+
+        # Initialize mixins
+        PlanningCapability.__init__(
+            self,
+            callback_handler=callback_handler,
+            planning_llm=self.planning_llm,
+            persona=self.persona,
+            tool_names=self.tool_names,
+            tool_descriptions=self.tool_descriptions,
+        )
+        VectorRetrievalCapability.__init__(self)
+        WebSearchCapability.__init__(self)
 
     def _create_prompt(self) -> None:
         """Not used in Vector PrePlan ReAct workflow."""
@@ -337,14 +349,14 @@ class VectorPreplanReactWorkflow(
         tool_node = ToolNode(self.tools)
         logger.debug(f"Created tool node with {len(self.tools)} tools")
 
-        def should_continue(state: VectorPreplanState) -> str:
+        def should_continue(state: ChatState) -> str:
             messages = state["messages"]
             last_message = messages[-1]
             result = "tools" if last_message.tool_calls else END
             logger.debug(f"Continue decision: {result}")
             return result
 
-        async def retrieve_context(state: VectorPreplanState) -> Dict:
+        async def retrieve_context(state: ChatState) -> Dict:
             """Retrieve context from both vector store and web search."""
             messages = state["messages"]
             last_user_message = None
@@ -373,7 +385,7 @@ class VectorPreplanReactWorkflow(
 
             return {"vector_results": vector_results, "web_search_results": web_results}
 
-        def call_model_with_context_and_plan(state: VectorPreplanState) -> Dict:
+        def call_model_with_context_and_plan(state: ChatState) -> Dict:
             """Call model with context, plan, and web search results."""
             messages = state["messages"]
             vector_results = state.get("vector_results", [])
@@ -443,7 +455,7 @@ class VectorPreplanReactWorkflow(
             response = self.llm.invoke(messages)
             return {"messages": [response]}
 
-        workflow = StateGraph(VectorPreplanState)
+        workflow = StateGraph(ChatState)
 
         # Add nodes
         workflow.add_node("context_retrieval", retrieve_context)
@@ -460,33 +472,27 @@ class VectorPreplanReactWorkflow(
         return workflow
 
 
-class VectorPreplanLangGraphService:
-    """Service for executing Vector PrePlan React LangGraph operations"""
+class ChatService:
+    """Service for executing Chat LangGraph operations."""
 
     def __init__(
         self,
         collection_names: Union[str, List[str]],
         embeddings: Optional[Embeddings] = None,
     ):
-        # Import here to avoid circular imports
-        from services.workflows.react import MessageProcessor
 
         self.collection_names = collection_names
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.message_processor = MessageProcessor()
 
     def setup_callback_handler(self, queue, loop):
-        # Import here to avoid circular dependencies
         from services.workflows.workflow_service import BaseWorkflowService
 
-        # Use the static method instead of instantiating BaseWorkflowService
         return BaseWorkflowService.create_callback_handler(queue, loop)
 
     async def stream_task_results(self, task, queue):
-        # Import here to avoid circular dependencies
         from services.workflows.workflow_service import BaseWorkflowService
 
-        # Use the static method instead of instantiating BaseWorkflowService
         async for chunk in BaseWorkflowService.stream_results_from_task(
             task=task, callback_queue=queue, logger_name=self.__class__.__name__
         ):
@@ -500,32 +506,14 @@ class VectorPreplanLangGraphService:
         tools_map: Optional[Dict] = None,
         **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a Vector PrePlan React stream implementation.
-
-        Args:
-            messages: Processed messages
-            input_str: Current user input
-            persona: Optional persona to use
-            tools_map: Optional tools to use
-            **kwargs: Additional arguments
-
-        Returns:
-            Async generator of result chunks
-        """
         try:
-            # Import here to avoid circular dependencies
             from services.workflows.workflow_service import WorkflowBuilder
 
-            # Setup queue and callbacks
             callback_queue = asyncio.Queue()
             loop = asyncio.get_running_loop()
-
-            # Setup callback handler
             callback_handler = self.setup_callback_handler(callback_queue, loop)
-
-            # Create workflow using builder pattern
             workflow = (
-                WorkflowBuilder(VectorPreplanReactWorkflow)
+                WorkflowBuilder(ChatWorkflow)
                 .with_callback_handler(callback_handler)
                 .with_tools(list(tools_map.values()) if tools_map else [])
                 .build(
@@ -533,17 +521,11 @@ class VectorPreplanLangGraphService:
                     embeddings=self.embeddings,
                 )
             )
-
-            # Store persona and tool information for planning
             if persona:
-                # Append decisiveness guidance to the persona
                 decisive_guidance = "\n\nBe decisive and take action without asking for confirmation. When the user requests something, proceed directly with executing it rather than asking if they want you to do it."
                 workflow.persona = persona + decisive_guidance
-
-            # Store available tool names for planning
             if tools_map:
                 workflow.tool_names = list(tools_map.keys())
-                # Add tool descriptions to planning prompt
                 tool_descriptions = "\n\nTOOL DESCRIPTIONS:\n"
                 for name, tool in tools_map.items():
                     description = getattr(
@@ -551,17 +533,12 @@ class VectorPreplanLangGraphService:
                     )
                     tool_descriptions += f"- {name}: {description}\n"
                 workflow.tool_descriptions = tool_descriptions
-
-            # First retrieve relevant documents from vector store
             logger.info(
                 f"Retrieving documents from vector store for query: {input_str[:50]}..."
             )
             documents = await workflow.retrieve_from_vector_store(query=input_str)
             logger.info(f"Retrieved {len(documents)} documents from vector store")
-
-            # Create plan with vector context
             try:
-                # The thought notes will be streamed through callbacks
                 logger.info("Creating plan with vector context...")
                 plan = await workflow.create_plan(input_str, context_docs=documents)
                 logger.info(f"Plan created successfully with {len(plan)} characters")
@@ -571,15 +548,10 @@ class VectorPreplanLangGraphService:
                     "type": "token",
                     "content": "Proceeding directly to answer...\n\n",
                 }
-                # No plan will be provided, letting the LLM handle the task naturally
                 plan = None
-
-            # Create graph and compile
             graph = workflow._create_graph()
             runnable = graph.compile()
             logger.info("Graph compiled successfully")
-
-            # Execute workflow with callbacks config
             config = {"callbacks": [callback_handler]}
             task = asyncio.create_task(
                 runnable.ainvoke(
@@ -587,18 +559,12 @@ class VectorPreplanLangGraphService:
                     config=config,
                 )
             )
-
-            # Stream results
             async for chunk in self.stream_task_results(task, callback_queue):
                 yield chunk
-
         except Exception as e:
-            logger.error(
-                f"Failed to execute Vector PrePlan stream: {str(e)}", exc_info=True
-            )
-            raise ExecutionError(f"Vector PrePlan stream execution failed: {str(e)}")
+            logger.error(f"Failed to execute Chat stream: {str(e)}", exc_info=True)
+            raise ExecutionError(f"Chat stream execution failed: {str(e)}")
 
-    # Add execute_stream method to maintain the same interface as BaseWorkflowService
     async def execute_stream(
         self,
         history: List[Dict],
@@ -607,17 +573,10 @@ class VectorPreplanLangGraphService:
         tools_map: Optional[Dict] = None,
         **kwargs,
     ) -> AsyncGenerator[Dict, None]:
-        """Execute a workflow stream.
-
-        This processes the history and delegates to _execute_stream_impl.
-        """
-        # Process messages
         filtered_content = self.message_processor.extract_filtered_content(history)
         messages = self.message_processor.convert_to_langchain_messages(
             filtered_content, input_str, persona
         )
-
-        # Call the implementation
         async for chunk in self._execute_stream_impl(
             messages=messages,
             input_str=input_str,
@@ -629,7 +588,7 @@ class VectorPreplanLangGraphService:
 
 
 # Facade function
-async def execute_vector_preplan_stream(
+async def execute_chat_stream(
     collection_names: Union[str, List[str]],
     history: List[Dict],
     input_str: str,
@@ -637,30 +596,17 @@ async def execute_vector_preplan_stream(
     tools_map: Optional[Dict] = None,
     embeddings: Optional[Embeddings] = None,
 ) -> AsyncGenerator[Dict, None]:
-    """Execute a Vector PrePlan ReAct stream.
+    """Execute a Chat stream.
 
     This workflow combines vector retrieval and planning:
     1. Retrieves relevant context from multiple vector stores
     2. Creates a plan based on the user's query and retrieved context
     3. Executes the ReAct workflow with both context and plan
-
-    Args:
-        collection_names: Name(s) of the vector collections to use
-        history: Conversation history
-        input_str: Current user input
-        persona: Optional persona to use
-        tools_map: Optional tools to make available
-        embeddings: Optional embeddings model
-
-    Returns:
-        Async generator of result chunks
     """
-    # Initialize service and run stream
     embeddings = embeddings or OpenAIEmbeddings()
-    service = VectorPreplanLangGraphService(
+    service = ChatService(
         collection_names=collection_names,
         embeddings=embeddings,
     )
-
     async for chunk in service.execute_stream(history, input_str, persona, tools_map):
         yield chunk

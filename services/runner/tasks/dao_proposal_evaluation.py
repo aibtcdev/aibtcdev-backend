@@ -127,8 +127,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
             formatted_prompt = result.get("formatted_prompt", "No prompt provided")
-            total_cost = result.get("token_costs", {}).get("total_cost", 0.0)
-            model = result.get("model_info", {}).get("name", "Unknown")
+            total_cost = result.get("total_overall_cost", 0.0)
+            model = result.get("evaluation_model_info", {}).get("name", "Unknown")
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "

@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.documents import Document
 
-from services.workflows.vector_react import (
+from services.workflows.chat import (
     VectorLangGraphService,
-    VectorReactWorkflow,
-    add_documents_to_vectors,
+    execute_vector_langgraph_stream,
 )
+from services.workflows.vector_mixin import add_documents_to_vectors
 
 
 class TestVectorOperations(unittest.TestCase):

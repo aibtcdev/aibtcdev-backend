@@ -15,10 +15,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.factory import backend
-from services.workflows.vector_react import (
-    add_documents_to_vectors,
-    execute_vector_langgraph_stream,
-)
+from services.workflows.chat import VectorLangGraphService
+from services.workflows.vector_mixin import add_documents_to_vectors
 
 dotenv.load_dotenv()
 
