@@ -278,7 +278,15 @@ class ProposalEvaluationWorkflow(
                                 mime_type = (
                                     "image/jpeg"
                                     if url.lower().endswith((".jpg", ".jpeg"))
-                                    else "image/png"
+                                    else (
+                                        "image/png"
+                                        if url.lower().endswith(".png")
+                                        else (
+                                            "image/gif"
+                                            if url.lower().endswith(".gif")
+                                            else "image/png"
+                                        )
+                                    )  # default to PNG if unknown
                                 )
                                 proposal_images.append(
                                     {
