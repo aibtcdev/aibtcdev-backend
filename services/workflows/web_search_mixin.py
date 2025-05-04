@@ -1,14 +1,15 @@
 """Web search mixin for workflows, providing web search capabilities using OpenAI Responses API."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
-from openai import OpenAI
 from langgraph.graph import StateGraph
+from openai import OpenAI
 
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflowMixin
 
 logger = configure_logger(__name__)
+
 
 class WebSearchCapability(BaseWorkflowMixin):
     """Mixin that adds web search capabilities to a workflow using OpenAI Responses API."""
@@ -27,7 +28,9 @@ class WebSearchCapability(BaseWorkflowMixin):
         if not hasattr(self, "client"):
             self.client = OpenAI()
 
-    async def search_web(self, query: str, **kwargs) -> List[Dict[str, Any]]:
+    async def search_web(
+        self, query: str, **kwargs
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """Search the web using OpenAI Responses API.
 
         Args:
@@ -35,7 +38,7 @@ class WebSearchCapability(BaseWorkflowMixin):
             **kwargs: Additional search parameters like user_location and search_context_size
 
         Returns:
-            List of search results with content and metadata
+            Tuple containing list of search results and token usage dict.
         """
         try:
             # Ensure initialization
@@ -44,7 +47,11 @@ class WebSearchCapability(BaseWorkflowMixin):
             # Check cache first
             if query in self.search_results_cache:
                 logger.info(f"Using cached results for query: {query}")
-                return self.search_results_cache[query]
+                return self.search_results_cache[query], {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                }
 
             # Configure web search tool
             tool_config = {
@@ -61,7 +68,21 @@ class WebSearchCapability(BaseWorkflowMixin):
                 model="gpt-4.1", tools=[tool_config], input=query
             )
 
+            token_usage = response.usage  # Access the usage object
+            standardized_usage = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+            if token_usage:  # Check if usage data exists
+                standardized_usage = {
+                    "input_tokens": token_usage.prompt_tokens,  # Access via attribute
+                    "output_tokens": token_usage.completion_tokens,  # Access via attribute
+                    "total_tokens": token_usage.total_tokens,  # Access via attribute
+                }
+
             logger.debug(f"Web search response: {response}")
+            logger.debug(f"Web search token usage: {standardized_usage}")
             # Process the response into our document format
             documents = []
 
@@ -110,12 +131,12 @@ class WebSearchCapability(BaseWorkflowMixin):
             self.search_results_cache[query] = documents
 
             logger.info(f"Web search completed with {len(documents)} results")
-            return documents
+            return documents, standardized_usage
 
         except Exception as e:
             logger.error(f"Web search failed: {str(e)}")
-            # Return a list with one empty result to prevent downstream errors
-            return [
+            # Return empty list and zero usage on error
+            error_doc = [
                 {
                     "page_content": "Web search failed to return results.",
                     "metadata": {
@@ -133,6 +154,7 @@ class WebSearchCapability(BaseWorkflowMixin):
                     },
                 }
             ]
+            return error_doc, {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
     def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
         """Integrate web search capability with a graph.
@@ -172,4 +194,4 @@ class WebSearchCapability(BaseWorkflowMixin):
                 "num_web_results": len(web_results),
                 "source_types": ["web_search"],
             },
-        } 
+        }

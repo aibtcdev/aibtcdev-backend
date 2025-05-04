@@ -1,16 +1,17 @@
 """Planning mixin for workflows, providing vector-aware planning capabilities."""
 
 import asyncio
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
 
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflowMixin
 from services.workflows.chat import StreamingCallbackHandler
 
 logger = configure_logger(__name__)
+
 
 class PlanningCapability(BaseWorkflowMixin):
     """Mixin that adds vector-aware planning capabilities to a workflow.
@@ -50,7 +51,7 @@ class PlanningCapability(BaseWorkflowMixin):
         query: str,
         context_docs: Optional[List[Any]] = None,
         **kwargs,
-    ) -> str:
+    ) -> Tuple[str, Dict[str, Any]]:
         """Create a plan based on the user's query and vector retrieval results.
 
         Args:
@@ -59,7 +60,7 @@ class PlanningCapability(BaseWorkflowMixin):
             **kwargs: Additional arguments
 
         Returns:
-            Generated plan
+            Tuple containing the generated plan (str) and token usage (dict)
         """
         planning_prompt = f"""
         You are an AI assistant planning a decisive response to the user's query.
@@ -108,7 +109,9 @@ class PlanningCapability(BaseWorkflowMixin):
         User Query: {query}
         """
         if context_docs:
-            context_str = "\n\n".join([getattr(doc, "page_content", str(doc)) for doc in context_docs])
+            context_str = "\n\n".join(
+                [getattr(doc, "page_content", str(doc)) for doc in context_docs]
+            )
             planning_prompt += f"\n\nHere is additional context that may be helpful:\n\n{context_str}\n\nUse this context to inform your plan."
         if self.tool_names:
             tool_info = "\n\nTools available to you:\n"
@@ -122,8 +125,11 @@ class PlanningCapability(BaseWorkflowMixin):
             planning_messages.append(SystemMessage(content=self.persona))
         planning_messages.append(HumanMessage(content=planning_prompt))
         try:
-            logger.info("Creating thought process notes for user query with vector context")
+            logger.info(
+                "Creating thought process notes for user query with vector context"
+            )
             original_new_token = self.callback_handler.custom_on_llm_new_token
+
             async def planning_token_wrapper(token, **kwargs):
                 if asyncio.iscoroutinefunction(original_new_token):
                     await original_new_token(token, planning_only=True, **kwargs)
@@ -140,19 +146,33 @@ class PlanningCapability(BaseWorkflowMixin):
                         ),
                         loop,
                     )
+
             self.callback_handler.custom_on_llm_new_token = planning_token_wrapper
             task = asyncio.create_task(self.planning_llm.ainvoke(planning_messages))
             response = await task
             plan = response.content
+            token_usage = response.usage_metadata or {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
             self.callback_handler.custom_on_llm_new_token = original_new_token
-            logger.info("Thought process notes created successfully with vector context")
+            logger.info(
+                "Thought process notes created successfully with vector context"
+            )
             logger.debug(f"Notes content length: {len(plan)}")
+            logger.debug(f"Planning token usage: {token_usage}")
             await self.callback_handler.process_step(
                 content=plan, role="assistant", thought="Planning Phase with Context"
             )
-            return plan
+            return plan, token_usage
         except Exception as e:
             if hasattr(self.callback_handler, "custom_on_llm_new_token"):
                 self.callback_handler.custom_on_llm_new_token = original_new_token
             logger.error(f"Failed to create plan: {str(e)}", exc_info=True)
-            raise 
+            # Return empty plan and zero usage on error
+            return "Failed to create plan.", {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }

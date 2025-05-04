@@ -66,12 +66,18 @@ class EvaluationState(TypedDict):
     agent_prompts: List[Dict]
     vector_results: Optional[List[Dict]]
     recent_tweets: Optional[List[Dict]]
-    web_search_results: Optional[List[Dict]]  # Add field for web search results
+    web_search_results: Optional[List[Dict]]
     treasury_balance: Optional[float]
-    token_usage: Optional[Dict]  # Add field for token usage tracking
-    model_info: Optional[Dict]  # Add field for model information
-    contract_source: Optional[str]  # Added field to store contract source
-    plan: Optional[str]  # Added field to store the evaluation plan
+    contract_source: Optional[str]
+    plan: Optional[str]
+    # Token usage tracking per step
+    planning_token_usage: Optional[Dict]
+    web_search_token_usage: Optional[Dict]
+    evaluation_token_usage: Optional[Dict]
+    # Model info for cost calculation
+    evaluation_model_info: Optional[Dict]
+    planning_model_info: Optional[Dict]
+    web_search_model_info: Optional[Dict]
 
 
 class ProposalEvaluationWorkflow(
@@ -98,7 +104,11 @@ class ProposalEvaluationWorkflow(
             **kwargs: Additional arguments passed to parent
         """
         # Initialize planning LLM
-        planning_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.0, streaming=True)
+        planning_llm = ChatOpenAI(
+            model="o4-mini",
+            stream_usage=True,
+            streaming=True,
+        )
 
         # Create callback handler for planning with queue
         callback_handler = StreamingCallbackHandler(queue=asyncio.Queue())
@@ -307,10 +317,19 @@ class ProposalEvaluationWorkflow(
 
                 # Use mixin capabilities for web search and vector retrieval
                 web_search_query = f"DAO proposal {proposal_dict.get('type', 'unknown')} - {proposal_dict.get('parameters', '')}"
-                state["web_search_results"] = await self.search_web(
+
+                # Fetch web search results and token usage
+                web_search_results, web_search_token_usage = await self.search_web(
                     query=web_search_query,
                     search_context_size="medium",
                 )
+                state["web_search_results"] = web_search_results
+                state["web_search_token_usage"] = web_search_token_usage
+                # Store web search model info (assuming gpt-4.1 as used in mixin)
+                state["web_search_model_info"] = {
+                    "name": "gpt-4.1",
+                    "temperature": None,
+                }
 
                 vector_search_query = f"Proposal type: {proposal_dict.get('type')} - {proposal_dict.get('parameters', '')}"
                 state["vector_results"] = await self.retrieve_from_vector_store(
@@ -501,12 +520,11 @@ class ProposalEvaluationWorkflow(
                 state["approve"] = parsed_result.approve
                 state["confidence_score"] = parsed_result.confidence_score
                 state["reasoning"] = parsed_result.reasoning
-                state["token_usage"] = token_usage
-                state["model_info"] = model_info
+                state["evaluation_token_usage"] = token_usage
+                state["evaluation_model_info"] = model_info
 
-                token_costs = calculate_token_cost(token_usage, model_info["name"])
                 self.logger.debug(
-                    f"Evaluation complete: Decision={'APPROVE' if parsed_result.approve else 'REJECT'} | Confidence={parsed_result.confidence_score:.2f} | Model={model_info['name']} (temp={model_info['temperature']}) | Tokens={token_usage} | Cost=${token_costs['total_cost']:.4f}"
+                    f"Evaluation step complete: Decision={'APPROVE' if parsed_result.approve else 'REJECT'} | Confidence={parsed_result.confidence_score:.2f}"
                 )
                 self.logger.debug(f"Full reasoning: {parsed_result.reasoning}")
 
@@ -675,11 +693,18 @@ class ProposalEvaluationWorkflow(
                 )
 
                 # Use the mixin's create_plan method
-                plan = await self.create_plan(
+                plan, planning_token_usage = await self.create_plan(
                     query=planning_query, context_docs=state.get("vector_results", [])
                 )
 
                 state["plan"] = plan
+                state["planning_token_usage"] = planning_token_usage
+                # Store planning model info
+                state["planning_model_info"] = {
+                    "name": self.planning_llm.model_name,
+                    "temperature": self.planning_llm.temperature,
+                }
+
                 self.logger.info("Evaluation plan generated using PlanningCapability.")
                 self.logger.debug(f"Generated Plan:\n{plan}")
                 return state
@@ -687,6 +712,12 @@ class ProposalEvaluationWorkflow(
             except Exception as e:
                 self.logger.error(f"Error generating plan: {str(e)}", exc_info=True)
                 state["plan"] = f"Error generating plan: {str(e)}"
+                state["planning_token_usage"] = {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                }
+                state["planning_model_info"] = {"name": "unknown", "temperature": None}
                 return state
 
         # Create the graph
@@ -866,6 +897,12 @@ async def evaluate_and_vote_on_proposal(
             "token_usage": None,
             "model_info": None,
             "plan": None,
+            "planning_token_usage": None,
+            "web_search_token_usage": None,
+            "evaluation_token_usage": None,
+            "evaluation_model_info": None,
+            "planning_model_info": None,
+            "web_search_model_info": None,
         }
 
         # Create and run workflow with model settings from prompt
@@ -916,24 +953,86 @@ async def evaluate_and_vote_on_proposal(
             "recent_tweets": result["recent_tweets"],
             "web_search_results": result["web_search_results"],
             "treasury_balance": result.get("treasury_balance"),
-            "token_usage": result.get(
-                "token_usage",
-                {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
-            ),
-            "model_info": result.get(
-                "model_info", {"name": "unknown", "temperature": None}
-            ),
+            "planning_token_usage": result.get("planning_token_usage"),
+            "web_search_token_usage": result.get("web_search_token_usage"),
+            "evaluation_token_usage": result.get("evaluation_token_usage"),
+            "evaluation_model_info": result.get("evaluation_model_info"),
+            "planning_model_info": result.get("planning_model_info"),
+            "web_search_model_info": result.get("web_search_model_info"),
         }
 
-        # Calculate token costs
-        token_costs = calculate_token_cost(
-            final_result["token_usage"], final_result["model_info"]["name"]
-        )
-        final_result["token_costs"] = token_costs
+        # --- Aggregate Token Usage and Calculate Costs --- #
+        total_token_usage_by_model = {}
+        total_cost_by_model = {}
+        total_overall_cost = 0.0
 
+        steps = [
+            (
+                "planning",
+                result.get("planning_token_usage"),
+                result.get("planning_model_info"),
+            ),
+            (
+                "web_search",
+                result.get("web_search_token_usage"),
+                result.get("web_search_model_info"),
+            ),
+            (
+                "evaluation",
+                result.get("evaluation_token_usage"),
+                result.get("evaluation_model_info"),
+            ),
+        ]
+
+        for step_name, usage, model_info in steps:
+            if usage and model_info and model_info.get("name") != "unknown":
+                model_name = model_info["name"]
+
+                # Aggregate usage per model
+                if model_name not in total_token_usage_by_model:
+                    total_token_usage_by_model[model_name] = {
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                    }
+                total_token_usage_by_model[model_name]["input_tokens"] += usage.get(
+                    "input_tokens", 0
+                )
+                total_token_usage_by_model[model_name]["output_tokens"] += usage.get(
+                    "output_tokens", 0
+                )
+                total_token_usage_by_model[model_name]["total_tokens"] += usage.get(
+                    "total_tokens", 0
+                )
+
+                # Calculate cost for this step/model
+                step_cost = calculate_token_cost(usage, model_name)
+
+                # Aggregate cost per model
+                if model_name not in total_cost_by_model:
+                    total_cost_by_model[model_name] = 0.0
+                total_cost_by_model[model_name] += step_cost["total_cost"]
+                total_overall_cost += step_cost["total_cost"]
+            else:
+                logger.warning(
+                    f"Skipping cost calculation for step '{step_name}' due to missing usage or model info."
+                )
+
+        final_result["total_token_usage_by_model"] = total_token_usage_by_model
+        final_result["total_cost_by_model"] = total_cost_by_model
+        final_result["total_overall_cost"] = total_overall_cost
+        # --- End Aggregation --- #
+
+        # Updated Logging
         logger.debug(
-            f"Proposal evaluation completed: Success={final_result['success']} | Decision={'APPROVE' if final_result['evaluation']['approve'] else 'REJECT'} | Confidence={final_result['evaluation']['confidence_score']:.2f} | Auto-voted={final_result['auto_voted']} | Transaction={tx_id or 'None'} | Model={final_result['model_info']['name']} | Token Usage={final_result['token_usage']} | Cost (USD)=${token_costs['total_cost']:.4f} (Input=${token_costs['input_cost']:.4f} for {token_costs['details']['input_tokens']} tokens, Output=${token_costs['output_cost']:.4f} for {token_costs['details']['output_tokens']} tokens)"
+            f"Proposal evaluation completed: Success={final_result['success']} | "
+            f"Decision={'APPROVE' if final_result['evaluation']['approve'] else 'REJECT'} | "
+            f"Confidence={final_result['evaluation']['confidence_score']:.2f} | "
+            f"Auto-voted={final_result['auto_voted']} | Transaction={tx_id or 'None'} | "
+            f"Total Cost (USD)=${total_overall_cost:.4f}"
         )
+        logger.debug(f"Cost Breakdown: {total_cost_by_model}")
+        logger.debug(f"Token Usage Breakdown: {total_token_usage_by_model}")
         logger.debug(f"Full evaluation result: {final_result}")
 
         return final_result

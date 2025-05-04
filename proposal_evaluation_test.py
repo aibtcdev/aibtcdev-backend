@@ -149,8 +149,13 @@ async def test_proposal_evaluation_workflow():
                     print(f"Approval: {result['evaluation']['approve']}")
                     print(f"Confidence: {result['evaluation']['confidence_score']}")
                     print(f"Reasoning: {result['evaluation']['reasoning']}")
-                    print(f"Token Usage: {result['token_usage']}")
-                    print(f"Cost: ${result['token_costs']['total_cost']:.4f}")
+                    print(
+                        f"Total Token Usage by Model: {result.get('total_token_usage_by_model')}"
+                    )
+                    print(f"Total Cost by Model: {result.get('total_cost_by_model')}")
+                    print(
+                        f"Total Overall Cost: ${result.get('total_overall_cost', 0.0):.4f}"
+                    )
 
                     if scenario["auto_vote"]:
                         print(f"Auto-voted: {result['auto_voted']}")
