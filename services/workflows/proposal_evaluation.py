@@ -284,7 +284,11 @@ class ProposalEvaluationWorkflow(
                                         else (
                                             "image/gif"
                                             if url.lower().endswith(".gif")
-                                            else "image/png"
+                                            else (
+                                                "image/webp"
+                                                if url.lower().endswith(".webp")
+                                                else "image/png"
+                                            )
                                         )
                                     )  # default to PNG if unknown
                                 )
