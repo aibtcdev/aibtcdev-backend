@@ -68,31 +68,38 @@ class WebSearchCapability(BaseWorkflowMixin):
                 model="gpt-4.1", tools=[tool_config], input=query
             )
 
-            token_usage = response.usage  # Access the usage object
+            # Extract token usage
+            token_usage = getattr(response, "usage", {})
             standardized_usage = {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
+                "input_tokens": token_usage.get("input_tokens", 0),
+                "output_tokens": token_usage.get("output_tokens", 0),
+                "total_tokens": token_usage.get("total_tokens", 0),
             }
-            if token_usage:  # Check if usage data exists
-                standardized_usage = {
-                    "input_tokens": token_usage.prompt_tokens,  # Access via attribute
-                    "output_tokens": token_usage.completion_tokens,  # Access via attribute
-                    "total_tokens": token_usage.total_tokens,  # Access via attribute
-                }
+            logger.debug(f"Web search token_usage: {standardized_usage}")
 
-            logger.debug(f"Web search response: {response}")
-            logger.debug(f"Web search token usage: {standardized_usage}")
-            # Process the response into our document format
-            documents = []
+            # Extract output text
+            text_content = None
+            if hasattr(response, "output") and isinstance(response.output, list):
+                try:
+                    first_output = response.output[0]
+                    if (
+                        isinstance(first_output, dict)
+                        and "content" in first_output
+                        and isinstance(first_output["content"], list)
+                        and len(first_output["content"]) > 0
+                        and "text" in first_output["content"][0]
+                    ):
+                        text_content = first_output["content"][0]["text"]
+                except Exception as e:
+                    logger.warning(f"Failed to extract output text: {e}")
 
-            # Access the output text directly
-            if hasattr(response, "output_text"):
-                text_content = response.output_text
-                source_urls = []
+            if not text_content:
+                text_content = "No output text available."
 
-                # Try to extract citations if available
-                if hasattr(response, "citations"):
+            # Defensive citation extraction (if present)
+            source_urls = []
+            if hasattr(response, "citations"):
+                try:
                     source_urls = [
                         {
                             "url": citation.url,
@@ -103,29 +110,30 @@ class WebSearchCapability(BaseWorkflowMixin):
                         for citation in response.citations
                         if hasattr(citation, "url")
                     ]
+                except Exception as e:
+                    logger.warning(f"Failed to extract citations: {e}")
 
-                # Ensure we always have at least one URL entry
-                if not source_urls:
-                    source_urls = [
-                        {
-                            "url": "No source URL available",
-                            "title": "Generated Response",
-                            "start_index": 0,
-                            "end_index": len(text_content),
-                        }
-                    ]
+            if not source_urls:
+                source_urls = [
+                    {
+                        "url": "No source URL available",
+                        "title": "Generated Response",
+                        "start_index": 0,
+                        "end_index": len(text_content),
+                    }
+                ]
 
-                # Create document with content
-                doc = {
-                    "page_content": text_content,
-                    "metadata": {
-                        "type": "web_search_result",
-                        "source_urls": source_urls,
-                        "query": query,
-                        "timestamp": None,
-                    },
-                }
-                documents.append(doc)
+            # Create document with content
+            doc = {
+                "page_content": text_content,
+                "metadata": {
+                    "type": "web_search_result",
+                    "source_urls": source_urls,
+                    "query": query,
+                    "timestamp": None,
+                },
+            }
+            documents = [doc]
 
             # Cache the results
             self.search_results_cache[query] = documents

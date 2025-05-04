@@ -403,17 +403,44 @@ class ChatWorkflow(
 
             # Add web search results if available
             if web_results:
-                web_context = "\n\n".join(
-                    [
-                        f"Web Search Result {i+1}:\n{result['page_content']}\nSource: {result['metadata'].get('source_urls', ['Unknown'])[0]}"
-                        for i, result in enumerate(web_results)
-                    ]
-                )
-                web_message = SystemMessage(
-                    content=f"Here are relevant web search results:\n\n{web_context}\n\n"
-                    "Consider this information in your response if relevant."
-                )
-                messages = [web_message] + messages
+                # Flatten web_results if it is a list of lists
+                if any(isinstance(r, list) for r in web_results):
+                    # Only flatten one level
+                    flat_results = []
+                    for r in web_results:
+                        if isinstance(r, list):
+                            flat_results.extend(r)
+                        else:
+                            flat_results.append(r)
+                    web_results = flat_results
+
+                web_context_chunks = []
+                for i, result in enumerate(web_results):
+                    if not isinstance(result, dict):
+                        logger.warning(
+                            f"Web search result at index {i} is not a dict: {type(result)}. Skipping."
+                        )
+                        continue
+                    page_content = result.get("page_content")
+                    metadata = result.get("metadata", {})
+                    source_urls = metadata.get("source_urls", ["Unknown"])
+                    if not isinstance(source_urls, list):
+                        source_urls = [str(source_urls)]
+                    if page_content is None:
+                        logger.warning(
+                            f"Web search result at index {i} missing 'page_content'. Skipping."
+                        )
+                        continue
+                    web_context_chunks.append(
+                        f"Web Search Result {i+1}:\n{page_content}\nSource: {source_urls[0]}"
+                    )
+                web_context = "\n\n".join(web_context_chunks)
+                if web_context:
+                    web_message = SystemMessage(
+                        content=f"Here are relevant web search results:\n\n{web_context}\n\n"
+                        "Consider this information in your response if relevant."
+                    )
+                    messages = [web_message] + messages
 
             # Add the plan as a system message if it exists and hasn't been added yet
             if plan is not None and not any(
