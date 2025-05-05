@@ -114,6 +114,14 @@ class SchedulerConfig:
     dao_proposal_vote_delay_blocks: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "2")
     )
+    proposal_embedder_enabled: bool = (
+        os.getenv("AIBTC_PROPOSAL_EMBEDDER_ENABLED", "false").lower() == "true"
+    )
+    proposal_embedder_interval_seconds: int = int(
+        os.getenv(
+            "AIBTC_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300"
+        )  # Default to 5 mins
+    )
 
 
 @dataclass

@@ -237,6 +237,34 @@ class SupabaseBackend(AbstractBackend):
             )
             raise
 
+    async def fetch_vectors(self, collection_name: str, ids: List[str]) -> List[Any]:
+        """Fetch specific vectors by their IDs using the vecs client.
+
+        Args:
+            collection_name: Name of the collection to query
+            ids: List of vector IDs to fetch
+
+        Returns:
+            List of fetched records (typically tuples of id, vector, metadata).
+        """
+        collection = self.get_vector_collection(collection_name)
+        if not ids:
+            logger.debug("fetch_vectors called with empty ID list.")
+            return []
+
+        try:
+            # Assuming the vecs library provides a `fetch` method
+            fetched_records = collection.fetch(ids=ids)
+            logger.debug(
+                f"Fetched {len(fetched_records)} vectors from collection {collection_name} for {len(ids)} requested IDs."
+            )
+            return fetched_records
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch vectors by ID from collection {collection_name}: {str(e)}"
+            )
+            raise
+
     async def query_vectors(
         self, collection_name: str, query_text: str, limit: int = 4, embeddings=None
     ) -> List[Dict[str, Any]]:

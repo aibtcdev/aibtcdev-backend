@@ -136,6 +136,19 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
+    async def fetch_vectors(self, collection_name: str, ids: List[str]) -> List[Any]:
+        """Fetch specific vectors by their IDs from a collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            ids: A list of vector IDs to fetch
+
+        Returns:
+            A list of the fetched records (structure depends on the backend).
+        """
+        pass
+
+    @abstractmethod
     async def query_vectors(
         self, collection_name: str, query_text: str, limit: int = 4
     ) -> List[Dict[str, Any]]:

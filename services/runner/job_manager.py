@@ -105,6 +105,12 @@ class JobManager:
                 config.scheduler.agent_account_deploy_runner_interval_seconds,
                 JobType.AGENT_ACCOUNT_DEPLOY.value,
             ),
+            (
+                "Proposal Embedder Runner Service",
+                config.scheduler.proposal_embedder_enabled,
+                config.scheduler.proposal_embedder_interval_seconds,
+                JobType.PROPOSAL_EMBEDDING.value,
+            ),
         ]
 
         # Add all runner jobs with common structure

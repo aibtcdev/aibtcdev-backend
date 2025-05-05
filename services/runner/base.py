@@ -74,6 +74,7 @@ class JobType(str, Enum):
     DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
     AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
+    PROPOSAL_EMBEDDING = "proposal_embedding"
 
     def __str__(self):
         return self.value
