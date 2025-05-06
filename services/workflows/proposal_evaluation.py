@@ -25,7 +25,6 @@ from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from lib.utils import (
     calculate_token_cost,
-    decode_hex_parameters,
     extract_image_urls,
 )
 from services.workflows.base import (
@@ -324,11 +323,6 @@ class ProposalEvaluationWorkflow(
                 if not proposal_data:
                     raise ValueError(f"Proposal {proposal_id} not found")
 
-                # Decode parameters if they exist
-                decoded_parameters = None
-                if hasattr(proposal_data, "parameters") and proposal_data.parameters:
-                    decoded_parameters = decode_hex_parameters(proposal_data.parameters)
-
                 image_urls = extract_image_urls(proposal_data.parameters)
 
                 # Process and encode images
@@ -381,11 +375,7 @@ class ProposalEvaluationWorkflow(
                 # Convert proposal data to dictionary
                 proposal_dict = {
                     "proposal_id": proposal_data.proposal_id,
-                    "parameters": (
-                        decoded_parameters
-                        if decoded_parameters is not None
-                        else proposal_data.parameters
-                    ),
+                    "parameters": proposal_data.parameters,
                     "action": proposal_data.action,
                     "caller": proposal_data.caller,
                     "contract_principal": proposal_data.contract_principal,
