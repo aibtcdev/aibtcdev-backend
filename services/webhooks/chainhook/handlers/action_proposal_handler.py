@@ -117,6 +117,28 @@ class ActionProposalHandler(BaseProposalHandler):
         self.logger.warning("Could not find proposal information in transaction events")
         return None
 
+    def _sanitize_string(self, input_string: Optional[str]) -> Optional[str]:
+        """Sanitize string by removing null bytes and other invalid characters.
+
+        Args:
+            input_string: The string to sanitize
+
+        Returns:
+            A sanitized string or None if input was None
+        """
+        if input_string is None:
+            return None
+
+        # Replace null bytes and other control characters
+        sanitized = ""
+        for char in input_string:
+            if (
+                ord(char) >= 32 or char in "\n\r\t"
+            ):  # Keep printable chars and some whitespace
+                sanitized += char
+
+        return sanitized
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle action proposal transactions.
 
@@ -167,41 +189,50 @@ class ActionProposalHandler(BaseProposalHandler):
         )
 
         if not existing_proposals:
-            # Decode parameters if they're hex encoded
-            decoded_parameters = decode_hex_parameters(proposal_info["parameters"])
-            parameters = (
-                decoded_parameters
-                if decoded_parameters is not None
-                else proposal_info["parameters"]
-            )
+            try:
+                # First try to decode parameters as hex
+                decoded_parameters = decode_hex_parameters(proposal_info["parameters"])
 
-            # Create a new proposal record in the database
-            proposal_title = f"Action Proposal #{proposal_info['proposal_id']}"
-            proposal = backend.create_proposal(
-                ProposalCreate(
-                    dao_id=dao_data["id"],
-                    title=proposal_title,
-                    description=f"Action proposal {proposal_info['proposal_id']} for {dao_data['name']}",
-                    contract_principal=contract_identifier,
-                    tx_id=tx_id,
-                    proposal_id=proposal_info["proposal_id"],
-                    status=ContractStatus.DEPLOYED,  # Since it's already on-chain
-                    type=ProposalType.ACTION,
-                    # Add fields from payload
-                    action=proposal_info["action"],
-                    caller=proposal_info["caller"],
-                    creator=proposal_info["creator"],
-                    created_at_block=proposal_info["created_at_block"],
-                    end_block=proposal_info["end_block"],
-                    start_block=proposal_info["start_block"],
-                    liquid_tokens=proposal_info["liquid_tokens"],
-                    parameters=parameters,
-                    bond=proposal_info["bond"],
+                # Sanitize the decoded parameters to remove null bytes and invalid characters
+                if decoded_parameters is not None:
+                    parameters = self._sanitize_string(decoded_parameters)
+                    self.logger.debug(
+                        f"Decoded and sanitized parameters: {parameters[:100]}..."
+                    )
+                else:
+                    parameters = proposal_info["parameters"]
+                    self.logger.debug("Using original parameters (hex decoding failed)")
+
+                # Create a new proposal record in the database
+                proposal_title = f"Action Proposal #{proposal_info['proposal_id']}"
+                proposal = backend.create_proposal(
+                    ProposalCreate(
+                        dao_id=dao_data["id"],
+                        title=proposal_title,
+                        description=f"Action proposal {proposal_info['proposal_id']} for {dao_data['name']}",
+                        contract_principal=contract_identifier,
+                        tx_id=tx_id,
+                        proposal_id=proposal_info["proposal_id"],
+                        status=ContractStatus.DEPLOYED,  # Since it's already on-chain
+                        type=ProposalType.ACTION,
+                        # Add fields from payload
+                        action=proposal_info["action"],
+                        caller=proposal_info["caller"],
+                        creator=proposal_info["creator"],
+                        created_at_block=proposal_info["created_at_block"],
+                        end_block=proposal_info["end_block"],
+                        start_block=proposal_info["start_block"],
+                        liquid_tokens=proposal_info["liquid_tokens"],
+                        parameters=parameters,
+                        bond=proposal_info["bond"],
+                    )
                 )
-            )
-            self.logger.info(
-                f"Created new action proposal record in database: {proposal.id}"
-            )
+                self.logger.info(
+                    f"Created new action proposal record in database: {proposal.id}"
+                )
+            except Exception as e:
+                self.logger.error(f"Error creating proposal in database: {str(e)}")
+                raise
         else:
             self.logger.info(
                 f"Action proposal already exists in database: {existing_proposals[0].id}"
