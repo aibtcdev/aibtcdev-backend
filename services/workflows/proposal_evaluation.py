@@ -2,11 +2,11 @@
 
 import asyncio
 import base64
-from typing import Any, Dict, List, Optional, TypedDict, Union
+from typing import Any, Dict, List, Optional, TypedDict
 
 import httpx
 from langchain.prompts import PromptTemplate
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
@@ -75,15 +75,12 @@ class EvaluationState(TypedDict):
     web_search_results: Optional[List[Dict]]
     treasury_balance: Optional[float]
     contract_source: Optional[str]
-    plan: Optional[str]
     proposal_images: Optional[List[Dict]]  # Store encoded images for LLM
     # Token usage tracking per step
-    planning_token_usage: Optional[Dict]
     web_search_token_usage: Optional[Dict]
     evaluation_token_usage: Optional[Dict]
     # Model info for cost calculation
     evaluation_model_info: Optional[Dict]
-    planning_model_info: Optional[Dict]
     web_search_model_info: Optional[Dict]
 
 
@@ -131,7 +128,7 @@ class ProposalEvaluationWorkflow(
 
         self.collection_names = collection_names or [
             "knowledge_collection",
-            "dao_collection",
+            "proposals",
         ]
         self.required_fields = ["proposal_id", "proposal_data"]
         self.logger.debug(
@@ -152,14 +149,22 @@ class ProposalEvaluationWorkflow(
                 "web_search_results",
             ],
             template="""
-            You are a DAO proposal evaluator. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it.
+            You are a skeptical and hard-to-convince DAO proposal evaluator. Your primary goal is rigorous analysis. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it based on verifiable evidence and alignment with DAO principles.
 
+            <instructions>
             # 1. AGENT-SPECIFIC INSTRUCTIONS (HIGHEST PRIORITY)
             {agent_prompts}
 
-            If no agent-specific instructions are provided, explicitly state: "No agent-specific instructions provided."
-            You MUST explain how each instruction influenced your decision.
+            If no agent-specific instructions are provided, apply these DEFAULT instructions:
+            - Approve ONLY if the proposal provides verifiable evidence (URL, transaction hash, IPFS CID for screenshots/documents) for its claims OR if it's a purely logistical matter (e.g., scheduling reminder).
+            - All other proposals lacking verifiable evidence for claims should be REJECTED (vote AGAINST) with LOW confidence (0.3-0.4 band).
+            - Reject proposals making promises about future DAO actions or events unless they provide on-chain evidence of a corresponding approved governance decision or multisig transaction proposal.
+            - CRITICAL: You MUST evaluate all proposal content (text, images, links) as ONE COHESIVE UNIT. If ANY image or attachment doesn't align with or support the proposal, contains misleading information, or is inappropriate, you MUST reject the entire proposal.
 
+            You MUST explain how each specific instruction (agent-provided or default) influenced your decision, especially if it led to rejection.
+            </instructions>
+
+            <proposal_content>
             # 2. PROPOSAL INFORMATION
             {proposal_data}
 
@@ -171,6 +176,16 @@ class ProposalEvaluationWorkflow(
             - Quality and authenticity of the images
             - Potential security or privacy concerns in the images
 
+            IMPORTANT: Images and text must form a cohesive whole. If any image:
+            - Doesn't clearly support or relate to the proposal text
+            - Contains misleading or contradictory information
+            - Is of poor quality making verification impossible
+            - Contains inappropriate content
+            - Appears manipulated or false
+            Then you MUST reject the entire proposal, regardless of the quality of the text portion.
+            </proposal_content>
+
+            <dao_context>
             # 3. DAO CONTEXT
             {dao_info}
 
@@ -181,10 +196,14 @@ class ProposalEvaluationWorkflow(
             Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
             Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
             Guardrails: Decentralized Governance, Smart Contract accountability
+            </dao_context>
 
+            <technical_details>
             # 6. CONTRACT SOURCE (for core proposals)
             {contract_source}
+            </technical_details>
 
+            <evaluation_criteria>
             # 7. EVALUATION CRITERIA
             For Core Proposals:
             - Security implications
@@ -197,15 +216,22 @@ class ProposalEvaluationWorkflow(
             - Resource implications
             - Security considerations
             - Alignment with DAO goals
+            - **Evidence Verification:** Claims MUST be backed by verifiable sources as per instructions.
+            - **Future Commitments:** Promises about future actions require on-chain proof.
+            - **Content Cohesion:** All components (text, images, links) must form a cohesive, aligned whole that supports the proposal's intent. A single misaligned or problematic image is grounds for rejection.
+            </evaluation_criteria>
 
+            <confidence_scoring>
             # 8. CONFIDENCE SCORING RUBRIC
             You MUST choose one of these confidence bands:
-            - 0.0-0.2: Extremely low confidence (major red flags or insufficient information)
-            - 0.3-0.4: Low confidence (significant concerns or unclear implications)
-            - 0.5-0.6: Moderate confidence (some concerns but manageable)
-            - 0.7-0.8: High confidence (minor concerns if any)
-            - 0.9-1.0: Very high confidence (clear positive alignment)
+            - **0.9-1.0 (Very High Confidence - Strong Approve):** All criteria met excellently. Clear alignment with DAO mission/values, strong verifiable evidence provided for all claims, minimal/no security risks identified, significant positive impact expected, and adheres strictly to all instructions (including future promise verification). All images directly support the proposal with high quality and authenticity.
+            - **0.7-0.8 (High Confidence - Approve):** Generally meets criteria well. Good alignment, sufficient verifiable evidence provided, risks identified but deemed manageable/acceptable, likely positive impact. Passes core checks (evidence, future promises). Minor reservations might exist but don't fundamentally undermine the proposal. Images support the proposal appropriately.
+            - **0.5-0.6 (Moderate Confidence - Borderline/Weak Approve):** Meets minimum criteria but with notable reservations. Alignment is present but perhaps weak or indirect, evidence meets minimum verification but might be incomplete or raise minor questions, moderate risks identified requiring monitoring, impact is unclear or modest. *Could apply to simple logistical proposals with no major claims.* Any included images are relevant though may not provide strong support.
+            - **0.3-0.4 (Low Confidence - Reject):** Fails one or more key criteria. Significant misalignment, **lacks required verifiable evidence** for claims (triggering default rejection), unacceptable risks identified, potential negative impact, or **contains unsubstantiated future promises**. Images may be missing where needed, irrelevant, or only weakly supportive. *This is the default band for rejections due to lack of evidence or unproven future commitments.*
+            - **0.0-0.2 (Extremely Low Confidence - Strong Reject):** Fails multiple critical criteria. Clear violation of DAO principles/guardrails, major security flaws identified, evidence is demonstrably false or misleading, significant negative impact is highly likely or certain. Any included images may be misleading, manipulated, inappropriate, or contradictory to the proposal.
+            </confidence_scoring>
 
+            <quality_standards>
             # 9. QUALITY STANDARDS
             Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
             • Be clear and specific — avoid vagueness or filler
@@ -217,7 +243,11 @@ class ProposalEvaluationWorkflow(
             • Use terms accurately — don't fake precision
             • Keep structure clean and easy to follow
             • Include analysis of any provided images and their implications
+            • Specifically address image-text cohesion in your analysis
+            • If rejecting, CLEARLY state the specific reason(s) based on the instructions or evaluation criteria (e.g., "Rejected due to lack of verifiable source for claim X", "Rejected because future promise lacks on-chain evidence", "Rejected because included image contradicts proposal text").
+            </quality_standards>
 
+            <additional_context>
             # 10. VECTOR CONTEXT
             {vector_context}
 
@@ -226,20 +256,26 @@ class ProposalEvaluationWorkflow(
 
             # 12. WEB SEARCH RESULTS
             {web_search_results}
+            </additional_context>
 
+            <output_format>
             # OUTPUT FORMAT
             Provide your evaluation in this exact JSON format:
+            ```json
             {{
                 "approve": boolean,  // true for FOR, false for AGAINST
                 "confidence_score": float,  // MUST be from the confidence bands above
                 "reasoning": string  // Brief, professional explanation addressing:
-                                   // 1. How agent instructions were applied
-                                   // 2. How DAO context influenced decision
-                                   // 3. How AIBTC Charter alignment was considered
-                                   // 4. Key factors in confidence score selection
-                                   // 5. Analysis of any provided images
-                                   // Must be clear, precise, and well-structured
+                                   // 1. How agent/default instructions were applied (state which).
+                                   // 2. Specific reason for rejection if applicable, referencing the unmet criteria or instruction.
+                                   // 3. How DAO context influenced decision.
+                                   // 4. How AIBTC Charter alignment was considered.
+                                   // 5. Key factors in confidence score selection.
+                                   // 6. Analysis of any provided images and their cohesion with proposal text.
+                                   // Must be clear, precise, and well-structured.
             }}
+            ```
+            </output_format>
             """,
         )
 
@@ -502,35 +538,86 @@ class ProposalEvaluationWorkflow(
                 # Format web search results
                 web_search_content = "No relevant web search results found."
                 if web_search_results:
-                    web_search_content = "\n\n".join(
-                        [
-                            f"Web Result {i+1}:\n{res.get('page_content', '')}\nSource: {res.get('metadata', {}).get('source_urls', [{}])[0].get('url', 'Unknown')}"
-                            for i, res in enumerate(web_search_results)
-                        ]
-                    )
+                    # Create structured XML format for each web search result
+                    web_search_items = []
+                    for i, res in enumerate(web_search_results):
+                        source_url = (
+                            res.get("metadata", {})
+                            .get("source_urls", [{}])[0]
+                            .get("url", "Unknown")
+                        )
+                        web_search_items.append(
+                            f"<search_result>\n<result_number>{i+1}</result_number>\n<content>{res.get('page_content', '')}</content>\n<source>{source_url}</source>\n</search_result>"
+                        )
+                    web_search_content = "\n".join(web_search_items)
 
                 # Format vector context
                 vector_context = "No additional context available from vector store."
                 if vector_results:
-                    vector_context = "\n\n".join(
+                    # Create structured XML format for each vector result
+                    vector_items = []
+                    for i, doc in enumerate(vector_results):
+                        vector_items.append(
+                            f"<vector_item>\n<item_number>{i+1}</item_number>\n<content>{doc.page_content}</content>\n</vector_item>"
+                        )
+                    vector_context = "\n".join(vector_items)
+
+                # Format recent tweets
+                tweets_content = "No recent DAO tweets found."
+                if recent_tweets:
+                    # Create structured XML format for each tweet
+                    tweet_items = []
+                    for i, tweet in enumerate(recent_tweets):
+                        tweet_items.append(
+                            f"<tweet>\n<tweet_number>{i+1}</tweet_number>\n<date>{tweet['created_at']}</date>\n<message>{tweet['message']}</message>\n</tweet>"
+                        )
+                    tweets_content = "\n".join(tweet_items)
+
+                # Convert JSON objects to formatted text
+                # Format proposal_data
+                proposal_data_str = "No proposal data available."
+                if proposal_data:
+                    proposal_data_str = "\n".join(
                         [
-                            f"Related Context {i+1}:\n{doc.page_content}"
-                            for i, doc in enumerate(vector_results)
+                            f"Proposal ID: {proposal_data.get('proposal_id', 'Unknown')}",
+                            f"Type: {proposal_data.get('type', 'Unknown')}",
+                            f"Action: {proposal_data.get('action', 'Unknown')}",
+                            f"Parameters: {proposal_data.get('parameters', 'None')}",
+                            f"Creator: {proposal_data.get('creator', 'Unknown')}",
+                            f"Contract Principal: {proposal_data.get('contract_principal', 'Unknown')}",
+                            f"Start Block: {proposal_data.get('start_block', 'Unknown')}",
+                            f"End Block: {proposal_data.get('end_block', 'Unknown')}",
+                            f"Created at Block: {proposal_data.get('created_at_block', 'Unknown')}",
+                            f"Liquid Tokens: {proposal_data.get('liquid_tokens', 'Unknown')}",
                         ]
                     )
 
-                # Format recent tweets
-                tweets_content = "\n".join(
-                    [
-                        f"Tweet {i+1} ({tweet['created_at']}): {tweet['message']}"
-                        for i, tweet in enumerate(recent_tweets)
-                    ]
-                )
+                    # Add proposal contract info if it exists
+                    if proposal_data.get("proposal_contract"):
+                        proposal_data_str += f"\nProposal Contract: {proposal_data.get('proposal_contract')}"
+
+                # Format dao_info
+                dao_info_str = "No DAO information available."
+                if dao_info:
+                    dao_info_str = "\n".join(
+                        [
+                            f"DAO Name: {dao_info.get('name', 'Unknown')}",
+                            f"DAO Mission: {dao_info.get('mission', 'Unknown')}",
+                            f"DAO Description: {dao_info.get('description', 'Unknown')}",
+                        ]
+                    )
+
+                # Format treasury_balance
+                treasury_balance_str = "Treasury balance information not available."
+                if treasury_balance is not None:
+                    treasury_balance_str = (
+                        f"Current DAO Treasury Balance: {treasury_balance} STX"
+                    )
 
                 formatted_prompt = prompt.format(
-                    proposal_data=proposal_data,
-                    dao_info=dao_info,
-                    treasury_balance=treasury_balance,
+                    proposal_data=proposal_data_str,
+                    dao_info=dao_info_str,
+                    treasury_balance=treasury_balance_str,
                     contract_source=contract_source,
                     agent_prompts=agent_prompts_str,
                     vector_context=vector_context,
@@ -734,77 +821,18 @@ class ProposalEvaluationWorkflow(
                 }
                 return state
 
-        # --- Planning Node --- #
-        async def plan_evaluation(state: EvaluationState) -> EvaluationState:
-            """Generate a plan for evaluating the proposal using the PlanningCapability mixin."""
-            try:
-                self.logger.debug(
-                    "Generating evaluation plan using PlanningCapability..."
-                )
-
-                # Construct initial context for planning
-                initial_context = (
-                    f"Proposal ID: {state['proposal_id']}\n"
-                    f"DAO ID: {state.get('dao_id')}\n"
-                    f"Agent ID: {state.get('agent_id')}\n"
-                    f"Auto-Vote Enabled: {state.get('auto_vote')}"
-                )
-
-                # Create planning query
-                planning_query = (
-                    f"Create a detailed plan for evaluating the following DAO proposal:\n\n"
-                    f"{initial_context}\n\n"
-                    f"The plan should cover:\n"
-                    f"1. Data gathering (proposal details, DAO context, treasury info)\n"
-                    f"2. Analysis approach (including use of vector search and web search)\n"
-                    f"3. Evaluation criteria and decision making process\n"
-                    f"4. Voting execution strategy (if auto-vote is enabled)"
-                )
-
-                # Use the mixin's create_plan method
-                plan, planning_token_usage = await self.create_plan(
-                    query=planning_query, context_docs=state.get("vector_results", [])
-                )
-
-                state["plan"] = plan
-                state["planning_token_usage"] = planning_token_usage
-                # Store planning model info
-                state["planning_model_info"] = {
-                    "name": self.planning_llm.model_name,
-                    "temperature": self.planning_llm.temperature,
-                }
-
-                self.logger.info("Evaluation plan generated using PlanningCapability.")
-                self.logger.debug(f"Generated Plan:\n{plan}")
-                return state
-
-            except Exception as e:
-                self.logger.error(f"Error generating plan: {str(e)}", exc_info=True)
-                state["plan"] = f"Error generating plan: {str(e)}"
-                state["planning_token_usage"] = {
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "total_tokens": 0,
-                }
-                state["planning_model_info"] = {"name": "unknown", "temperature": None}
-                return state
-
         # Create the graph
         workflow = StateGraph(EvaluationState)
 
         # Add nodes
-        workflow.add_node("plan_evaluation", plan_evaluation)  # New planning node
         workflow.add_node("fetch_context", fetch_context)
         workflow.add_node("format_prompt", format_evaluation_prompt)
-        workflow.add_node(
-            "evaluate", call_evaluation_llm
-        )  # Renamed from evaluate_proposal
+        workflow.add_node("evaluate", call_evaluation_llm)
         workflow.add_node("vote", vote_on_proposal)
         workflow.add_node("skip_vote", skip_voting)
 
         # Set up the conditional branching
-        workflow.set_entry_point("plan_evaluation")  # Start with planning
-        workflow.add_edge("plan_evaluation", "fetch_context")  # Plan -> Fetch
+        workflow.set_entry_point("fetch_context")  # Start with fetching context
         workflow.add_edge("fetch_context", "format_prompt")
         workflow.add_edge("format_prompt", "evaluate")
         workflow.add_conditional_edges(
@@ -965,12 +993,9 @@ async def evaluate_and_vote_on_proposal(
             "web_search_results": None,
             "token_usage": None,
             "model_info": None,
-            "plan": None,
-            "planning_token_usage": None,
             "web_search_token_usage": None,
             "evaluation_token_usage": None,
             "evaluation_model_info": None,
-            "planning_model_info": None,
             "web_search_model_info": None,
         }
 
@@ -1022,11 +1047,9 @@ async def evaluate_and_vote_on_proposal(
             "recent_tweets": result["recent_tweets"],
             "web_search_results": result["web_search_results"],
             "treasury_balance": result.get("treasury_balance"),
-            "planning_token_usage": result.get("planning_token_usage"),
             "web_search_token_usage": result.get("web_search_token_usage"),
             "evaluation_token_usage": result.get("evaluation_token_usage"),
             "evaluation_model_info": result.get("evaluation_model_info"),
-            "planning_model_info": result.get("planning_model_info"),
             "web_search_model_info": result.get("web_search_model_info"),
         }
 
@@ -1036,11 +1059,6 @@ async def evaluate_and_vote_on_proposal(
         total_overall_cost = 0.0
 
         steps = [
-            (
-                "planning",
-                result.get("planning_token_usage"),
-                result.get("planning_model_info"),
-            ),
             (
                 "web_search",
                 result.get("web_search_token_usage"),
