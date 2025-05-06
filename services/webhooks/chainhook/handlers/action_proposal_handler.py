@@ -13,6 +13,7 @@ from services.webhooks.chainhook.handlers.base_proposal_handler import (
     BaseProposalHandler,
 )
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
+from services.workflows.utils import decode_hex_parameters
 
 
 class ActionProposalHandler(BaseProposalHandler):
@@ -166,6 +167,14 @@ class ActionProposalHandler(BaseProposalHandler):
         )
 
         if not existing_proposals:
+            # Decode parameters if they're hex encoded
+            decoded_parameters = decode_hex_parameters(proposal_info["parameters"])
+            parameters = (
+                decoded_parameters
+                if decoded_parameters is not None
+                else proposal_info["parameters"]
+            )
+
             # Create a new proposal record in the database
             proposal_title = f"Action Proposal #{proposal_info['proposal_id']}"
             proposal = backend.create_proposal(
@@ -186,7 +195,7 @@ class ActionProposalHandler(BaseProposalHandler):
                     end_block=proposal_info["end_block"],
                     start_block=proposal_info["start_block"],
                     liquid_tokens=proposal_info["liquid_tokens"],
-                    parameters=proposal_info["parameters"],
+                    parameters=parameters,
                     bond=proposal_info["bond"],
                 )
             )
