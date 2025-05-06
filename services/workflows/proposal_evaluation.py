@@ -381,7 +381,11 @@ class ProposalEvaluationWorkflow(
                 # Convert proposal data to dictionary
                 proposal_dict = {
                     "proposal_id": proposal_data.proposal_id,
-                    "parameters": decoded_parameters or proposal_data.parameters,
+                    "parameters": (
+                        decoded_parameters
+                        if decoded_parameters is not None
+                        else proposal_data.parameters
+                    ),
                     "action": proposal_data.action,
                     "caller": proposal_data.caller,
                     "contract_principal": proposal_data.contract_principal,
@@ -1065,18 +1069,22 @@ async def evaluate_and_vote_on_proposal(
         final_result = {
             "success": True,
             "evaluation": {
-                "approve": result["approve"],
-                "confidence_score": result["confidence_score"],
-                "reasoning": result["reasoning"],
+                "approve": result.get("approve", False),
+                "confidence_score": result.get("confidence_score", 0.0),
+                "reasoning": result.get(
+                    "reasoning", "Evaluation failed or not available"
+                ),
             },
-            "vote_result": result["vote_result"],
+            "vote_result": result.get("vote_result"),
             "auto_voted": auto_vote
-            and result["confidence_score"] >= confidence_threshold,
+            and result.get("confidence_score", 0.0) >= confidence_threshold,
             "tx_id": tx_id,
-            "formatted_prompt": result["formatted_prompt"],
-            "vector_results": result["vector_results"],
-            "recent_tweets": result["recent_tweets"],
-            "web_search_results": result["web_search_results"],
+            "formatted_prompt": result.get(
+                "formatted_prompt", "Formatted prompt not available"
+            ),
+            "vector_results": result.get("vector_results"),
+            "recent_tweets": result.get("recent_tweets"),
+            "web_search_results": result.get("web_search_results"),
             "treasury_balance": result.get("treasury_balance"),
             "web_search_token_usage": result.get("web_search_token_usage"),
             "evaluation_token_usage": result.get("evaluation_token_usage"),
