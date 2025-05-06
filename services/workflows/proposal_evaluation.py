@@ -30,7 +30,6 @@ from services.workflows.chat import ChatService, StreamingCallbackHandler
 from services.workflows.planning_mixin import PlanningCapability
 from services.workflows.utils import (
     calculate_token_cost,
-    decode_hex_parameters,
     extract_image_urls,
 )
 from services.workflows.vector_mixin import VectorRetrievalCapability
@@ -325,8 +324,7 @@ class ProposalEvaluationWorkflow(
                     raise ValueError(f"Proposal {proposal_id} not found")
 
                 # Decode parameters if they exist
-                decoded_parameters = decode_hex_parameters(proposal_data.parameters)
-                image_urls = extract_image_urls(decoded_parameters)
+                image_urls = extract_image_urls(proposal_data.parameters)
 
                 # Process and encode images
                 proposal_images = []
