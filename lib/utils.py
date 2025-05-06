@@ -41,9 +41,14 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
         hex_string = hex_string[2:]  # Remove "0x" prefix
     try:
         decoded_bytes = binascii.unhexlify(hex_string)
-        decoded_string = decoded_bytes.decode(
-            "utf-8", errors="ignore"
-        )  # Decode as UTF-8
+
+        # Handle Clarity hex format which often includes length prefixes
+        # First 5 bytes typically contain: 4-byte length + 1-byte type indicator
+        if len(decoded_bytes) > 5 and decoded_bytes[0] == 0x0D:  # Length byte check
+            # Skip the 4-byte length prefix and any potential type indicator
+            decoded_bytes = decoded_bytes[5:]
+
+        decoded_string = decoded_bytes.decode("utf-8", errors="ignore")
         logger.debug(f"Successfully decoded hex string: {hex_string[:20]}...")
         return decoded_string
     except (binascii.Error, UnicodeDecodeError) as e:

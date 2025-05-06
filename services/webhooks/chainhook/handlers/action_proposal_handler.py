@@ -9,11 +9,11 @@ from backend.models import (
     ProposalFilter,
     ProposalType,
 )
+from lib.utils import decode_hex_parameters
 from services.webhooks.chainhook.handlers.base_proposal_handler import (
     BaseProposalHandler,
 )
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
-from services.workflows.utils import decode_hex_parameters
 
 
 class ActionProposalHandler(BaseProposalHandler):

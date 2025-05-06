@@ -23,15 +23,16 @@ from backend.models import (
 )
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
+from lib.utils import (
+    calculate_token_cost,
+    decode_hex_parameters,
+    extract_image_urls,
+)
 from services.workflows.base import (
     BaseWorkflow,
 )
 from services.workflows.chat import ChatService, StreamingCallbackHandler
 from services.workflows.planning_mixin import PlanningCapability
-from services.workflows.utils import (
-    calculate_token_cost,
-    extract_image_urls,
-)
 from services.workflows.vector_mixin import VectorRetrievalCapability
 from services.workflows.web_search_mixin import WebSearchCapability
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
@@ -324,6 +325,10 @@ class ProposalEvaluationWorkflow(
                     raise ValueError(f"Proposal {proposal_id} not found")
 
                 # Decode parameters if they exist
+                decoded_parameters = None
+                if hasattr(proposal_data, "parameters") and proposal_data.parameters:
+                    decoded_parameters = decode_hex_parameters(proposal_data.parameters)
+
                 image_urls = extract_image_urls(proposal_data.parameters)
 
                 # Process and encode images
