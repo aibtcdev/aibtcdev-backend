@@ -1,9 +1,3 @@
-"""Generic workflow service interface and factory.
-
-This module provides a standard interface for all workflow services and
-a factory function to instantiate the appropriate service based on configuration.
-"""
-
 import asyncio
 import datetime
 from abc import ABC, abstractmethod
@@ -12,7 +6,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain_core.embeddings import Embeddings
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 from lib.logger import configure_logger
 from services.workflows.base import ExecutionError, StreamingError

@@ -8,7 +8,6 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
     ChainStateCreate,

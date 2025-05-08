@@ -1,7 +1,7 @@
 """Proposal embedding task implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import openai
 from langchain_openai import OpenAIEmbeddings

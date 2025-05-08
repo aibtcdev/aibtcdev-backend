@@ -1,5 +1,3 @@
-"""Web search mixin for workflows, providing web search capabilities using OpenAI Responses API."""
-
 from typing import Any, Dict, List, Tuple
 
 from langgraph.graph import StateGraph

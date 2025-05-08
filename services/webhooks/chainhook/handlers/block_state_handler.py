@@ -5,10 +5,8 @@ from typing import Optional
 from backend.factory import backend
 from backend.models import ChainState, ChainStateBase, ChainStateCreate
 from config import config
-from lib.logger import configure_logger
 from services.webhooks.chainhook.models import (
     Apply,
-    ChainHookData,
     TransactionWithReceipt,
 )
 

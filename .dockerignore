@@ -1,4 +1,67 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.egg
+*.log
+
+# Node/Bun/JS/TS
+node_modules/
+bun.lockb
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+agent-tools-ts/node_modules/
+agent-tools-ts/.next/
+agent-tools-ts/dist/
+agent-tools-ts/.turbo/
+agent-tools-ts/.bun/
+
+# General
+.DS_Store
 .env
-agent-tools-ts/.env
+.env.*
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.old
+
+# Git
 .git
-agent-tools-ts/.git
+.gitmodules
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# VSCode/Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Test/Cache/Build Artifacts
+.pytest_cache/
+.ruff_cache/
+*.coverage
+coverage.*
+htmlcov/
+dist/
+build/
+*.spec
+
+# Documentation
+*.md
+docs/
+README.md
+
+# Misc
+*.sqlite3
+*.db
+*.pid

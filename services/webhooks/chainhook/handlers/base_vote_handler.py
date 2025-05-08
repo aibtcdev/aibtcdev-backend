@@ -3,7 +3,7 @@
 from typing import Dict, List, Optional
 
 from backend.factory import backend
-from backend.models import ProposalFilter, VoteBase, VoteCreate, VoteFilter
+from backend.models import VoteBase, VoteCreate, VoteFilter
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt

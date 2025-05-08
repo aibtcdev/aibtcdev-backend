@@ -1,7 +1,5 @@
 """Handler for capturing new DAO proposals."""
 
-from typing import Dict, Optional
-
 from services.webhooks.chainhook.handlers.action_proposal_handler import (
     ActionProposalHandler,
 )

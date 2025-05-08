@@ -7,15 +7,21 @@ add documents, and execute the vector-enabled ReAct workflow.
 """
 
 import asyncio
+import os
+import sys
+
+# Add the project root to Python path
+sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 import dotenv
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.factory import backend
-from services.workflows.chat import VectorLangGraphService
+from services.workflows.chat import (
+    execute_vector_langgraph_stream,
+)
 from services.workflows.vector_mixin import add_documents_to_vectors
 
 dotenv.load_dotenv()
