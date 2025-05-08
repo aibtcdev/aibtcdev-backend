@@ -7,16 +7,17 @@ test to see the workflow in action.
 
 import asyncio
 import binascii
-import json
-from typing import Dict, Optional
+import os
+import sys
 from uuid import UUID
+
+# Add the project root to Python path
+sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 from backend.factory import backend
 from backend.models import (
     ProposalCreate,
     ProposalType,
-    QueueMessageCreate,
-    QueueMessageType,
 )
 from services.workflows.proposal_evaluation import (
     evaluate_and_vote_on_proposal,
