@@ -10,7 +10,6 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
-    VoteBase,
     VoteCreate,
 )
 from lib.logger import configure_logger

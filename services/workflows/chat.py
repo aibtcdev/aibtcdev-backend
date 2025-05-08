@@ -1,9 +1,3 @@
-"""Vector-enabled PrePlan ReAct workflow.
-
-This workflow combines vector retrieval and planning capabilities
-to first retrieve relevant context, create a plan, then execute the ReAct workflow.
-"""
-
 import asyncio
 from typing import (
     Annotated,

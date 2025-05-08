@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import api
-from api import chat, tools, webhooks
 from config import config
 from lib.logger import configure_logger
 from services import startup
@@ -12,6 +11,8 @@ from services.websocket import websocket_manager
 
 # Configure module logger
 logger = configure_logger(__name__)
+
+_ = config
 
 # Define app
 app = FastAPI(
@@ -26,8 +27,8 @@ app.add_middleware(
     allow_origins=[
         "https://sprint.aibtc.dev",
         "https://sprint-faster.aibtc.dev",
-        "https://*.aibtcdev-frontend.pages.dev",  # Cloudflare preview deployments
-        "http://localhost:3000",  # Local development
+        "https://*.aibtcdev-frontend.pages.dev",
+        "http://localhost:3000",
         "https://staging.aibtc.chat",
         "https://app.aibtc.dev",
         "https://aibtc.dev",

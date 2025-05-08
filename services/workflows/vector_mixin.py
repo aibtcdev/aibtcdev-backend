@@ -1,5 +1,3 @@
-"""Vector retrieval mixin and vector document utilities for workflows."""
-
 from typing import Any, Dict, List, Optional
 
 from langchain_core.documents import Document

@@ -1,5 +1,3 @@
-"""Planning mixin for workflows, providing vector-aware planning capabilities."""
-
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 

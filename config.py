@@ -8,7 +8,6 @@ from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
-# Load environment variables first
 load_dotenv()
 
 

@@ -1,5 +1,3 @@
-"""Tweet generator workflow."""
-
 from typing import Dict, TypedDict
 
 from langchain.prompts import PromptTemplate

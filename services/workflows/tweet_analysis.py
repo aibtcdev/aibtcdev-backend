@@ -1,5 +1,3 @@
-"""Tweet analysis workflow."""
-
 from typing import Dict, Optional, TypedDict
 
 from langchain.prompts import PromptTemplate

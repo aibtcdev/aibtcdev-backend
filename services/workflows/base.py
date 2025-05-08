@@ -1,5 +1,3 @@
-"""Base workflow functionality and shared components for all workflow types."""
-
 import asyncio
 import datetime
 import json

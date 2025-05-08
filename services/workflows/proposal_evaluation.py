@@ -1,5 +1,3 @@
-"""Proposal evaluation workflow."""
-
 import asyncio
 import base64
 from typing import Any, Dict, List, Optional, TypedDict

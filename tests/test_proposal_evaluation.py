@@ -1,12 +1,7 @@
 """Test script for the proposal evaluation workflow."""
 
 import asyncio
-import os
-import sys
 from typing import Dict, Optional
-
-# Add the parent directory to the path so we can import the modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.models import UUID
 from services.workflows.proposal_evaluation import (
