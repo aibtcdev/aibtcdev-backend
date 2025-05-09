@@ -35,7 +35,7 @@ async def create_test_proposal(dao_id: UUID) -> UUID:
         The ID of the created proposal
     """
     # Create test parameters as a JSON object
-    parameters = "let this rip https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3VoZzJzdmV3eGs4M2VrOXBkamg2dTVhb2NhcndwNzVxNHplMzhoaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/M7HkIkPrNhSy4/giphy.gif https://mkkhfmcrbwyuutcvtier.supabase.co/storage/v1/object/public/x-vote-media//img_2.jpeg"
+    parameters = "I Publius.btc will do a $FACES airdrop to as many bitcoin faces holders as possible. I will report back with a confirmation message and proof. Give me a shot."
 
     # # Convert parameters to JSON string and then hex encode it
     # parameters_hex = "0x" + binascii.hexlify(parameters.encode("utf-8")).decode("utf-8")

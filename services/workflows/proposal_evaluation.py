@@ -81,46 +81,69 @@ def no_update_reducer(current: Any, new: List[Any]) -> Any:
     return current
 
 
-def merge_dict_override_fn(key, values):
-    """Merge dictionaries by taking the last non-None value."""
-    # Handle case where values is None
-    if values is None:
+def merge_dicts(current: Optional[Dict], updates: List[Optional[Dict]]) -> Dict:
+    """Merge multiple dictionary updates into the current dictionary."""
+    # Initialize current if it's None
+    if current is None:
+        current = {}
+
+    # Handle case where updates is None
+    if updates is None:
+        return current
+
+    # Process updates if it's a list
+    if isinstance(updates, list):
+        for update in updates:
+            if update and isinstance(update, dict):
+                current.update(update)
+    # Handle case where updates is a single dictionary, not a list
+    elif isinstance(updates, dict):
+        current.update(updates)
+
+    return current
+
+
+def set_once(current: Any, updates: List[Any]) -> Any:
+    """Set the value once and prevent further updates."""
+    # If current already has a value, return it unchanged
+    if current is not None:
+        return current
+
+    # Handle case where updates is None instead of a list
+    if updates is None:
         return None
 
-    # Handle case where values is not iterable
-    if not hasattr(values, "__iter__"):
-        return values
+    # Process updates if it's a list
+    if isinstance(updates, list):
+        for update in updates:
+            if update is not None:
+                return update
+    # Handle case where updates is a single value, not a list
+    elif updates is not None:
+        return updates
 
-    result = None
-    for value in values:
-        if value is not None:
-            result = value
-    return result
+    return current
 
 
 class ProposalEvaluationState(TypedDict):
     """Type definition for the proposal evaluation state."""
 
-    proposal_id: Annotated[str, no_update_reducer]  # Read-only during execution
-    proposal_data: Annotated[str, no_update_reducer]  # Now a string, not a dict
-    core_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
-    historical_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
-    financial_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
-    social_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
-    final_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
-    flags: Annotated[List[str], append_list_fn]  # Merges lists of flags
-    summaries: Annotated[
-        Dict[str, str], merge_dict_fn
-    ]  # Merges dictionaries of summaries
-    decision: Annotated[Optional[str], merge_dict_override_fn]
-    halt: Annotated[bool, operator.or_]  # Use OR for boolean flags
+    proposal_id: Annotated[str, no_update_reducer]
+    proposal_data: Annotated[str, no_update_reducer]
+    core_score: Annotated[Optional[Dict[str, Any]], set_once]
+    historical_score: Annotated[Optional[Dict[str, Any]], set_once]
+    financial_score: Annotated[Optional[Dict[str, Any]], set_once]
+    social_score: Annotated[Optional[Dict[str, Any]], set_once]
+    final_score: Annotated[Optional[Dict[str, Any]], set_once]
+    flags: Annotated[List[str], append_list_fn]  # Correctly appends lists
+    summaries: Annotated[Dict[str, str], merge_dicts]  # Properly merges dictionaries
+    decision: Annotated[Optional[str], set_once]
+    halt: Annotated[bool, operator.or_]
     token_usage: Annotated[
-        Dict[str, Dict[str, int]], merge_dict_fn
-    ]  # Merges nested dictionaries
-    core_agent_invocations: Annotated[int, operator.add]  # Counts should add
-    proposal_images: Annotated[
-        Optional[List[Dict]], merge_dict_override_fn
-    ]  # ADDED: To store encoded images
+        Dict[str, Dict[str, int]], merge_dicts
+    ]  # Properly merges dictionaries
+    core_agent_invocations: Annotated[int, operator.add]
+    proposal_images: Annotated[Optional[List[Dict]], set_once]
 
 
 class AgentOutput(BaseModel):
@@ -143,9 +166,34 @@ def update_state_with_agent_result(
     state: ProposalEvaluationState, agent_result: Dict[str, Any], agent_name: str
 ):
     """Helper function to update state with agent result including summaries and flags."""
+    # ADDED DEBUG: Log the incoming data
+    logger.debug(
+        f"[DEBUG:update_state:{agent_name}] Updating state with agent result: {agent_result}"
+    )
+    logger.debug(
+        f"[DEBUG:update_state:{agent_name}] Current state before update - {agent_name}_score: {state.get(f'{agent_name}_score')}"
+    )
+
     # Update agent score in state
     if agent_name in ["core", "historical", "financial", "social", "final"]:
-        state[f"{agent_name}_score"] = agent_result
+        # Make a copy of agent_result to avoid modifying the original
+        score_dict = dict(agent_result)
+        # Don't pass token_usage through this path to avoid duplication
+        if "token_usage" in score_dict:
+            del score_dict["token_usage"]
+
+        # ADDED DEBUG: Log what we're about to assign
+        logger.debug(
+            f"[DEBUG:update_state:{agent_name}] Setting {agent_name}_score to: {score_dict}"
+        )
+
+        # Directly assign the dictionary to the state key
+        state[f"{agent_name}_score"] = score_dict
+
+        # ADDED DEBUG: Immediately verify what was assigned
+        logger.debug(
+            f"[DEBUG:update_state:{agent_name}] Immediate check - {agent_name}_score now: {state.get(f'{agent_name}_score')}"
+        )
 
     # Update summaries
     if "summaries" not in state:
@@ -161,19 +209,13 @@ def update_state_with_agent_result(
     if "flags" in agent_result and isinstance(agent_result["flags"], list):
         state["flags"].extend(agent_result["flags"])
 
-    # Update token usage
-    if (
-        "token_usage" in state
-        and isinstance(state["token_usage"], dict)
-        and f"{agent_name}_agent" in state["token_usage"]
-    ):
-        # Token usage has been set by the agent directly
-        pass
-    elif hasattr(agent_result, "get") and agent_result.get("token_usage"):
-        # Token usage available in the result
-        if "token_usage" not in state:
-            state["token_usage"] = {}
-        state["token_usage"][f"{agent_name}_agent"] = agent_result.get("token_usage")
+    # Note: Token usage is already directly handled by each agent via state["token_usage"]["{agent_name}_agent"]
+    # So we don't need to do anything with token usage here
+
+    # ADDED DEBUG: Log final state
+    logger.debug(
+        f"[DEBUG:update_state:{agent_name}] Final state after update - {agent_name}_score: {state.get(f'{agent_name}_score')}"
+    )
 
     return state
 
@@ -351,6 +393,7 @@ Provide a score from 0-100, flag any critical issues (including image-related on
                     "output_tokens": len(result.model_dump_json())
                     // 4,  # rough estimate
                     "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                    "model_name": llm_model_name,  # Include model name
                 }
                 self.logger.debug(
                     f"[DEBUG:CoreAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
@@ -362,8 +405,27 @@ Provide a score from 0-100, flag any critical issues (including image-related on
             state["token_usage"]["core_agent"] = token_usage_data
 
             result_dict = result.model_dump()
+            # Add token usage to result_dict so it's properly processed
+            result_dict["token_usage"] = token_usage_data
+
+            # ADDED DEBUG: Log the exact result dictionary before state update
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] BEFORE STATE UPDATE: Result dict to be added to state: {result_dict}"
+            )
+
+            # Capture state before update for debugging
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] State before update - core_score: {state.get('core_score')}"
+            )
+
             # Update state with the result
             update_state_with_agent_result(state, result_dict, "core")
+
+            # ADDED DEBUG: Log the state after update
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] AFTER STATE UPDATE: core_score in state: {state.get('core_score')}"
+            )
+
             return result_dict
         except Exception as e:
             self.logger.error(
@@ -527,6 +589,7 @@ Provide a score from 0-100, flag any critical issues (including image-related on
                     "output_tokens": len(result.model_dump_json())
                     // 4,  # rough estimate
                     "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                    "model_name": llm_model_name,  # Include model name
                 }
                 self.logger.debug(
                     f"[DEBUG:HistoricalAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
@@ -538,6 +601,9 @@ Provide a score from 0-100, flag any critical issues (including image-related on
             state["token_usage"]["historical_agent"] = token_usage_data
 
             result_dict = result.model_dump()
+            # Add token usage to result_dict so it's properly processed
+            result_dict["token_usage"] = token_usage_data
+
             # Update state with the result
             update_state_with_agent_result(state, result_dict, "historical")
             return result_dict
@@ -665,6 +731,7 @@ Provide a score from 0-100, flag any critical issues (including image-related on
                     "output_tokens": len(result.model_dump_json())
                     // 4,  # rough estimate
                     "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                    "model_name": llm_model_name,  # Include model name
                 }
                 self.logger.debug(
                     f"[DEBUG:FinancialAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
@@ -676,6 +743,9 @@ Provide a score from 0-100, flag any critical issues (including image-related on
             state["token_usage"]["financial_agent"] = token_usage_data
 
             result_dict = result.model_dump()
+            # Add token usage to result_dict so it's properly processed
+            result_dict["token_usage"] = token_usage_data
+
             # Update state with the result
             update_state_with_agent_result(state, result_dict, "financial")
             return result_dict
@@ -711,7 +781,7 @@ class ImageProcessingNode(BaseCapabilityMixin):
             self.logger.info(
                 f"[ImageProcessorNode:{proposal_id}] No proposal_data string, skipping image processing."
             )
-            return []
+            return []  # Return empty list, not None
 
         self.logger.info(
             f"[ImageProcessorNode:{proposal_id}] Starting image processing."
@@ -722,7 +792,7 @@ class ImageProcessingNode(BaseCapabilityMixin):
             self.logger.info(
                 f"[ImageProcessorNode:{proposal_id}] No image URLs found in proposal data."
             )
-            return []
+            return []  # Return empty list, not None
 
         self.logger.info(
             f"[ImageProcessorNode:{proposal_id}] Found {len(image_urls)} image URLs: {image_urls}"
@@ -778,7 +848,7 @@ class ImageProcessingNode(BaseCapabilityMixin):
         self.logger.info(
             f"[ImageProcessorNode:{proposal_id}] Finished. {len(processed_images)} images processed."
         )
-        return processed_images
+        return processed_images  # This will be a list, possibly empty
 
 
 class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability):
@@ -933,6 +1003,7 @@ Provide a score from 0-100, flag any critical issues (including image-related on
                     "output_tokens": len(result.model_dump_json())
                     // 4,  # rough estimate
                     "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                    "model_name": llm_model_name,  # Include model name
                 }
                 self.logger.debug(
                     f"[DEBUG:SocialAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
@@ -944,6 +1015,9 @@ Provide a score from 0-100, flag any critical issues (including image-related on
             state["token_usage"]["social_agent"] = token_usage_data
 
             result_dict = result.model_dump()
+            # Add token usage to result_dict so it's properly processed
+            result_dict["token_usage"] = token_usage_data
+
             # Update state with the result
             update_state_with_agent_result(state, result_dict, "social")
             return result_dict
@@ -1150,6 +1224,7 @@ Provide a final score, decision (Approve/Reject), and explanation."""
                     "output_tokens": len(result.model_dump_json())
                     // 4,  # rough estimate
                     "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                    "model_name": llm_model_name,  # Include model name
                 }
                 self.logger.debug(
                     f"[DEBUG:ReasoningAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
@@ -1161,6 +1236,9 @@ Provide a final score, decision (Approve/Reject), and explanation."""
             state["token_usage"]["reasoning_agent"] = token_usage_data
 
             result_dict = result.model_dump()
+            # Add token usage to result_dict so it's properly processed
+            result_dict["token_usage"] = token_usage_data
+
             # Update state with the result
             update_state_with_agent_result(state, result_dict, "reasoning")
             return result_dict
@@ -1434,6 +1512,28 @@ async def evaluate_proposal(
             f"[DEBUG:Workflow:{proposal_id}] Workflow execution completed with decision: {result.get('decision', 'Unknown')}"
         )
 
+        # ADDED DEBUG: More comprehensive logging of result structure
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] RESULT STRUCTURE: {list(result.keys())}"
+        )
+
+        # ADDED DEBUG: Log full core_score and other scores
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] FULL CORE SCORE: {result.get('core_score')}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] FULL HISTORICAL SCORE: {result.get('historical_score')}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] FULL FINANCIAL SCORE: {result.get('financial_score')}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] FULL SOCIAL SCORE: {result.get('social_score')}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] FULL FINAL SCORE: {result.get('final_score')}"
+        )
+
         logger.debug(f"[DEBUG:Workflow:{proposal_id}] RESULT SCORES TYPES:")
         logger.debug(
             f"[DEBUG:Workflow:{proposal_id}] - Core: {type(result.get('core_score'))} = {repr(result.get('core_score'))}"
@@ -1474,15 +1574,36 @@ async def evaluate_proposal(
             }
 
         def safe_extract_score(value, default=0):
+            # ADDED DEBUG: Log what we're trying to extract
+            logger.debug(
+                f"[DEBUG:safe_extract_score] Extracting score from: {repr(value)} (type: {type(value)})"
+            )
+
             if isinstance(value, dict) and "score" in value:
-                return value.get("score", default)
+                score_val = value.get("score", default)
+                logger.debug(
+                    f"[DEBUG:safe_extract_score] Found score in dict: {score_val}"
+                )
+                return score_val
             elif isinstance(value, int):
+                logger.debug(
+                    f"[DEBUG:safe_extract_score] Value is already int: {value}"
+                )
                 return value
             elif isinstance(value, str):
+                logger.debug(f"[DEBUG:safe_extract_score] Value is string: '{value}'")
                 try:
-                    return int(value)
+                    int_val = int(value)
+                    logger.debug(
+                        f"[DEBUG:safe_extract_score] Converted string to int: {int_val}"
+                    )
+                    return int_val
                 except ValueError:
+                    logger.debug(
+                        f"[DEBUG:safe_extract_score] Could not convert string to int"
+                    )
                     pass  # If string is not int, will fall through to default
+            logger.debug(f"[DEBUG:safe_extract_score] Using default: {default}")
             return default
 
         final_score_val = result.get("final_score")
@@ -1541,11 +1662,13 @@ async def evaluate_proposal(
         # Aggregate tokens from all agent steps
         # Assuming model_name is consistent across all steps for this aggregation, or we use the primary model_name
         # If each agent could use a different model, this would need more detailed per-model tracking
+        logger.debug(f"Token usage entries in result: {list(total_token_usage.keys())}")
         for agent_key, usage_data in total_token_usage.items():
             if isinstance(usage_data, dict):
                 total_input_tokens += usage_data.get("input_tokens", 0)
                 total_output_tokens += usage_data.get("output_tokens", 0)
                 total_tokens += usage_data.get("total_tokens", 0)
+                logger.debug(f"Token usage for {agent_key}: {usage_data}")
             else:
                 logger.warning(
                     f"Unexpected format for token_usage data for agent {agent_key}: {usage_data}"
@@ -1573,8 +1696,15 @@ async def evaluate_proposal(
         # Extract token usage by model from token_usage data
         for agent_name, agent_usage in total_token_usage.items():
             if isinstance(agent_usage, dict) and agent_usage.get("total_tokens", 0) > 0:
-                # Use default model name if not specified
-                model_name = "gpt-4.1"  # default model name
+                # Get model name from config, or use default
+                model_name = config.get(
+                    "model_name", "gpt-4.1"
+                )  # Use configured model name
+
+                # Extract model name from each agent usage if available
+                # This would require each agent to include model info in their token usage
+                if "model_name" in agent_usage:
+                    model_name = agent_usage["model_name"]
 
                 # Initialize the model entry if needed
                 if model_name not in total_token_usage_by_model:
@@ -1648,7 +1778,7 @@ async def evaluate_proposal(
             "component_scores": component_scores,
             "component_summaries": component_summaries,  # Include component summaries
             "flags": all_flags,
-            "token_usage": total_token_usage,
+            "token_usage": total_token_usage,  # Include all token usage details
             "web_search_results": [],
             "treasury_balance": None,
             "web_search_token_usage": {
@@ -1661,12 +1791,17 @@ async def evaluate_proposal(
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_tokens,
             },
-            "evaluation_model_info": {"name": "gpt-4.1", "temperature": 0.1},
-            "web_search_model_info": {"name": "gpt-4.1", "temperature": 0.1},
+            "evaluation_model_info": {
+                "name": config.get("model_name", "gpt-4.1"),
+                "temperature": config.get("temperature", 0.1),
+            },
+            "web_search_model_info": {
+                "name": config.get("model_name", "gpt-4.1"),
+                "temperature": config.get("temperature", 0.1),
+            },
             "total_token_usage_by_model": total_token_usage_by_model,
             "total_cost_by_model": total_cost_by_model,
             "total_overall_cost": total_overall_cost,
-            "summaries": component_summaries,
         }
 
         logger.debug(
@@ -1901,11 +2036,13 @@ async def evaluate_and_vote_on_proposal(
         # Aggregate tokens from all agent steps
         # Assuming model_name is consistent across all steps for this aggregation, or we use the primary model_name
         # If each agent could use a different model, this would need more detailed per-model tracking
+        logger.debug(f"Token usage entries in result: {list(total_token_usage.keys())}")
         for agent_key, usage_data in total_token_usage.items():
             if isinstance(usage_data, dict):
                 total_input_tokens += usage_data.get("input_tokens", 0)
                 total_output_tokens += usage_data.get("output_tokens", 0)
                 total_tokens += usage_data.get("total_tokens", 0)
+                logger.debug(f"Token usage for {agent_key}: {usage_data}")
             else:
                 logger.warning(
                     f"Unexpected format for token_usage data for agent {agent_key}: {usage_data}"
@@ -1974,11 +2111,12 @@ async def evaluate_and_vote_on_proposal(
             "tx_id": tx_id,
             "vector_results": [],
             "recent_tweets": [],
-            "web_search_results": [],
+            "web_search_results": eval_result.get("web_search_results", []),
             "treasury_balance": treasury_balance,
             "component_scores": eval_result.get("component_scores", {}),
-            "component_summaries": eval_result.get("summaries", {}),
+            "component_summaries": eval_result.get("component_summaries", {}),
             "flags": eval_result.get("flags", []),
+            "token_usage": total_token_usage,  # Pass the complete token_usage dictionary
             "web_search_token_usage": {
                 "input_tokens": web_search_input_tokens,
                 "output_tokens": web_search_output_tokens,
