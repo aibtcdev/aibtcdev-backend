@@ -18,7 +18,7 @@ WORKDIR /usr/src/app/agent-tools-ts
 
 # Copy only dependency files first for better caching
 COPY agent-tools-ts/package.json agent-tools-ts/bun.lock ./
-RUN bun install
+RUN bun install --frozen-lockfile
 
 # Now copy the rest of the code
 COPY . .
