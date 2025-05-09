@@ -1,11 +1,14 @@
 import asyncio
 import base64
-from typing import Any, Dict, List, Optional, TypedDict
+import operator
+import uuid
+from typing import Annotated, Any, Dict, List, Optional, TypedDict, Union
 
 import httpx
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
+from langgraph.channels import LastValue
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
@@ -15,6 +18,7 @@ from backend.models import (
     ExtensionFilter,
     Profile,
     PromptFilter,
+    ProposalBase,
     ProposalType,
     QueueMessageFilter,
     QueueMessageType,
@@ -28,7 +32,13 @@ from lib.utils import (
 from services.workflows.base import (
     BaseWorkflow,
 )
+from services.workflows.capability_mixins import BaseCapabilityMixin
 from services.workflows.chat import ChatService, StreamingCallbackHandler
+from services.workflows.hierarchical_workflows import (
+    HierarchicalTeamWorkflow,
+    append_list_fn,
+    merge_dict_fn,
+)
 from services.workflows.planning_mixin import PlanningCapability
 from services.workflows.vector_mixin import VectorRetrievalCapability
 from services.workflows.web_search_mixin import WebSearchCapability
@@ -50,881 +60,1653 @@ class ProposalEvaluationOutput(BaseModel):
     reasoning: str = Field(description="The reasoning behind the evaluation decision")
 
 
-class EvaluationState(TypedDict):
-    """State for the proposal evaluation flow."""
+def no_update_reducer(current: Any, new: List[Any]) -> Any:
+    """Reducer that prevents updates after initial value is set."""
+    # Treat initial empty string for str types as if it were None for accepting the first value
+    is_initial_empty_string = isinstance(current, str) and current == ""
 
-    action_proposals_contract: str
-    action_proposals_voting_extension: str
-    proposal_id: int
-    proposal_data: Dict
-    dao_info: Optional[Dict]
-    approve: bool
-    confidence_score: float
-    reasoning: str
-    vote_result: Optional[Dict]
-    wallet_id: Optional[UUID]
-    confidence_threshold: float
-    auto_vote: bool
-    formatted_prompt: str
-    agent_prompts: List[Dict]
-    vector_results: Optional[List[Dict]]
-    recent_tweets: Optional[List[Dict]]
-    web_search_results: Optional[List[Dict]]
-    treasury_balance: Optional[float]
-    contract_source: Optional[str]
-    proposal_images: Optional[List[Dict]]  # Store encoded images for LLM
-    # Token usage tracking per step
-    web_search_token_usage: Optional[Dict]
-    evaluation_token_usage: Optional[Dict]
-    # Model info for cost calculation
-    evaluation_model_info: Optional[Dict]
-    web_search_model_info: Optional[Dict]
+    # If current is genuinely set (not None and not initial empty string), keep it.
+    if current is not None and not is_initial_empty_string:
+        return current
+
+    # Current is None or an initial empty string. Try to set it from new.
+    processed_new_values = (
+        new if isinstance(new, list) else [new]
+    )  # Ensure 'new' is a list
+    for n_val in processed_new_values:
+        if n_val is not None:
+            return n_val
+
+    # If current was None/initial empty string and new is all None or empty, return current (which is None or '')
+    return current
 
 
-class ProposalEvaluationWorkflow(
-    BaseWorkflow[EvaluationState],
-    VectorRetrievalCapability,
-    WebSearchCapability,
-    PlanningCapability,
+def merge_dict_override_fn(key, values):
+    """Merge dictionaries by taking the last non-None value."""
+    # Handle case where values is None
+    if values is None:
+        return None
+
+    # Handle case where values is not iterable
+    if not hasattr(values, "__iter__"):
+        return values
+
+    result = None
+    for value in values:
+        if value is not None:
+            result = value
+    return result
+
+
+class ProposalEvaluationState(TypedDict):
+    """Type definition for the proposal evaluation state."""
+
+    proposal_id: Annotated[str, no_update_reducer]  # Read-only during execution
+    proposal_data: Annotated[str, no_update_reducer]  # Now a string, not a dict
+    core_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
+    historical_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
+    financial_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
+    social_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
+    final_score: Annotated[Optional[Dict[str, Any]], merge_dict_override_fn]
+    flags: Annotated[List[str], append_list_fn]  # Merges lists of flags
+    summaries: Annotated[
+        Dict[str, str], merge_dict_fn
+    ]  # Merges dictionaries of summaries
+    decision: Annotated[Optional[str], merge_dict_override_fn]
+    halt: Annotated[bool, operator.or_]  # Use OR for boolean flags
+    token_usage: Annotated[
+        Dict[str, Dict[str, int]], merge_dict_fn
+    ]  # Merges nested dictionaries
+    core_agent_invocations: Annotated[int, operator.add]  # Counts should add
+    proposal_images: Annotated[
+        Optional[List[Dict]], merge_dict_override_fn
+    ]  # ADDED: To store encoded images
+
+
+class AgentOutput(BaseModel):
+    """Output model for agent evaluations."""
+
+    score: int = Field(description="Score from 0-100")
+    flags: List[str] = Field(description="Critical issues flagged")
+    summary: str = Field(description="Summary of findings")
+
+
+class FinalOutput(BaseModel):
+    """Output model for the final evaluation decision."""
+
+    score: int = Field(description="Final evaluation score")
+    decision: str = Field(description="Approve or Reject")
+    explanation: str = Field(description="Reasoning for decision")
+
+
+def update_state_with_agent_result(
+    state: ProposalEvaluationState, agent_result: Dict[str, Any], agent_name: str
 ):
-    """Workflow for evaluating DAO proposals and voting automatically."""
+    """Helper function to update state with agent result including summaries and flags."""
+    # Update agent score in state
+    if agent_name in ["core", "historical", "financial", "social", "final"]:
+        state[f"{agent_name}_score"] = agent_result
 
-    def __init__(
-        self,
-        collection_names: Optional[List[str]] = None,
-        model_name: str = "gpt-4.1",
-        temperature: Optional[float] = 0.1,
-        **kwargs,
+    # Update summaries
+    if "summaries" not in state:
+        state["summaries"] = {}
+
+    if "summary" in agent_result and agent_result["summary"]:
+        state["summaries"][f"{agent_name}_score"] = agent_result["summary"]
+
+    # Update flags
+    if "flags" not in state:
+        state["flags"] = []
+
+    if "flags" in agent_result and isinstance(agent_result["flags"], list):
+        state["flags"].extend(agent_result["flags"])
+
+    # Update token usage
+    if (
+        "token_usage" in state
+        and isinstance(state["token_usage"], dict)
+        and f"{agent_name}_agent" in state["token_usage"]
     ):
-        """Initialize the workflow.
+        # Token usage has been set by the agent directly
+        pass
+    elif hasattr(agent_result, "get") and agent_result.get("token_usage"):
+        # Token usage available in the result
+        if "token_usage" not in state:
+            state["token_usage"] = {}
+        state["token_usage"][f"{agent_name}_agent"] = agent_result.get("token_usage")
 
-        Args:
-            collection_names: Optional list of collection names to search
-            model_name: The model to use for evaluation
-            temperature: Optional temperature setting for the model
-            **kwargs: Additional arguments passed to parent
-        """
-        # Initialize planning LLM
-        planning_llm = ChatOpenAI(
-            model="o4-mini",
-            stream_usage=True,
-            streaming=True,
-        )
+    return state
 
-        # Create callback handler for planning with queue
-        callback_handler = StreamingCallbackHandler(queue=asyncio.Queue())
 
-        # Initialize all parent classes including PlanningCapability
-        super().__init__(model_name=model_name, temperature=temperature, **kwargs)
-        PlanningCapability.__init__(
-            self,
-            callback_handler=callback_handler,
-            planning_llm=planning_llm,
-            persona="You are a DAO proposal evaluation planner, focused on creating structured evaluation plans.",
-        )
+class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability):
+    """Core Context Agent evaluates proposals against DAO mission and standards."""
 
-        self.collection_names = collection_names or [
-            "knowledge_collection",
-            "proposals",
-        ]
-        self.required_fields = ["proposal_id", "proposal_data"]
-        self.logger.debug(
-            f"Initialized workflow: collections={self.collection_names} | model={model_name} | temperature={temperature}"
-        )
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize the Core Context Agent."""
+        BaseCapabilityMixin.__init__(self, config=config, state_key="core_score")
+        VectorRetrievalCapability.__init__(self)
+        self.initialize()
+        self._initialize_vector_capability()
 
-    def _create_prompt(self) -> PromptTemplate:
-        """Create the evaluation prompt template."""
-        return PromptTemplate(
-            input_variables=[
-                "proposal_data",
-                "dao_info",
-                "treasury_balance",
-                "contract_source",
-                "agent_prompts",
-                "vector_context",
-                "recent_tweets",
-                "web_search_results",
-            ],
-            template="""
-            You are a skeptical and hard-to-convince DAO proposal evaluator. Your primary goal is rigorous analysis. Your task is to analyze the proposal and determine whether to vote FOR or AGAINST it based on verifiable evidence and alignment with DAO principles.
+    def _initialize_vector_capability(self):
+        """Initialize the vector retrieval functionality."""
+        if not hasattr(self, "retrieve_from_vector_store"):
+            self.retrieve_from_vector_store = (
+                VectorRetrievalCapability.retrieve_from_vector_store.__get__(
+                    self, self.__class__
+                )
+            )
+            self.logger.info(
+                "Initialized vector retrieval capability for CoreContextAgent"
+            )
 
-            <instructions>
-            <high_priority_instructions importance="critical">
-            {agent_prompts}
-            </high_priority_instructions>
-            <default_instructions>
-            If no agent-specific instructions are provided, apply these DEFAULT instructions:
-            - Approve ONLY if the proposal provides verifiable evidence (URL, transaction hash, IPFS CID for screenshots/documents) for its claims OR if it's a purely logistical matter (e.g., scheduling reminder).
-            - All other proposals lacking verifiable evidence for claims should be REJECTED (vote AGAINST) with LOW confidence (0.3-0.4 band).
-            - Reject proposals making promises about future DAO actions or events unless they provide on-chain evidence of a corresponding approved governance decision or multisig transaction proposal.
-            - CRITICAL: You MUST evaluate all proposal content (text, images, links) as ONE COHESIVE UNIT. If ANY image or attachment doesn't align with or support the proposal, contains misleading information, or is inappropriate, you MUST reject the entire proposal.
-            </default_instructions>
-            You MUST explain how each specific instruction (agent-provided or default) influenced your decision, especially if it led to rejection.
-            </instructions>
+    async def process(self, state: ProposalEvaluationState) -> Dict[str, Any]:
+        """Evaluate the proposal against DAO core mission and standards."""
+        self._initialize_vector_capability()
 
-            <evaluation_criteria>
-            <core_proposals>
-                <security_criteria>
-                    <criterion>Verify smart contract security measures</criterion>
-                    <criterion>Check for potential vulnerabilities in contract logic</criterion>
-                    <criterion>Assess potential attack vectors</criterion>
-                    <criterion>Evaluate access control mechanisms</criterion>
-                </security_criteria>
-                <alignment_criteria>
-                    <criterion>Analyze alignment with DAO mission statement</criterion>
-                    <criterion>Verify compatibility with existing DAO infrastructure</criterion>
-                    <criterion>Check adherence to DAO's established governance principles</criterion>
-                </alignment_criteria>
-                <impact_criteria>
-                    <criterion>Evaluate potential risks vs. rewards</criterion>
-                    <criterion>Assess short-term and long-term implications</criterion>
-                    <criterion>Consider effects on DAO reputation and stakeholders</criterion>
-                </impact_criteria>
-            </core_proposals>
-            <action_proposals>
-                <validation_criteria>
-                    <criterion>Validate all proposed parameters against acceptable ranges</criterion>
-                    <criterion>Verify parameter compatibility with existing systems</criterion>
-                    <criterion>Check for realistic implementation timelines</criterion>
-                </validation_criteria>
-                <resource_criteria>
-                    <criterion>Assess treasury impact and funding requirements</criterion>
-                    <criterion>Evaluate operational resource needs</criterion>
-                    <criterion>Consider opportunity costs against other initiatives</criterion>
-                </resource_criteria>
-                <security_criteria>
-                    <criterion>Identify potential security implications of the action</criterion>
-                    <criterion>Check for unintended system vulnerabilities</criterion>
-                </security_criteria>
-                <evidence_criteria>
-                    <criterion importance="critical">**Evidence Verification:** All claims MUST be backed by verifiable sources (URLs, transaction hashes, IPFS CIDs)</criterion>
-                    <criterion importance="critical">**Future Commitments:** Any promises about future actions require on-chain proof of approved governance decisions</criterion>
-                    <criterion importance="critical">**Content Cohesion:** All components (text, images, links) must form a cohesive, aligned whole supporting the proposal's intent</criterion>
-                </evidence_criteria>
-            </action_proposals>
-            </evaluation_criteria>
+        proposal_id = state.get("proposal_id", "unknown")
+        proposal_content = state.get("proposal_data", "")
 
-            <proposal_content>
-            <proposal_data>
-            {proposal_data}
-            </proposal_data>
-            <proposal_instructions>
-            Note: If any images are provided with the proposal, they will be shown after this prompt.
-            You should analyze any provided images in the context of the proposal and include your observations
-            in your evaluation. Consider aspects such as:
-            - Image content and relevance to the proposal
-            - Any visual evidence supporting or contradicting the proposal
-            - Quality and authenticity of the images
-            - Potential security or privacy concerns in the images
+        dao_mission_text = self.config.get("dao_mission", "")
+        if not dao_mission_text:
+            try:
+                self.logger.debug(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Attempting to retrieve DAO mission from vector store"
+                )
+                dao_mission = await self.retrieve_from_vector_store(
+                    query="DAO mission statement and values",
+                    collection_name=self.config.get(
+                        "mission_collection", "dao_documents"
+                    ),
+                    limit=3,
+                )
+                dao_mission_text = "\n".join([doc.page_content for doc in dao_mission])
+                self.logger.debug(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Retrieved DAO mission, length: {len(dao_mission_text)}"
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Error retrieving DAO mission: {str(e)}",
+                    exc_info=True,
+                )
+                dao_mission_text = "Elevate human potential through AI on Bitcoin"
+                self.logger.debug(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Using default DAO mission: {dao_mission_text}"
+                )
 
-            IMPORTANT: Images and text must form a cohesive whole. If any image:
-            - Doesn't clearly support or relate to the proposal text
-            - Contains misleading or contradictory information
-            - Is of poor quality making verification impossible
-            - Contains inappropriate content
-            - Appears manipulated or false
-            Then you MUST reject the entire proposal, regardless of the quality of the text portion.
-            </proposal_instructions>
-            </proposal_content>
-            <additional_context>
-            <vector_context>
-            {vector_context}
-            </vector_context>
-            <recent_tweets>
-            {recent_tweets}
-            </recent_tweets>
-            <web_search_results>
-            {web_search_results}
-            </web_search_results>
-            </additional_context>
+        prompt = PromptTemplate(
+            input_variables=["proposal_data", "dao_mission"],
+            template="""Evaluate the following proposal against the DAO's mission and values.\\n            
+Proposal: {proposal_data}\\nDAO Mission: {dao_mission}\\n
+Assess whether this proposal aligns with the DAO's core mission and values.\\nConsider:\\n1. Mission Alignment: Does it directly support the stated mission?\\n2. Quality Standards: Does it meet quality requirements?\\n3. Innovation: Does it bring new ideas aligned with our vision?\\n4. Impact: How significant is its potential contribution?\\n
+# ADDED: Image processing instructions
+**Image Analysis Instructions:**
+If images are provided with this proposal (they will appear after this text), you MUST analyze them as an integral part of the proposal.
+- Relevance: Does each image directly relate to and support the proposal's text?
+- Evidence: Do the images provide visual evidence for claims made in the proposal?
+- Authenticity & Quality: Are the images clear, authentic, and not misleading or manipulated?
+- Cohesion: The images and text MUST form a cohesive and consistent whole. If any image contradicts the text, is irrelevant, misleading, of very poor quality, or inappropriate, you should consider this a significant flaw in the proposal.
 
-            <dao_context>
-            <dao_info>
-            {dao_info}
-            </dao_info>
-            <treasury_balance>
-            {treasury_balance}
-            </treasury_balance>
-            <aibtc_charter>
-            Core Values: Curiosity, Truth Maximizing, Humanity's Best Interests, Transparency, Resilience, Collaboration
-            Mission: Elevate human potential through Autonomous Intelligence on Bitcoin
-            Guardrails: Decentralized Governance, Smart Contract accountability
-            </aibtc_charter>
-            </dao_context>
-
-            <technical_details>
-            <contract_source>
-            {contract_source}
-            </contract_source>
-            </technical_details>
-
-            <confidence_scoring>
-            <confidence_bands>
-            You MUST choose one of these confidence bands:
-            - **0.9-1.0 (Very High Confidence - Strong Approve):** All criteria met excellently. Clear alignment with DAO mission/values, strong verifiable evidence provided for all claims, minimal/no security risks identified, significant positive impact expected, and adheres strictly to all instructions (including future promise verification). All images directly support the proposal with high quality and authenticity.
-            - **0.7-0.8 (High Confidence - Approve):** Generally meets criteria well. Good alignment, sufficient verifiable evidence provided, risks identified but deemed manageable/acceptable, likely positive impact. Passes core checks (evidence, future promises). Minor reservations might exist but don't fundamentally undermine the proposal. Images support the proposal appropriately.
-            - **0.5-0.6 (Moderate Confidence - Borderline/Weak Approve):** Meets minimum criteria but with notable reservations. Alignment is present but perhaps weak or indirect, evidence meets minimum verification but might be incomplete or raise minor questions, moderate risks identified requiring monitoring, impact is unclear or modest. *Could apply to simple logistical proposals with no major claims.* Any included images are relevant though may not provide strong support.
-            - **0.3-0.4 (Low Confidence - Reject):** Fails one or more key criteria. Significant misalignment, **lacks required verifiable evidence** for claims (triggering default rejection), unacceptable risks identified, potential negative impact, or **contains unsubstantiated future promises**. Images may be missing where needed, irrelevant, or only weakly supportive. *This is the default band for rejections due to lack of evidence or unproven future commitments.*
-            - **0.0-0.2 (Extremely Low Confidence - Strong Reject):** Fails multiple critical criteria. Clear violation of DAO principles/guardrails, major security flaws identified, evidence is demonstrably false or misleading, significant negative impact is highly likely or certain. Any included images may be misleading, manipulated, inappropriate, or contradictory to the proposal.
-            </confidence_bands>
-            </confidence_scoring>
-
-            <quality_standards>
-            Your evaluation must uphold clarity, reasoning, and respect for the DAO's voice:
-            • Be clear and specific — avoid vagueness or filler
-            • Use a consistent tone, but reflect the DAO's personality if known
-            • Avoid casual throwaway phrases, sarcasm, or hype
-            • Don't hedge — take a position and justify it clearly
-            • Make every point logically sound and backed by facts or context
-            • Cite relevant parts of the proposal, DAO mission, or prior actions
-            • Use terms accurately — don't fake precision
-            • Keep structure clean and easy to follow
-            • Include analysis of any provided images and their implications
-            • Specifically address image-text cohesion in your analysis
-            • If rejecting, CLEARLY state the specific reason(s) based on the instructions or evaluation criteria (e.g., "Rejected due to lack of verifiable source for claim X", "Rejected because future promise lacks on-chain evidence", "Rejected because included image contradicts proposal text").
-            </quality_standards>
-
-            <output_format>
-            Provide your evaluation in this exact JSON format:
-            ```json
-            {{
-                "approve": boolean,  // true for FOR, false for AGAINST
-                "confidence_score": float,  // MUST be from the confidence bands above
-                "reasoning": string  // Brief, professional explanation addressing:
-                                   // 1. How agent/default instructions were applied (state which).
-                                   // 2. Specific reason for rejection if applicable, referencing the unmet criteria or instruction.
-                                   // 3. How DAO context influenced decision.
-                                   // 4. How AIBTC Charter alignment was considered.
-                                   // 5. Key factors in confidence score selection.
-                                   // 6. Analysis of any provided images and their cohesion with proposal text.
-                                   // Must be clear, precise, and well-structured.
-            }}
-            ```
-            </output_format>
+Provide a score from 0-100, flag any critical issues (including image-related ones), and summarize your findings, explicitly mentioning your image analysis if images were present.\\
             """,
         )
 
-    def _create_graph(self) -> Graph:
-        """Create the evaluation graph."""
-        prompt = self._create_prompt()
+        try:
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] Formatting prompt for evaluation"
+            )
+            formatted_prompt_text = prompt.format(
+                proposal_data=proposal_content,
+                dao_mission=dao_mission_text
+                or "Elevate human potential through AI on Bitcoin",
+            )
+            debug_level = self.config.get("debug_level", 0)
+            if debug_level >= 2:
+                self.logger.debug(
+                    f"[PROPOSAL_DEBUG:CoreAgent] FULL EVALUATION PROMPT:\n{formatted_prompt_text}"
+                )
+            else:
+                self.logger.debug(
+                    f"[PROPOSAL_DEBUG:CoreAgent] Generated evaluation prompt: {formatted_prompt_text}"
+                )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:CoreAgent:{proposal_id}] Error formatting prompt: {str(e)}",
+                exc_info=True,
+            )
+            formatted_prompt_text = f"Evaluate proposal: {proposal_content}"
 
-        async def fetch_context(state: EvaluationState) -> EvaluationState:
-            """Fetch context including web search, vector results, tweets, and contract source."""
-            try:
-                # --- Fetch Core Data --- #
-                proposal_id = state["proposal_id"]
-                dao_id = state.get("dao_id")
-                agent_id = state.get("agent_id")
+        try:
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] Invoking LLM for core evaluation"
+            )
 
-                # Get proposal data
-                proposal_data = backend.get_proposal(proposal_id)
-                if not proposal_data:
-                    raise ValueError(f"Proposal {proposal_id} not found")
+            # ADDED: Image handling
+            proposal_images_list = state.get("proposal_images", [])
+            if not isinstance(proposal_images_list, list):
+                self.logger.warning(
+                    f"[DEBUG:CoreAgent:{proposal_id}] proposal_images is not a list: {type(proposal_images_list)}. Defaulting to empty list."
+                )
+                proposal_images_list = []
 
-                image_urls = extract_image_urls(proposal_data.parameters)
+            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
+            if proposal_images_list:
+                self.logger.debug(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Adding {len(proposal_images_list)} images to LLM input."
+                )
+                message_content_list.extend(proposal_images_list)
 
-                # Process and encode images
-                proposal_images = []
-                for url in image_urls:
-                    try:
-                        async with httpx.AsyncClient() as client:
-                            response = await client.get(url, timeout=10.0)
-                            if response.status_code == 200:
-                                image_data = base64.b64encode(response.content).decode(
-                                    "utf-8"
-                                )
-                                # Determine MIME type based on URL extension
-                                mime_type = (
-                                    "image/jpeg"
-                                    if url.lower().endswith((".jpg", ".jpeg"))
-                                    else (
-                                        "image/png"
-                                        if url.lower().endswith(".png")
-                                        else (
-                                            "image/gif"
-                                            if url.lower().endswith(".gif")
-                                            else (
-                                                "image/webp"
-                                                if url.lower().endswith(".webp")
-                                                else "image/png"
-                                            )
-                                        )
-                                    )  # default to PNG if unknown
-                                )
-                                proposal_images.append(
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:{mime_type};base64,{image_data}"
-                                        },
-                                    }
-                                )
-                            else:
-                                logger.warning(
-                                    f"Failed to fetch image: {url} (status {response.status_code})"
-                                )
-                    except Exception as e:
-                        logger.error(
-                            f"Error fetching image {url}: {str(e)}", exc_info=True
-                        )
+            llm_input_message = HumanMessage(content=message_content_list)
 
-                state["proposal_images"] = proposal_images
+            result = await self.llm.with_structured_output(AgentOutput).ainvoke(
+                [llm_input_message]
+            )
+            self.logger.debug(
+                f"[DEBUG:CoreAgent:{proposal_id}] LLM returned core evaluation with score: {result.score}"
+            )
+            self.logger.info(
+                f"[DEBUG:CoreAgent:{proposal_id}] SCORE={result.score}/100 | FLAGS={result.flags} | SUMMARY={result.summary}"
+            )
 
-                # Convert proposal data to dictionary
-                proposal_dict = {
-                    "proposal_id": proposal_data.proposal_id,
-                    "parameters": proposal_data.parameters,
-                    "action": proposal_data.action,
-                    "caller": proposal_data.caller,
-                    "contract_principal": proposal_data.contract_principal,
-                    "creator": proposal_data.creator,
-                    "created_at_block": proposal_data.created_at_block,
-                    "end_block": proposal_data.end_block,
-                    "start_block": proposal_data.start_block,
-                    "liquid_tokens": proposal_data.liquid_tokens,
-                    "type": proposal_data.type,
-                    "proposal_contract": proposal_data.proposal_contract,
-                }
-                state["proposal_data"] = proposal_dict  # Update state with full data
+            # Track token usage - extract directly from LLM if available
+            token_usage_data = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
 
-                # Get DAO info (if dao_id wasn't passed explicitly, use proposal's)
-                if not dao_id and proposal_data.dao_id:
-                    dao_id = proposal_data.dao_id
-                    state["dao_id"] = dao_id  # Update state if derived
+            # Use the Annotated operator.add feature by assigning 1 to increment
+            # This is safe with concurrent execution
+            state["core_agent_invocations"] = 1
 
-                dao_info = None
-                if dao_id:
-                    dao_info = backend.get_dao(dao_id)
-                if not dao_info:
-                    raise ValueError(f"DAO Information not found for ID: {dao_id}")
-                state["dao_info"] = dao_info.model_dump()
-
-                # Get agent prompts
-                agent_prompts_text = []
-                if agent_id:
-                    try:
-                        prompts = backend.list_prompts(
-                            PromptFilter(
-                                agent_id=agent_id,
-                                dao_id=dao_id,
-                                is_active=True,
-                            )
-                        )
-                        agent_prompts_text = [p.prompt_text for p in prompts]
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to get agent prompts: {str(e)}", exc_info=True
-                        )
-                state["agent_prompts"] = agent_prompts_text
-
-                # Get treasury balance
-                treasury_balance = None
-                try:
-                    treasury_extensions = backend.list_extensions(
-                        ExtensionFilter(dao_id=dao_info.id, type="EXTENSIONS_TREASURY")
+            # Try to extract token usage directly from LLM response
+            if (
+                hasattr(self.llm, "_last_prompt_id")
+                and hasattr(self.llm, "client")
+                and hasattr(self.llm.client, "usage_by_prompt_id")
+            ):
+                last_prompt_id = self.llm._last_prompt_id
+                if last_prompt_id in self.llm.client.usage_by_prompt_id:
+                    usage = self.llm.client.usage_by_prompt_id[last_prompt_id]
+                    token_usage_data = {
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
+                    }
+                    self.logger.debug(
+                        f"[DEBUG:CoreAgent:{proposal_id}] Extracted token usage from LLM: {token_usage_data}"
                     )
-                    if treasury_extensions:
-                        hiro_api = HiroApi()
-                        treasury_balance = hiro_api.get_address_balance(
-                            treasury_extensions[0].contract_principal
-                        )
-                    else:
-                        self.logger.warning(
-                            f"No treasury extension for DAO {dao_info.id}"
-                        )
+            # Fallback to estimation
+            if token_usage_data["total_tokens"] == 0:
+                # Get model name from LLM
+                llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+                # First calculate token count from the text
+                token_count = len(formatted_prompt_text) // 4  # Simple estimation
+                # Create token usage dictionary for calculate_token_cost
+                token_usage_dict = {"input_tokens": token_count}
+                # Calculate cost
+                cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+                token_usage_data = {
+                    "input_tokens": token_count,
+                    "output_tokens": len(result.model_dump_json())
+                    // 4,  # rough estimate
+                    "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                }
+                self.logger.debug(
+                    f"[DEBUG:CoreAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
+                )
+
+            # Add token usage to state
+            if "token_usage" not in state:
+                state["token_usage"] = {}
+            state["token_usage"]["core_agent"] = token_usage_data
+
+            result_dict = result.model_dump()
+            # Update state with the result
+            update_state_with_agent_result(state, result_dict, "core")
+            return result_dict
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:CoreAgent:{proposal_id}] Error in core evaluation: {str(e)}",
+                exc_info=True,
+            )
+            fallback_score_dict = {
+                "score": 50,
+                "flags": [f"Error: {str(e)}"],
+                "summary": "Evaluation failed due to error",
+            }
+            self.logger.info(
+                f"[DEBUG:CoreAgent:{proposal_id}] ERROR_SCORE=50/100 | FLAGS=[{str(e)}] | SUMMARY=Evaluation failed"
+            )
+            return fallback_score_dict
+
+
+class HistoricalContextAgent(BaseCapabilityMixin, VectorRetrievalCapability):
+    """Historical Context Agent examines past proposals and patterns."""
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        BaseCapabilityMixin.__init__(self, config=config, state_key="historical_score")
+        VectorRetrievalCapability.__init__(self)
+        self.initialize()
+        self._initialize_vector_capability()
+
+    def _initialize_vector_capability(self):
+        if not hasattr(self, "retrieve_from_vector_store"):
+            self.retrieve_from_vector_store = (
+                VectorRetrievalCapability.retrieve_from_vector_store.__get__(
+                    self, self.__class__
+                )
+            )
+            self.logger.info(
+                "Initialized vector retrieval capability for HistoricalContextAgent"
+            )
+
+    async def process(self, state: ProposalEvaluationState) -> Dict[str, Any]:
+        proposal_id = state.get("proposal_id", "unknown")
+        self._initialize_vector_capability()
+        proposal_content = state.get("proposal_data", "")
+
+        historical_text = ""
+        try:
+            self.logger.debug(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Searching for similar proposals: {proposal_content[:50]}..."
+            )
+            similar_proposals = await self.retrieve_from_vector_store(
+                query=f"Proposals similar to: {proposal_content}",
+                collection_name=self.config.get(
+                    "proposals_collection", "past_proposals"
+                ),
+                limit=5,
+            )
+            historical_text = "\n".join([doc.page_content for doc in similar_proposals])
+            self.logger.debug(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Found {len(similar_proposals)} similar proposals"
+            )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Error retrieving historical proposals: {str(e)}",
+                exc_info=True,
+            )
+            historical_text = "No similar historical proposals found."
+        prompt = PromptTemplate(
+            input_variables=["proposal_data", "historical_proposals"],
+            template="""Analyze this proposal in the context of historical patterns and similar past proposals.\\n            
+Current Proposal: {proposal_data}\\nSimilar Past Proposals: {historical_proposals}\\n
+Evaluate:\\n1. Precedent: Have similar proposals been approved or rejected?\\n2. Cross-DAO Similarities: How does this compare to proposals in similar DAOs?\\n3. Learning from Past: Does it address issues from past proposals?\\n4. Uniqueness: Is this novel or repeating past ideas?\\n
+# ADDED: Image processing instructions
+**Image Analysis Instructions:**
+If images are provided with this proposal (they will appear after this text), you MUST analyze them as an integral part of the proposal.
+- Relevance: Does each image directly relate to and support the proposal's text?
+- Evidence: Do the images provide visual evidence for claims made in the proposal?
+- Authenticity & Quality: Are the images clear, authentic, and not misleading or manipulated?
+- Cohesion: The images and text MUST form a cohesive and consistent whole. If any image contradicts the text, is irrelevant, misleading, of very poor quality, or inappropriate, you should consider this a significant flaw in the proposal.
+
+Provide a score from 0-100, flag any critical issues (including image-related ones), and summarize your findings, explicitly mentioning your image analysis if images were present.\\
+            """,
+        )
+        try:
+            self.logger.debug(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Formatting prompt"
+            )
+            formatted_prompt_text = prompt.format(
+                proposal_data=proposal_content,
+                historical_proposals=historical_text
+                or "No similar historical proposals found.",
+            )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Error formatting prompt: {str(e)}",
+                exc_info=True,
+            )
+            formatted_prompt_text = f"Analyze proposal: {proposal_content}"
+        try:
+            self.logger.debug(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Invoking LLM for historical evaluation"
+            )
+
+            # ADDED: Image handling
+            proposal_images_list = state.get("proposal_images", [])
+            if not isinstance(proposal_images_list, list):
+                self.logger.warning(
+                    f"[DEBUG:HistoricalAgent:{proposal_id}] proposal_images is not a list: {type(proposal_images_list)}. Defaulting to empty list."
+                )
+                proposal_images_list = []
+
+            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
+            if proposal_images_list:
+                self.logger.debug(
+                    f"[DEBUG:HistoricalAgent:{proposal_id}] Adding {len(proposal_images_list)} images to LLM input."
+                )
+                message_content_list.extend(proposal_images_list)
+
+            llm_input_message = HumanMessage(content=message_content_list)
+
+            result = await self.llm.with_structured_output(AgentOutput).ainvoke(
+                [llm_input_message]
+            )
+            self.logger.info(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] SCORE={result.score}/100 | FLAGS={result.flags} | SUMMARY={result.summary}"
+            )
+
+            # Track token usage - extract directly from LLM if available
+            token_usage_data = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+
+            # Try to extract token usage directly from LLM response
+            if (
+                hasattr(self.llm, "_last_prompt_id")
+                and hasattr(self.llm, "client")
+                and hasattr(self.llm.client, "usage_by_prompt_id")
+            ):
+                last_prompt_id = self.llm._last_prompt_id
+                if last_prompt_id in self.llm.client.usage_by_prompt_id:
+                    usage = self.llm.client.usage_by_prompt_id[last_prompt_id]
+                    token_usage_data = {
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
+                    }
+                    self.logger.debug(
+                        f"[DEBUG:HistoricalAgent:{proposal_id}] Extracted token usage from LLM: {token_usage_data}"
+                    )
+            # Fallback to estimation
+            if token_usage_data["total_tokens"] == 0:
+                # Get model name from LLM
+                llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+                # First calculate token count from the text
+                token_count = len(formatted_prompt_text) // 4  # Simple estimation
+                # Create token usage dictionary for calculate_token_cost
+                token_usage_dict = {"input_tokens": token_count}
+                # Calculate cost
+                cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+                token_usage_data = {
+                    "input_tokens": token_count,
+                    "output_tokens": len(result.model_dump_json())
+                    // 4,  # rough estimate
+                    "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                }
+                self.logger.debug(
+                    f"[DEBUG:HistoricalAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
+                )
+
+            # Add token usage to state
+            if "token_usage" not in state:
+                state["token_usage"] = {}
+            state["token_usage"]["historical_agent"] = token_usage_data
+
+            result_dict = result.model_dump()
+            # Update state with the result
+            update_state_with_agent_result(state, result_dict, "historical")
+            return result_dict
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Error in historical evaluation: {str(e)}",
+                exc_info=True,
+            )
+            fallback_score_dict = {
+                "score": 50,
+                "flags": [f"Error: {str(e)}"],
+                "summary": "Evaluation failed due to error",
+            }
+            self.logger.info(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] ERROR_SCORE=50/100 | FLAGS=[{str(e)}] | SUMMARY=Evaluation failed"
+            )
+            return fallback_score_dict
+
+
+class FinancialContextAgent(BaseCapabilityMixin):
+    """Financial Context Agent evaluates treasury impact and financial viability."""
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__(config=config, state_key="financial_score")
+        self.initialize()
+
+    async def process(self, state: ProposalEvaluationState) -> Dict[str, Any]:
+        proposal_id = state.get("proposal_id", "unknown")
+        treasury_balance = state.get(
+            "treasury_balance", self.config.get("treasury_balance", 1000000)
+        )
+        proposal_content = state.get("proposal_data", "")
+
+        prompt = PromptTemplate(
+            input_variables=["proposal_data", "treasury_balance"],
+            template="""Assess the financial aspects of this proposal.\\n            
+Proposal: {proposal_data}\\nCurrent Treasury Balance: {treasury_balance}\\n
+Evaluate:\\n1. Cost-Benefit Analysis: Is the ROI reasonable?\\n2. Treasury Impact: What percentage of treasury would this use?\\n3. Budget Alignment: Does it align with budget priorities?\\n4. Projected Impact: What's the expected financial outcome?\\n5. Risk Assessment: What financial risks might arise?\\n
+# ADDED: Image processing instructions
+**Image Analysis Instructions:**
+If images are provided with this proposal (they will appear after this text), you MUST analyze them as an integral part of the proposal.
+- Relevance: Does each image directly relate to and support the proposal's text?
+- Evidence: Do the images provide visual evidence for claims made in the proposal (e.g., screenshots of transactions, diagrams of financial models if applicable)?
+- Authenticity & Quality: Are the images clear, authentic, and not misleading or manipulated?
+- Cohesion: The images and text MUST form a cohesive and consistent whole. If any image contradicts the text, is irrelevant, misleading, of very poor quality, or inappropriate, you should consider this a significant flaw in the proposal.
+
+Provide a score from 0-100, flag any critical issues (including image-related ones), and summarize your findings, explicitly mentioning your image analysis if images were present.\\
+            """,
+        )
+        try:
+            self.logger.debug(
+                f"[DEBUG:FinancialAgent:{proposal_id}] Formatting prompt for financial evaluation"
+            )
+            formatted_prompt_text = prompt.format(
+                proposal_data=proposal_content,
+                treasury_balance=treasury_balance,
+            )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:FinancialAgent:{proposal_id}] Error formatting prompt: {str(e)}",
+                exc_info=True,
+            )
+            formatted_prompt_text = (
+                f"Assess financial aspects of proposal: {proposal_content}"
+            )
+        try:
+            self.logger.debug(
+                f"[DEBUG:FinancialAgent:{proposal_id}] Invoking LLM for financial evaluation"
+            )
+
+            # ADDED: Image handling
+            proposal_images = state.get("proposal_images", [])
+            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
+            if proposal_images:
+                logger.debug(
+                    f"[DEBUG:FinancialAgent:{proposal_id}] Adding {len(proposal_images)} images to LLM input."
+                )
+                message_content_list.extend(proposal_images)
+
+            llm_input_message = HumanMessage(content=message_content_list)
+
+            result = await self.llm.with_structured_output(AgentOutput).ainvoke(
+                [llm_input_message]
+            )
+            self.logger.info(
+                f"[DEBUG:FinancialAgent:{proposal_id}] SCORE={result.score}/100 | FLAGS={result.flags} | SUMMARY={result.summary}"
+            )
+
+            # Track token usage - extract directly from LLM if available
+            token_usage_data = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+
+            # Try to extract token usage directly from LLM response
+            if (
+                hasattr(self.llm, "_last_prompt_id")
+                and hasattr(self.llm, "client")
+                and hasattr(self.llm.client, "usage_by_prompt_id")
+            ):
+                last_prompt_id = self.llm._last_prompt_id
+                if last_prompt_id in self.llm.client.usage_by_prompt_id:
+                    usage = self.llm.client.usage_by_prompt_id[last_prompt_id]
+                    token_usage_data = {
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
+                    }
+                    self.logger.debug(
+                        f"[DEBUG:FinancialAgent:{proposal_id}] Extracted token usage from LLM: {token_usage_data}"
+                    )
+            # Fallback to estimation
+            if token_usage_data["total_tokens"] == 0:
+                # Get model name from LLM
+                llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+                # First calculate token count from the text
+                token_count = len(formatted_prompt_text) // 4  # Simple estimation
+                # Create token usage dictionary for calculate_token_cost
+                token_usage_dict = {"input_tokens": token_count}
+                # Calculate cost
+                cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+                token_usage_data = {
+                    "input_tokens": token_count,
+                    "output_tokens": len(result.model_dump_json())
+                    // 4,  # rough estimate
+                    "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                }
+                self.logger.debug(
+                    f"[DEBUG:FinancialAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
+                )
+
+            # Add token usage to state
+            if "token_usage" not in state:
+                state["token_usage"] = {}
+            state["token_usage"]["financial_agent"] = token_usage_data
+
+            result_dict = result.model_dump()
+            # Update state with the result
+            update_state_with_agent_result(state, result_dict, "financial")
+            return result_dict
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:FinancialAgent:{proposal_id}] Error in financial evaluation: {str(e)}",
+                exc_info=True,
+            )
+            fallback_score_dict = {
+                "score": 50,
+                "flags": [f"Error: {str(e)}"],
+                "summary": "Evaluation failed due to error",
+            }
+            self.logger.info(
+                f"[DEBUG:FinancialAgent:{proposal_id}] ERROR_SCORE=50/100 | FLAGS=[{str(e)}] | SUMMARY=Evaluation failed"
+            )
+            return fallback_score_dict
+
+
+class ImageProcessingNode(BaseCapabilityMixin):
+    """A workflow node to process proposal images: extract URLs, download, and base64 encode."""
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__(config=config, state_key="proposal_images")
+        self.initialize()
+
+    async def process(self, state: ProposalEvaluationState) -> List[Dict[str, Any]]:
+        """The core logic for processing images, returns the list of processed image dicts directly."""
+        proposal_id = state.get("proposal_id", "unknown")
+        proposal_data_str = state.get("proposal_data", "")
+
+        if not proposal_data_str:
+            self.logger.info(
+                f"[ImageProcessorNode:{proposal_id}] No proposal_data string, skipping image processing."
+            )
+            return []
+
+        self.logger.info(
+            f"[ImageProcessorNode:{proposal_id}] Starting image processing."
+        )
+        image_urls = extract_image_urls(proposal_data_str)
+
+        if not image_urls:
+            self.logger.info(
+                f"[ImageProcessorNode:{proposal_id}] No image URLs found in proposal data."
+            )
+            return []
+
+        self.logger.info(
+            f"[ImageProcessorNode:{proposal_id}] Found {len(image_urls)} image URLs: {image_urls}"
+        )
+
+        processed_images = []
+        async with httpx.AsyncClient() as client:
+            for url in image_urls:
+                try:
+                    self.logger.debug(
+                        f"[ImageProcessorNode:{proposal_id}] Downloading image from {url}"
+                    )
+                    response = await client.get(url, timeout=10.0)
+                    response.raise_for_status()
+                    image_data = base64.b64encode(response.content).decode("utf-8")
+                    mime_type = "image/jpeg"
+                    if url.lower().endswith((".jpg", ".jpeg")):
+                        mime_type = "image/jpeg"
+                    elif url.lower().endswith(".png"):
+                        mime_type = "image/png"
+                    elif url.lower().endswith(".gif"):
+                        mime_type = "image/gif"
+                    elif url.lower().endswith(".webp"):
+                        mime_type = "image/webp"
+
+                    processed_images.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_data}"
+                            },
+                        }
+                    )
+                    self.logger.debug(
+                        f"[ImageProcessorNode:{proposal_id}] Successfully processed image from {url}"
+                    )
+                except httpx.HTTPStatusError as e:
+                    self.logger.error(
+                        f"[ImageProcessorNode:{proposal_id}] HTTP error for {url}: {e.response.status_code}",
+                        exc_info=False,
+                    )
+                except httpx.RequestError as e:
+                    self.logger.error(
+                        f"[ImageProcessorNode:{proposal_id}] Request error for {url}: {str(e)}",
+                        exc_info=False,
+                    )
                 except Exception as e:
                     self.logger.error(
-                        f"Failed to get treasury balance: {str(e)}", exc_info=True
+                        f"[ImageProcessorNode:{proposal_id}] Generic error for {url}: {str(e)}",
+                        exc_info=True,
                     )
-                state["treasury_balance"] = treasury_balance
-                # --- End Fetch Core Data --- #
 
-                # Use mixin capabilities for web search and vector retrieval
-                web_search_query = f"DAO proposal {proposal_dict.get('type', 'unknown')} - {proposal_dict.get('parameters', '')}"
+        self.logger.info(
+            f"[ImageProcessorNode:{proposal_id}] Finished. {len(processed_images)} images processed."
+        )
+        return processed_images
 
-                # Fetch web search results and token usage
-                web_search_results, web_search_token_usage = await self.search_web(
-                    query=web_search_query,
-                    search_context_size="medium",
-                )
-                state["web_search_results"] = web_search_results
-                state["web_search_token_usage"] = web_search_token_usage
-                # Store web search model info (assuming gpt-4.1 as used in mixin)
-                state["web_search_model_info"] = {
-                    "name": "gpt-4.1",
-                    "temperature": None,
-                }
 
-                vector_search_query = f"Proposal type: {proposal_dict.get('type')} - {proposal_dict.get('parameters', '')}"
-                state["vector_results"] = await self.retrieve_from_vector_store(
-                    query=vector_search_query, limit=5
-                )
+class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability):
+    """Social Context Agent gauges community sentiment and social impact."""
 
-                # Fetch recent tweets
-                recent_tweets = []
-                if dao_id:
-                    try:
-                        self.logger.debug(f"Fetching tweets for DAO ID: {dao_id}")
-                        queue_messages = backend.list_queue_messages(
-                            QueueMessageFilter(
-                                type=QueueMessageType.TWEET,
-                                dao_id=dao_id,
-                                is_processed=True,
-                            )
-                        )
-                        sorted_messages = sorted(
-                            queue_messages, key=lambda x: x.created_at, reverse=True
-                        )[:5]
-                        recent_tweets = [
-                            {
-                                "created_at": msg.created_at,
-                                "message": (
-                                    msg.message.get("message", "No text available")
-                                    if isinstance(msg.message, dict)
-                                    else msg.message
-                                ),
-                                "tweet_id": msg.tweet_id,
-                            }
-                            for msg in sorted_messages
-                        ]
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to fetch tweets: {str(e)}", exc_info=True
-                        )
-                state["recent_tweets"] = recent_tweets
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        BaseCapabilityMixin.__init__(self, config=config, state_key="social_score")
+        WebSearchCapability.__init__(self)
+        self.initialize()
+        self._initialize_web_search_capability()
 
-                # Fetch contract source for core proposals
-                contract_source = ""
-                if proposal_dict.get("type") == ProposalType.CORE and proposal_dict.get(
-                    "proposal_contract"
-                ):
-                    parts = proposal_dict["proposal_contract"].split(".")
-                    if len(parts) >= 2:
-                        try:
-                            api = HiroApi()
-                            result = api.get_contract_source(parts[0], parts[1])
-                            contract_source = result.get("source", "")
-                        except Exception as e:
-                            self.logger.error(
-                                f"Failed to fetch contract source: {str(e)}",
-                                exc_info=True,
-                            )
-                    else:
-                        self.logger.warning(
-                            f"Invalid contract format: {proposal_dict['proposal_contract']}"
-                        )
-                state["contract_source"] = contract_source
+    def _initialize_web_search_capability(self):
+        if not hasattr(self, "search_web"):
+            self.search_web = WebSearchCapability.search_web.__get__(
+                self, self.__class__
+            )
+            self.logger.info("Initialized web search capability for SocialContextAgent")
 
-                # Validate proposal data structure (moved from entry point)
-                proposal_type = proposal_dict.get("type")
-                if proposal_type == ProposalType.ACTION and not proposal_dict.get(
-                    "parameters"
-                ):
-                    raise ValueError("Action proposal missing parameters")
-                if proposal_type == ProposalType.CORE and not proposal_dict.get(
-                    "proposal_contract"
-                ):
-                    raise ValueError("Core proposal missing proposal_contract")
+    async def process(self, state: ProposalEvaluationState) -> Dict[str, Any]:
+        proposal_id = state.get("proposal_id", "unknown")
+        self._initialize_web_search_capability()
+        proposal_content = state.get("proposal_data", "")
 
-                return state
-            except Exception as e:
-                self.logger.error(f"Error in fetch_context: {str(e)}", exc_info=True)
-                state["reasoning"] = f"Error fetching context: {str(e)}"
-                # Propagate error state
-                return state
-
-        async def format_evaluation_prompt(state: EvaluationState) -> EvaluationState:
-            """Format the evaluation prompt using the fetched context."""
-            if "reasoning" in state and "Error" in state["reasoning"]:
-                return state  # Skip if context fetching failed
+        social_context = ""
+        if self.config.get("enable_web_search", True):
             try:
-                # Extract data from state for easier access
-                proposal_data = state["proposal_data"]
-                dao_info = state.get("dao_info", {})
-                treasury_balance = state.get("treasury_balance")
-                contract_source = state.get("contract_source", "")
-                agent_prompts = state.get("agent_prompts", [])
-                vector_results = state.get("vector_results", [])
-                recent_tweets = state.get("recent_tweets", [])
-                web_search_results = state.get("web_search_results", [])
-
-                # Format agent prompts
-                agent_prompts_str = "No agent-specific instructions available."
-                if agent_prompts:
-                    if isinstance(agent_prompts, list):
-                        agent_prompts_str = "\n\n".join(agent_prompts)
-                    else:
-                        self.logger.warning(
-                            f"Invalid agent prompts: {type(agent_prompts)}"
-                        )
-
-                # Format web search results
-                web_search_content = "No relevant web search results found."
-                if web_search_results:
-                    # Create structured XML format for each web search result
-                    web_search_items = []
-                    for i, res in enumerate(web_search_results):
-                        source_url = (
-                            res.get("metadata", {})
-                            .get("source_urls", [{}])[0]
-                            .get("url", "Unknown")
-                        )
-                        web_search_items.append(
-                            f"<search_result>\n<result_number>{i+1}</result_number>\n<content>{res.get('page_content', '')}</content>\n<source>{source_url}</source>\n</search_result>"
-                        )
-                    web_search_content = "\n".join(web_search_items)
-
-                # Format vector context
-                vector_context = "No additional context available from vector store."
-                if vector_results:
-                    # Create structured XML format for each vector result
-                    vector_items = []
-                    for i, doc in enumerate(vector_results):
-                        vector_items.append(
-                            f"<vector_item>\n<item_number>{i+1}</item_number>\n<content>{doc.page_content}</content>\n</vector_item>"
-                        )
-                    vector_context = "\n".join(vector_items)
-
-                # Format recent tweets
-                tweets_content = "No recent DAO tweets found."
-                if recent_tweets:
-                    # Create structured XML format for each tweet
-                    tweet_items = []
-                    for i, tweet in enumerate(recent_tweets):
-                        tweet_items.append(
-                            f"<tweet>\n<tweet_number>{i+1}</tweet_number>\n<date>{tweet['created_at']}</date>\n<message>{tweet['message']}</message>\n</tweet>"
-                        )
-                    tweets_content = "\n".join(tweet_items)
-
-                # Convert JSON objects to formatted text
-                # Format proposal_data
-                proposal_data_str = "No proposal data available."
-                if proposal_data:
-                    proposal_data_str = "\n".join(
-                        [
-                            f"Proposal ID: {proposal_data.get('proposal_id', 'Unknown')}",
-                            f"Type: {proposal_data.get('type', 'Unknown')}",
-                            f"Action: {proposal_data.get('action', 'Unknown')}",
-                            f"Parameters: {proposal_data.get('parameters', 'None')}",
-                            f"Creator: {proposal_data.get('creator', 'Unknown')}",
-                            f"Contract Principal: {proposal_data.get('contract_principal', 'Unknown')}",
-                            f"Start Block: {proposal_data.get('start_block', 'Unknown')}",
-                            f"End Block: {proposal_data.get('end_block', 'Unknown')}",
-                            f"Created at Block: {proposal_data.get('created_at_block', 'Unknown')}",
-                            f"Liquid Tokens: {proposal_data.get('liquid_tokens', 'Unknown')}",
-                        ]
-                    )
-
-                    # Add proposal contract info if it exists
-                    if proposal_data.get("proposal_contract"):
-                        proposal_data_str += f"\nProposal Contract: {proposal_data.get('proposal_contract')}"
-
-                # Format dao_info
-                dao_info_str = "No DAO information available."
-                if dao_info:
-                    dao_info_str = "\n".join(
-                        [
-                            f"DAO Name: {dao_info.get('name', 'Unknown')}",
-                            f"DAO Mission: {dao_info.get('mission', 'Unknown')}",
-                            f"DAO Description: {dao_info.get('description', 'Unknown')}",
-                        ]
-                    )
-
-                # Format treasury_balance
-                treasury_balance_str = "Treasury balance information not available."
-                if treasury_balance is not None:
-                    treasury_balance_str = (
-                        f"Current DAO Treasury Balance: {treasury_balance} STX"
-                    )
-
-                formatted_prompt = prompt.format(
-                    proposal_data=proposal_data_str,
-                    dao_info=dao_info_str,
-                    treasury_balance=treasury_balance_str,
-                    contract_source=contract_source,
-                    agent_prompts=agent_prompts_str,
-                    vector_context=vector_context,
-                    recent_tweets=tweets_content,
-                    web_search_results=web_search_content,
+                search_query = (
+                    f"Community sentiment {proposal_content[:50]} cryptocurrency DAO"
                 )
-                state["formatted_prompt"] = formatted_prompt
-                return state
-            except Exception as e:
-                self.logger.error(f"Error formatting prompt: {str(e)}", exc_info=True)
-                state["reasoning"] = f"Error formatting prompt: {str(e)}"
-                return state
-
-        async def call_evaluation_llm(state: EvaluationState) -> EvaluationState:
-            """Call the LLM with the formatted prompt for evaluation."""
-            if "reasoning" in state and "Error" in state["reasoning"]:
-                return state  # Skip if previous steps failed
-            try:
-                # Prepare message content with text and images
-                message_content = [{"type": "text", "text": state["formatted_prompt"]}]
-
-                # Add any proposal images if they exist
-                if state.get("proposal_images"):
-                    message_content.extend(state["proposal_images"])
-
-                # Create the message for the LLM
-                message = HumanMessage(content=message_content)
-
-                structured_output = self.llm.with_structured_output(
-                    ProposalEvaluationOutput, include_raw=True
-                )
-                result: Dict[str, Any] = await structured_output.ainvoke([message])
-
-                parsed_result = result.get("parsed")
-                if not isinstance(parsed_result, ProposalEvaluationOutput):
-                    # Attempt to handle cases where parsing might return the raw dict
-                    if isinstance(parsed_result, dict):
-                        parsed_result = ProposalEvaluationOutput(**parsed_result)
-                    else:
-                        raise TypeError(
-                            f"Expected ProposalEvaluationOutput or dict, got {type(parsed_result)}"
-                        )
-
-                model_info = {"name": self.model_name, "temperature": self.temperature}
-                token_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-
-                raw_response = result.get("raw")
-                if raw_response:
-                    if hasattr(raw_response, "usage_metadata"):
-                        token_usage = raw_response.usage_metadata
-                    else:
-                        self.logger.warning("Raw response missing usage_metadata")
-                else:
-                    self.logger.warning("LLM result missing raw response data")
-
-                state["approve"] = parsed_result.approve
-                state["confidence_score"] = parsed_result.confidence_score
-                state["reasoning"] = parsed_result.reasoning
-                state["evaluation_token_usage"] = token_usage
-                state["evaluation_model_info"] = model_info
-
                 self.logger.debug(
-                    f"Evaluation step complete: Decision={'APPROVE' if parsed_result.approve else 'REJECT'} | Confidence={parsed_result.confidence_score:.2f}"
+                    f"[DEBUG:SocialAgent:{proposal_id}] Performing web search: {search_query}"
                 )
-                self.logger.debug(f"Full reasoning: {parsed_result.reasoning}")
-
-                return state
-            except Exception as e:
-                self.logger.error(f"Error calling LLM: {str(e)}", exc_info=True)
-                state["approve"] = False
-                state["confidence_score"] = 0.0
-                state["reasoning"] = f"Error during LLM evaluation: {str(e)}"
-                return state
-
-        # Create decision node
-        async def should_vote(state: EvaluationState) -> str:
-            """Decide whether to vote based on confidence threshold."""
-            try:
+                search_results, web_search_token_usage = await self.search_web(
+                    query=search_query,
+                    num_results=3,
+                )
+                social_context = "\n".join(
+                    [f"{r.get('page_content', '')}" for r in search_results]
+                )
                 self.logger.debug(
-                    f"Deciding vote: auto_vote={state['auto_vote']} | confidence={state['confidence_score']} | threshold={state['confidence_threshold']}"
+                    f"[DEBUG:SocialAgent:{proposal_id}] Found {len(search_results)} web search results"
                 )
 
-                if not state["auto_vote"]:
-                    self.logger.debug("Auto-vote is disabled, skipping vote")
-                    return "skip_vote"
+                # Store web search token usage
+                if "token_usage" not in state:
+                    state["token_usage"] = {}
+                state["token_usage"]["social_web_search"] = web_search_token_usage
 
-                if state["confidence_score"] >= state["confidence_threshold"]:
-                    self.logger.debug(
-                        f"Confidence score {state['confidence_score']} meets threshold {state['confidence_threshold']}, proceeding to vote"
-                    )
-                    return "vote"
-                else:
-                    self.logger.debug(
-                        f"Confidence score {state['confidence_score']} below threshold {state['confidence_threshold']}, skipping vote"
-                    )
-                    return "skip_vote"
             except Exception as e:
-                self.logger.error(f"Error in should_vote: {str(e)}", exc_info=True)
-                return "skip_vote"
+                logger.error(
+                    f"[DEBUG:SocialAgent:{proposal_id}] Web search failed: {str(e)}",
+                    exc_info=True,
+                )
+                social_context = "Web search unavailable."
+        prompt = PromptTemplate(
+            input_variables=["proposal_data", "social_context"],
+            template="""Gauge the community sentiment and social impact of this proposal.\\n            
+Proposal: {proposal_data}\\nSocial Context: {social_context}\\n
+Evaluate:\\n1. Community Sentiment: How might members perceive this?\\n2. Social Media Presence: Any discussions online about this?\\n3. Engagement Potential: Will this engage the community?\\n4. Cross-Platform Analysis: How does sentiment vary across platforms?\\n5. Social Risk: Any potential for controversy or division?\\n
+# ADDED: Image processing instructions
+**Image Analysis Instructions:**
+If images are provided with this proposal (they will appear after this text), you MUST analyze them as an integral part of the proposal.
+- Relevance: Does each image directly relate to and support the proposal's text or the community/social aspects being discussed?
+- Evidence: Do the images provide visual evidence for claims made (e.g., screenshots of community discussions, mockups of social impact visuals)?
+- Authenticity & Quality: Are the images clear, authentic, and not misleading or manipulated?
+- Cohesion: The images and text MUST form a cohesive and consistent whole. If any image contradicts the text, is irrelevant, misleading, of very poor quality, or inappropriate, you should consider this a significant flaw in the proposal.
 
-        # Create voting node using VectorReact workflow
-        async def vote_on_proposal(state: EvaluationState) -> EvaluationState:
-            """Vote on the proposal using VectorReact workflow."""
-            try:
-                # Check if wallet_id is available
-                if not state.get("wallet_id"):
-                    self.logger.warning(
-                        "No wallet_id provided for voting, skipping vote"
-                    )
-                    state["vote_result"] = {
-                        "success": False,
-                        "error": "No wallet_id provided for voting",
+Provide a score from 0-100, flag any critical issues (including image-related ones), and summarize your findings, explicitly mentioning your image analysis if images were present.\\
+            """,
+        )
+        try:
+            self.logger.debug(
+                f"[DEBUG:SocialAgent:{proposal_id}] Formatting prompt for social evaluation"
+            )
+            formatted_prompt_text = prompt.format(
+                proposal_data=proposal_content,
+                social_context=social_context,
+            )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:SocialAgent:{proposal_id}] Error formatting prompt: {str(e)}",
+                exc_info=True,
+            )
+            formatted_prompt_text = (
+                f"Gauge social impact of proposal: {proposal_content}"
+            )
+        try:
+            self.logger.debug(
+                f"[DEBUG:SocialAgent:{proposal_id}] Invoking LLM for social evaluation"
+            )
+
+            # ADDED: Image handling
+            proposal_images_list = state.get("proposal_images", [])
+            if not isinstance(proposal_images_list, list):
+                self.logger.warning(
+                    f"[DEBUG:SocialAgent:{proposal_id}] proposal_images is not a list: {type(proposal_images_list)}. Defaulting to empty list."
+                )
+                proposal_images_list = []
+
+            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
+            if proposal_images_list:
+                self.logger.debug(
+                    f"[DEBUG:SocialAgent:{proposal_id}] Adding {len(proposal_images_list)} images to LLM input."
+                )
+                message_content_list.extend(proposal_images_list)
+
+            llm_input_message = HumanMessage(content=message_content_list)
+
+            result = await self.llm.with_structured_output(AgentOutput).ainvoke(
+                [llm_input_message]
+            )
+            self.logger.info(
+                f"[DEBUG:SocialAgent:{proposal_id}] SCORE={result.score}/100 | FLAGS={result.flags} | SUMMARY={result.summary}"
+            )
+
+            # Track token usage - extract directly from LLM if available
+            token_usage_data = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+
+            # Try to extract token usage directly from LLM response
+            if (
+                hasattr(self.llm, "_last_prompt_id")
+                and hasattr(self.llm, "client")
+                and hasattr(self.llm.client, "usage_by_prompt_id")
+            ):
+                last_prompt_id = self.llm._last_prompt_id
+                if last_prompt_id in self.llm.client.usage_by_prompt_id:
+                    usage = self.llm.client.usage_by_prompt_id[last_prompt_id]
+                    token_usage_data = {
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
                     }
-                    return state
-
+                    self.logger.debug(
+                        f"[DEBUG:SocialAgent:{proposal_id}] Extracted token usage from LLM: {token_usage_data}"
+                    )
+            # Fallback to estimation
+            if token_usage_data["total_tokens"] == 0:
+                # Get model name from LLM
+                llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+                # First calculate token count from the text
+                token_count = len(formatted_prompt_text) // 4  # Simple estimation
+                # Create token usage dictionary for calculate_token_cost
+                token_usage_dict = {"input_tokens": token_count}
+                # Calculate cost
+                cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+                token_usage_data = {
+                    "input_tokens": token_count,
+                    "output_tokens": len(result.model_dump_json())
+                    // 4,  # rough estimate
+                    "total_tokens": token_count + len(result.model_dump_json()) // 4,
+                }
                 self.logger.debug(
-                    f"Setting up VectorReact workflow: proposal_id={state['proposal_id']} | vote={state['approve']}"
+                    f"[DEBUG:SocialAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
                 )
 
-                # Set up the voting tool
-                vote_tool = VoteOnActionProposalTool(wallet_id=state["wallet_id"])
-                tools_map = {"dao_action_vote_on_proposal": vote_tool}
+            # Add token usage to state
+            if "token_usage" not in state:
+                state["token_usage"] = {}
+            state["token_usage"]["social_agent"] = token_usage_data
 
-                # Create a user input message that instructs the LLM what to do
-                vote_instruction = f"I need you to vote on a DAO proposal with ID {state['proposal_id']} in the contract {state['action_proposals_contract']}. Please vote {'FOR' if state['approve'] else 'AGAINST'} the proposal. Use the dao_action_vote_on_proposal tool to submit the vote."
+            result_dict = result.model_dump()
+            # Update state with the result
+            update_state_with_agent_result(state, result_dict, "social")
+            return result_dict
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:SocialAgent:{proposal_id}] Error in social evaluation: {str(e)}",
+                exc_info=True,
+            )
+            fallback_score_dict = {
+                "score": 50,
+                "flags": [f"Error: {str(e)}"],
+                "summary": "Evaluation failed due to error",
+            }
+            self.logger.info(
+                f"[DEBUG:SocialAgent:{proposal_id}] ERROR_SCORE=50/100 | FLAGS=[{str(e)}] | SUMMARY=Evaluation failed"
+            )
+            return fallback_score_dict
 
-                # Create VectorLangGraph service with collections
-                service = ChatService(
-                    collection_names=self.collection_names,
-                )
 
-                # History with system message only
-                history = [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant tasked with voting on DAO proposals. Follow the instructions precisely.",
+class ReasoningAgent(BaseCapabilityMixin, PlanningCapability):
+    """Configuration & Reasoning Agent synthesizes evaluations and makes decisions."""
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize the Reasoning Agent."""
+        BaseCapabilityMixin.__init__(self, config=config, state_key="final_score")
+        self.initialize()
+        planning_queue = asyncio.Queue()
+        callback_handler = self.config.get(
+            "callback_handler"
+        ) or StreamingCallbackHandler(planning_queue)
+        PlanningCapability.__init__(
+            self,
+            callback_handler=callback_handler,
+            planning_llm=ChatOpenAI(
+                model=self.config.get("planning_model", "gpt-4.1-mini")
+            ),
+            persona="DAO Proposal Evaluator",
+        )
+        self._initialize_planning_capability()
+
+    def _initialize_planning_capability(self):
+        """Initialize planning capability methods."""
+        if not hasattr(self, "create_plan"):
+            self.create_plan = PlanningCapability.create_plan.__get__(
+                self, self.__class__
+            )
+            self.logger.info("Initialized planning capability for ReasoningAgent")
+
+    def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
+        """Integrate planning capability with the graph."""
+        pass
+
+    async def process(self, state: ProposalEvaluationState) -> Dict[str, Any]:
+        proposal_id = state.get("proposal_id", "unknown")
+        self._initialize_planning_capability()
+        proposal_content = state.get("proposal_data", "")
+        self.logger.debug(
+            f"[DEBUG:ReasoningAgent:{proposal_id}] Beginning final evaluation processing with proposal_content (length: {len(proposal_content)})"
+        )
+
+        def safe_get_score(value, default=0):
+            if isinstance(value, dict) and "score" in value:
+                return value.get("score", default)
+            elif isinstance(value, int):
+                return value
+            return default
+
+        core_score = state.get("core_score", {})
+        historical_score = state.get("historical_score", {})
+        financial_score = state.get("financial_score", {})
+        social_score = state.get("social_score", {})
+
+        core_score_val = safe_get_score(core_score)
+        historical_score_val = safe_get_score(historical_score)
+        financial_score_val = safe_get_score(financial_score)
+        social_score_val = safe_get_score(social_score)
+
+        self.logger.debug(
+            f"[DEBUG:ReasoningAgent:{proposal_id}] Input scores: Core={core_score_val}, Historical={historical_score_val}, Financial={financial_score_val}, Social={social_score_val}"
+        )
+
+        scores = {
+            "Core Context": core_score_val,
+            "Historical Context": historical_score_val,
+            "Financial Context": financial_score_val,
+            "Social Context": social_score_val,
+        }
+        summaries = state.get("summaries", {})
+        flags = state.get("flags", [])
+
+        self.logger.debug(
+            f"[DEBUG:ReasoningAgent:{proposal_id}] Summaries: {summaries}"
+        )
+
+        self.logger.debug(f"[DEBUG:ReasoningAgent:{proposal_id}] Flags raised: {flags}")
+
+        # Update the summaries with the content from each agent's evaluation
+        if isinstance(core_score, dict) and "summary" in core_score:
+            summaries["core_score"] = core_score["summary"]
+        if isinstance(historical_score, dict) and "summary" in historical_score:
+            summaries["historical_score"] = historical_score["summary"]
+        if isinstance(financial_score, dict) and "summary" in financial_score:
+            summaries["financial_score"] = financial_score["summary"]
+        if isinstance(social_score, dict) and "summary" in social_score:
+            summaries["social_score"] = social_score["summary"]
+
+        # Update flags
+        for score_obj in [core_score, historical_score, financial_score, social_score]:
+            if (
+                isinstance(score_obj, dict)
+                and "flags" in score_obj
+                and isinstance(score_obj["flags"], list)
+            ):
+                flags.extend(score_obj["flags"])
+
+        prompt = PromptTemplate(
+            input_variables=["proposal_data", "scores", "summaries", "flags"],
+            template="""Synthesize all evaluations and make a final decision on this proposal.\\n            
+Proposal: {proposal_data}\\n
+Evaluations:\\n- Core Context (Score: {scores[Core Context]}): {summaries[core_score]}\\n- Historical Context (Score: {scores[Historical Context]}): {summaries[historical_score]}\\n- Financial Context (Score: {scores[Financial Context]}): {summaries[financial_score]}\\n- Social Context (Score: {scores[Social Context]}): {summaries[social_score]}\\n
+Flags Raised: {flags}\\n
+Synthesize these evaluations to:\\n1. Weigh the importance of each context\\n2. Calibrate confidence based on available information\\n3. Consider the implications of the flags raised\\n4. Make a final decision: Approve or Reject\\n5. Calculate an overall score\\n
+Provide a final score, decision (Approve/Reject), and detailed explanation.\\n            
+            """,
+        )
+
+        try:
+            for key in [
+                "core_score",
+                "historical_score",
+                "financial_score",
+                "social_score",
+            ]:
+                if key not in summaries:
+                    summaries[key] = "No evaluation available"
+
+            self.logger.debug(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] Formatting final evaluation prompt"
+            )
+            formatted_prompt_text = prompt.format(
+                proposal_data=proposal_content,
+                scores=scores,
+                summaries=summaries,
+                flags=", ".join(flags) if flags else "None",
+            )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] Error formatting prompt: {str(e)}",
+                exc_info=True,
+            )
+            formatted_prompt_text = f"""Synthesize evaluations for proposal: {proposal_content}
+Scores: {scores}
+Flags: {flags}
+Provide a final score, decision (Approve/Reject), and explanation."""
+
+        try:
+            self.logger.debug(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] Invoking LLM for final decision"
+            )
+            result = await self.llm.with_structured_output(FinalOutput).ainvoke(
+                [formatted_prompt_text]
+            )
+
+            self.logger.info(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] FINAL DECISION: {result.decision} | SCORE={result.score}/100 | EXPLANATION={result.explanation}"
+            )
+
+            # Track token usage - extract directly from LLM if available
+            token_usage_data = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+
+            # Try to extract token usage directly from LLM response
+            if (
+                hasattr(self.llm, "_last_prompt_id")
+                and hasattr(self.llm, "client")
+                and hasattr(self.llm.client, "usage_by_prompt_id")
+            ):
+                last_prompt_id = self.llm._last_prompt_id
+                if last_prompt_id in self.llm.client.usage_by_prompt_id:
+                    usage = self.llm.client.usage_by_prompt_id[last_prompt_id]
+                    token_usage_data = {
+                        "input_tokens": usage.get("prompt_tokens", 0),
+                        "output_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
                     }
-                ]
-
-                self.logger.debug("Executing VectorReact workflow for voting...")
-
-                # Collect response chunks
-                response_chunks = []
-                vote_result = None
-
-                # Execute the VectorReact workflow
-                async for chunk in service.execute_stream(
-                    history=history,
-                    input_str=vote_instruction,
-                    tools_map=tools_map,
-                ):
-                    response_chunks.append(chunk)
-                    self.logger.debug(f"VectorReact chunk: {chunk}")
-
-                    # Extract tool results
-                    if (
-                        chunk.get("type") == "tool"
-                        and chunk.get("tool") == "dao_action_vote_on_proposal"
-                    ):
-                        if "output" in chunk:
-                            vote_result = chunk.get("output")
-                            self.logger.debug(f"Vote result: {vote_result}")
-
-                # Update state with vote result and vector results
-                state["vote_result"] = {
-                    "success": vote_result is not None,
-                    "output": vote_result,
+                    self.logger.debug(
+                        f"[DEBUG:ReasoningAgent:{proposal_id}] Extracted token usage from LLM: {token_usage_data}"
+                    )
+            # Fallback to estimation
+            if token_usage_data["total_tokens"] == 0:
+                # Get model name from LLM
+                llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+                # First calculate token count from the text
+                token_count = len(formatted_prompt_text) // 4  # Simple estimation
+                # Create token usage dictionary for calculate_token_cost
+                token_usage_dict = {"input_tokens": token_count}
+                # Calculate cost
+                cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+                token_usage_data = {
+                    "input_tokens": token_count,
+                    "output_tokens": len(result.model_dump_json())
+                    // 4,  # rough estimate
+                    "total_tokens": token_count + len(result.model_dump_json()) // 4,
                 }
-                state["vector_results"] = [
-                    chunk.get("vector_results", [])
-                    for chunk in response_chunks
-                    if chunk.get("vector_results")
-                ]
+                self.logger.debug(
+                    f"[DEBUG:ReasoningAgent:{proposal_id}] Estimated token usage: {token_usage_data}"
+                )
 
-                return state
-            except Exception as e:
-                self.logger.error(f"Error in vote_on_proposal: {str(e)}", exc_info=True)
-                state["vote_result"] = {
-                    "success": False,
-                    "error": f"Error during voting: {str(e)}",
-                }
-                return state
+            # Add token usage to state
+            if "token_usage" not in state:
+                state["token_usage"] = {}
+            state["token_usage"]["reasoning_agent"] = token_usage_data
 
-        # Create skip voting node
-        async def skip_voting(state: EvaluationState) -> EvaluationState:
-            """Skip voting and just return the evaluation."""
-            try:
-                self.logger.debug("Vote skipped: reason=threshold_or_setting")
-                state["vote_result"] = {
-                    "success": True,
-                    "message": "Voting skipped due to confidence threshold or auto_vote setting",
-                    "data": None,
-                }
-                return state
-            except Exception as e:
-                self.logger.error(f"Error in skip_voting: {str(e)}", exc_info=True)
-                state["vote_result"] = {
-                    "success": True,
-                    "message": f"Voting skipped (with error: {str(e)})",
-                    "data": None,
-                }
-                return state
+            result_dict = result.model_dump()
+            # Update state with the result
+            update_state_with_agent_result(state, result_dict, "reasoning")
+            return result_dict
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] Error in final evaluation: {str(e)}",
+                exc_info=True,
+            )
+            self.logger.info(
+                f"[DEBUG:ReasoningAgent:{proposal_id}] ERROR_SCORE=50/100 | DECISION=Pending | REASON=Error: {str(e)}"
+            )
+            return {
+                "score": 50,
+                "decision": "Pending",
+                "explanation": f"Unable to make final decision due to error: {str(e)}",
+            }
 
-        # Create the graph
-        workflow = StateGraph(EvaluationState)
 
-        # Add nodes
-        workflow.add_node("fetch_context", fetch_context)
-        workflow.add_node("format_prompt", format_evaluation_prompt)
-        workflow.add_node("evaluate", call_evaluation_llm)
-        workflow.add_node("vote", vote_on_proposal)
-        workflow.add_node("skip_vote", skip_voting)
+class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
+    """Main workflow for evaluating DAO proposals using a hierarchical team."""
 
-        # Set up the conditional branching
-        workflow.set_entry_point("fetch_context")  # Start with fetching context
-        workflow.add_edge("fetch_context", "format_prompt")
-        workflow.add_edge("format_prompt", "evaluate")
-        workflow.add_conditional_edges(
-            "evaluate",
-            should_vote,
-            {
-                "vote": "vote",
-                "skip_vote": "skip_vote",
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize the proposal evaluation workflow."""
+        super().__init__()
+        self.config = config or {}
+        self.hierarchical_workflow = HierarchicalTeamWorkflow(
+            name="ProposalEvaluation",
+            config={
+                "state_type": ProposalEvaluationState,
+                "recursion_limit": self.config.get("recursion_limit", 20),
             },
         )
-        workflow.add_edge("vote", END)
-        workflow.add_edge("skip_vote", END)
 
-        return workflow.compile()
-
-    def _validate_state(self, state: EvaluationState) -> bool:
-        """Validate the workflow state."""
-        # Only validate minimal required fields for initial state
-        # Other fields like proposal_data are fetched within the workflow
-        required_fields = ["proposal_id"]
-
-        # Log the state for debugging
-        self.logger.debug(
-            f"Validating initial state: proposal_id={state.get('proposal_id')}"
+        # Instantiate and add the new ImageProcessingNode
+        image_processor_agent = ImageProcessingNode(
+            config=self.config
+        )  # Use self.config
+        self.hierarchical_workflow.add_sub_workflow(
+            "image_processor", image_processor_agent
         )
 
-        # Check all fields and log problems
-        for field in required_fields:
-            if field not in state:
-                self.logger.error(f"Missing required field: {field}")
-                return False
-            elif not state[field]:
-                self.logger.error(f"Empty required field: {field}")
-                return False
+        core_agent = CoreContextAgent(self.config)
+        historical_agent = HistoricalContextAgent(self.config)
+        financial_agent = FinancialContextAgent(self.config)
+        social_agent = SocialContextAgent(self.config)
+        reasoning_agent = ReasoningAgent(self.config)
 
-        # Note: Detailed validation of proposal_data happens in fetch_context node
-        self.logger.debug("Initial state validation successful")
+        self.hierarchical_workflow.add_sub_workflow("core_agent", core_agent)
+        self.hierarchical_workflow.add_sub_workflow(
+            "historical_agent", historical_agent
+        )
+        self.hierarchical_workflow.add_sub_workflow("financial_agent", financial_agent)
+        self.hierarchical_workflow.add_sub_workflow("social_agent", social_agent)
+        self.hierarchical_workflow.add_sub_workflow("reasoning_agent", reasoning_agent)
+
+        self.hierarchical_workflow.set_entry_point("image_processor")
+
+        def supervisor_logic(state: ProposalEvaluationState) -> Union[str, List[str]]:
+            """Determine the next step in the workflow."""
+            proposal_id = state.get("proposal_id", "unknown")
+
+            # Debugging current state view for supervisor
+            logger.debug(
+                f"[DEBUG:Supervisor:{proposal_id}] Evaluating next step. State keys: {list(state.keys())}. "
+                f"proposal_images set: {'proposal_images' in state}, "
+                f"core_score set: {state.get('core_score') is not None}, "
+                f"historical_score set: {state.get('historical_score') is not None}, "
+                f"financial_score set: {state.get('financial_score') is not None}, "
+                f"social_score set: {state.get('social_score') is not None}, "
+                f"final_score set: {state.get('final_score') is not None}"
+            )
+
+            if state.get("halt", False):
+                logger.debug(
+                    f"[DEBUG:Supervisor:{proposal_id}] Halt condition met, returning END"
+                )
+                return END
+
+            # After image_processor (entry point), if core_score isn't set, go to core_agent.
+            # The image_processor node output (even if empty list for images) should be in state.
+            if state.get("core_score") is None:
+                # This will be the first check after image_processor completes as it's the entry point.
+                current_core_invocations = state.get("core_agent_invocations", 0)
+                if current_core_invocations > 3:
+                    logger.error(
+                        f"[DEBUG:Supervisor:{proposal_id}] Core agent invoked too many times ({current_core_invocations}), halting."
+                    )
+                    return END
+
+                # Do not manually increment core_agent_invocations - the langgraph framework will handle this
+                # with the Annotated type we restored
+
+                logger.debug(
+                    f"[DEBUG:Supervisor:{proposal_id}] Routing to core_agent (core_score is None, invocation #{current_core_invocations})."
+                )
+                return "core_agent"
+
+            if state.get("historical_score") is None:
+                logger.debug(
+                    f"[DEBUG:Supervisor:{proposal_id}] Routing to historical_agent."
+                )
+                return "historical_agent"
+
+            if (
+                state.get("financial_score") is None
+                or state.get("social_score") is None
+            ):
+                parallel_nodes = []
+                if state.get("financial_score") is None:
+                    parallel_nodes.append("financial_agent")
+                if state.get("social_score") is None:
+                    parallel_nodes.append("social_agent")
+                logger.debug(
+                    f"[DEBUG:Supervisor:{proposal_id}] Initiating parallel execution of {parallel_nodes}"
+                )
+                return parallel_nodes
+
+            if state.get("final_score") is None:
+                logger.debug(
+                    f"[DEBUG:Supervisor:{proposal_id}] All scores available but final score is None, routing to reasoning_agent"
+                )
+                return "reasoning_agent"
+
+            logger.debug(
+                f"[DEBUG:Supervisor:{proposal_id}] All scores completed, returning END"
+            )
+            return END
+
+        self.hierarchical_workflow.set_supervisor_logic(supervisor_logic)
+
+        def halt_condition(state: ProposalEvaluationState) -> bool:
+            """Check if workflow should halt."""
+            proposal_id = state.get("proposal_id", "unknown")
+
+            if state.get("halt", False):
+                logger.debug(
+                    f"[DEBUG:HaltCondition:{proposal_id}] Halting workflow due to explicit halt flag"
+                )
+                return True
+
+            # Check for excessive core agent invocations
+            if state.get("core_agent_invocations", 0) > 3:
+                logger.debug(
+                    f"[DEBUG:HaltCondition:{proposal_id}] Halting workflow due to excessive core agent invocations: {state.get('core_agent_invocations', 0)}"
+                )
+                return True
+
+            recursion_count = state.get("recursion_count", 0)
+            if recursion_count > 8:
+                logger.debug(
+                    f"[DEBUG:HaltCondition:{proposal_id}] Halting workflow - possible loop detected after {recursion_count} iterations"
+                )
+                return True
+
+            if (
+                state.get("core_score") is not None
+                and state.get("historical_score") is not None
+                and state.get("financial_score") is not None
+                and state.get("social_score") is not None
+                and state.get("final_score") is None
+                and recursion_count > 3
+            ):
+                logger.debug(
+                    f"[DEBUG:HaltCondition:{proposal_id}] Halting workflow - reasoning agent appears to be failing after {recursion_count} attempts"
+                )
+                return True
+
+            state["recursion_count"] = recursion_count + 1
+            logger.debug(
+                f"[DEBUG:HaltCondition:{proposal_id}] Incrementing recursion counter to {state['recursion_count']}"
+            )
+
+            return False
+
+        self.hierarchical_workflow.set_halt_condition(halt_condition)
+        self.required_fields = ["proposal_id", "proposal_data"]
+
+    def _create_prompt(self) -> PromptTemplate:
+        """Create the main workflow prompt."""
+        return PromptTemplate(
+            input_variables=["proposal_data"],
+            template="Evaluate the DAO proposal: {proposal_data}",
+        )
+
+    def _create_graph(self) -> StateGraph:
+        """Create the workflow graph."""
+        return self.hierarchical_workflow.build_graph()
+
+    def _validate_state(self, state: ProposalEvaluationState) -> bool:
+        """Validate the workflow state."""
+        if not super()._validate_state(state):
+            return False
+
+        if "flags" not in state:
+            state["flags"] = []
+        elif state["flags"] is None:
+            state["flags"] = []
+
+        if "summaries" not in state:
+            state["summaries"] = {}
+        elif state["summaries"] is None:
+            state["summaries"] = {}
+
+        if "halt" not in state:
+            state["halt"] = False
+
+        if "token_usage" not in state:
+            state["token_usage"] = {}
+        elif state["token_usage"] is None:
+            state["token_usage"] = {}
+
         return True
+
+
+async def evaluate_proposal(
+    proposal_id: str,
+    proposal_data: str,
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Evaluate a proposal using the hierarchical team workflow."""
+    logger.info(f"[DEBUG:Workflow:{proposal_id}] Starting evaluation workflow")
+
+    debug_level = 0
+    if config and "debug_level" in config:
+        debug_level = config.get("debug_level", 0)
+        logger.debug(f"[PROPOSAL_DEBUG] Using debug_level: {debug_level}")
+
+    logger.debug(
+        f"[PROPOSAL_DEBUG] evaluate_proposal received proposal_id: {proposal_id}"
+    )
+    logger.debug(
+        f"[PROPOSAL_DEBUG] evaluate_proposal received proposal_data type: {type(proposal_data)}"
+    )
+
+    if not proposal_data:
+        logger.warning(
+            f"[PROPOSAL_DEBUG] proposal_data is empty or None! This will cause evaluation failure."
+        )
+
+    state = {
+        "proposal_id": proposal_id,
+        "proposal_data": proposal_data,
+        "flags": [],
+        "summaries": {},
+        "halt": False,
+        "token_usage": {},
+        "core_score": None,
+        "historical_score": None,
+        "financial_score": None,
+        "social_score": None,
+        "final_score": None,
+        "decision": None,
+        "core_agent_invocations": 0,
+        "recursion_count": 0,
+    }
+
+    logger.debug(
+        f"[DEBUG:Workflow:{proposal_id}] Initialized workflow state with keys: {state.keys()}"
+    )
+    logger.debug(
+        f"[PROPOSAL_DEBUG] Proposal data in state: {state.get('proposal_data')}"
+    )
+
+    try:
+        workflow = ProposalEvaluationWorkflow(config or {})
+        logger.info(
+            f"[DEBUG:Workflow:{proposal_id}] Executing hierarchical team workflow"
+        )
+        result = await workflow.execute(state)
+        logger.info(
+            f"[DEBUG:Workflow:{proposal_id}] Workflow execution completed with decision: {result.get('decision', 'Unknown')}"
+        )
+
+        logger.debug(f"[DEBUG:Workflow:{proposal_id}] RESULT SCORES TYPES:")
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Core: {type(result.get('core_score'))} = {repr(result.get('core_score'))}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Historical: {type(result.get('historical_score'))} = {repr(result.get('historical_score'))}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Financial: {type(result.get('financial_score'))} = {repr(result.get('financial_score'))}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Social: {type(result.get('social_score'))} = {repr(result.get('social_score'))}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Final: {type(result.get('final_score'))} = {repr(result.get('final_score'))}"
+        )
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] - Decision: {type(result.get('decision'))} = {repr(result.get('decision'))}"
+        )
+
+        if result is None:
+            logger.error(
+                f"[DEBUG:Workflow:{proposal_id}] Workflow returned None result, using default values"
+            )
+            return {
+                "proposal_id": proposal_id,
+                "score": 0,
+                "decision": "Error",
+                "explanation": "Evaluation failed: Workflow returned empty result",
+                "component_scores": {
+                    "core": 0,
+                    "historical": 0,
+                    "financial": 0,
+                    "social": 0,
+                },
+                "flags": ["Workflow error: Empty result"],
+                "token_usage": {},
+            }
+
+        def safe_extract_score(value, default=0):
+            if isinstance(value, dict) and "score" in value:
+                return value.get("score", default)
+            elif isinstance(value, int):
+                return value
+            elif isinstance(value, str):
+                try:
+                    return int(value)
+                except ValueError:
+                    pass  # If string is not int, will fall through to default
+            return default
+
+        final_score_val = result.get("final_score")
+        logger.debug(
+            f"[DEBUG:evaluate_proposal] Raw final_score_val from result state: {repr(final_score_val)} (type: {type(final_score_val)})"
+        )
+
+        final_score_dict = {}
+        if isinstance(final_score_val, dict):
+            final_score_dict = final_score_val
+
+        component_scores = {
+            "core": safe_extract_score(result.get("core_score")),
+            "historical": safe_extract_score(result.get("historical_score")),
+            "financial": safe_extract_score(result.get("financial_score")),
+            "social": safe_extract_score(result.get("social_score")),
+        }
+
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] EXTRACTED COMPONENT SCORES: {component_scores}"
+        )
+
+        explanation = ""
+        if isinstance(final_score_dict, dict) and "explanation" in final_score_dict:
+            explanation = final_score_dict.get("explanation", "")
+        elif isinstance(final_score_val, str):
+            explanation = final_score_val
+
+        # Log the explanation to help debug
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] Explanation extracted: {explanation[:100]}..."
+        )
+
+        final_score = 0
+        if isinstance(final_score_dict, dict) and "score" in final_score_dict:
+            final_score = final_score_dict.get("score", 0)
+        else:
+            final_score = safe_extract_score(final_score_val)
+
+        decision = result.get("decision")
+        if decision is None:
+            if isinstance(final_score_dict, dict) and "decision" in final_score_dict:
+                decision = final_score_dict.get("decision")
+            else:
+                decision = "Reject"
+
+        logger.debug(
+            f"[DEBUG:Workflow:{proposal_id}] Final decision: {decision}, score: {final_score}"
+        )
+
+        total_token_usage = result.get("token_usage", {})
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_tokens = 0
+
+        # Aggregate tokens from all agent steps
+        # Assuming model_name is consistent across all steps for this aggregation, or we use the primary model_name
+        # If each agent could use a different model, this would need more detailed per-model tracking
+        for agent_key, usage_data in total_token_usage.items():
+            if isinstance(usage_data, dict):
+                total_input_tokens += usage_data.get("input_tokens", 0)
+                total_output_tokens += usage_data.get("output_tokens", 0)
+                total_tokens += usage_data.get("total_tokens", 0)
+            else:
+                logger.warning(
+                    f"Unexpected format for token_usage data for agent {agent_key}: {usage_data}"
+                )
+
+        # Extract component summaries for detailed reporting
+        component_summaries = {}
+        if isinstance(result.get("summaries"), dict):
+            component_summaries = result.get("summaries")
+
+        # Extract and aggregate flags
+        all_flags = result.get("flags", [])
+        if not isinstance(all_flags, list):
+            all_flags = []
+
+        # Placeholder for web search specific token usage if it were tracked separately
+        # In the original, these seemed to be fixed placeholders.
+        web_search_input_tokens = 0
+        web_search_output_tokens = 0
+        web_search_total_tokens = 0
+
+        # Initialize total token usage by model
+        total_token_usage_by_model = {}
+
+        # Extract token usage by model from token_usage data
+        for agent_name, agent_usage in total_token_usage.items():
+            if isinstance(agent_usage, dict) and agent_usage.get("total_tokens", 0) > 0:
+                # Use default model name if not specified
+                model_name = "gpt-4.1"  # default model name
+
+                # Initialize the model entry if needed
+                if model_name not in total_token_usage_by_model:
+                    total_token_usage_by_model[model_name] = {
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                    }
+
+                # Add token usage for this agent to the model's tally
+                total_token_usage_by_model[model_name][
+                    "input_tokens"
+                ] += agent_usage.get("input_tokens", 0)
+                total_token_usage_by_model[model_name][
+                    "output_tokens"
+                ] += agent_usage.get("output_tokens", 0)
+                total_token_usage_by_model[model_name][
+                    "total_tokens"
+                ] += agent_usage.get("total_tokens", 0)
+
+        # Fallback if no token usage was recorded
+        if not total_token_usage_by_model:
+            total_token_usage_by_model["gpt-4.1"] = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_tokens,
+            }
+
+        # Improved cost calculation by model
+        cost_per_thousand = {
+            "gpt-4.1": 0.01,  # $0.01 per 1K tokens
+            "gpt-4.1-mini": 0.005,  # $0.005 per 1K tokens
+            "gpt-4.1-32k": 0.03,  # $0.03 per 1K tokens
+            "gpt-4": 0.03,  # $0.03 per 1K tokens
+            "gpt-4-32k": 0.06,  # $0.06 per 1K tokens
+            "gpt-3.5-turbo": 0.0015,  # $0.0015 per 1K tokens
+            "default": 0.01,  # default fallback
+        }
+
+        # Calculate costs for each model
+        total_cost_by_model = {}
+        total_overall_cost = 0.0
+        for model_name, usage in total_token_usage_by_model.items():
+            # Get cost per 1K tokens for this model
+            model_cost_per_k = cost_per_thousand.get(
+                model_name, cost_per_thousand["default"]
+            )
+            # Calculate cost for this model's usage
+            model_cost = usage["total_tokens"] * (model_cost_per_k / 1000)
+            total_cost_by_model[model_name] = model_cost
+            total_overall_cost += model_cost
+
+        if not total_cost_by_model:
+            # Fallback if no models were recorded
+            model_name = "gpt-4.1"  # Default model name
+            total_cost_by_model[model_name] = total_tokens * (
+                cost_per_thousand["default"] / 1000
+            )
+            total_overall_cost = total_cost_by_model[model_name]
+
+        final_result = {
+            "success": True,
+            "evaluation": {
+                "approve": decision == "Approve",
+                "confidence_score": final_score / 100.0 if final_score else 0.0,
+                "reasoning": explanation,
+            },
+            "decision": decision,
+            "score": final_score,
+            "explanation": explanation,
+            "component_scores": component_scores,
+            "component_summaries": component_summaries,  # Include component summaries
+            "flags": all_flags,
+            "token_usage": total_token_usage,
+            "web_search_results": [],
+            "treasury_balance": None,
+            "web_search_token_usage": {
+                "input_tokens": web_search_input_tokens,
+                "output_tokens": web_search_output_tokens,
+                "total_tokens": web_search_total_tokens,
+            },
+            "evaluation_token_usage": {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_tokens,
+            },
+            "evaluation_model_info": {"name": "gpt-4.1", "temperature": 0.1},
+            "web_search_model_info": {"name": "gpt-4.1", "temperature": 0.1},
+            "total_token_usage_by_model": total_token_usage_by_model,
+            "total_cost_by_model": total_cost_by_model,
+            "total_overall_cost": total_overall_cost,
+            "summaries": component_summaries,
+        }
+
+        logger.debug(
+            f"Proposal evaluation completed: Success={final_result['success']} | Decision={'APPROVE' if decision == 'Approve' else 'REJECT'} | Confidence={final_result['evaluation']['confidence_score']:.2f} | Auto-voted={decision == 'Approve'}"
+        )
+        return final_result
+    except Exception as e:
+        logger.error(f"Error in workflow execution: {str(e)}", exc_info=True)
+        return {
+            "proposal_id": proposal_id,
+            "score": 0,
+            "decision": "Error",
+            "explanation": f"Evaluation failed: {str(e)}",
+            "component_scores": {
+                "core": 0,
+                "historical": 0,
+                "financial": 0,
+                "social": 0,
+            },
+            "flags": [f"Workflow error: {str(e)}"],
+            "token_usage": {},
+        }
 
 
 def get_proposal_evaluation_tools(
     profile: Optional[Profile] = None, agent_id: Optional[UUID] = None
 ):
-    """Get the tools needed for proposal evaluation.
-
-    Args:
-        profile: Optional user profile
-        agent_id: Optional agent ID
-
-    Returns:
-        Dictionary of filtered tools for proposal evaluation
-    """
-    # Initialize all tools
+    """Get the tools needed for proposal evaluation."""
     all_tools = initialize_tools(profile=profile, agent_id=agent_id)
     logger.debug(f"Available tools: {', '.join(all_tools.keys())}")
-
-    # Filter to only include the tools we need
     required_tools = [
         "dao_action_get_proposal",
         "dao_action_vote_on_proposal",
         "dao_action_get_voting_power",
         "dao_action_get_voting_configuration",
-        "database_get_dao_get_by_name",  # Try old name
-        "dao_search",  # Try new name
+        "database_get_dao_get_by_name",
+        "dao_search",
     ]
-
     filtered_tools = filter_tools_by_names(required_tools, all_tools)
     logger.debug(f"Using tools: {', '.join(filtered_tools.keys())}")
-
     return filtered_tools
 
 
@@ -935,26 +1717,13 @@ async def evaluate_and_vote_on_proposal(
     auto_vote: bool = True,
     confidence_threshold: float = 0.7,
     dao_id: Optional[UUID] = None,
+    debug_level: int = 0,  # 0=normal, 1=verbose, 2=very verbose
 ) -> Dict:
-    """Evaluate a proposal and automatically vote based on the evaluation.
-
-    Args:
-        proposal_id: The ID of the proposal to evaluate and vote on
-        wallet_id: Optional wallet ID to use for voting
-        agent_id: Optional agent ID to use for retrieving prompts
-        auto_vote: Whether to automatically vote based on the evaluation
-        confidence_threshold: Minimum confidence score required to auto-vote (0.0-1.0)
-        dao_id: Optional DAO ID to explicitly pass to the workflow
-
-    Returns:
-        Dictionary containing the evaluation results and voting outcome
-    """
+    """Evaluate a proposal and automatically vote based on the evaluation."""
     logger.debug(
-        f"Starting proposal evaluation: proposal_id={proposal_id} | auto_vote={auto_vote} | confidence_threshold={confidence_threshold}"
+        f"Starting proposal evaluation: proposal_id={proposal_id} | auto_vote={auto_vote} | confidence_threshold={confidence_threshold} | debug_level={debug_level}"
     )
-
     try:
-        # Determine effective agent ID
         effective_agent_id = agent_id
         if not effective_agent_id and wallet_id:
             wallet = backend.get_wallet(wallet_id)
@@ -964,17 +1733,14 @@ async def evaluate_and_vote_on_proposal(
                     f"Using agent ID {effective_agent_id} from wallet {wallet_id}"
                 )
 
-        # Fetch the primary prompt to determine model and temperature settings
-        # Note: Actual prompt text fetching happens inside the workflow now.
-        model_name = "gpt-4.1"  # Default model
-        temperature = 0.1  # Default temperature
+        model_name = "gpt-4.1"
+        temperature = 0.1
         if effective_agent_id:
             try:
-                # We only need one active prompt to get settings
                 prompts = backend.list_prompts(
                     PromptFilter(
                         agent_id=effective_agent_id,
-                        dao_id=dao_id,  # Assuming dao_id is available, might need refinement
+                        dao_id=dao_id,
                         is_active=True,
                         limit=1,
                     )
@@ -992,171 +1758,252 @@ async def evaluate_and_vote_on_proposal(
                     )
                 else:
                     logger.warning(
-                        f"No active prompts found for agent {effective_agent_id} to determine settings."
+                        f"No active prompts found for agent {effective_agent_id}."
                     )
             except Exception as e:
                 logger.error(
                     f"Failed to get agent prompt settings: {str(e)}", exc_info=True
                 )
 
-        # Initialize state (minimal initial data)
-        state = {
-            "proposal_id": proposal_id,
-            "dao_id": dao_id,  # Pass DAO ID to the workflow
-            "agent_id": effective_agent_id,  # Pass Agent ID for prompt loading
-            "wallet_id": wallet_id,  # Pass wallet ID for voting tool
-            "approve": False,
-            "confidence_score": 0.0,
-            "reasoning": "",
-            "vote_result": None,
-            "confidence_threshold": confidence_threshold,
-            "auto_vote": auto_vote,
-            "vector_results": None,
-            "recent_tweets": None,
-            "web_search_results": None,
-            "token_usage": None,
-            "model_info": None,
-            "web_search_token_usage": None,
-            "evaluation_token_usage": None,
-            "evaluation_model_info": None,
-            "web_search_model_info": None,
+        logger.debug(
+            f"[PROPOSAL_DEBUG] Fetching proposal data from backend for ID: {proposal_id}"
+        )
+        proposal_data = backend.get_proposal(proposal_id)
+        if not proposal_data:
+            logger.error(
+                f"[PROPOSAL_DEBUG] No proposal data found for ID: {proposal_id}"
+            )
+            raise ValueError(f"Proposal {proposal_id} not found")
+
+        logger.debug(f"[PROPOSAL_DEBUG] Raw proposal data: {proposal_data}")
+
+        proposal_content = proposal_data.parameters or ""
+        if not proposal_content:
+            logger.warning(f"[PROPOSAL_DEBUG] Proposal parameters/content is empty!")
+
+        config = {
+            "model_name": model_name,
+            "temperature": temperature,
+            "mission_collection": "knowledge_collection",
+            "proposals_collection": "proposals",
+            "enable_web_search": True,
+            "planning_model": "gpt-4.1-mini",
         }
 
-        # Create and run workflow with model settings from prompt
-        workflow = ProposalEvaluationWorkflow(
-            model_name=model_name, temperature=temperature
+        if debug_level > 0:
+            config["debug_level"] = debug_level
+            logger.debug(f"[PROPOSAL_DEBUG] Setting debug_level to {debug_level}")
+
+        if not dao_id and proposal_data.dao_id:
+            dao_id = proposal_data.dao_id
+        dao_info = None
+        if dao_id:
+            dao_info = backend.get_dao(dao_id)
+            if dao_info:
+                config["dao_mission"] = dao_info.mission
+
+        treasury_balance = None
+        try:
+            if dao_id:
+                treasury_extensions = backend.list_extensions(
+                    ExtensionFilter(dao_id=dao_id, type="EXTENSIONS_TREASURY")
+                )
+                if treasury_extensions:
+                    hiro_api = HiroApi()
+                    treasury_balance = hiro_api.get_address_balance(
+                        treasury_extensions[0].contract_principal
+                    )
+        except Exception as e:
+            logger.error(f"Failed to get treasury balance: {str(e)}", exc_info=True)
+
+        logger.debug("Starting hierarchical evaluation workflow...")
+        eval_result = await evaluate_proposal(
+            proposal_id=str(proposal_id),
+            proposal_data=proposal_data.parameters,
+            config=config,
         )
-        if not workflow._validate_state(state):
-            error_msg = "Invalid workflow state"
-            logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
+
+        decision = eval_result.get("decision")
+        if decision is None:
+            decision = "Reject"
+            logger.warning(
+                f"No decision found in evaluation results, defaulting to '{decision}'"
+            )
+
+        score = eval_result.get("score", 0)
+        confidence_score = score / 100.0 if score else 0.0
+
+        approve = False
+        if isinstance(decision, str) and decision.lower() == "approve":
+            approve = True
+
+        should_vote = auto_vote and confidence_score >= confidence_threshold
+
+        vote_result = None
+        tx_id = None
+        if should_vote and wallet_id:
+            try:
+                vote_tool = VoteOnActionProposalTool(wallet_id=wallet_id)
+                if proposal_data.type == ProposalType.ACTION:
+                    contract_info = proposal_data.contract_principal
+                    if "." in contract_info:
+                        parts = contract_info.split(".")
+                        if len(parts) >= 2:
+                            action_proposals_contract = parts[0]
+                            action_proposals_voting_extension = parts[1]
+                            result = await vote_tool.vote_on_proposal(
+                                contract_principal=action_proposals_contract,
+                                extension_name=action_proposals_voting_extension,
+                                proposal_id=proposal_data.proposal_id,
+                                vote=approve,
+                            )
+                            vote_result = {
+                                "success": result is not None,
+                                "output": result,
+                            }
+                            if (
+                                result
+                                and isinstance(result, str)
+                                and "txid:" in result.lower()
+                            ):
+                                for line in result.split("\n"):
+                                    if "txid:" in line.lower():
+                                        parts = line.split(":")
+                                        if len(parts) > 1:
+                                            tx_id = parts[1].strip()
+                                            break
+                    else:
+                        logger.warning(
+                            f"Invalid contract principal format: {contract_info}"
+                        )
+                else:
+                    logger.warning(
+                        f"Cannot vote on non-action proposal type: {proposal_data.type}"
+                    )
+            except Exception as e:
+                logger.error(f"Error executing vote: {str(e)}", exc_info=True)
+                vote_result = {
+                    "success": False,
+                    "error": f"Error during voting: {str(e)}",
+                }
+        elif not should_vote:
+            vote_result = {
+                "success": True,
+                "message": "Voting skipped due to confidence threshold or auto_vote setting",
+                "data": None,
             }
 
-        logger.debug("Starting workflow execution...")
-        result = await workflow.execute(state)
-        logger.debug("Workflow execution completed")
+        total_token_usage = eval_result.get("token_usage", {})
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_tokens = 0
 
-        # Extract transaction ID from vote result if available
-        tx_id = None
-        if result.get("vote_result") and result["vote_result"].get("output"):
-            # Try to extract tx_id from the output
-            output = result["vote_result"]["output"]
-            if isinstance(output, str) and "txid:" in output.lower():
-                # Extract the transaction ID from the output
-                for line in output.split("\n"):
-                    if "txid:" in line.lower():
-                        parts = line.split(":")
-                        if len(parts) > 1:
-                            tx_id = parts[1].strip()
-                            logger.debug(f"Transaction ID extracted: {tx_id}")
-                            break
+        # Aggregate tokens from all agent steps
+        # Assuming model_name is consistent across all steps for this aggregation, or we use the primary model_name
+        # If each agent could use a different model, this would need more detailed per-model tracking
+        for agent_key, usage_data in total_token_usage.items():
+            if isinstance(usage_data, dict):
+                total_input_tokens += usage_data.get("input_tokens", 0)
+                total_output_tokens += usage_data.get("output_tokens", 0)
+                total_tokens += usage_data.get("total_tokens", 0)
+            else:
+                logger.warning(
+                    f"Unexpected format for token_usage data for agent {agent_key}: {usage_data}"
+                )
 
-        # Prepare final result
+        # Placeholder for web search specific token usage if it were tracked separately
+        # In the original, these seemed to be fixed placeholders.
+        web_search_input_tokens = 0
+        web_search_output_tokens = 0
+        web_search_total_tokens = 0
+
+        # Initialize total_token_usage_by_model
+        total_token_usage_by_model = {}
+
+        # Use the default model name from settings or default to gpt-4.1
+        default_model = model_name or "gpt-4.1"
+
+        # Add total token counts to the model
+        total_token_usage_by_model[default_model] = {
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+            "total_tokens": total_tokens,
+        }
+
+        # Improved cost calculation by model
+        cost_per_thousand = {
+            "gpt-4.1": 0.01,  # $0.01 per 1K tokens
+            "gpt-4.1-mini": 0.005,  # $0.005 per 1K tokens
+            "gpt-4.1-32k": 0.03,  # $0.03 per 1K tokens
+            "gpt-4": 0.03,  # $0.03 per 1K tokens
+            "gpt-4-32k": 0.06,  # $0.06 per 1K tokens
+            "gpt-3.5-turbo": 0.0015,  # $0.0015 per 1K tokens
+            "default": 0.01,  # default fallback
+        }
+
+        # Calculate costs for each model
+        total_cost_by_model = {}
+        total_overall_cost = 0.0
+        for model_key, usage in total_token_usage_by_model.items():
+            # Get cost per 1K tokens for this model
+            model_cost_per_k = cost_per_thousand.get(
+                model_key, cost_per_thousand["default"]
+            )
+            # Calculate cost for this model's usage
+            model_cost = usage["total_tokens"] * (model_cost_per_k / 1000)
+            total_cost_by_model[model_key] = model_cost
+            total_overall_cost += model_cost
+
+        if not total_cost_by_model:
+            # Fallback if no models were recorded
+            default_model_key = "gpt-4.1"  # Default model name
+            total_cost_by_model[default_model_key] = total_tokens * (
+                cost_per_thousand["default"] / 1000
+            )
+            total_overall_cost = total_cost_by_model[default_model_key]
+
         final_result = {
             "success": True,
             "evaluation": {
-                "approve": result.get("approve", False),
-                "confidence_score": result.get("confidence_score", 0.0),
-                "reasoning": result.get(
-                    "reasoning", "Evaluation failed or not available"
-                ),
+                "approve": approve,
+                "confidence_score": confidence_score,
+                "reasoning": eval_result.get("explanation", ""),
             },
-            "vote_result": result.get("vote_result"),
-            "auto_voted": auto_vote
-            and result.get("confidence_score", 0.0) >= confidence_threshold,
+            "vote_result": vote_result,
+            "auto_voted": should_vote,
             "tx_id": tx_id,
-            "formatted_prompt": result.get(
-                "formatted_prompt", "Formatted prompt not available"
-            ),
-            "vector_results": result.get("vector_results"),
-            "recent_tweets": result.get("recent_tweets"),
-            "web_search_results": result.get("web_search_results"),
-            "treasury_balance": result.get("treasury_balance"),
-            "web_search_token_usage": result.get("web_search_token_usage"),
-            "evaluation_token_usage": result.get("evaluation_token_usage"),
-            "evaluation_model_info": result.get("evaluation_model_info"),
-            "web_search_model_info": result.get("web_search_model_info"),
+            "vector_results": [],
+            "recent_tweets": [],
+            "web_search_results": [],
+            "treasury_balance": treasury_balance,
+            "component_scores": eval_result.get("component_scores", {}),
+            "component_summaries": eval_result.get("summaries", {}),
+            "flags": eval_result.get("flags", []),
+            "web_search_token_usage": {
+                "input_tokens": web_search_input_tokens,
+                "output_tokens": web_search_output_tokens,
+                "total_tokens": web_search_total_tokens,
+            },
+            "evaluation_token_usage": {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_tokens,
+            },
+            "evaluation_model_info": {"name": model_name, "temperature": temperature},
+            "web_search_model_info": {"name": model_name, "temperature": temperature},
+            "total_token_usage_by_model": total_token_usage_by_model,
+            "total_cost_by_model": total_cost_by_model,
+            "total_overall_cost": total_overall_cost,
         }
 
-        # --- Aggregate Token Usage and Calculate Costs --- #
-        total_token_usage_by_model = {}
-        total_cost_by_model = {}
-        total_overall_cost = 0.0
-
-        steps = [
-            (
-                "web_search",
-                result.get("web_search_token_usage"),
-                result.get("web_search_model_info"),
-            ),
-            (
-                "evaluation",
-                result.get("evaluation_token_usage"),
-                result.get("evaluation_model_info"),
-            ),
-        ]
-
-        for step_name, usage, model_info in steps:
-            if usage and model_info and model_info.get("name") != "unknown":
-                model_name = model_info["name"]
-
-                # Aggregate usage per model
-                if model_name not in total_token_usage_by_model:
-                    total_token_usage_by_model[model_name] = {
-                        "input_tokens": 0,
-                        "output_tokens": 0,
-                        "total_tokens": 0,
-                    }
-                total_token_usage_by_model[model_name]["input_tokens"] += usage.get(
-                    "input_tokens", 0
-                )
-                total_token_usage_by_model[model_name]["output_tokens"] += usage.get(
-                    "output_tokens", 0
-                )
-                total_token_usage_by_model[model_name]["total_tokens"] += usage.get(
-                    "total_tokens", 0
-                )
-
-                # Calculate cost for this step/model
-                step_cost = calculate_token_cost(usage, model_name)
-
-                # Aggregate cost per model
-                if model_name not in total_cost_by_model:
-                    total_cost_by_model[model_name] = 0.0
-                total_cost_by_model[model_name] += step_cost["total_cost"]
-                total_overall_cost += step_cost["total_cost"]
-            else:
-                logger.warning(
-                    f"Skipping cost calculation for step '{step_name}' due to missing usage or model info."
-                )
-
-        final_result["total_token_usage_by_model"] = total_token_usage_by_model
-        final_result["total_cost_by_model"] = total_cost_by_model
-        final_result["total_overall_cost"] = total_overall_cost
-        # --- End Aggregation --- #
-
-        # Updated Logging
         logger.debug(
-            f"Proposal evaluation completed: Success={final_result['success']} | "
-            f"Decision={'APPROVE' if final_result['evaluation']['approve'] else 'REJECT'} | "
-            f"Confidence={final_result['evaluation']['confidence_score']:.2f} | "
-            f"Auto-voted={final_result['auto_voted']} | Transaction={tx_id or 'None'} | "
-            f"Total Cost (USD)=${total_overall_cost:.4f}"
+            f"Proposal evaluation completed: Success={final_result['success']} | Decision={'APPROVE' if approve else 'REJECT'} | Confidence={confidence_score:.2f} | Auto-voted={should_vote} | Transaction={tx_id or 'None'}"
         )
-        logger.debug(f"Cost Breakdown: {total_cost_by_model}")
-        logger.debug(f"Token Usage Breakdown: {total_token_usage_by_model}")
-        logger.debug(f"Full evaluation result: {final_result}")
-
         return final_result
     except Exception as e:
         error_msg = f"Unexpected error in evaluate_and_vote_on_proposal: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return {
-            "success": False,
-            "error": error_msg,
-        }
+        return {"success": False, "error": error_msg}
 
 
 async def evaluate_proposal_only(
@@ -1165,20 +2012,8 @@ async def evaluate_proposal_only(
     agent_id: Optional[UUID] = None,
     dao_id: Optional[UUID] = None,
 ) -> Dict:
-    """Evaluate a proposal without voting.
-
-    Args:
-        proposal_id: The ID of the proposal to evaluate
-        wallet_id: Optional wallet ID to use for retrieving proposal data
-        agent_id: Optional agent ID associated with the evaluation
-        dao_id: Optional DAO ID associated with the proposal
-
-    Returns:
-        Dictionary containing the evaluation results
-    """
+    """Evaluate a proposal without voting."""
     logger.debug(f"Starting proposal-only evaluation: proposal_id={proposal_id}")
-
-    # Determine effective agent ID (same logic as evaluate_and_vote)
     effective_agent_id = agent_id
     if not effective_agent_id and wallet_id:
         wallet = backend.get_wallet(wallet_id)
@@ -1193,7 +2028,6 @@ async def evaluate_proposal_only(
         auto_vote=False,
     )
 
-    # Remove vote-related fields from the response
     logger.debug("Removing vote-related fields from response")
     if "vote_result" in result:
         del result["vote_result"]

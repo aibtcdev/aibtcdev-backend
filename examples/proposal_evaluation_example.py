@@ -37,14 +37,14 @@ async def create_test_proposal(dao_id: UUID) -> UUID:
     # Create test parameters as a JSON object
     parameters = "let this rip https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3VoZzJzdmV3eGs4M2VrOXBkamg2dTVhb2NhcndwNzVxNHplMzhoaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/M7HkIkPrNhSy4/giphy.gif https://mkkhfmcrbwyuutcvtier.supabase.co/storage/v1/object/public/x-vote-media//img_2.jpeg"
 
-    # Convert parameters to JSON string and then hex encode it
-    parameters_hex = "0x" + binascii.hexlify(parameters.encode("utf-8")).decode("utf-8")
+    # # Convert parameters to JSON string and then hex encode it
+    # parameters_hex = "0x" + binascii.hexlify(parameters.encode("utf-8")).decode("utf-8")
 
     # Create a test proposal
     proposal_data = ProposalCreate(
         dao_id=dao_id,
         type=ProposalType.ACTION,
-        parameters=parameters_hex,  # Use hex encoded parameters
+        parameters=parameters,  # Use hex encoded parameters
         action="send_message",
         contract_principal="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test-contract",
         creator="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",

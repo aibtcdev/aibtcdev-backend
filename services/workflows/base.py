@@ -212,7 +212,13 @@ class BaseWorkflow(Generic[StateType]):
 
             # Execute the workflow
             self.logger.info(f"Executing workflow {self.__class__.__name__}")
+            self.logger.debug(
+                f"[DEBUG:Workflow:{self.__class__.__name__}] State before ain_invoke: {repr(initial_state)}"
+            )
             result = await app.ainvoke(initial_state)
+            self.logger.debug(
+                f"[DEBUG:Workflow:{self.__class__.__name__}] State after ain_invoke: {repr(result)}"
+            )
             self.logger.info(f"Workflow {self.__class__.__name__} execution completed")
             return result
 

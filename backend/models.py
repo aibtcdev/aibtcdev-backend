@@ -336,7 +336,7 @@ class ProposalBase(CustomBaseModel):
     end_block: Optional[int] = None
     start_block: Optional[int] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
-    parameters: Optional[str] = None  # Hex encoded parameters
+    parameters: Optional[str] = None
     # Additional fields from blockchain data
     concluded_by: Optional[str] = None
     executed: Optional[bool] = None
