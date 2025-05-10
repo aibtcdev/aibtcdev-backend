@@ -166,12 +166,9 @@ def update_state_with_agent_result(
     state: ProposalEvaluationState, agent_result: Dict[str, Any], agent_name: str
 ):
     """Helper function to update state with agent result including summaries and flags."""
-    # ADDED DEBUG: Log the incoming data
+    # Simplified logging - just log once with relevant details
     logger.debug(
-        f"[DEBUG:update_state:{agent_name}] Updating state with agent result: {agent_result}"
-    )
-    logger.debug(
-        f"[DEBUG:update_state:{agent_name}] Current state before update - {agent_name}_score: {state.get(f'{agent_name}_score')}"
+        f"[DEBUG:update_state:{agent_name}] Updating state with {agent_name}_score (score: {agent_result.get('score', 'N/A')})"
     )
 
     # Update agent score in state
@@ -182,18 +179,8 @@ def update_state_with_agent_result(
         if "token_usage" in score_dict:
             del score_dict["token_usage"]
 
-        # ADDED DEBUG: Log what we're about to assign
-        logger.debug(
-            f"[DEBUG:update_state:{agent_name}] Setting {agent_name}_score to: {score_dict}"
-        )
-
         # Directly assign the dictionary to the state key
         state[f"{agent_name}_score"] = score_dict
-
-        # ADDED DEBUG: Immediately verify what was assigned
-        logger.debug(
-            f"[DEBUG:update_state:{agent_name}] Immediate check - {agent_name}_score now: {state.get(f'{agent_name}_score')}"
-        )
 
     # Update summaries
     if "summaries" not in state:
@@ -211,11 +198,6 @@ def update_state_with_agent_result(
 
     # Note: Token usage is already directly handled by each agent via state["token_usage"]["{agent_name}_agent"]
     # So we don't need to do anything with token usage here
-
-    # ADDED DEBUG: Log final state
-    logger.debug(
-        f"[DEBUG:update_state:{agent_name}] Final state after update - {agent_name}_score: {state.get(f'{agent_name}_score')}"
-    )
 
     return state
 
@@ -408,23 +390,8 @@ Provide a score from 0-100, flag any critical issues (including image-related on
             # Add token usage to result_dict so it's properly processed
             result_dict["token_usage"] = token_usage_data
 
-            # ADDED DEBUG: Log the exact result dictionary before state update
-            self.logger.debug(
-                f"[DEBUG:CoreAgent:{proposal_id}] BEFORE STATE UPDATE: Result dict to be added to state: {result_dict}"
-            )
-
-            # Capture state before update for debugging
-            self.logger.debug(
-                f"[DEBUG:CoreAgent:{proposal_id}] State before update - core_score: {state.get('core_score')}"
-            )
-
-            # Update state with the result
+            # Remove verbose debug logs and simply update state
             update_state_with_agent_result(state, result_dict, "core")
-
-            # ADDED DEBUG: Log the state after update
-            self.logger.debug(
-                f"[DEBUG:CoreAgent:{proposal_id}] AFTER STATE UPDATE: core_score in state: {state.get('core_score')}"
-            )
 
             return result_dict
         except Exception as e:
@@ -1464,14 +1431,8 @@ async def evaluate_proposal(
     debug_level = 0
     if config and "debug_level" in config:
         debug_level = config.get("debug_level", 0)
-        logger.debug(f"[PROPOSAL_DEBUG] Using debug_level: {debug_level}")
-
-    logger.debug(
-        f"[PROPOSAL_DEBUG] evaluate_proposal received proposal_id: {proposal_id}"
-    )
-    logger.debug(
-        f"[PROPOSAL_DEBUG] evaluate_proposal received proposal_data type: {type(proposal_data)}"
-    )
+        if debug_level > 0:
+            logger.debug(f"[PROPOSAL_DEBUG] Using debug_level: {debug_level}")
 
     if not proposal_data:
         logger.warning(
@@ -1495,13 +1456,6 @@ async def evaluate_proposal(
         "recursion_count": 0,
     }
 
-    logger.debug(
-        f"[DEBUG:Workflow:{proposal_id}] Initialized workflow state with keys: {state.keys()}"
-    )
-    logger.debug(
-        f"[PROPOSAL_DEBUG] Proposal data in state: {state.get('proposal_data')}"
-    )
-
     try:
         workflow = ProposalEvaluationWorkflow(config or {})
         logger.info(
@@ -1512,47 +1466,30 @@ async def evaluate_proposal(
             f"[DEBUG:Workflow:{proposal_id}] Workflow execution completed with decision: {result.get('decision', 'Unknown')}"
         )
 
-        # ADDED DEBUG: More comprehensive logging of result structure
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] RESULT STRUCTURE: {list(result.keys())}"
-        )
-
-        # ADDED DEBUG: Log full core_score and other scores
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] FULL CORE SCORE: {result.get('core_score')}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] FULL HISTORICAL SCORE: {result.get('historical_score')}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] FULL FINANCIAL SCORE: {result.get('financial_score')}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] FULL SOCIAL SCORE: {result.get('social_score')}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] FULL FINAL SCORE: {result.get('final_score')}"
-        )
-
-        logger.debug(f"[DEBUG:Workflow:{proposal_id}] RESULT SCORES TYPES:")
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Core: {type(result.get('core_score'))} = {repr(result.get('core_score'))}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Historical: {type(result.get('historical_score'))} = {repr(result.get('historical_score'))}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Financial: {type(result.get('financial_score'))} = {repr(result.get('financial_score'))}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Social: {type(result.get('social_score'))} = {repr(result.get('social_score'))}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Final: {type(result.get('final_score'))} = {repr(result.get('final_score'))}"
-        )
-        logger.debug(
-            f"[DEBUG:Workflow:{proposal_id}] - Decision: {type(result.get('decision'))} = {repr(result.get('decision'))}"
-        )
+        # Only output detailed debug info at higher debug levels
+        if debug_level >= 2:
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] RESULT STRUCTURE: {list(result.keys())}"
+            )
+            logger.debug(f"[DEBUG:Workflow:{proposal_id}] RESULT SCORES TYPES:")
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Core: {type(result.get('core_score'))} = {repr(result.get('core_score'))[:100]+'...' if len(repr(result.get('core_score'))) > 100 else repr(result.get('core_score'))}"
+            )
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Historical: {type(result.get('historical_score'))} = {repr(result.get('historical_score'))[:100]+'...' if len(repr(result.get('historical_score'))) > 100 else repr(result.get('historical_score'))}"
+            )
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Financial: {type(result.get('financial_score'))} = {repr(result.get('financial_score'))[:100]+'...' if len(repr(result.get('financial_score'))) > 100 else repr(result.get('financial_score'))}"
+            )
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Social: {type(result.get('social_score'))} = {repr(result.get('social_score'))[:100]+'...' if len(repr(result.get('social_score'))) > 100 else repr(result.get('social_score'))}"
+            )
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Final: {type(result.get('final_score'))} = {repr(result.get('final_score'))[:100]+'...' if len(repr(result.get('final_score'))) > 100 else repr(result.get('final_score'))}"
+            )
+            logger.debug(
+                f"[DEBUG:Workflow:{proposal_id}] - Decision: {type(result.get('decision'))} = {repr(result.get('decision'))}"
+            )
 
         if result is None:
             logger.error(
@@ -1574,43 +1511,18 @@ async def evaluate_proposal(
             }
 
         def safe_extract_score(value, default=0):
-            # ADDED DEBUG: Log what we're trying to extract
-            logger.debug(
-                f"[DEBUG:safe_extract_score] Extracting score from: {repr(value)} (type: {type(value)})"
-            )
-
             if isinstance(value, dict) and "score" in value:
-                score_val = value.get("score", default)
-                logger.debug(
-                    f"[DEBUG:safe_extract_score] Found score in dict: {score_val}"
-                )
-                return score_val
+                return value.get("score", default)
             elif isinstance(value, int):
-                logger.debug(
-                    f"[DEBUG:safe_extract_score] Value is already int: {value}"
-                )
                 return value
             elif isinstance(value, str):
-                logger.debug(f"[DEBUG:safe_extract_score] Value is string: '{value}'")
                 try:
-                    int_val = int(value)
-                    logger.debug(
-                        f"[DEBUG:safe_extract_score] Converted string to int: {int_val}"
-                    )
-                    return int_val
+                    return int(value)
                 except ValueError:
-                    logger.debug(
-                        f"[DEBUG:safe_extract_score] Could not convert string to int"
-                    )
                     pass  # If string is not int, will fall through to default
-            logger.debug(f"[DEBUG:safe_extract_score] Using default: {default}")
             return default
 
         final_score_val = result.get("final_score")
-        logger.debug(
-            f"[DEBUG:evaluate_proposal] Raw final_score_val from result state: {repr(final_score_val)} (type: {type(final_score_val)})"
-        )
-
         final_score_dict = {}
         if isinstance(final_score_val, dict):
             final_score_dict = final_score_val
@@ -1622,6 +1534,7 @@ async def evaluate_proposal(
             "social": safe_extract_score(result.get("social_score")),
         }
 
+        # This is a useful log to keep even at lower debug levels
         logger.debug(
             f"[DEBUG:Workflow:{proposal_id}] EXTRACTED COMPONENT SCORES: {component_scores}"
         )
@@ -2028,77 +1941,62 @@ async def evaluate_and_vote_on_proposal(
                 "data": None,
             }
 
+        # Get token usage data from eval_result
         total_token_usage = eval_result.get("token_usage", {})
         total_input_tokens = 0
         total_output_tokens = 0
         total_tokens = 0
 
-        # Aggregate tokens from all agent steps
-        # Assuming model_name is consistent across all steps for this aggregation, or we use the primary model_name
-        # If each agent could use a different model, this would need more detailed per-model tracking
-        logger.debug(f"Token usage entries in result: {list(total_token_usage.keys())}")
+        # Aggregate tokens from all agent steps - no need to log duplicates here
         for agent_key, usage_data in total_token_usage.items():
             if isinstance(usage_data, dict):
                 total_input_tokens += usage_data.get("input_tokens", 0)
                 total_output_tokens += usage_data.get("output_tokens", 0)
                 total_tokens += usage_data.get("total_tokens", 0)
-                logger.debug(f"Token usage for {agent_key}: {usage_data}")
-            else:
-                logger.warning(
-                    f"Unexpected format for token_usage data for agent {agent_key}: {usage_data}"
-                )
 
-        # Placeholder for web search specific token usage if it were tracked separately
-        # In the original, these seemed to be fixed placeholders.
-        web_search_input_tokens = 0
-        web_search_output_tokens = 0
-        web_search_total_tokens = 0
+        # Initialize total_token_usage_by_model using data from eval_result
+        total_token_usage_by_model = eval_result.get("total_token_usage_by_model", {})
+        if not total_token_usage_by_model:
+            # Use the default model name from settings or default to gpt-4.1
+            default_model = model_name or "gpt-4.1"
+            # Add total token counts to the model
+            total_token_usage_by_model[default_model] = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_tokens,
+            }
 
-        # Initialize total_token_usage_by_model
-        total_token_usage_by_model = {}
+        # Get cost calculations from eval_result if available
+        total_cost_by_model = eval_result.get("total_cost_by_model", {})
+        total_overall_cost = eval_result.get("total_overall_cost", 0.0)
 
-        # Use the default model name from settings or default to gpt-4.1
-        default_model = model_name or "gpt-4.1"
-
-        # Add total token counts to the model
-        total_token_usage_by_model[default_model] = {
-            "input_tokens": total_input_tokens,
-            "output_tokens": total_output_tokens,
-            "total_tokens": total_tokens,
-        }
-
-        # Improved cost calculation by model
-        cost_per_thousand = {
-            "gpt-4.1": 0.01,  # $0.01 per 1K tokens
-            "gpt-4.1-mini": 0.005,  # $0.005 per 1K tokens
-            "gpt-4.1-32k": 0.03,  # $0.03 per 1K tokens
-            "gpt-4": 0.03,  # $0.03 per 1K tokens
-            "gpt-4-32k": 0.06,  # $0.06 per 1K tokens
-            "gpt-3.5-turbo": 0.0015,  # $0.0015 per 1K tokens
-            "default": 0.01,  # default fallback
-        }
-
-        # Calculate costs for each model
-        total_cost_by_model = {}
-        total_overall_cost = 0.0
-        for model_key, usage in total_token_usage_by_model.items():
-            # Get cost per 1K tokens for this model
-            model_cost_per_k = cost_per_thousand.get(
-                model_key, cost_per_thousand["default"]
-            )
-            # Calculate cost for this model's usage
-            model_cost = usage["total_tokens"] * (model_cost_per_k / 1000)
-            total_cost_by_model[model_key] = model_cost
-            total_overall_cost += model_cost
-
+        # If cost data is missing, calculate it
         if not total_cost_by_model:
-            # Fallback if no models were recorded
-            default_model_key = "gpt-4.1"  # Default model name
-            total_cost_by_model[default_model_key] = total_tokens * (
-                cost_per_thousand["default"] / 1000
-            )
-            total_overall_cost = total_cost_by_model[default_model_key]
+            # Improved cost calculation by model
+            cost_per_thousand = {
+                "gpt-4.1": 0.01,  # $0.01 per 1K tokens
+                "gpt-4.1-mini": 0.005,  # $0.005 per 1K tokens
+                "gpt-4.1-32k": 0.03,  # $0.03 per 1K tokens
+                "gpt-4": 0.03,  # $0.03 per 1K tokens
+                "gpt-4-32k": 0.06,  # $0.06 per 1K tokens
+                "gpt-3.5-turbo": 0.0015,  # $0.0015 per 1K tokens
+                "default": 0.01,  # default fallback
+            }
 
+            # Calculate costs for each model
+            total_cost_by_model = {}
+            total_overall_cost = 0.0
+            for model_key, usage in total_token_usage_by_model.items():
+                # Get cost per 1K tokens for this model
+                model_cost_per_k = cost_per_thousand.get(
+                    model_key, cost_per_thousand["default"]
+                )
+                # Calculate cost for this model's usage
+                model_cost = usage["total_tokens"] * (model_cost_per_k / 1000)
+                total_cost_by_model[model_key] = model_cost
+                total_overall_cost += model_cost
+
+        # Construct final result with voting information added
         final_result = {
             "success": True,
             "evaluation": {
@@ -2116,12 +2014,15 @@ async def evaluate_and_vote_on_proposal(
             "component_scores": eval_result.get("component_scores", {}),
             "component_summaries": eval_result.get("component_summaries", {}),
             "flags": eval_result.get("flags", []),
-            "token_usage": total_token_usage,  # Pass the complete token_usage dictionary
-            "web_search_token_usage": {
-                "input_tokens": web_search_input_tokens,
-                "output_tokens": web_search_output_tokens,
-                "total_tokens": web_search_total_tokens,
-            },
+            "token_usage": total_token_usage,
+            "web_search_token_usage": eval_result.get(
+                "web_search_token_usage",
+                {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                },
+            ),
             "evaluation_token_usage": {
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
@@ -2134,8 +2035,9 @@ async def evaluate_and_vote_on_proposal(
             "total_overall_cost": total_overall_cost,
         }
 
+        # Single log entry about the final result instead of duplicating token usage logs
         logger.debug(
-            f"Proposal evaluation completed: Success={final_result['success']} | Decision={'APPROVE' if approve else 'REJECT'} | Confidence={confidence_score:.2f} | Auto-voted={should_vote} | Transaction={tx_id or 'None'}"
+            f"Proposal evaluation completed with voting: Decision={'APPROVE' if approve else 'REJECT'} | Confidence={confidence_score:.2f} | Auto-voted={should_vote} | Transaction={tx_id or 'None'}"
         )
         return final_result
     except Exception as e:
@@ -2166,6 +2068,7 @@ async def evaluate_proposal_only(
         auto_vote=False,
     )
 
+    # Simplified logging - no need to duplicate what evaluate_and_vote_on_proposal already logged
     logger.debug("Removing vote-related fields from response")
     if "vote_result" in result:
         del result["vote_result"]
