@@ -1,42 +1,50 @@
-FROM public.ecr.aws/docker/library/python:3.13
+FROM oven/bun:latest AS bun
+
+# First stage: build the application with uv
+FROM public.ecr.aws/docker/library/python:3.13 AS builder
+
+# Enable bytecode compilation and set link mode
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+# Disable Python downloads to use the system interpreter across both images
+ENV UV_PYTHON_DOWNLOADS=0
 
 WORKDIR /usr/src/app
 
+# Install uv
 RUN pip install uv
 
-# Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
-# Copy from the cache instead of linking since it's a mounted volume
-ENV UV_LINK_MODE=copy
-
-# Install the project's dependencies using the lockfile and settings
+# Install dependencies using the lockfile
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project
 
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
+# Copy the rest of the code
+COPY . /usr/src/app
 
-# Set Bun path for this shell
-ENV PATH="/root/.bun/bin:${PATH}"
+# Sync again to install the project and all dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
 
-# Install JS/TS dependencies efficiently
+# Second stage: final image without uv
+FROM public.ecr.aws/docker/library/python:3.13-slim
+
+# Copy the application from the builder
+COPY --from=builder /usr/src/app /usr/src/app
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=builder /usr/src/app/agent-tools-ts/package.json /usr/src/app/agent-tools-ts/bun.lock ./
+
+# Install JS/TS dependencies
 WORKDIR /usr/src/app/agent-tools-ts
-
-# Copy only dependency files first for better caching
-COPY agent-tools-ts/package.json agent-tools-ts/bun.lock ./
 RUN bun install --frozen-lockfile
 
-# Now copy the rest of the code
+# Return to app directory
 WORKDIR /usr/src/app
-COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
 
-ENV PATH="/app/.venv/bin:$PATH"
+# Place executables in the environment at the front of the path
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
-ENTRYPOINT [ "uv", "run" ]
-
-CMD [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
+# Run using uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

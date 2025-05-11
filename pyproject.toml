@@ -1,7 +1,7 @@
 [project]
 name = "aibtcdev-backend"
 version = "0.1.0"
-description = "A sophisticated FastAPI-based backend service that powers AI-driven interactions with Bitcoin and Stacks blockchain technologies, providing real-time chat with AI agents, DAO management, social media integration, blockchain interaction capabilities, market data analysis, and document processing with vector search."
+description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -30,6 +30,7 @@ dependencies = [
     "uvicorn==0.34.2",
     "vecs==0.4.5",
 ]
+
 [project.optional-dependencies]
 testing = [
     "pytest==8.3.5",
