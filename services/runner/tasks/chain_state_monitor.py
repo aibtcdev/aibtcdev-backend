@@ -33,9 +33,9 @@ class ChainStateMonitorResult(RunnerResult):
         self,
         success: bool,
         message: str,
-        network: str,
-        is_stale: bool,
         error: Optional[Exception] = None,
+        network: str = None,
+        is_stale: bool = False,
         last_updated: Optional[datetime] = None,
         elapsed_minutes: float = 0,
         blocks_behind: int = 0,
@@ -46,16 +46,18 @@ class ChainStateMonitorResult(RunnerResult):
         Args:
             success: Whether the operation was successful
             message: Message describing the operation result
-            network: The network being monitored
-            is_stale: Whether the chain state is stale
             error: Optional exception that occurred
+            network: The network being monitored (optional, defaults to None)
+            is_stale: Whether the chain state is stale (optional, defaults to False)
             last_updated: When the chain state was last updated
             elapsed_minutes: Minutes since last update
             blocks_behind: Number of blocks behind
             blocks_processed: List of blocks processed
         """
         super().__init__(success=success, message=message, error=error)
-        self.network = network
+        self.network = (
+            network or config.network.network
+        )  # Use config network as default
         self.is_stale = is_stale
         self.last_updated = last_updated
         self.elapsed_minutes = elapsed_minutes
@@ -67,7 +69,8 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
     """Task runner for monitoring chain state freshness."""
 
     def __init__(self):
-        """Initialize the task."""
+        """Initialize the task without requiring config parameter."""
+        # No config parameter needed - we get it from the import
         super().__init__()
         self.hiro_api = HiroApi()
         self.chainhook_service = ChainhookService()
