@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
 # Second stage: final image without uv
-FROM public.ecr.aws/docker/library/python:3.13-slim
+FROM public.ecr.aws/docker/library/python:3.13
 
 # Copy the application from the builder
 COPY --from=builder /usr/src/app /usr/src/app
