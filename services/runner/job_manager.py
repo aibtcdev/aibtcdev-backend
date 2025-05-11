@@ -1,7 +1,7 @@
 """Job management utilities for the runner service."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, List, Optional, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -182,7 +182,7 @@ class JobManager:
 
                 # Add max_instances=1 for all jobs to prevent concurrent execution
                 # and set misfire_grace_time to prevent missed execution warnings
-                # Set next_run_time to now to execute immediately
+                # Set next_run_time to one minute from now
                 scheduler.add_job(
                     job_func,
                     "interval",
@@ -190,12 +190,11 @@ class JobManager:
                     id=job_id,
                     max_instances=1,
                     misfire_grace_time=60,
-                    next_run_time=datetime.now(),
                     **job_args,
                 )
 
                 logger.info(
-                    f"{job.name} started with interval of {job.seconds} seconds (will execute immediately)"
+                    f"{job.name} started with interval of {job.seconds} seconds (will execute in one minute)"
                 )
             else:
                 logger.info(f"{job.name} is disabled")
