@@ -49,52 +49,83 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
         funding_priorities = dao_financial_context.get("funding_priorities", [])
         financial_constraints = dao_financial_context.get("financial_constraints", [])
 
-        # Format financial context for the prompt
-        financial_context_text = f"""
-Treasury Balance: {treasury_balance}
-Monthly Budget: {monthly_budget}
-Funding Priorities: {', '.join(funding_priorities) if funding_priorities else 'Not specified'}
-Financial Constraints: {', '.join(financial_constraints) if financial_constraints else 'Not specified'}
-"""
-
         prompt = PromptTemplate(
-            input_variables=["proposal_data", "financial_context"],
-            template="""Evaluate the financial aspects of this proposal for the DAO.
-
-# Proposal
-{proposal_data}
-
-# DAO Financial Context
-{financial_context}
-
-# Task
-Score this proposal from 0-100 based on:
-1. Cost-effectiveness and value for money (40%)
-2. Budget accuracy and detail (20%)
-3. Financial risk assessment (20%)
-4. Alignment with DAO's financial priorities (20%)
-
-When analyzing, consider:
-- Is the proposal requesting a reasonable amount?
-- Are costs well-justified with clear deliverables?
-- Are there hidden or underestimated costs?
-- Does it align with the DAO's financial priorities?
-- What is the potential ROI (Return on Investment)?
-- Are there financial risks or dependencies?
-
-# Output Format
-Provide:
-- Score (0-100)
-- List of any critical financial issues or red flags
-- Brief summary of your financial evaluation
-
-Only return a JSON object with these three fields: score, flags (array), and summary.""",
+            input_variables=[
+                "proposal_data",
+                "treasury_balance",
+                "monthly_budget",
+                "funding_priorities",
+                "financial_constraints",
+            ],
+            template="""<system>
+  <reminder>
+    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+  </reminder>
+  <reminder>
+    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
+  </reminder>
+  <reminder>
+    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
+  </reminder>
+</system>
+<financial_context_evaluation>
+  <current_proposal>
+    {proposal_data}
+  </current_proposal>
+  <dao_financial_context>
+    <treasury_balance>{treasury_balance}</treasury_balance>
+    <monthly_budget>{monthly_budget}</monthly_budget>
+    <funding_priorities>{funding_priorities}</funding_priorities>
+    <financial_constraints>{financial_constraints}</financial_constraints>
+  </dao_financial_context>
+  <task>
+    <criteria>
+      <criterion weight=\"40\">Cost-effectiveness and value for money</criterion>
+      <criterion weight=\"20\">Budget accuracy and detail</criterion>
+      <criterion weight=\"20\">Financial risk assessment</criterion>
+      <criterion weight=\"20\">Alignment with DAO's financial priorities</criterion>
+    </criteria>
+    <considerations>
+      <consideration>Is the proposal requesting a reasonable amount?</consideration>
+      <consideration>Are costs well-justified with clear deliverables?</consideration>
+      <consideration>Are there hidden or underestimated costs?</consideration>
+      <consideration>Does it align with the DAO's financial priorities?</consideration>
+      <consideration>What is the potential ROI (Return on Investment)?</consideration>
+      <consideration>Are there financial risks or dependencies?</consideration>
+    </considerations>
+    <scoring_guide>
+      <score range=\"0-20\">Very poor financial justification, high risk, or not aligned with priorities</score>
+      <score range=\"21-50\">Significant issues or missing details, questionable value</score>
+      <score range=\"51-70\">Adequate but with some concerns or minor risks</score>
+      <score range=\"71-90\">Good value, well-justified, low risk, fits priorities</score>
+      <score range=\"91-100\">Excellent value, clear ROI, no concerns, highly aligned</score>
+    </scoring_guide>
+  </task>
+  <output_format>
+    Provide:
+    <score>A number from 0-100</score>
+    <flags>List of any critical financial issues or red flags</flags>
+    <summary>Brief summary of your financial evaluation</summary>
+    Only return a JSON object with these three fields: score, flags (array), and summary.
+  </output_format>
+</financial_context_evaluation>""",
         )
 
         try:
             formatted_prompt_text = prompt.format(
                 proposal_data=proposal_content,
-                financial_context=financial_context_text,
+                treasury_balance=treasury_balance,
+                monthly_budget=monthly_budget,
+                funding_priorities=(
+                    ", ".join(funding_priorities)
+                    if funding_priorities
+                    else "Not specified"
+                ),
+                financial_constraints=(
+                    ", ".join(financial_constraints)
+                    if financial_constraints
+                    else "Not specified"
+                ),
             )
             message_content_list = [{"type": "text", "text": formatted_prompt_text}]
 

@@ -134,39 +134,58 @@ Recent Community Sentiment: {recent_sentiment}
 
         prompt = PromptTemplate(
             input_variables=["proposal_data", "search_results", "community_info"],
-            template="""Evaluate the social impact and community aspects of this proposal.
-
-# Proposal
-{proposal_data}
-
-# Community Information
-{community_info}
-
-# External Context
-{search_results}
-
-# Task
-Score this proposal from 0-100 based on:
-1. Community benefit and inclusion (40%)
-2. Alignment with community values and interests (30%)
-3. Potential for community engagement (20%)
-4. Consideration of diverse stakeholders (10%)
-
-When analyzing, consider:
-- Will this proposal benefit the broader community or just a few members?
-- Is there likely community support or opposition?
-- Does it foster inclusivity and participation?
-- Does it align with the community's values and interests?
-- Could it cause controversy or division?
-- Does it consider the needs of diverse stakeholders?
-
-# Output Format
-Provide:
-- Score (0-100)
-- List of any critical social issues or red flags
-- Brief summary of your social evaluation
-
-Only return a JSON object with these three fields: score, flags (array), and summary.""",
+            template="""<system>
+  <reminder>
+    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+  </reminder>
+  <reminder>
+    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
+  </reminder>
+  <reminder>
+    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
+  </reminder>
+</system>
+<social_context_evaluation>
+  <proposal_data>
+    {proposal_data}
+  </proposal_data>
+  <community_info>
+    {community_info}
+  </community_info>
+  <external_context>
+    {search_results}
+  </external_context>
+  <task>
+    <criteria>
+      <criterion weight=\"40\">Community benefit and inclusion</criterion>
+      <criterion weight=\"30\">Alignment with community values and interests</criterion>
+      <criterion weight=\"20\">Potential for community engagement</criterion>
+      <criterion weight=\"10\">Consideration of diverse stakeholders</criterion>
+    </criteria>
+    <considerations>
+      <consideration>Will this proposal benefit the broader community or just a few members?</consideration>
+      <consideration>Is there likely community support or opposition?</consideration>
+      <consideration>Does it foster inclusivity and participation?</consideration>
+      <consideration>Does it align with the community's values and interests?</consideration>
+      <consideration>Could it cause controversy or division?</consideration>
+      <consideration>Does it consider the needs of diverse stakeholders?</consideration>
+    </considerations>
+    <scoring_guide>
+      <score range=\"0-20\">No benefit, misaligned, or divisive</score>
+      <score range=\"21-50\">Significant issues or missing details</score>
+      <score range=\"51-70\">Adequate but with some concerns or minor risks</score>
+      <score range=\"71-90\">Good benefit, aligned, and inclusive</score>
+      <score range=\"91-100\">Excellent benefit, highly aligned, and unifying</score>
+    </scoring_guide>
+  </task>
+  <output_format>
+    Provide:
+    <score>A number from 0-100</score>
+    <flags>List of any critical social issues or red flags</flags>
+    <summary>Brief summary of your social evaluation</summary>
+    Only return a JSON object with these three fields: score, flags (array), and summary.
+  </output_format>
+</social_context_evaluation>""",
         )
 
         try:

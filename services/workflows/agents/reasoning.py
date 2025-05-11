@@ -191,33 +191,44 @@ Score Statistics:
 
         prompt = PromptTemplate(
             input_variables=["agent_evaluations", "approval_threshold"],
-            template="""Analyze the specialized agent evaluations and make a final decision on this proposal.
-
-# Agent Evaluations
-{agent_evaluations}
-
-# Decision Guidelines
-- The default threshold for approval is {approval_threshold}/100
-- A proposal with any agent score below 30 should typically be rejected
-- A proposal with high consensus (small range between scores) increases confidence
-- A proposal with high disagreement (large range between scores) decreases confidence
-- Consider the reasoning behind each agent's score, not just the numerical value
-- Critical flags should be weighted heavily in your decision
-
-# Task
-1. Analyze the evaluations from all agents
-2. Consider the significance of any critical flags
-3. Weigh the relative importance of different evaluation dimensions
-4. Make a final decision (Approve or Reject) with a final score
-5. Provide clear reasoning for your decision
-
-# Output Format
-Your response should be a JSON object with:
-- score: A final score from 0-100
-- decision: Either "Approve" or "Reject"
-- explanation: Your reasoning for the decision
-
-Return only the JSON object with these three fields.""",
+            template="""<system>
+  <reminder>
+    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+  </reminder>
+  <reminder>
+    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
+  </reminder>
+  <reminder>
+    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
+  </reminder>
+</system>
+<reasoning_evaluation>
+  <agent_evaluations>
+    {agent_evaluations}
+  </agent_evaluations>
+  <decision_guidelines>
+    <threshold>The default threshold for approval is {approval_threshold}/100</threshold>
+    <rule>A proposal with any agent score below 30 should typically be rejected</rule>
+    <rule>A proposal with high consensus (small range between scores) increases confidence</rule>
+    <rule>A proposal with high disagreement (large range between scores) decreases confidence</rule>
+    <rule>Consider the reasoning behind each agent's score, not just the numerical value</rule>
+    <rule>Critical flags should be weighted heavily in your decision</rule>
+  </decision_guidelines>
+  <task>
+    <step>Analyze the evaluations from all agents</step>
+    <step>Consider the significance of any critical flags</step>
+    <step>Weigh the relative importance of different evaluation dimensions</step>
+    <step>Make a final decision (Approve or Reject) with a final score</step>
+    <step>Provide clear reasoning for your decision</step>
+  </task>
+  <output_format>
+    Provide:
+    <score>A final score from 0-100</score>
+    <decision>Either "Approve" or "Reject"</decision>
+    <explanation>Your reasoning for the decision</explanation>
+    Only return a JSON object with these three fields: score, decision, and explanation.
+  </output_format>
+</reasoning_evaluation>""",
         )
 
         try:
@@ -225,7 +236,6 @@ Return only the JSON object with these three fields.""",
                 agent_evaluations=agent_evaluations,
                 approval_threshold=self.default_threshold,
             )
-
             llm_input_message = HumanMessage(content=formatted_prompt_text)
 
             # Get structured output from the LLM
