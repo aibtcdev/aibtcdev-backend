@@ -293,20 +293,14 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
             # Get current chain height from API
             try:
-                logger.debug("Fetching current chain info from API")
+                logger.info("Fetching current chain info from API")
                 api_info = self.hiro_api.get_info()
-
-                # Debug output for the API response
-                logger.debug(f"API info type: {type(api_info)}")
-                logger.debug(f"API info raw: {api_info}")
 
                 # Handle different response types
                 if isinstance(api_info, dict):
-                    logger.debug("API returned dictionary instead of object")
                     # Try to access chain_tip from dictionary
                     if "chain_tip" in api_info:
                         chain_tip = api_info["chain_tip"]
-                        logger.debug(f"Chain tip from dict: {chain_tip}")
                         current_api_block_height = chain_tip.get("block_height", 0)
                     else:
                         logger.error(f"Missing chain_tip in API response: {api_info}")
@@ -315,7 +309,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         )
                 else:
                     # We have a HiroApiInfo object but chain_tip is still a dict
-                    logger.debug(f"Chain tip: {api_info.chain_tip}")
                     # Access it as a dictionary
                     if isinstance(api_info.chain_tip, dict):
                         current_api_block_height = api_info.chain_tip.get(
@@ -358,7 +351,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                         try:
                             # Get all transactions for this block
-                            logger.debug(f"Fetching transactions for block {height}")
                             transactions = self.hiro_api.get_all_transactions_by_block(
                                 height
                             )
@@ -370,36 +362,18 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                             # Get block details
                             if transactions.results:
-                                logger.debug(
-                                    f"Using transaction data for block hash and parent hash"
-                                )
-                                logger.debug(
-                                    f"Transaction result type: {type(transactions.results[0])}"
-                                )
-
                                 # Handle transactions.results as either dict or object
                                 tx = transactions.results[0]
                                 if isinstance(tx, dict):
-                                    logger.debug("Transaction is a dictionary")
                                     block_hash = tx.get("block_hash")
                                     parent_hash = tx.get("parent_block_hash")
                                 else:
-                                    logger.debug("Transaction is an object")
                                     block_hash = tx.block_hash
                                     parent_hash = tx.parent_block_hash
-
-                                logger.debug(
-                                    f"Block hash: {block_hash}, Parent hash: {parent_hash}"
-                                )
                             else:
                                 # If no transactions, fetch the block directly
-                                logger.debug(
-                                    f"No transactions found, fetching block directly"
-                                )
                                 try:
                                     block = self.hiro_api.get_block_by_height(height)
-                                    logger.debug(f"Block data type: {type(block)}")
-                                    logger.debug(f"Block data: {block}")
 
                                     # Handle different response formats
                                     if isinstance(block, dict):
@@ -408,10 +382,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                     else:
                                         block_hash = block.hash
                                         parent_hash = block.parent_block_hash
-
-                                    logger.debug(
-                                        f"Block hash: {block_hash}, Parent hash: {parent_hash}"
-                                    )
 
                                     if not block_hash or not parent_hash:
                                         raise ValueError(
@@ -424,21 +394,17 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                     raise
 
                             # Convert to chainhook format
-                            logger.debug(
-                                f"Converting block {height} to chainhook format"
-                            )
                             chainhook_data = self._convert_to_chainhook_format(
                                 height, block_hash, parent_hash, transactions
                             )
 
                             # Process through chainhook service
-                            logger.debug(
-                                f"Sending block {height} to chainhook service for processing"
-                            )
                             result = await self.chainhook_service.process(
                                 chainhook_data
                             )
-                            logger.info(f"Chainhook processing result: {result}")
+                            logger.info(
+                                f"Block {height} processed with result: {result}"
+                            )
 
                             blocks_processed.append(height)
 
@@ -463,7 +429,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     )
                     return results
                 else:
-                    logger.debug(
+                    logger.info(
                         f"Chain state for network {network} is {'stale' if is_stale else 'fresh'}. "
                         f"{blocks_behind} blocks behind (threshold: {stale_threshold_blocks})."
                     )
