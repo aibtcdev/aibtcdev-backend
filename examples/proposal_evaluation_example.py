@@ -35,7 +35,62 @@ async def create_test_proposal(dao_id: UUID) -> UUID:
         The ID of the created proposal
     """
     # Create test parameters as a JSON object
-    parameters = "I Publius.btc will do a $FACES airdrop to as many bitcoin faces holders as possible. I will report back with a confirmation message and proof. Give me a shot."
+    # parameters = "I Publius.btc will do a $FACES airdrop to as many bitcoin faces holders as possible. I will report back with a confirmation message and proof. Give me a shot."
+    parameters = """
+
+Proposal Title: $FACES Airdrop to Bitcoin Faces Holders with Transparent Execution and Community Engagement
+
+Proposal ID: [Generate a new UUID for submission]
+
+Proposer: Publius.btc
+
+Proposal Data:
+I, Publius.btc, propose to execute a $FACES airdrop to Bitcoin Faces holders to boost community engagement and reward active participants in the DAO. The airdrop will distribute 10,000 $FACES tokens to eligible holders, with a clear execution plan, transparent verification, and measurable outcomes. The proposal aligns with the DAO’s mission to promote community activity and token utility. Below are the details:
+
+Objective: Distribute $FACES tokens to Bitcoin Faces holders to incentivize participation, increase governance engagement, and strengthen community ties.
+Eligibility Criteria:
+Holders of Bitcoin Faces NFTs as of a snapshot date (to be set 7 days after proposal approval).
+Minimum holding: 1 Bitcoin Faces NFT.
+Exclusion: Wallets flagged for suspicious activity (e.g., wash trading) based on on-chain analysis.
+Execution Plan:
+Snapshot: Conduct a blockchain snapshot of Bitcoin Faces holders on the specified date, using a third-party tool (e.g., Etherscan or equivalent for Bitcoin-based assets).
+Distribution: Distribute 10 $FACES per eligible wallet, up to a total of 10,000 tokens, via a smart contract to ensure transparency and immutability.
+Timeline:
+Day 1–7: Proposal approval and snapshot preparation.
+Day 8: Snapshot execution.
+Day 9–14: Smart contract deployment and testing.
+Day 15: Airdrop distribution.
+Day 20: Post-airdrop report published.
+Budget and Funding:
+Total Cost: 10,000 $FACES tokens (valued at $0.10 per token based on current market price, totaling $1,000).
+Additional Costs: $500 for smart contract development, auditing, and gas fees, to be funded from the DAO treasury.
+Funding Request: 10,000 $FACES tokens + $500 in stablecoins (e.g., USDC) from the DAO treasury.
+Cost Justification: The airdrop is cost-effective, targeting active holders to maximize engagement with minimal token dilution. The $500 covers secure execution to mitigate risks.
+Verification and Transparency:
+Publish the snapshot data and eligible wallet list on the DAO’s governance forum.
+Share the smart contract address and transaction hashes on-chain for public verification.
+Provide a detailed post-airdrop report within 5 days of distribution, including the number of wallets reached, tokens distributed, and community feedback.
+Community Benefit:
+Inclusivity: All Bitcoin Faces holders are eligible, ensuring broad participation.
+Engagement: The airdrop will encourage holders to participate in governance and DAO activities, addressing low governance participation.
+Stakeholder Consideration: The plan includes outreach to diverse community segments via the DAO’s social channels (e.g., Discord, X) to ensure awareness and feedback.
+Alignment with DAO Priorities:
+Promotes token utility and community engagement, core to the DAO’s mission.
+Supports financial prudence by capping costs and providing ROI through increased governance participation (measurable via voting turnout post-airdrop).
+Risk Mitigation:
+Financial Risk: Limited to 10,000 $FACES and $500, with no ongoing costs.
+Execution Risk: Smart contract audit to prevent vulnerabilities.
+Inclusion Risk: Transparent eligibility criteria to avoid disputes.
+Deliverables and ROI:
+Deliverables: Snapshot data, smart contract, airdrop distribution, and post-airdrop report.
+ROI: Expected 10% increase in governance participation (based on similar airdrop campaigns) and enhanced community sentiment, measurable via forum activity and X posts.
+Addressing Past Concerns:
+Unlike previous proposals, this includes a detailed execution plan, budget, and verification process.
+Responds to feedback on inclusion by defining clear eligibility and outreach strategies.
+Aligns with financial priorities by justifying costs and capping token usage.
+Commitment:
+I will execute the airdrop as outlined, provide regular updates on the DAO’s governance forum, and deliver a comprehensive report with proof of distribution. If the proposal is approved, I will collaborate with the DAO’s technical and community teams to ensure success.
+"""
 
     # # Convert parameters to JSON string and then hex encode it
     # parameters_hex = "0x" + binascii.hexlify(parameters.encode("utf-8")).decode("utf-8")
@@ -145,28 +200,21 @@ async def test_proposal_evaluation_workflow():
 
                 # Print the results
                 print("\nEvaluation Results:")
-                print(f"Success: {result['success']}")
-                if result["success"]:
-                    print(f"Approval: {result['evaluation']['approve']}")
-                    print(f"Confidence: {result['evaluation']['confidence_score']}")
-                    print(f"Reasoning: {result['evaluation']['reasoning']}")
-                    print(
-                        f"Total Token Usage by Model: {result.get('total_token_usage_by_model')}"
-                    )
-                    print(f"Total Cost by Model: {result.get('total_cost_by_model')}")
-                    print(
-                        f"Total Overall Cost: ${result.get('total_overall_cost', 0.0):.4f}"
-                    )
+                print(f"Approval: {result['evaluation'].get('approve', False)}")
+                print(f"Confidence: {result['evaluation'].get('confidence_score', 0)}")
+                print(
+                    f"Reasoning: {result['evaluation'].get('reasoning', 'No reasoning provided')}"
+                )
 
-                    if scenario["auto_vote"]:
-                        print(f"Auto-voted: {result['auto_voted']}")
-                        if result["vote_result"]:
-                            print(f"Vote Result: {result['vote_result']}")
-                            if result.get("tx_id"):
-                                print(f"Transaction ID: {result['tx_id']}")
-                else:
-                    print(f"Error: {result.get('error', 'Unknown error')}")
+                if "token_usage" in result.get("evaluation", {}):
+                    print(f"Total Token Usage: {result['evaluation']['token_usage']}")
 
+                if scenario["auto_vote"]:
+                    print(f"Auto-voted: {result.get('auto_voted', False)}")
+                    if result.get("vote_result"):
+                        print(f"Vote Result: {result['vote_result']}")
+                        if result.get("tx_id"):
+                            print(f"Transaction ID: {result['tx_id']}")
             except Exception as e:
                 print(f"Error in scenario {scenario['name']}: {e}")
 
