@@ -121,6 +121,14 @@ class SchedulerConfig:
             "AIBTC_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300"
         )  # Default to 5 mins
     )
+    chain_state_monitor_enabled: bool = (
+        os.getenv("AIBTC_CHAIN_STATE_MONITOR_ENABLED", "true").lower() == "true"
+    )
+    chain_state_monitor_interval_seconds: int = int(
+        os.getenv(
+            "AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300"
+        )  # Default to 5 mins
+    )
 
 
 @dataclass

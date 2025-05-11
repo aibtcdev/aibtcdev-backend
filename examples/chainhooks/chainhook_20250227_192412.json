@@ -1,1 +1,110 @@
-{"apply": [{"block_identifier": {"hash": "0x2ef386b35f11d2f0e99bd057d28d41d5488a9673c30aca94f3f5c19fa711bb90", "index": 222020}, "metadata": {"bitcoin_anchor_block_identifier": {"hash": "0x1d9e703b5bff59bcc7589b2c13f40fdcf919a95770203c7afab71971b68b35af", "index": 19757}, "block_time": 1740712827, "confirm_microblock_identifier": null, "cycle_number": null, "pox_cycle_index": 982, "pox_cycle_length": 20, "pox_cycle_position": 16, "reward_set": null, "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f", "signer_public_keys": ["0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504", "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"], "signer_signature": ["01add4bd52080f9ca8f7edf09a30227d2d0be08a7f868f2848b1f3d9d777e6406a18b192481c9fe3b4952b1852add1437a843a5fb01544421714258a81e969b78c", "005a3ec9d89689663b6f7e452559e2e5fc7b18087c593c7c9e29f1af26aa4e59f72f476946417768f473bd5daee0c4fe3a92fea21bc2cae3dce2498d828b86da09"], "stacks_block_hash": "0x8b7c5c7d93a04a1df807923f3b1ce40d1baa0960192e5d4ec9bc41c93d3a1b21", "tenure_height": 16953}, "parent_block_identifier": {"hash": "0x16483b75ed9a428134a6726cb874e77dc300fb5e4ec72b431e7e1e10b97aefee", "index": 222019}, "timestamp": 1740712542, "transactions": [{"metadata": {"description": "tenure change", "execution_cost": {"read_count": 0, "read_length": 0, "runtime": 0, "write_count": 0, "write_length": 0}, "fee": 0, "kind": {"type": "TenureChange"}, "nonce": 38248, "position": {"index": 0}, "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e3470000000000009568000000000000000000001709dcd9bc9bef4dbf9047a58907e1da8e739633505d63ee6d350b40557ad7584434757fa4b2f64c6ec8ade788511052ff9b4197a42a6406348aa911535c5ee7010200000000077d5bdf9538521bd7e75d85f99efa43ee1ab01d3994c1e3466b8c49845b8147fcf4fe8dabf128437c7d5bdf9538521bd7e75d85f99efa43ee1ab01d3916483b75ed9a428134a6726cb874e77dc300fb5e4ec72b431e7e1e10b97aefee00000008002d58c278d1c9e1a8a26236ac81b543193c10e347", "receipt": {"contract_calls_stack": [], "events": [], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1", "sponsor": null, "success": true}, "operations": [], "transaction_identifier": {"hash": "0x0daa7d7f1028dc0ad28d023f4604b066787a8703cf9d225b71561ed54abfda7b"}}, {"metadata": {"description": "coinbase", "execution_cost": {"read_count": 0, "read_length": 0, "runtime": 0, "write_count": 0, "write_length": 0}, "fee": 0, "kind": {"type": "Coinbase"}, "nonce": 38249, "position": {"index": 1}, "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e34700000000000095690000000000000000000106d31f70f7764a32fee4abc4816e510ceebb3cb1f8af695fd12cd593c75851913a4e3d29c9c78ef28cb8010610331eb4f7fe38acca0d40704419492518e718c4010200000000080000000000000000000000000000000000000000000000000000000000000000096a821176ad01a601a6c09dfb68fccddd71508babf45855c5247faf2601139ad0e04a10f86d8049bdff0de597edf347df0e36a1fcd593a6b7dcc875b28eecf87b42c4964ad38ffd51b49239eec788f809", "receipt": {"contract_calls_stack": [], "events": [], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1", "sponsor": null, "success": true}, "operations": [], "transaction_identifier": {"hash": "0x2121c53d2fa2ce59a3c5a6af95a0ad5aeecd454a150420c9bf95ddf3d341d6a2"}}]}], "chainhook": {"is_streaming_blocks": false, "predicate": {"higher_than": 221993, "scope": "block_height"}, "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"}, "events": [], "rollback": []}
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0x2ef386b35f11d2f0e99bd057d28d41d5488a9673c30aca94f3f5c19fa711bb90",
+        "index": 222020
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x1d9e703b5bff59bcc7589b2c13f40fdcf919a95770203c7afab71971b68b35af",
+          "index": 19757
+        },
+        "block_time": 1740712827,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 982,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 16,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "01add4bd52080f9ca8f7edf09a30227d2d0be08a7f868f2848b1f3d9d777e6406a18b192481c9fe3b4952b1852add1437a843a5fb01544421714258a81e969b78c",
+          "005a3ec9d89689663b6f7e452559e2e5fc7b18087c593c7c9e29f1af26aa4e59f72f476946417768f473bd5daee0c4fe3a92fea21bc2cae3dce2498d828b86da09"
+        ],
+        "stacks_block_hash": "0x8b7c5c7d93a04a1df807923f3b1ce40d1baa0960192e5d4ec9bc41c93d3a1b21",
+        "tenure_height": 16953
+      },
+      "parent_block_identifier": {
+        "hash": "0x16483b75ed9a428134a6726cb874e77dc300fb5e4ec72b431e7e1e10b97aefee",
+        "index": 222019
+      },
+      "timestamp": 1740712542,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "tenure change",
+            "execution_cost": {
+              "read_count": 0,
+              "read_length": 0,
+              "runtime": 0,
+              "write_count": 0,
+              "write_length": 0
+            },
+            "fee": 0,
+            "kind": { "type": "TenureChange" },
+            "nonce": 38248,
+            "position": { "index": 0 },
+            "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e3470000000000009568000000000000000000001709dcd9bc9bef4dbf9047a58907e1da8e739633505d63ee6d350b40557ad7584434757fa4b2f64c6ec8ade788511052ff9b4197a42a6406348aa911535c5ee7010200000000077d5bdf9538521bd7e75d85f99efa43ee1ab01d3994c1e3466b8c49845b8147fcf4fe8dabf128437c7d5bdf9538521bd7e75d85f99efa43ee1ab01d3916483b75ed9a428134a6726cb874e77dc300fb5e4ec72b431e7e1e10b97aefee00000008002d58c278d1c9e1a8a26236ac81b543193c10e347",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [],
+          "transaction_identifier": {
+            "hash": "0x0daa7d7f1028dc0ad28d023f4604b066787a8703cf9d225b71561ed54abfda7b"
+          }
+        },
+        {
+          "metadata": {
+            "description": "coinbase",
+            "execution_cost": {
+              "read_count": 0,
+              "read_length": 0,
+              "runtime": 0,
+              "write_count": 0,
+              "write_length": 0
+            },
+            "fee": 0,
+            "kind": { "type": "Coinbase" },
+            "nonce": 38249,
+            "position": { "index": 1 },
+            "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e34700000000000095690000000000000000000106d31f70f7764a32fee4abc4816e510ceebb3cb1f8af695fd12cd593c75851913a4e3d29c9c78ef28cb8010610331eb4f7fe38acca0d40704419492518e718c4010200000000080000000000000000000000000000000000000000000000000000000000000000096a821176ad01a601a6c09dfb68fccddd71508babf45855c5247faf2601139ad0e04a10f86d8049bdff0de597edf347df0e36a1fcd593a6b7dcc875b28eecf87b42c4964ad38ffd51b49239eec788f809",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [],
+          "transaction_identifier": {
+            "hash": "0x2121c53d2fa2ce59a3c5a6af95a0ad5aeecd454a150420c9bf95ddf3d341d6a2"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": { "higher_than": 221993, "scope": "block_height" },
+    "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"
+  },
+  "events": [],
+  "rollback": []
+}

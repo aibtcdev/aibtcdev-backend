@@ -1,5 +1,6 @@
 """Handler for tracking the latest block state from chainhooks."""
 
+from datetime import datetime
 from typing import Optional
 
 from backend.factory import backend
@@ -97,7 +98,11 @@ class BlockStateHandler(ChainhookEventHandler):
                 )
                 updated = backend.update_chain_state(
                     current_state.id,
-                    ChainStateBase(block_height=block_height, block_hash=block_hash),
+                    ChainStateBase(
+                        block_height=block_height,
+                        block_hash=block_hash,
+                        network=current_state.network,
+                    ),
                 )
                 if not updated:
                     self.logger.error(

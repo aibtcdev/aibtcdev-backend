@@ -1,5 +1,6 @@
 """Task runners for scheduled and on-demand jobs."""
 
+from .chain_state_monitor import ChainStateMonitorTask, chain_state_monitor
 from .dao_proposal_concluder import DAOProposalConcluderTask, dao_proposal_concluder
 from .dao_proposal_evaluation import DAOProposalEvaluationTask, dao_proposal_evaluation
 from .dao_proposal_voter import DAOProposalVoterTask, dao_proposal_voter
@@ -20,4 +21,6 @@ __all__ = [
     "dao_proposal_concluder",
     "DAOProposalEvaluationTask",
     "dao_proposal_evaluation",
+    "ChainStateMonitorTask",
+    "chain_state_monitor",
 ]

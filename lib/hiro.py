@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, ClassVar, Dict, List, Optional, TypedDict
 
 import aiohttp
 import requests
@@ -10,6 +10,7 @@ from cachetools import TTLCache, cached
 
 from config import config
 from lib.logger import configure_logger
+from services.webhooks.chainhook import models
 
 logger = configure_logger(__name__)
 
@@ -228,9 +229,15 @@ class ChainHookBuilder:
 class BaseHiroApi:
     """Base class for Hiro API clients with shared functionality."""
 
-    # Rate limiting settings
-    RATE_LIMIT = 100  # requests per minute
-    RATE_LIMIT_WINDOW = 60  # seconds
+    # Default rate limiting settings (will be updated from API headers)
+    DEFAULT_SECOND_LIMIT: ClassVar[int] = 20
+    DEFAULT_MINUTE_LIMIT: ClassVar[int] = 50
+
+    # Rate limit tracking (shared across all instances)
+    _second_limit: ClassVar[int] = DEFAULT_SECOND_LIMIT
+    _minute_limit: ClassVar[int] = DEFAULT_MINUTE_LIMIT
+    _second_requests: ClassVar[List[float]] = []
+    _minute_requests: ClassVar[List[float]] = []
 
     # Retry settings
     MAX_RETRIES = 3
@@ -247,27 +254,141 @@ class BaseHiroApi:
         if not self.api_key:
             raise ValueError("HIRO_API_KEY environment variable is required")
 
-        self._request_times: List[float] = []
         self._cache = TTLCache(maxsize=100, ttl=300)  # Cache with 5-minute TTL
         self._session: Optional[aiohttp.ClientSession] = None
         logger.debug("Initialized API client with base URL: %s", self.base_url)
 
-    def _rate_limit(self) -> None:
-        """Implement rate limiting."""
-        current_time = time.time()
-        self._request_times = [
-            t for t in self._request_times if current_time - t < self.RATE_LIMIT_WINDOW
-        ]
+    def _update_rate_limits(self, headers: Dict[str, str]) -> None:
+        """Update rate limit settings from response headers.
 
-        if len(self._request_times) >= self.RATE_LIMIT:
-            sleep_time = self._request_times[0] + self.RATE_LIMIT_WINDOW - current_time
+        Args:
+            headers: Response headers containing rate limit information
+        """
+        # Update limits if headers are present
+        if "x-ratelimit-limit-second" in headers:
+            old_limit = self.__class__._second_limit
+            self.__class__._second_limit = int(headers["x-ratelimit-limit-second"])
+            logger.debug(
+                "Second rate limit updated: %d → %d",
+                old_limit,
+                self.__class__._second_limit,
+            )
+
+        if "x-ratelimit-limit-minute" in headers:
+            old_limit = self.__class__._minute_limit
+            self.__class__._minute_limit = int(headers["x-ratelimit-limit-minute"])
+            logger.debug(
+                "Minute rate limit updated: %d → %d",
+                old_limit,
+                self.__class__._minute_limit,
+            )
+
+        # Log remaining rate limit information if available
+        if "x-ratelimit-remaining-second" in headers:
+            logger.debug(
+                "Second rate limit remaining: %s",
+                headers["x-ratelimit-remaining-second"],
+            )
+
+        if "x-ratelimit-remaining-minute" in headers:
+            logger.debug(
+                "Minute rate limit remaining: %s",
+                headers["x-ratelimit-remaining-minute"],
+            )
+
+        logger.debug(
+            "Current rate limit state - second: %d/%d, minute: %d/%d",
+            len(self.__class__._second_requests),
+            self.__class__._second_limit,
+            len(self.__class__._minute_requests),
+            self.__class__._minute_limit,
+        )
+
+    def _rate_limit(self) -> None:
+        """Implement rate limiting for both second and minute windows."""
+        current_time = time.time()
+
+        # Update second window requests
+        old_second_count = len(self.__class__._second_requests)
+        self.__class__._second_requests = [
+            t for t in self.__class__._second_requests if current_time - t < 1.0
+        ]
+        new_second_count = len(self.__class__._second_requests)
+
+        if old_second_count != new_second_count:
+            logger.debug(
+                "Pruned expired second window requests: %d → %d",
+                old_second_count,
+                new_second_count,
+            )
+
+        # Update minute window requests
+        old_minute_count = len(self.__class__._minute_requests)
+        self.__class__._minute_requests = [
+            t for t in self.__class__._minute_requests if current_time - t < 60.0
+        ]
+        new_minute_count = len(self.__class__._minute_requests)
+
+        if old_minute_count != new_minute_count:
+            logger.debug(
+                "Pruned expired minute window requests: %d → %d",
+                old_minute_count,
+                new_minute_count,
+            )
+
+        # Check second limit
+        if len(self.__class__._second_requests) >= self.__class__._second_limit:
+            sleep_time = self.__class__._second_requests[0] + 1.0 - current_time
             if sleep_time > 0:
                 logger.warning(
-                    "Rate limit reached, sleeping for %.2f seconds", sleep_time
+                    "Second rate limit reached (%d/%d), sleeping for %.2f seconds",
+                    len(self.__class__._second_requests),
+                    self.__class__._second_limit,
+                    sleep_time,
                 )
                 time.sleep(sleep_time)
+                # Recalculate current time after sleep
+                current_time = time.time()
+        else:
+            logger.debug(
+                "Second rate limit check: %d/%d (%.1f%% of limit)",
+                len(self.__class__._second_requests),
+                self.__class__._second_limit,
+                (len(self.__class__._second_requests) / self.__class__._second_limit)
+                * 100,
+            )
 
-        self._request_times.append(current_time)
+        # Check minute limit
+        if len(self.__class__._minute_requests) >= self.__class__._minute_limit:
+            sleep_time = self.__class__._minute_requests[0] + 60.0 - current_time
+            if sleep_time > 0:
+                logger.warning(
+                    "Minute rate limit reached (%d/%d), sleeping for %.2f seconds",
+                    len(self.__class__._minute_requests),
+                    self.__class__._minute_limit,
+                    sleep_time,
+                )
+                time.sleep(sleep_time)
+        else:
+            logger.debug(
+                "Minute rate limit check: %d/%d (%.1f%% of limit)",
+                len(self.__class__._minute_requests),
+                self.__class__._minute_limit,
+                (len(self.__class__._minute_requests) / self.__class__._minute_limit)
+                * 100,
+            )
+
+        # Record the new request
+        self.__class__._second_requests.append(time.time())
+        self.__class__._minute_requests.append(time.time())
+
+        logger.debug(
+            "New request recorded: second window now %d/%d, minute window now %d/%d",
+            len(self.__class__._second_requests),
+            self.__class__._second_limit,
+            len(self.__class__._minute_requests),
+            self.__class__._minute_limit,
+        )
 
     def _retry_on_error(func):
         """Decorator to retry API calls on transient errors."""
@@ -321,12 +442,24 @@ class BaseHiroApi:
         try:
             self._rate_limit()
             url = f"{self.base_url}{endpoint}"
-            headers = headers or {"Accept": "application/json"}
+            headers = headers or {}
+
+            # Set default Accept header if not provided
+            if "Accept" not in headers:
+                headers["Accept"] = "application/json"
+
+            # Add X-API-Key header if api_key is set
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
 
             logger.debug("Making %s request to %s", method, url)
             response = requests.request(
                 method, url, headers=headers, params=params, json=json
             )
+
+            # Update rate limits from headers
+            self._update_rate_limits(response.headers)
+
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
@@ -354,15 +487,29 @@ class BaseHiroApi:
         try:
             self._rate_limit()
             url = f"{self.base_url}{endpoint}"
-            headers = headers or {"Accept": "application/json"}
+            headers = headers or {}
+
+            # Set default Accept header if not provided
+            if "Accept" not in headers:
+                headers["Accept"] = "application/json"
+
+            # Add X-API-Key header if api_key is set
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
 
             logger.debug("Making async %s request to %s", method, url)
             async with self._session.request(
                 method, url, headers=headers, params=params, json=json
             ) as response:
+                # Update rate limits from headers
+                self._update_rate_limits(response.headers)
+
                 response.raise_for_status()
                 return await response.json()
         except aiohttp.ClientError as e:
+            if isinstance(e, aiohttp.ClientResponseError) and e.status == 429:
+                logger.error("Rate limit exceeded in async request: %s", str(e))
+                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}")
             logger.error("Async request error: %s", str(e))
             raise HiroApiError(f"Async request error: {str(e)}")
 
@@ -671,10 +818,24 @@ class HiroApi(BaseHiroApi):
             "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
         )
 
+    async def aget_token_holders(self, token: str) -> Dict[str, Any]:
+        """Async version of get_token_holders."""
+        logger.debug("Async retrieving token holders for %s", token)
+        return await self._amake_request(
+            "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
+        )
+
     def get_address_balance(self, addr: str) -> Dict[str, Any]:
         """Retrieve wallet balance for an address."""
         logger.debug("Retrieving balance for address %s", addr)
         return self._make_request(
+            "GET", f"{self.ENDPOINTS['addresses']}/{addr}/balances"
+        )
+
+    async def aget_address_balance(self, addr: str) -> Dict[str, Any]:
+        """Async version of get_address_balance."""
+        logger.debug("Async retrieving balance for address %s", addr)
+        return await self._amake_request(
             "GET", f"{self.ENDPOINTS['addresses']}/{addr}/balances"
         )
 
@@ -687,9 +848,199 @@ class HiroApi(BaseHiroApi):
         """Get raw transaction details."""
         return self._make_request("GET", f"/extended/v1/tx/{tx_id}/raw")
 
-    def get_transactions_by_block(self, block_hash: str) -> Dict[str, Any]:
-        """Get transactions in a block."""
+    def get_transactions_by_block(
+        self, block_height: int, limit: int = 50, offset: int = 0
+    ) -> models.BlockTransactionsResponse:
+        """Get transactions in a block.
+
+        Args:
+            block_height: The height of the block to get transactions for
+            limit: The maximum number of transactions to return (default: 50)
+            offset: Pagination offset (default: 0)
+
+        Returns:
+            Typed response containing transaction data
+        """
+        logger.debug(
+            "Getting transactions for block height %d with limit %d offset %d",
+            block_height,
+            limit,
+            offset,
+        )
+        response = self._make_request(
+            "GET",
+            f"/extended/v2/blocks/{block_height}/transactions",
+            params={"limit": limit, "offset": offset},
+        )
+
+        logger.debug(f"API response type: {type(response)}")
+        logger.debug(
+            f"API response keys: {response.keys() if isinstance(response, dict) else 'Not a dict'}"
+        )
+
+        # For debugging purposes
+        if (
+            "results" in response
+            and response["results"]
+            and isinstance(response["results"], list)
+        ):
+            logger.debug(f"First result type: {type(response['results'][0])}")
+            logger.debug(
+                f"First result sample keys: {list(response['results'][0].keys())[:5]}"
+            )
+
+        # We're getting dictionaries back, so create BlockTransactionsResponse manually
+        # This ensures we don't lose the raw data structure if dataclass conversion fails
+        try:
+            return models.BlockTransactionsResponse(**response)
+        except Exception as e:
+            logger.warning(f"Error creating BlockTransactionsResponse: {str(e)}")
+            # Fall back to returning a raw dictionary-based response
+            return models.BlockTransactionsResponse(
+                limit=response.get("limit", 0),
+                offset=response.get("offset", 0),
+                total=response.get("total", 0),
+                results=response.get("results", []),
+            )
+
+    def get_all_transactions_by_block(
+        self, block_height: int, page_size: int = 50
+    ) -> models.BlockTransactionsResponse:
+        """Get all transactions in a block by paginating through results.
+
+        Args:
+            block_height: The height of the block to get transactions for
+            page_size: Number of transactions per page request (default: 50)
+
+        Returns:
+            Combined response with all transactions
+        """
+        logger.debug(f"Getting all transactions for block height {block_height}")
+
+        # Get first page to determine total
+        first_page = self.get_transactions_by_block(block_height, limit=page_size)
+        logger.debug(f"First page type: {type(first_page)}")
+        logger.debug(f"First page results type: {type(first_page.results)}")
+
+        if first_page.results:
+            logger.debug(f"First result type: {type(first_page.results[0])}")
+
+        # If we got all transactions in the first request, return it
+        if first_page.total <= page_size:
+            return first_page
+
+        # Initialize with first page results
+        all_transactions = first_page.results.copy()
+
+        # Paginate through the rest
+        remaining = first_page.total - page_size
+        offset = page_size
+
+        while remaining > 0:
+            current_limit = min(page_size, remaining)
+            logger.debug(
+                f"Fetching {current_limit} more transactions with offset {offset}"
+            )
+
+            page = self.get_transactions_by_block(
+                block_height, limit=current_limit, offset=offset
+            )
+
+            all_transactions.extend(page.results)
+            offset += current_limit
+            remaining -= current_limit
+
+        # Create combined response
+        return models.BlockTransactionsResponse(
+            limit=first_page.total,
+            offset=0,
+            total=first_page.total,
+            results=all_transactions,
+        )
+
+    def get_transactions_by_block_hash(self, block_hash: str) -> Dict[str, Any]:
+        """Get transactions in a block by hash."""
         return self._make_request("GET", f"/extended/v1/tx/block/{block_hash}")
+
+    async def aget_transactions_by_block(
+        self, block_height: int, limit: int = 50, offset: int = 0
+    ) -> models.BlockTransactionsResponse:
+        """Async version of get_transactions_by_block.
+
+        Args:
+            block_height: The height of the block to get transactions for
+            limit: The maximum number of transactions to return (default: 50)
+            offset: Pagination offset (default: 0)
+
+        Returns:
+            Typed response containing transaction data
+        """
+        logger.debug(
+            "Async getting transactions for block height %d with limit %d offset %d",
+            block_height,
+            limit,
+            offset,
+        )
+        response = await self._amake_request(
+            "GET",
+            f"/extended/v2/blocks/{block_height}/transactions",
+            params={"limit": limit, "offset": offset},
+        )
+        return models.BlockTransactionsResponse(**response)
+
+    async def aget_all_transactions_by_block(
+        self, block_height: int, page_size: int = 50
+    ) -> models.BlockTransactionsResponse:
+        """Async version to get all transactions in a block by paginating through results.
+
+        Args:
+            block_height: The height of the block to get transactions for
+            page_size: Number of transactions per page request (default: 50)
+
+        Returns:
+            Combined response with all transactions
+        """
+        logger.debug("Async getting all transactions for block height %d", block_height)
+
+        # Get first page to determine total
+        first_page = await self.aget_transactions_by_block(
+            block_height, limit=page_size
+        )
+
+        # If we got all transactions in the first request, return it
+        if first_page.total <= page_size:
+            return first_page
+
+        # Initialize with first page results
+        all_transactions = first_page.results.copy()
+
+        # Paginate through the rest
+        remaining = first_page.total - page_size
+        offset = page_size
+
+        while remaining > 0:
+            current_limit = min(page_size, remaining)
+            logger.debug(
+                "Async fetching %d more transactions with offset %d",
+                current_limit,
+                offset,
+            )
+
+            page = await self.aget_transactions_by_block(
+                block_height, limit=current_limit, offset=offset
+            )
+
+            all_transactions.extend(page.results)
+            offset += current_limit
+            remaining -= current_limit
+
+        # Create combined response
+        return models.BlockTransactionsResponse(
+            limit=first_page.total,
+            offset=0,
+            total=first_page.total,
+            results=all_transactions,
+        )
 
     def get_transactions_by_block_height(self, height: int) -> Dict[str, Any]:
         """Get transactions in a block by height."""
@@ -835,7 +1186,6 @@ class HiroApi(BaseHiroApi):
         response.raise_for_status()
         return response.json()["price"]
 
-    # @cached(lambda self: self._cache)
     def get_current_block_height(self) -> int:
         """Get the current block height"""
         logger.debug("Retrieving current block height")
@@ -848,24 +1198,29 @@ class HiroApi(BaseHiroApi):
         logger.debug(f"Response: {response}")
         return response["results"][0]["height"]
 
+    def get_info(self) -> models.HiroApiInfo:
+        """Get Hiro API server information and chain tip.
+
+        Returns:
+            Server information including version, status, and current chain tip
+        """
+        logger.debug("Retrieving Hiro API server info")
+        response = self._make_request("GET", "/extended")
+        return models.HiroApiInfo(**response)
+
+    async def aget_info(self) -> models.HiroApiInfo:
+        """Async version of get_info.
+
+        Returns:
+            Server information including version, status, and current chain tip
+        """
+        logger.debug("Async retrieving Hiro API server info")
+        response = await self._amake_request("GET", "/extended")
+        return models.HiroApiInfo(**response)
+
     def search(self, query_id: str) -> Dict[str, Any]:
         """Search for blocks, transactions, contracts, or addresses."""
         logger.debug("Performing search for query: %s", query_id)
         return self._make_request("GET", f"{self.ENDPOINTS['search']}/{query_id}")
-
-    # Async versions of selected methods
-    async def aget_token_holders(self, token: str) -> Dict[str, Any]:
-        """Async version of get_token_holders."""
-        logger.debug("Async retrieving token holders for %s", token)
-        return await self._amake_request(
-            "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
-        )
-
-    async def aget_address_balance(self, addr: str) -> Dict[str, Any]:
-        """Async version of get_address_balance."""
-        logger.debug("Async retrieving balance for address %s", addr)
-        return await self._amake_request(
-            "GET", f"{self.ENDPOINTS['addresses']}/{addr}/balances"
-        )
 
     # ... add async versions of other methods as needed ...

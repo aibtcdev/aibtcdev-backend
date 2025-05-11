@@ -5,7 +5,6 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
 
-from backend.models import QueueMessageType
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -75,6 +74,7 @@ class JobType(str, Enum):
     TWEET = "tweet"
     AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
     PROPOSAL_EMBEDDING = "proposal_embedding"
+    CHAIN_STATE_MONITOR = "chain_state_monitor"
 
     def __str__(self):
         return self.value

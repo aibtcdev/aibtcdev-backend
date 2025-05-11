@@ -7,6 +7,10 @@ from services.runner.tasks.agent_account_deployer import (
     AgentAccountDeployerTask,
     agent_account_deployer,
 )
+from services.runner.tasks.chain_state_monitor import (
+    ChainStateMonitorTask,
+    chain_state_monitor,
+)
 from services.runner.tasks.dao_proposal_concluder import (
     DAOProposalConcluderTask,
     dao_proposal_concluder,
@@ -36,6 +40,7 @@ JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
 JobRegistry.register(JobType.AGENT_ACCOUNT_DEPLOY, AgentAccountDeployerTask)
 JobRegistry.register(JobType.PROPOSAL_EMBEDDING, ProposalEmbedderTask)
+JobRegistry.register(JobType.CHAIN_STATE_MONITOR, ChainStateMonitorTask)
 
 __all__ = [
     "BaseTask",
@@ -61,4 +66,6 @@ __all__ = [
     "agent_account_deployer",
     "ProposalEmbedderTask",
     "proposal_embedder",
+    "ChainStateMonitorTask",
+    "chain_state_monitor",
 ]

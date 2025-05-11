@@ -1,1 +1,186 @@
-{"apply": [{"block_identifier": {"hash": "0xc93f68701ee5103d8cac5d90c08a1962ee0f2897ec021eddb86851505ef4eb2b", "index": 222011}, "metadata": {"bitcoin_anchor_block_identifier": {"hash": "0x36203cf8f01b0ef09aff54bc8446a5fc36d141d50ad3398e648c07e5998e286a", "index": 19755}, "block_time": 1740712530, "confirm_microblock_identifier": null, "cycle_number": null, "pox_cycle_index": 982, "pox_cycle_length": 20, "pox_cycle_position": 14, "reward_set": null, "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f", "signer_public_keys": ["0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504", "0x03161dd42571db5ca2599ef32774ec0c6c9ef125cbb8f826a63fe527489bb91400", "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"], "signer_signature": ["01cb2edc820a5a44edbcfda911fb5eba1f12a39b8176b885f55e53be090699afde297f0a0ce4e35688e651a898ebdc745596a830eb5928edb870ffc4d178541d71", "0001178d5a6e0c8d50a6c71ab881d27f4991ba29a0d20f75e810984c4587696a53336c27de0171b43697d7d6001ee3db0a1713d40ea046977097389fd26b1c29bc", "0080b1a3a8af8d7c4b3ac7f643cc229775d0b5c01addb4eef240817cb2994887e7070a044fc83c8d238c7815bea7cdbc2867dd357dd7d18573ef3ec1c0fc0f2e7b"], "stacks_block_hash": "0x96b5cc54197c931e161ef0c45fad575ea907eac13153e8499bb9b43e849a49ac", "tenure_height": 16951}, "parent_block_identifier": {"hash": "0x0ab5329b1aac18a9edb27908919a2337a2f1d46c56790e2e011b8baabff457b1", "index": 222010}, "timestamp": 1740712308, "transactions": [{"metadata": {"description": "transfered: 1000 \u00b5STX from ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF to ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H", "execution_cost": {"read_count": 0, "read_length": 0, "runtime": 0, "write_count": 0, "write_length": 0}, "fee": 300, "kind": {"type": "NativeTokenTransfer"}, "nonce": 67695, "position": {"index": 0}, "raw_tx": "0x80800000000400c2963cbcd9cf3f60311c34087ceb45c8abdbc413000000000001086f000000000000012c000141267c91d91c7deba77c99acb013c98903568f17540bc593de4ccbdb52402fc6218739e8964395a91cd90e31fa2aac712605fd0b20d2ec942ac5d8a43ed5d31203020000000000051a841f9b4dd30ae02fd816cc225c59d1b00b9c3a3a00000000000003e800000000000000000000000000000000000000000000000000000000000000000000", "receipt": {"contract_calls_stack": [], "events": [{"data": {"amount": "1000", "recipient": "ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H", "sender": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"}, "position": {"index": 0}, "type": "STXTransferEvent"}], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF", "sponsor": null, "success": true}, "operations": [{"account": {"address": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 1000}, "operation_identifier": {"index": 0}, "related_operations": [{"index": 1}], "status": "SUCCESS", "type": "DEBIT"}, {"account": {"address": "ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 1000}, "operation_identifier": {"index": 1}, "related_operations": [{"index": 0}], "status": "SUCCESS", "type": "CREDIT"}], "transaction_identifier": {"hash": "0x854154d2c03501b69ef4cbf18cd8c06263d39202ab482daac9cceb1f5439c2a5"}}, {"metadata": {"description": "transfered: 500000000 \u00b5STX from ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B to ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN", "execution_cost": {"read_count": 0, "read_length": 0, "runtime": 0, "write_count": 0, "write_length": 0}, "fee": 180, "kind": {"type": "NativeTokenTransfer"}, "nonce": 67695, "position": {"index": 1}, "raw_tx": "0x80800000000400b4fdae98b64b9cd6c9436f3b965558966afe890b000000000001086f00000000000000b4000197c15ba5734dc337420e420998fc4f2258229b5a2344bf0d2438106e4a8bd4717df887fdb1e3875e3c327266007d2bb38694b02941e52e40ac0bd7d07db736a303020000000000051ad18a36efdb086137320b2cee15deebbf3566fb62000000001dcd650066617563657400000000000000000000000000000000000000000000000000000000", "receipt": {"contract_calls_stack": [], "events": [{"data": {"amount": "500000000", "recipient": "ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN", "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"}, "position": {"index": 1}, "type": "STXTransferEvent"}], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B", "sponsor": null, "success": true}, "operations": [{"account": {"address": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 500000000}, "operation_identifier": {"index": 0}, "related_operations": [{"index": 1}], "status": "SUCCESS", "type": "DEBIT"}, {"account": {"address": "ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 500000000}, "operation_identifier": {"index": 1}, "related_operations": [{"index": 0}], "status": "SUCCESS", "type": "CREDIT"}], "transaction_identifier": {"hash": "0x1356bf9bbbea75ab265ae57b1501a32bd6ce379d96e96821c9334826e3e0a71b"}}]}], "chainhook": {"is_streaming_blocks": false, "predicate": {"higher_than": 221993, "scope": "block_height"}, "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"}, "events": [], "rollback": []}
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0xc93f68701ee5103d8cac5d90c08a1962ee0f2897ec021eddb86851505ef4eb2b",
+        "index": 222011
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x36203cf8f01b0ef09aff54bc8446a5fc36d141d50ad3398e648c07e5998e286a",
+          "index": 19755
+        },
+        "block_time": 1740712530,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 982,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 14,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x03161dd42571db5ca2599ef32774ec0c6c9ef125cbb8f826a63fe527489bb91400",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "01cb2edc820a5a44edbcfda911fb5eba1f12a39b8176b885f55e53be090699afde297f0a0ce4e35688e651a898ebdc745596a830eb5928edb870ffc4d178541d71",
+          "0001178d5a6e0c8d50a6c71ab881d27f4991ba29a0d20f75e810984c4587696a53336c27de0171b43697d7d6001ee3db0a1713d40ea046977097389fd26b1c29bc",
+          "0080b1a3a8af8d7c4b3ac7f643cc229775d0b5c01addb4eef240817cb2994887e7070a044fc83c8d238c7815bea7cdbc2867dd357dd7d18573ef3ec1c0fc0f2e7b"
+        ],
+        "stacks_block_hash": "0x96b5cc54197c931e161ef0c45fad575ea907eac13153e8499bb9b43e849a49ac",
+        "tenure_height": 16951
+      },
+      "parent_block_identifier": {
+        "hash": "0x0ab5329b1aac18a9edb27908919a2337a2f1d46c56790e2e011b8baabff457b1",
+        "index": 222010
+      },
+      "timestamp": 1740712308,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "transfered: 1000 \u00b5STX from ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF to ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H",
+            "execution_cost": {
+              "read_count": 0,
+              "read_length": 0,
+              "runtime": 0,
+              "write_count": 0,
+              "write_length": 0
+            },
+            "fee": 300,
+            "kind": { "type": "NativeTokenTransfer" },
+            "nonce": 67695,
+            "position": { "index": 0 },
+            "raw_tx": "0x80800000000400c2963cbcd9cf3f60311c34087ceb45c8abdbc413000000000001086f000000000000012c000141267c91d91c7deba77c99acb013c98903568f17540bc593de4ccbdb52402fc6218739e8964395a91cd90e31fa2aac712605fd0b20d2ec942ac5d8a43ed5d31203020000000000051a841f9b4dd30ae02fd816cc225c59d1b00b9c3a3a00000000000003e800000000000000000000000000000000000000000000000000000000000000000000",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [
+                {
+                  "data": {
+                    "amount": "1000",
+                    "recipient": "ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H",
+                    "sender": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"
+                  },
+                  "position": { "index": 0 },
+                  "type": "STXTransferEvent"
+                }
+              ],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [
+            {
+              "account": {
+                "address": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 1000
+              },
+              "operation_identifier": { "index": 0 },
+              "related_operations": [{ "index": 1 }],
+              "status": "SUCCESS",
+              "type": "DEBIT"
+            },
+            {
+              "account": {
+                "address": "ST221Z6TDTC5E0BYR2V624Q2ST6R0Q71T78WTAX6H"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 1000
+              },
+              "operation_identifier": { "index": 1 },
+              "related_operations": [{ "index": 0 }],
+              "status": "SUCCESS",
+              "type": "CREDIT"
+            }
+          ],
+          "transaction_identifier": {
+            "hash": "0x854154d2c03501b69ef4cbf18cd8c06263d39202ab482daac9cceb1f5439c2a5"
+          }
+        },
+        {
+          "metadata": {
+            "description": "transfered: 500000000 \u00b5STX from ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B to ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN",
+            "execution_cost": {
+              "read_count": 0,
+              "read_length": 0,
+              "runtime": 0,
+              "write_count": 0,
+              "write_length": 0
+            },
+            "fee": 180,
+            "kind": { "type": "NativeTokenTransfer" },
+            "nonce": 67695,
+            "position": { "index": 1 },
+            "raw_tx": "0x80800000000400b4fdae98b64b9cd6c9436f3b965558966afe890b000000000001086f00000000000000b4000197c15ba5734dc337420e420998fc4f2258229b5a2344bf0d2438106e4a8bd4717df887fdb1e3875e3c327266007d2bb38694b02941e52e40ac0bd7d07db736a303020000000000051ad18a36efdb086137320b2cee15deebbf3566fb62000000001dcd650066617563657400000000000000000000000000000000000000000000000000000000",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [
+                {
+                  "data": {
+                    "amount": "500000000",
+                    "recipient": "ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN",
+                    "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"
+                  },
+                  "position": { "index": 1 },
+                  "type": "STXTransferEvent"
+                }
+              ],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [
+            {
+              "account": {
+                "address": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 500000000
+              },
+              "operation_identifier": { "index": 0 },
+              "related_operations": [{ "index": 1 }],
+              "status": "SUCCESS",
+              "type": "DEBIT"
+            },
+            {
+              "account": {
+                "address": "ST38RMDQFVC462DSJ1CPEW5EYXEZKASQVC8XDGARN"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 500000000
+              },
+              "operation_identifier": { "index": 1 },
+              "related_operations": [{ "index": 0 }],
+              "status": "SUCCESS",
+              "type": "CREDIT"
+            }
+          ],
+          "transaction_identifier": {
+            "hash": "0x1356bf9bbbea75ab265ae57b1501a32bd6ce379d96e96821c9334826e3e0a71b"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": { "higher_than": 221993, "scope": "block_height" },
+    "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"
+  },
+  "events": [],
+  "rollback": []
+}

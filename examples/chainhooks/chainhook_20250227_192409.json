@@ -1,1 +1,118 @@
-{"apply": [{"block_identifier": {"hash": "0x1973929448ad499f4b3bfbf344741cffa4a5474b5db374af39c6dfcae3999fea", "index": 222016}, "metadata": {"bitcoin_anchor_block_identifier": {"hash": "0x3e7804a435b1a5147c986d2acc86c7a4e44f6119383d4c1a969102b6bce24a09", "index": 19756}, "block_time": 1740712685, "confirm_microblock_identifier": null, "cycle_number": null, "pox_cycle_index": 982, "pox_cycle_length": 20, "pox_cycle_position": 15, "reward_set": null, "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f", "signer_public_keys": ["0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504", "0x03161dd42571db5ca2599ef32774ec0c6c9ef125cbb8f826a63fe527489bb91400", "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"], "signer_signature": ["0041b224964114d1cf6a8013a52581a3c5487a9bef271856c83687cae33279a8d2189f84dcd5036995069e9ac956ac028e9464ac40e80993cc3695a01a92bf4034", "01b2529349a44a67da799a8da69259a271765a1144e0355c43d63e0cedad9998a72838a3425b1f82042ee4c6b066a4fef953830524802eaebe03c2b905516f453a", "019a4f9374fd0a44cd9dbc9f9a9e90f83e71602b7add530709d92e8c23fa9833387eaece038ac0a6a49b8d34e2d03b53735172457f68c7ea62d5dbc1b705fd507d"], "stacks_block_hash": "0x83ffcdbf76c8acaa16315008292522609f99a1e917d63fcddfc9e6004121fe84", "tenure_height": 16952}, "parent_block_identifier": {"hash": "0x24b437445703d848ae372623642ce739e60c572266a25f91962256ab21dd98d0", "index": 222015}, "timestamp": 1740712542, "transactions": [{"metadata": {"description": "transfered: 1000 \u00b5STX from ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B to ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF", "execution_cost": {"read_count": 0, "read_length": 0, "runtime": 0, "write_count": 0, "write_length": 0}, "fee": 300, "kind": {"type": "NativeTokenTransfer"}, "nonce": 67696, "position": {"index": 0}, "raw_tx": "0x80800000000400b4fdae98b64b9cd6c9436f3b965558966afe890b0000000000010870000000000000012c000020ff168f089a0f4b822aed24928c40c0cf51586843913f25a1235e4d77b49a8549988411753d423c4b956e509747f7468b0c0fb29b47700e661091e2933be34503020000000000051ac2963cbcd9cf3f60311c34087ceb45c8abdbc41300000000000003e800000000000000000000000000000000000000000000000000000000000000000000", "receipt": {"contract_calls_stack": [], "events": [{"data": {"amount": "1000", "recipient": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF", "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"}, "position": {"index": 0}, "type": "STXTransferEvent"}], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B", "sponsor": null, "success": true}, "operations": [{"account": {"address": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 1000}, "operation_identifier": {"index": 0}, "related_operations": [{"index": 1}], "status": "SUCCESS", "type": "DEBIT"}, {"account": {"address": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"}, "amount": {"currency": {"decimals": 6, "symbol": "STX"}, "value": 1000}, "operation_identifier": {"index": 1}, "related_operations": [{"index": 0}], "status": "SUCCESS", "type": "CREDIT"}], "transaction_identifier": {"hash": "0x3222f011a6ae8353fe402e81c768b9756685d79b355efd18d16fbaf68b6d356d"}}]}], "chainhook": {"is_streaming_blocks": false, "predicate": {"higher_than": 221993, "scope": "block_height"}, "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"}, "events": [], "rollback": []}
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0x1973929448ad499f4b3bfbf344741cffa4a5474b5db374af39c6dfcae3999fea",
+        "index": 222016
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x3e7804a435b1a5147c986d2acc86c7a4e44f6119383d4c1a969102b6bce24a09",
+          "index": 19756
+        },
+        "block_time": 1740712685,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 982,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 15,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x03161dd42571db5ca2599ef32774ec0c6c9ef125cbb8f826a63fe527489bb91400",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "0041b224964114d1cf6a8013a52581a3c5487a9bef271856c83687cae33279a8d2189f84dcd5036995069e9ac956ac028e9464ac40e80993cc3695a01a92bf4034",
+          "01b2529349a44a67da799a8da69259a271765a1144e0355c43d63e0cedad9998a72838a3425b1f82042ee4c6b066a4fef953830524802eaebe03c2b905516f453a",
+          "019a4f9374fd0a44cd9dbc9f9a9e90f83e71602b7add530709d92e8c23fa9833387eaece038ac0a6a49b8d34e2d03b53735172457f68c7ea62d5dbc1b705fd507d"
+        ],
+        "stacks_block_hash": "0x83ffcdbf76c8acaa16315008292522609f99a1e917d63fcddfc9e6004121fe84",
+        "tenure_height": 16952
+      },
+      "parent_block_identifier": {
+        "hash": "0x24b437445703d848ae372623642ce739e60c572266a25f91962256ab21dd98d0",
+        "index": 222015
+      },
+      "timestamp": 1740712542,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "transfered: 1000 \u00b5STX from ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B to ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF",
+            "execution_cost": {
+              "read_count": 0,
+              "read_length": 0,
+              "runtime": 0,
+              "write_count": 0,
+              "write_length": 0
+            },
+            "fee": 300,
+            "kind": { "type": "NativeTokenTransfer" },
+            "nonce": 67696,
+            "position": { "index": 0 },
+            "raw_tx": "0x80800000000400b4fdae98b64b9cd6c9436f3b965558966afe890b0000000000010870000000000000012c000020ff168f089a0f4b822aed24928c40c0cf51586843913f25a1235e4d77b49a8549988411753d423c4b956e509747f7468b0c0fb29b47700e661091e2933be34503020000000000051ac2963cbcd9cf3f60311c34087ceb45c8abdbc41300000000000003e800000000000000000000000000000000000000000000000000000000000000000000",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [
+                {
+                  "data": {
+                    "amount": "1000",
+                    "recipient": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF",
+                    "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"
+                  },
+                  "position": { "index": 0 },
+                  "type": "STXTransferEvent"
+                }
+              ],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [
+            {
+              "account": {
+                "address": "ST2TFVBMRPS5SSNP98DQKQ5JNB2B6NZM91C4K3P7B"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 1000
+              },
+              "operation_identifier": { "index": 0 },
+              "related_operations": [{ "index": 1 }],
+              "status": "SUCCESS",
+              "type": "DEBIT"
+            },
+            {
+              "account": {
+                "address": "ST319CF5WV77KYR1H3GT0GZ7B8Q4AQPY42ETP1VPF"
+              },
+              "amount": {
+                "currency": { "decimals": 6, "symbol": "STX" },
+                "value": 1000
+              },
+              "operation_identifier": { "index": 1 },
+              "related_operations": [{ "index": 0 }],
+              "status": "SUCCESS",
+              "type": "CREDIT"
+            }
+          ],
+          "transaction_identifier": {
+            "hash": "0x3222f011a6ae8353fe402e81c768b9756685d79b355efd18d16fbaf68b6d356d"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": { "higher_than": 221993, "scope": "block_height" },
+    "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"
+  },
+  "events": [],
+  "rollback": []
+}

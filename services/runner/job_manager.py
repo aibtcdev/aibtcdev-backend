@@ -111,6 +111,12 @@ class JobManager:
                 config.scheduler.proposal_embedder_interval_seconds,
                 JobType.PROPOSAL_EMBEDDING.value,
             ),
+            (
+                "Chain State Monitor Service",
+                config.scheduler.chain_state_monitor_enabled,
+                config.scheduler.chain_state_monitor_interval_seconds,
+                JobType.CHAIN_STATE_MONITOR.value,
+            ),
         ]
 
         # Add all runner jobs with common structure
@@ -172,9 +178,17 @@ class JobManager:
 
                 # Add the job with a specific ID for easier management
                 job_id = job.job_id or f"{job.name.lower().replace(' ', '_')}"
+
+                # Add max_instances=1 for all jobs to prevent concurrent execution
                 scheduler.add_job(
-                    job_func, "interval", seconds=job.seconds, id=job_id, **job_args
+                    job_func,
+                    "interval",
+                    seconds=job.seconds,
+                    id=job_id,
+                    max_instances=1,
+                    **job_args,
                 )
+
                 logger.info(
                     f"{job.name} started with interval of {job.seconds} seconds"
                 )
