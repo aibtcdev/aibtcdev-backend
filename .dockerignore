@@ -59,7 +59,6 @@ build/
 # Documentation
 *.md
 docs/
-README.md
 
 # Misc
 *.sqlite3
