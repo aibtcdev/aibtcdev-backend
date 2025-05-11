@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import api
+from api import chat, tools, webhooks
 from config import config
 from lib.logger import configure_logger
 from services import startup
@@ -48,9 +48,9 @@ async def health_check():
 
 
 # Load API routes
-app.include_router(api.tools.router)
-app.include_router(api.chat.router)
-app.include_router(api.webhooks.router)
+app.include_router(tools.router)
+app.include_router(chat.router)
+app.include_router(webhooks.router)
 
 
 @app.on_event("startup")

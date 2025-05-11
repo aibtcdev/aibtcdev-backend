@@ -179,49 +179,40 @@ class BaseWorkflow(Generic[StateType]):
         ]
 
     async def execute(self, initial_state: StateType) -> Dict:
-        """Execute the workflow.
+        """Execute the workflow with the given initial state.
 
         Args:
-            initial_state: The initial state for the workflow
+            initial_state: Initial state for the workflow
 
         Returns:
-            The final state after execution
-
-        Raises:
-            ValidationError: If the initial state is invalid
-            ExecutionError: If the workflow execution fails
+            Final state after workflow execution
         """
+        # Validate state
+        if not self._validate_state(initial_state):
+            error_message = f"Invalid initial state: {initial_state}"
+            self.logger.error(error_message)
+            missing = self.get_missing_fields(initial_state)
+            if missing:
+                error_message += f" Missing fields: {', '.join(missing)}"
+            raise ValidationError(error_message)
+
+        # Create runtime workflow
+        app = self._create_graph()
+
+        self.logger.debug(
+            f"[DEBUG:Workflow:{self.__class__.__name__}] State before ain_invoke: {json.dumps(initial_state, indent=2, default=str)}"
+        )
         try:
-            # Validate state
-            is_valid = self._validate_state(initial_state)
-            if not is_valid:
-                missing_fields = self.get_missing_fields(initial_state)
-                error_msg = (
-                    f"Invalid initial state. Missing required fields: {missing_fields}"
-                )
-                self.logger.error(error_msg)
-                raise ValidationError(error_msg, {"missing_fields": missing_fields})
-
-            # Create and compile the graph
-            graph = self._create_graph()
-            if hasattr(graph, "compile"):
-                app = graph.compile()
-            else:
-                # Graph is already compiled
-                app = graph
-
             # Execute the workflow
-            self.logger.info(f"Executing workflow {self.__class__.__name__}")
             result = await app.ainvoke(initial_state)
-            self.logger.info(f"Workflow {self.__class__.__name__} execution completed")
+            self.logger.debug(
+                f"[DEBUG:Workflow:{self.__class__.__name__}] State after ain_invoke: {json.dumps(result, indent=2, default=str)}"
+            )
             return result
-
-        except ValidationError as e:
-            # Re-raise validation errors
-            raise e
         except Exception as e:
-            self.logger.error(f"Workflow execution failed: {str(e)}", exc_info=True)
-            raise ExecutionError(f"Workflow execution failed: {str(e)}")
+            error_message = f"Workflow execution failed: {str(e)}"
+            self.logger.error(error_message)
+            raise ExecutionError(error_message) from e
 
 
 class BaseWorkflowMixin(ABC):

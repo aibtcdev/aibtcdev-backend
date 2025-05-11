@@ -26,7 +26,7 @@ class WebSearchCapability(BaseWorkflowMixin):
         if not hasattr(self, "client"):
             self.client = OpenAI()
 
-    async def search_web(
+    async def web_search(
         self, query: str, **kwargs
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """Search the web using OpenAI Responses API.
@@ -175,7 +175,7 @@ class WebSearchCapability(BaseWorkflowMixin):
                      - user_location: dict with type, country, city, region
         """
         # Add web search node
-        graph.add_node("web_search", self.search_web)
+        graph.add_node("web_search", self.web_search)
 
         # Add result processing node if needed
         if "process_results" not in graph.nodes:

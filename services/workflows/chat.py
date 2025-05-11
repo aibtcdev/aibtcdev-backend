@@ -371,7 +371,7 @@ class ChatWorkflow(
 
             # Get web search results
             try:
-                web_results = await self.search_web(last_user_message)
+                web_results = await self.web_search(last_user_message)
                 logger.info(f"Retrieved {len(web_results)} web search results")
             except Exception as e:
                 logger.error(f"Web search failed: {str(e)}")
