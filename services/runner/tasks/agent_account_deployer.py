@@ -120,16 +120,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             if config.network == "mainnet":
                 owner_address = profile.email.strip("@stacks.id").upper()
-                agent_address = wallet.mainnet_address
             else:
                 owner_address = "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
-                agent_address = wallet.testnet_address
 
             # Execute the deployment
             logger.debug("Executing deployment...")
             deployment_result = await deploy_tool._arun(
                 owner_address=owner_address,
-                agent_address=agent_address,
+                agent_address=message_data["owner_address"],
                 dao_token_contract=message_data["dao_token_contract"],
                 dao_token_dex_contract=message_data["dao_token_dex_contract"],
             )
