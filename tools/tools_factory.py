@@ -67,33 +67,6 @@ from .lunarcrush import (
     LunarCrushTokenMetricsTool,
     SearchLunarCrushTool,
 )
-from .smartwallet import (
-    SmartWalletApproveAssetTool,
-    SmartWalletConcludeActionProposalTool,
-    SmartWalletConcludeCoreProposalTool,
-    SmartWalletDeployMySmartWalletTool,
-    SmartWalletDeploySmartWalletTool,
-    SmartWalletDepositFTTool,
-    SmartWalletDepositSTXTool,
-    SmartWalletGenerateMySmartWalletTool,
-    SmartWalletGenerateSmartWalletTool,
-    SmartWalletGetBalanceSTXTool,
-    SmartWalletGetConfigurationTool,
-    SmartWalletIsApprovedAssetTool,
-    SmartWalletProxyCreateProposalTool,
-    SmartWalletProxyProposeActionAddResourceTool,
-    SmartWalletProxyProposeActionAllowAssetTool,
-    SmartWalletProxyProposeActionSendMessageTool,
-    SmartWalletProxyProposeActionSetAccountHolderTool,
-    SmartWalletProxyProposeActionSetWithdrawalAmountTool,
-    SmartWalletProxyProposeActionSetWithdrawalPeriodTool,
-    SmartWalletProxyProposeActionToggleResourceByNameTool,
-    SmartWalletRevokeAssetTool,
-    SmartWalletVoteOnActionProposalTool,
-    SmartWalletVoteOnCoreProposalTool,
-    SmartWalletWithdrawFTTool,
-    SmartWalletWithdrawSTXTool,
-)
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
