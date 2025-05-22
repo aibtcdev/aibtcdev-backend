@@ -13,7 +13,7 @@ from backend.models import (
 from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
-from tools.smartwallet import SmartWalletDeploySmartWalletTool
+from tools.agent_account import AgentAccountDeployTool
 
 logger = configure_logger(__name__)
 
@@ -89,16 +89,31 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Initialize the SmartWalletDeploySmartWalletTool
+            # Initialize the AgentAccountDeployTool
             logger.debug("Preparing to deploy agent account")
-            deploy_tool = SmartWalletDeploySmartWalletTool(
+            deploy_tool = AgentAccountDeployTool(
                 wallet_id=config.scheduler.agent_account_deploy_runner_wallet_id
             )
+
+            # get address from wallet id
+            wallet = backend.get_wallet(
+                config.scheduler.agent_account_deploy_runner_wallet_id
+            )
+            # depending on the network, use the correct address
+            profile = backend.get_profile(wallet.profile_id)
+
+            if config.network == "mainnet":
+                owner_address = profile.email.strip("@stacks.id").upper()
+                agent_address = wallet.mainnet_address
+            else:
+                owner_address = "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
+                agent_address = wallet.testnet_address
 
             # Execute the deployment
             logger.debug("Executing deployment...")
             deployment_result = await deploy_tool._arun(
-                owner_address=message_data["owner_address"],
+                owner_address=owner_address,
+                agent_address=agent_address,
                 dao_token_contract=message_data["dao_token_contract"],
                 dao_token_dex_contract=message_data["dao_token_dex_contract"],
             )
