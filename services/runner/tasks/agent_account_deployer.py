@@ -1,5 +1,6 @@
 """Agent account deployment task implementation."""
 
+import json
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -51,7 +52,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             # Validate that at least one message has valid deployment data
             for message in pending_messages:
-                message_data = message.message or {}
+                message_data = self._parse_message_data(message.message)
                 if self._validate_message_data(message_data):
                     logger.info("Found valid agent account deployment message")
                     return True
@@ -66,6 +67,21 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
             return False
 
+    def _parse_message_data(self, message: Any) -> Dict[str, Any]:
+        """Parse message data from either string or dictionary format."""
+        if message is None:
+            return {}
+
+        if isinstance(message, dict):
+            return message
+
+        try:
+            # Try to parse as JSON string
+            return json.loads(message)
+        except (json.JSONDecodeError, TypeError):
+            logger.error(f"Failed to parse message data: {message}")
+            return {}
+
     def _validate_message_data(self, message_data: Dict[str, Any]) -> bool:
         """Validate the message data contains required fields."""
         required_fields = [
@@ -78,7 +94,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
         message_id = message.id
-        message_data = message.message or {}
+        message_data = self._parse_message_data(message.message)
 
         logger.debug(f"Processing agent account deployment message {message_id}")
 
@@ -133,7 +149,13 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed messages from the queue."""
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
-        return backend.list_queue_messages(filters=filters)
+        messages = backend.list_queue_messages(filters=filters)
+
+        # Messages are already parsed by the backend, but we log them for debugging
+        for message in messages:
+            logger.debug(f"Queue message raw data: {message.message!r}")
+
+        return messages
 
     async def _execute_impl(
         self, context: JobContext
