@@ -8,7 +8,12 @@ from api.dependencies import (
     verify_profile_from_token,  # Added verify_profile_from_token
 )
 from backend.factory import backend  # Added backend factory
-from backend.models import UUID, AgentFilter, Profile  # Added Profile, AgentFilter
+from backend.models import (  # Added Profile, AgentFilter
+    UUID,
+    AgentFilter,
+    Profile,
+    WalletFilter,
+)
 from lib.logger import configure_logger
 from lib.tools import Tool, get_available_tools
 from tools.dao_ext_action_proposals import (
@@ -226,11 +231,20 @@ async def execute_faktory_buy(
         agent = agents[0]  # Assuming the first agent is the one to use
         agent_id = agent.id
 
+        # get wallet id from agent
+        wallet = backend.get_wallet(WalletFilter(agent_id=agent_id))
+        if not wallet:
+            logger.error(f"No wallet found for agent ID: {agent_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No wallet found for agent ID: {agent_id}",
+            )
+
         logger.info(
             f"Using agent {agent_id} for profile {profile.id} to execute Faktory buy."
         )
 
-        tool = FaktoryExecuteBuyTool(wallet_id=agent_id)  # Use fetched agent_id
+        tool = FaktoryExecuteBuyTool(wallet_id=wallet.id)  # Use fetched agent_id
         result = await tool._arun(
             btc_amount=payload.btc_amount,
             dao_token_dex_contract_address=payload.dao_token_dex_contract_address,
@@ -293,11 +307,20 @@ async def propose_dao_action_send_message(
         agent = agents[0]
         agent_id = agent.id
 
+        # get wallet id from agent
+        wallet = backend.get_wallet(WalletFilter(agent_id=agent_id))
+        if not wallet:
+            logger.error(f"No wallet found for agent ID: {agent_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No wallet found for agent ID: {agent_id}",
+            )
+
         logger.info(
-            f"Using agent {agent_id} for profile {profile.id} to propose DAO send message action."
+            f"Using wallet {wallet.id} for profile {profile.id} to propose DAO send message action."
         )
 
-        tool = ProposeActionSendMessageTool(wallet_id=agent_id)
+        tool = ProposeActionSendMessageTool(wallet_id=wallet.id)
         result = await tool._arun(
             action_proposals_voting_extension=payload.action_proposals_voting_extension,
             action_proposal_contract_to_execute=payload.action_proposal_contract_to_execute,
@@ -307,7 +330,7 @@ async def propose_dao_action_send_message(
         )
 
         logger.debug(
-            f"DAO propose send message result for agent {agent_id} (profile {profile.id}): {result}"
+            f"DAO propose send message result for wallet {wallet.id} (profile {profile.id}): {result}"
         )
         return JSONResponse(content=result)
 
