@@ -232,13 +232,15 @@ async def execute_faktory_buy(
         agent_id = agent.id
 
         # get wallet id from agent
-        wallet = backend.get_wallet(WalletFilter(agent_id=agent_id))
-        if not wallet:
+        wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
+        if not wallets:
             logger.error(f"No wallet found for agent ID: {agent_id}")
             raise HTTPException(
                 status_code=404,
                 detail=f"No wallet found for agent ID: {agent_id}",
             )
+
+        wallet = wallets[0]  # Get the first wallet for this agent
 
         logger.info(
             f"Using agent {agent_id} for profile {profile.id} to execute Faktory buy."
@@ -308,13 +310,15 @@ async def propose_dao_action_send_message(
         agent_id = agent.id
 
         # get wallet id from agent
-        wallet = backend.get_wallet(WalletFilter(agent_id=agent_id))
-        if not wallet:
+        wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
+        if not wallets:
             logger.error(f"No wallet found for agent ID: {agent_id}")
             raise HTTPException(
                 status_code=404,
                 detail=f"No wallet found for agent ID: {agent_id}",
             )
+
+        wallet = wallets[0]  # Get the first wallet for this agent
 
         logger.info(
             f"Using wallet {wallet.id} for profile {profile.id} to propose DAO send message action."
