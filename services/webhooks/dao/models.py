@@ -1,79 +1,207 @@
 """Models for DAO webhook service."""
 
-from typing import List, Optional
+from enum import Enum
+from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
-class ExtensionData(BaseModel):
-    """Data model for extension creation via webhook."""
+class ContractType(str, Enum):
+    """Contract types enum."""
+
+    AGENT = "AGENT"
+    BASE = "BASE"
+    ACTIONS = "ACTIONS"
+    EXTENSIONS = "EXTENSIONS"
+    PROPOSALS = "PROPOSALS"
+    TOKEN = "TOKEN"
+
+
+class ClarityVersion(int, Enum):
+    """Clarity version enum."""
+
+    CLARITY1 = 1
+    CLARITY2 = 2
+    CLARITY3 = 3
+
+
+class ContractCategory(str, Enum):
+    """Contract categories enum."""
+
+    BASE = "BASE"
+    ACTIONS = "ACTIONS"
+    EXTENSIONS = "EXTENSIONS"
+    PROPOSALS = "PROPOSALS"
+    EXTERNAL = "EXTERNAL"
+    TOKEN = "TOKEN"
+
+
+# Contract subtypes for each type
+class AgentSubtype(str, Enum):
+    """Agent contract subtypes."""
+
+    AGENT_ACCOUNT = "AGENT_ACCOUNT"
+
+
+class BaseSubtype(str, Enum):
+    """Base contract subtypes."""
+
+    DAO = "DAO"
+
+
+class ActionsSubtype(str, Enum):
+    """Actions contract subtypes."""
+
+    SEND_MESSAGE = "SEND_MESSAGE"
+
+
+class ExtensionsSubtype(str, Enum):
+    """Extensions contract subtypes."""
+
+    ACTION_PROPOSAL_VOTING = "ACTION_PROPOSAL_VOTING"
+    DAO_CHARTER = "DAO_CHARTER"
+    DAO_EPOCH = "DAO_EPOCH"
+    DAO_USERS = "DAO_USERS"
+    ONCHAIN_MESSAGING = "ONCHAIN_MESSAGING"
+    REWARDS_ACCOUNT = "REWARDS_ACCOUNT"
+    TOKEN_OWNER = "TOKEN_OWNER"
+    TREASURY = "TREASURY"
+
+
+class ProposalsSubtype(str, Enum):
+    """Proposals contract subtypes."""
+
+    INITIALIZE_DAO = "INITIALIZE_DAO"
+
+
+class TokenSubtype(str, Enum):
+    """Token contract subtypes."""
+
+    DAO = "DAO"
+    DEX = "DEX"
+    POOL = "POOL"
+    PRELAUNCH = "PRELAUNCH"
+
+
+# Contract subcategories for each category
+class BaseSubcategory(str, Enum):
+    """Base contract subcategories."""
+
+    DAO = "DAO"
+
+
+class ActionsSubcategory(str, Enum):
+    """Actions contract subcategories."""
+
+    CONFIGURE_TIMED_VAULT_DAO = "CONFIGURE_TIMED_VAULT_DAO"
+    CONFIGURE_TIMED_VAULT_SBTC = "CONFIGURE_TIMED_VAULT_SBTC"
+    CONFIGURE_TIMED_VAULT_STX = "CONFIGURE_TIMED_VAULT_STX"
+    PMT_DAO_ADD_RESOURCE = "PMT_DAO_ADD_RESOURCE"
+    PMT_DAO_TOGGLE_RESOURCE = "PMT_DAO_TOGGLE_RESOURCE"
+    PMT_SBTC_ADD_RESOURCE = "PMT_SBTC_ADD_RESOURCE"
+    PMT_SBTC_TOGGLE_RESOURCE = "PMT_SBTC_TOGGLE_RESOURCE"
+    PMT_STX_ADD_RESOURCE = "PMT_STX_ADD_RESOURCE"
+    PMT_STX_TOGGLE_RESOURCE = "PMT_STX_TOGGLE_RESOURCE"
+    MESSAGING_SEND_MESSAGE = "MESSAGING_SEND_MESSAGE"
+    TREASURY_ALLOW_ASSET = "TREASURY_ALLOW_ASSET"
+
+
+class ExtensionsSubcategory(str, Enum):
+    """Extensions contract subcategories."""
+
+    ACTION_PROPOSALS = "ACTION_PROPOSALS"
+    CORE_PROPOSALS = "CORE_PROPOSALS"
+    CHARTER = "CHARTER"
+    MESSAGING = "MESSAGING"
+    PAYMENTS_DAO = "PAYMENTS_DAO"
+    PAYMENTS_SBTC = "PAYMENTS_SBTC"
+    PAYMENTS_STX = "PAYMENTS_STX"
+    TIMED_VAULT_DAO = "TIMED_VAULT_DAO"
+    TIMED_VAULT_SBTC = "TIMED_VAULT_SBTC"
+    TIMED_VAULT_STX = "TIMED_VAULT_STX"
+    TOKEN_OWNER = "TOKEN_OWNER"
+    TREASURY = "TREASURY"
+
+
+class ProposalsSubcategory(str, Enum):
+    """Proposals contract subcategories."""
+
+    BOOTSTRAP_INIT = "BOOTSTRAP_INIT"
+
+
+class ExternalSubcategory(str, Enum):
+    """External contract subcategories."""
+
+    STANDARD_SIP009 = "STANDARD_SIP009"
+    STANDARD_SIP010 = "STANDARD_SIP010"
+    FAKTORY_SIP010 = "FAKTORY_SIP010"
+    BITFLOW_POOL = "BITFLOW_POOL"
+    BITFOW_SIP010 = "BITFOW_SIP010"
+
+
+class TokenSubcategory(str, Enum):
+    """Token contract subcategories."""
+
+    DAO = "DAO"
+    DEX = "DEX"
+    POOL = "POOL"
+    POOL_STX = "POOL_STX"
+    PRELAUNCH = "PRELAUNCH"
+
+
+class ContractResponse(BaseModel):
+    """Contract response model."""
 
     name: str
-    type: str
-    subtype: Optional[str] = None
+    display_name: Optional[str] = Field(None, alias="displayName")
+    type: ContractType
+    subtype: str  # Handle union of subtypes as string for flexibility
     source: Optional[str] = None
     hash: Optional[str] = None
-    sender: Optional[str] = None
-    success: Optional[bool] = True
-    txId: Optional[str] = None
-    address: Optional[str] = None
-    contract_principal: Optional[str] = None
-    tx_id: Optional[str] = None
+    deployment_order: int = Field(alias="deploymentOrder")
+    clarity_version: Optional[ClarityVersion] = Field(None, alias="clarityVersion")
 
-    @model_validator(mode="after")
-    def set_contract_info(self):
-        """Set contract_principal and tx_id from address and txId if not provided."""
-        if not self.contract_principal and self.address:
-            self.contract_principal = self.address
-        if not self.tx_id and self.txId:
-            self.tx_id = self.txId
-        return self
+    model_config = {"populate_by_name": True}
+
+
+class DeployedContractRegistryEntry(ContractResponse):
+    """Deployed contract registry entry model."""
+
+    sender: str
+    success: bool
+    tx_id: Optional[str] = Field(None, alias="txId")
+    address: str
+    error: Optional[str] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class TokenData(BaseModel):
-    """Data model for token creation via webhook."""
+    """Token data model for DAO webhook."""
 
-    contract_principal: Optional[str] = None
-    tx_id: Optional[str] = None
     name: str
-    description: Optional[str] = None
     symbol: str
-    decimals: int = 6
-    max_supply: Optional[str] = None
-    uri: Optional[str] = None
-    image_url: Optional[str] = None
+    decimals: int
+    description: str
+    max_supply: str
+    uri: str
+    tx_id: str
+    contract_principal: str
+    image_url: str
     x_url: Optional[str] = None
     telegram_url: Optional[str] = None
     website_url: Optional[str] = None
 
 
 class DAOWebhookPayload(BaseModel):
-    """Webhook payload for DAO creation."""
+    """Webhook payload for DAO creation with new structure."""
 
     name: str
-    mission: Optional[str] = None
-    description: Optional[str] = None
-    extensions: Optional[List[ExtensionData]] = Field(default_factory=list)
-    token: Optional[TokenData] = None
-
-    @model_validator(mode="after")
-    def extract_token_from_extensions(self):
-        """Extract token information from extensions if token is not provided."""
-        if not self.token and self.extensions:
-            # Look for a TOKEN extension with subtype DAO
-            for ext in self.extensions:
-                if ext.type == "TOKEN" and ext.subtype == "DAO":
-                    # Create a token from the extension data
-                    self.token = TokenData(
-                        contract_principal=ext.address,
-                        tx_id=ext.txId,
-                        name=f"{self.name} Token",
-                        symbol="TKN",
-                        decimals=6,
-                    )
-                    break
-        return self
+    mission: str
+    description: str
+    extensions: List[Union[DeployedContractRegistryEntry, ContractResponse]]
+    token: TokenData
 
 
 class DAOWebhookResponse(BaseModel):
