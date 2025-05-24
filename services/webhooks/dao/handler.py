@@ -7,7 +7,11 @@ from backend.factory import backend
 from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCreate
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
-from services.webhooks.dao.models import DAOWebhookPayload, DAOWebhookResponse
+from services.webhooks.dao.models import (
+    DAOWebhookPayload,
+    DAOWebhookResponse,
+    DeployedContractRegistryEntry,
+)
 
 
 class DAOHandler(WebhookHandler):
@@ -50,59 +54,70 @@ class DAOHandler(WebhookHandler):
             dao = self.db.create_dao(dao_create)
             self.logger.info(f"Created DAO with ID: {dao.id}")
 
-            # Create extensions if provided
+            # Create extensions
             extension_ids: List[UUID] = []
-            if parsed_data.extensions:
-                for ext_data in parsed_data.extensions:
-                    extension_create = ExtensionCreate(
-                        dao_id=dao.id,
-                        type=(
-                            f"{ext_data.type}_{ext_data.subtype}"
-                            if ext_data.subtype
-                            else ext_data.type
-                        ),
-                        contract_principal=ext_data.contract_principal,
-                        tx_id=ext_data.tx_id,
-                        status=(
-                            ContractStatus.DEPLOYED
-                            if ext_data.success
-                            else ContractStatus.FAILED
-                        ),
+            for ext_data in parsed_data.extensions:
+                # Determine if this is a deployed contract or just a contract response
+                if isinstance(ext_data, DeployedContractRegistryEntry):
+                    # This is a deployed contract
+                    contract_principal = ext_data.address
+                    tx_id = ext_data.tx_id
+                    status = (
+                        ContractStatus.DEPLOYED
+                        if ext_data.success
+                        else ContractStatus.FAILED
                     )
+                else:
+                    # This is just a contract response (not deployed yet)
+                    contract_principal = None
+                    tx_id = None
+                    status = ContractStatus.DRAFT
 
-                    extension = self.db.create_extension(extension_create)
-                    extension_ids.append(extension.id)
-                    self.logger.info(f"Created extension with ID: {extension.id}")
-
-            # Create token if provided
-            token_id = None
-            if parsed_data.token:
-                token_create = TokenCreate(
-                    dao_id=dao.id,
-                    contract_principal=parsed_data.token.contract_principal,
-                    tx_id=parsed_data.token.tx_id,
-                    name=parsed_data.token.name,
-                    description=parsed_data.token.description,
-                    symbol=parsed_data.token.symbol,
-                    decimals=parsed_data.token.decimals,
-                    max_supply=parsed_data.token.max_supply,
-                    uri=parsed_data.token.uri,
-                    image_url=parsed_data.token.image_url,
-                    x_url=parsed_data.token.x_url,
-                    telegram_url=parsed_data.token.telegram_url,
-                    website_url=parsed_data.token.website_url,
-                    status=ContractStatus.DEPLOYED,
+                # Create extension type from type and subtype
+                extension_type = (
+                    f"{ext_data.type.value}_{ext_data.subtype}"
+                    if ext_data.subtype
+                    else ext_data.type.value
                 )
 
-                token = self.db.create_token(token_create)
-                token_id = token.id
-                self.logger.info(f"Created token with ID: {token.id}")
+                extension_create = ExtensionCreate(
+                    dao_id=dao.id,
+                    type=extension_type,
+                    contract_principal=contract_principal,
+                    tx_id=tx_id,
+                    status=status,
+                )
+
+                extension = self.db.create_extension(extension_create)
+                extension_ids.append(extension.id)
+                self.logger.info(f"Created extension with ID: {extension.id}")
+
+            # Create token
+            token_create = TokenCreate(
+                dao_id=dao.id,
+                contract_principal=parsed_data.token.contract_principal,
+                tx_id=parsed_data.token.tx_id,
+                name=parsed_data.token.name,
+                description=parsed_data.token.description,
+                symbol=parsed_data.token.symbol,
+                decimals=parsed_data.token.decimals,
+                max_supply=parsed_data.token.max_supply,
+                uri=parsed_data.token.uri,
+                image_url=parsed_data.token.image_url,
+                x_url=parsed_data.token.x_url,
+                telegram_url=parsed_data.token.telegram_url,
+                website_url=parsed_data.token.website_url,
+                status=ContractStatus.DEPLOYED,
+            )
+
+            token = self.db.create_token(token_create)
+            self.logger.info(f"Created token with ID: {token.id}")
 
             # Prepare response
             response = DAOWebhookResponse(
                 dao_id=dao.id,
                 extension_ids=extension_ids if extension_ids else None,
-                token_id=token_id,
+                token_id=token.id,
             )
 
             return {
