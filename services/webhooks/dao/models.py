@@ -4,7 +4,7 @@ from enum import Enum
 from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ContractType(str, Enum):
@@ -162,7 +162,7 @@ class ContractResponse(BaseModel):
     deployment_order: int = Field(alias="deploymentOrder")
     clarity_version: Optional[ClarityVersion] = Field(None, alias="clarityVersion")
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 class DeployedContractRegistryEntry(ContractResponse):
@@ -174,7 +174,7 @@ class DeployedContractRegistryEntry(ContractResponse):
     address: str
     error: Optional[str] = None
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 class TokenData(BaseModel):
