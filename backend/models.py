@@ -198,6 +198,7 @@ class Agent(AgentBase):
 class ExtensionBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
+    subtype: Optional[str] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     status: Optional[ContractStatus] = ContractStatus.DRAFT
@@ -542,6 +543,7 @@ class AgentFilter(CustomBaseModel):
 class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
+    subtype: Optional[str] = None
     status: Optional[ContractStatus] = None
     contract_principal: Optional[str] = None
 

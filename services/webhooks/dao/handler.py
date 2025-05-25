@@ -61,18 +61,12 @@ class DAOHandler(WebhookHandler):
                 # Set status as DRAFT since they're not deployed yet
                 contract_principal = None
                 tx_id = None
-                status = ContractStatus.DRAFT
-
-                # Create extension type from type and subtype
-                extension_type = (
-                    f"{ext_data.type.value}_{ext_data.subtype}"
-                    if ext_data.subtype
-                    else ext_data.type.value
-                )
+                status = ContractStatus.DEPLOYED
 
                 extension_create = ExtensionCreate(
                     dao_id=dao.id,
-                    type=extension_type,
+                    type=ext_data.type,
+                    subtype=ext_data.subtype,
                     contract_principal=contract_principal,
                     tx_id=tx_id,
                     status=status,
@@ -81,7 +75,7 @@ class DAOHandler(WebhookHandler):
                 extension = self.db.create_extension(extension_create)
                 extension_ids.append(extension.id)
                 self.logger.info(
-                    f"Created extension with ID: {extension.id} for type: {extension_type}"
+                    f"Created extension with ID: {extension.id} for type: {ext_data.type} and subtype: {ext_data.subtype}"
                 )
 
             # Create token
