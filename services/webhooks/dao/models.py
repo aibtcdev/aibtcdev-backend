@@ -159,7 +159,7 @@ class ContractResponse(BaseModel):
     subtype: str  # Handle union of subtypes as string for flexibility
     source: Optional[str] = None
     hash: Optional[str] = None
-    deployment_order: int = Field(alias="deploymentOrder")
+    deployment_order: Optional[int] = Field(None, alias="deploymentOrder")
     clarity_version: Optional[ClarityVersion] = Field(None, alias="clarityVersion")
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
@@ -200,7 +200,7 @@ class DAOWebhookPayload(BaseModel):
     name: str
     mission: str
     description: str
-    extensions: List[Union[DeployedContractRegistryEntry, ContractResponse]]
+    extensions: List[ContractResponse]
     token: TokenData
 
 

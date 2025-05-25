@@ -8,9 +8,9 @@ from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCrea
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import (
+    ContractResponse,
     DAOWebhookPayload,
     DAOWebhookResponse,
-    DeployedContractRegistryEntry,
 )
 
 
@@ -57,21 +57,11 @@ class DAOHandler(WebhookHandler):
             # Create extensions
             extension_ids: List[UUID] = []
             for ext_data in parsed_data.extensions:
-                # Determine if this is a deployed contract or just a contract response
-                if isinstance(ext_data, DeployedContractRegistryEntry):
-                    # This is a deployed contract
-                    contract_principal = ext_data.address
-                    tx_id = ext_data.tx_id
-                    status = (
-                        ContractStatus.DEPLOYED
-                        if ext_data.success
-                        else ContractStatus.FAILED
-                    )
-                else:
-                    # This is just a contract response (not deployed yet)
-                    contract_principal = None
-                    tx_id = None
-                    status = ContractStatus.DRAFT
+                # All extensions in this payload are contract definitions, not deployed contracts
+                # Set status as DRAFT since they're not deployed yet
+                contract_principal = None
+                tx_id = None
+                status = ContractStatus.DRAFT
 
                 # Create extension type from type and subtype
                 extension_type = (
@@ -90,7 +80,9 @@ class DAOHandler(WebhookHandler):
 
                 extension = self.db.create_extension(extension_create)
                 extension_ids.append(extension.id)
-                self.logger.info(f"Created extension with ID: {extension.id}")
+                self.logger.info(
+                    f"Created extension with ID: {extension.id} for type: {extension_type}"
+                )
 
             # Create token
             token_create = TokenCreate(
