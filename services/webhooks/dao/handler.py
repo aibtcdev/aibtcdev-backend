@@ -1,6 +1,6 @@
 """Handler for DAO webhook payloads."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
@@ -9,10 +9,10 @@ from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import (
     AIBTCCoreWebhookPayload,  # Changed from DAOWebhookPayload
-    AIBTCCoreRequestContract, # For type hinting if needed, though direct use is in parsed_data
+    AIBTCCoreRequestContract,  # For type hinting if needed, though direct use is in parsed_data
     DAOWebhookResponse,
     ContractType,
-    TokenSubtype # Assuming these enums are in models.py and needed for logic
+    TokenSubtype,
 )
 
 
@@ -42,7 +42,9 @@ class DAOHandler(WebhookHandler):
             Exception: If there is an error creating any of the entities
         """
         try:
-            self.logger.info(f"Handling DAO webhook (new structure) for '{parsed_data.name}'")
+            self.logger.info(
+                f"Handling DAO webhook (new structure) for '{parsed_data.name}'"
+            )
 
             # Create the DAO
             dao_create = DAOCreate(
@@ -61,10 +63,15 @@ class DAOHandler(WebhookHandler):
             for contract_item in parsed_data.contracts:
                 # Identify the main token contract from the list
                 # This condition might need to be more specific based on your contract naming or type/subtype conventions
-                if contract_item.type == ContractType.TOKEN and contract_item.subtype == TokenSubtype.DAO: # Example
+                if (
+                    contract_item.type == ContractType.TOKEN
+                    and contract_item.subtype == TokenSubtype.DAO
+                ):
                     if token_contract_entry is not None:
                         # Handle case where multiple token contracts are unexpectedly found
-                        self.logger.warning(f"Multiple token contracts found for DAO '{parsed_data.name}'. Using the first one found.")
+                        self.logger.warning(
+                            f"Multiple token contracts found for DAO '{parsed_data.name}'. Using the first one found."
+                        )
                         # Or raise an error: raise ValueError("Multiple token contracts found")
                     token_contract_entry = contract_item
                     continue  # Don't process the token as a generic extension here
@@ -77,7 +84,7 @@ class DAOHandler(WebhookHandler):
                     subtype=contract_item.subtype,
                     contract_principal=contract_item.contract_principal,
                     tx_id=contract_item.tx_id,
-                    status=ContractStatus.DEPLOYED, # Assuming DEPLOYED as tx_id is present
+                    status=ContractStatus.DEPLOYED,  # Assuming DEPLOYED as tx_id is present
                 )
                 extension = self.db.create_extension(extension_create)
                 extension_ids.append(extension.id)
@@ -86,7 +93,9 @@ class DAOHandler(WebhookHandler):
                 )
 
             if token_contract_entry is None:
-                self.logger.error(f"Token contract entry not found in contracts list for DAO '{parsed_data.name}'")
+                self.logger.error(
+                    f"Token contract entry not found in contracts list for DAO '{parsed_data.name}'"
+                )
                 raise ValueError("Token contract entry not found in contracts list")
 
             # Create token
@@ -105,7 +114,7 @@ class DAOHandler(WebhookHandler):
                 x_url=parsed_data.token_info.x_url,
                 telegram_url=parsed_data.token_info.telegram_url,
                 website_url=parsed_data.token_info.website_url,
-                status=ContractStatus.DEPLOYED, # Assuming DEPLOYED
+                status=ContractStatus.DEPLOYED,  # Assuming DEPLOYED
             )
             token = self.db.create_token(token_create)
             self.logger.info(f"Created token with ID: {token.id}")
@@ -123,5 +132,7 @@ class DAOHandler(WebhookHandler):
             }
 
         except Exception as e:
-            self.logger.error(f"Error handling DAO webhook (new structure): {str(e)}", exc_info=True)
+            self.logger.error(
+                f"Error handling DAO webhook (new structure): {str(e)}", exc_info=True
+            )
             raise
