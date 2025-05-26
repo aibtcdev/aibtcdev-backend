@@ -150,6 +150,56 @@ class TokenSubcategory(str, Enum):
     PRELAUNCH = "PRELAUNCH"
 
 
+class DeployedContract(BaseModel):
+    """Deployed contract model for the new webhook structure."""
+
+    name: str
+    display_name: Optional[str] = Field(None, alias="displayName")
+    type: ContractType
+    subtype: str  # Handle union of subtypes as string for flexibility
+    tx_id: str = Field(alias="txId")
+    deployer: str
+    contract_principal: str = Field(alias="contractPrincipal")
+
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+
+
+class TokenInfo(BaseModel):
+    """Token information model for DAO webhook."""
+
+    symbol: str
+    decimals: int
+    max_supply: str = Field(alias="maxSupply")
+    uri: str
+    image_url: str = Field(alias="imageUrl")
+    x_url: Optional[str] = Field(None, alias="xUrl")
+    telegram_url: Optional[str] = Field(None, alias="telegramUrl")
+    website_url: Optional[str] = Field(None, alias="websiteUrl")
+
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+
+
+class DAOWebhookPayload(BaseModel):
+    """Webhook payload for DAO creation with deployed contracts structure."""
+
+    name: str
+    mission: str
+    description: Optional[str] = None
+    contracts: List[DeployedContract]
+    token_info: TokenInfo = Field(alias="tokenInfo")
+
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+
+
+class DAOWebhookResponse(BaseModel):
+    """Response model for DAO creation webhook."""
+
+    dao_id: UUID
+    extension_ids: Optional[List[UUID]] = None
+    token_id: Optional[UUID] = None
+
+
+# Legacy models for backward compatibility
 class ContractResponse(BaseModel):
     """Contract response model."""
 
@@ -192,21 +242,3 @@ class TokenData(BaseModel):
     x_url: Optional[str] = None
     telegram_url: Optional[str] = None
     website_url: Optional[str] = None
-
-
-class DAOWebhookPayload(BaseModel):
-    """Webhook payload for DAO creation with new structure."""
-
-    name: str
-    mission: str
-    description: str
-    extensions: List[ContractResponse]
-    token: TokenData
-
-
-class DAOWebhookResponse(BaseModel):
-    """Response model for DAO creation webhook."""
-
-    dao_id: UUID
-    extension_ids: Optional[List[UUID]] = None
-    token_id: Optional[UUID] = None
