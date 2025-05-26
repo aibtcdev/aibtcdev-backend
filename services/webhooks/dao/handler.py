@@ -8,9 +8,11 @@ from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCrea
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import (
-    ContractResponse,
-    DAOWebhookPayload,
+    AIBTCCoreWebhookPayload,  # Changed from DAOWebhookPayload
+    AIBTCCoreRequestContract, # For type hinting if needed, though direct use is in parsed_data
     DAOWebhookResponse,
+    ContractType,
+    TokenSubtype # Assuming these enums are in models.py and needed for logic
 )
 
 
@@ -27,11 +29,11 @@ class DAOHandler(WebhookHandler):
         self.logger = configure_logger(self.__class__.__name__)
         self.db = backend
 
-    async def handle(self, parsed_data: DAOWebhookPayload) -> Dict[str, Any]:
-        """Handle the parsed DAO webhook data.
+    async def handle(self, parsed_data: AIBTCCoreWebhookPayload) -> Dict[str, Any]:
+        """Handle the parsed AIBTCCoreWebhookPayload data.
 
         Args:
-            parsed_data: The parsed and validated DAO webhook payload
+            parsed_data: The parsed and validated AIBTCCoreWebhookPayload
 
         Returns:
             Dict containing the result of handling the webhook with created entities
@@ -40,62 +42,71 @@ class DAOHandler(WebhookHandler):
             Exception: If there is an error creating any of the entities
         """
         try:
-            self.logger.info(f"Handling DAO webhook for '{parsed_data.name}'")
+            self.logger.info(f"Handling DAO webhook (new structure) for '{parsed_data.name}'")
 
             # Create the DAO
             dao_create = DAOCreate(
                 name=parsed_data.name,
                 mission=parsed_data.mission,
-                description=parsed_data.description,
+                description=parsed_data.mission,  # Use mission for description
                 is_deployed=True,
                 is_broadcasted=True,
             )
-
             dao = self.db.create_dao(dao_create)
             self.logger.info(f"Created DAO with ID: {dao.id}")
 
-            # Create extensions
             extension_ids: List[UUID] = []
-            for ext_data in parsed_data.extensions:
-                # All extensions in this payload are contract definitions, not deployed contracts
-                # Set status as DRAFT since they're not deployed yet
-                contract_principal = None
-                tx_id = None
-                status = ContractStatus.DEPLOYED
+            token_contract_entry: Optional[AIBTCCoreRequestContract] = None
 
+            for contract_item in parsed_data.contracts:
+                # Identify the main token contract from the list
+                # This condition might need to be more specific based on your contract naming or type/subtype conventions
+                if contract_item.type == ContractType.TOKEN and contract_item.subtype == TokenSubtype.DAO: # Example
+                    if token_contract_entry is not None:
+                        # Handle case where multiple token contracts are unexpectedly found
+                        self.logger.warning(f"Multiple token contracts found for DAO '{parsed_data.name}'. Using the first one found.")
+                        # Or raise an error: raise ValueError("Multiple token contracts found")
+                    token_contract_entry = contract_item
+                    continue  # Don't process the token as a generic extension here
+
+                # Create extensions for other contracts
+                # The 'deployer' (contract_item.deployer) is available here but not passed to ExtensionCreate
                 extension_create = ExtensionCreate(
                     dao_id=dao.id,
-                    type=ext_data.type,
-                    subtype=ext_data.subtype,
-                    contract_principal=contract_principal,
-                    tx_id=tx_id,
-                    status=status,
+                    type=contract_item.type,
+                    subtype=contract_item.subtype,
+                    contract_principal=contract_item.contract_principal,
+                    tx_id=contract_item.tx_id,
+                    status=ContractStatus.DEPLOYED, # Assuming DEPLOYED as tx_id is present
                 )
-
                 extension = self.db.create_extension(extension_create)
                 extension_ids.append(extension.id)
                 self.logger.info(
-                    f"Created extension with ID: {extension.id} for type: {ext_data.type} and subtype: {ext_data.subtype}"
+                    f"Created extension with ID: {extension.id} for type: {contract_item.type} and subtype: {contract_item.subtype}"
                 )
 
+            if token_contract_entry is None:
+                self.logger.error(f"Token contract entry not found in contracts list for DAO '{parsed_data.name}'")
+                raise ValueError("Token contract entry not found in contracts list")
+
             # Create token
+            # The 'deployer' (token_contract_entry.deployer) is available here but not passed to TokenCreate
             token_create = TokenCreate(
                 dao_id=dao.id,
-                contract_principal=parsed_data.token.contract_principal,
-                tx_id=parsed_data.token.tx_id,
-                name=parsed_data.token.name,
-                description=parsed_data.token.description,
-                symbol=parsed_data.token.symbol,
-                decimals=parsed_data.token.decimals,
-                max_supply=parsed_data.token.max_supply,
-                uri=parsed_data.token.uri,
-                image_url=parsed_data.token.image_url,
-                x_url=parsed_data.token.x_url,
-                telegram_url=parsed_data.token.telegram_url,
-                website_url=parsed_data.token.website_url,
-                status=ContractStatus.DEPLOYED,
+                contract_principal=token_contract_entry.contract_principal,
+                tx_id=token_contract_entry.tx_id,
+                name=parsed_data.token_info.symbol,  # Use symbol from token_info as name
+                description=parsed_data.mission,  # Use mission for description
+                symbol=parsed_data.token_info.symbol,
+                decimals=parsed_data.token_info.decimals,
+                max_supply=parsed_data.token_info.max_supply,
+                uri=parsed_data.token_info.uri,
+                image_url=parsed_data.token_info.image_url,
+                x_url=parsed_data.token_info.x_url,
+                telegram_url=parsed_data.token_info.telegram_url,
+                website_url=parsed_data.token_info.website_url,
+                status=ContractStatus.DEPLOYED, # Assuming DEPLOYED
             )
-
             token = self.db.create_token(token_create)
             self.logger.info(f"Created token with ID: {token.id}")
 
@@ -105,13 +116,12 @@ class DAOHandler(WebhookHandler):
                 extension_ids=extension_ids if extension_ids else None,
                 token_id=token.id,
             )
-
             return {
                 "success": True,
-                "message": f"Successfully created DAO '{dao.name}' with ID: {dao.id}",
+                "message": f"Successfully created DAO '{dao.name}' with ID: {dao.id} using new structure",
                 "data": response.model_dump(),
             }
 
         except Exception as e:
-            self.logger.error(f"Error handling DAO webhook: {str(e)}", exc_info=True)
+            self.logger.error(f"Error handling DAO webhook (new structure): {str(e)}", exc_info=True)
             raise

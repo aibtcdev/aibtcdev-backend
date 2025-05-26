@@ -210,3 +210,33 @@ class DAOWebhookResponse(BaseModel):
     dao_id: UUID
     extension_ids: Optional[List[UUID]] = None
     token_id: Optional[UUID] = None
+
+
+class AIBTCCoreRequestContract(BaseModel):  # New model
+    name: str
+    display_name: str
+    type: ContractType
+    subtype: str  # Keeping as string for flexibility as per original ContractResponse
+    tx_id: str
+    deployer: str  # Will be parsed from payload but not stored in DB
+    contract_principal: str
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AIBTCCoreRequestTokenInfo(BaseModel):  # New model
+    symbol: str
+    decimals: int
+    max_supply: str
+    uri: str
+    image_url: str
+    x_url: Optional[str] = None
+    telegram_url: Optional[str] = None
+    website_url: Optional[str] = None
+
+
+class AIBTCCoreWebhookPayload(BaseModel):  # New model for the entire payload
+    name: str
+    mission: str
+    contracts: List[AIBTCCoreRequestContract]
+    token_info: AIBTCCoreRequestTokenInfo
