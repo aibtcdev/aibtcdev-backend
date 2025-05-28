@@ -1,6 +1,7 @@
 """Handler for capturing new DAO action proposals."""
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+from uuid import UUID
 
 from backend.factory import backend
 from backend.models import (
@@ -8,6 +9,8 @@ from backend.models import (
     ProposalCreate,
     ProposalFilter,
     ProposalType,
+    QueueMessageCreate,
+    QueueMessageType,
 )
 from lib.utils import decode_hex_parameters
 from services.webhooks.chainhook.handlers.base_proposal_handler import (
@@ -159,6 +162,34 @@ class ActionProposalHandler(BaseProposalHandler):
 
         return sanitized
 
+    def _get_agent_token_holders(self, dao_id: UUID) -> List[Dict]:
+        """Get agents that hold tokens for the given DAO.
+
+        Args:
+            dao_id: The ID of the DAO
+
+        Returns:
+            List[Dict]: List of agents with their wallet IDs
+        """
+        # Use the specialized backend method for getting agents with DAO tokens
+        agents_with_tokens_dto = backend.get_agents_with_dao_tokens(dao_id)
+
+        if not agents_with_tokens_dto:
+            self.logger.error(f"No agents found with tokens for DAO {dao_id}")
+            return []
+
+        # Convert DTOs to the expected format
+        agents_with_tokens = [
+            {"agent_id": dto.agent_id, "wallet_id": dto.wallet_id}
+            for dto in agents_with_tokens_dto
+        ]
+
+        self.logger.info(
+            f"Found {len(agents_with_tokens)} agents holding tokens for DAO {dao_id}"
+        )
+
+        return agents_with_tokens
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle action proposal transactions.
 
@@ -263,6 +294,33 @@ class ActionProposalHandler(BaseProposalHandler):
                 self.logger.info(
                     f"Created new action proposal record in database: {proposal.id}"
                 )
+
+                # Queue evaluation messages for agents holding governance tokens
+                agents = self._get_agent_token_holders(dao_data["id"])
+                if agents:
+                    for agent in agents:
+                        # Create message with only the proposal ID
+                        message_data = {
+                            "proposal_id": proposal.id,  # Only pass the proposal UUID
+                        }
+
+                        backend.create_queue_message(
+                            QueueMessageCreate(
+                                type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
+                                message=message_data,
+                                dao_id=dao_data["id"],
+                                wallet_id=agent["wallet_id"],
+                            )
+                        )
+
+                        self.logger.info(
+                            f"Created evaluation queue message for agent {agent['agent_id']} "
+                            f"to evaluate proposal {proposal.id}"
+                        )
+                else:
+                    self.logger.warning(
+                        f"No agents found holding tokens for DAO {dao_data['id']}"
+                    )
             except Exception as e:
                 self.logger.error(f"Error creating proposal in database: {str(e)}")
                 raise
