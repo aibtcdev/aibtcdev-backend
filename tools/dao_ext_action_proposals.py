@@ -96,7 +96,7 @@ class ProposeActionAddResourceTool(BaseTool):
 
         if resource_url:
             args.append(resource_url)
-        
+
         if memo:
             if not resource_url:
                 args.append("")  # Add empty URL if not provided but memo is
@@ -354,8 +354,8 @@ class ProposeActionSendMessageTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
-            dao_token_contract_address,
             message,
+            dao_token_contract_address,
         ]
 
         if memo:
@@ -363,8 +363,8 @@ class ProposeActionSendMessageTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-send-message.ts",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+            "create-action-proposal.ts",
             *args,
         )
 
