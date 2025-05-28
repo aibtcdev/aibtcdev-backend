@@ -333,9 +333,6 @@ class ProposalBase(CustomBaseModel):
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
-    created_at_block: Optional[int] = None
-    end_block: Optional[int] = None
-    start_block: Optional[int] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
     parameters: Optional[str] = None
     # Additional fields from blockchain data
@@ -347,7 +344,7 @@ class ProposalBase(CustomBaseModel):
     votes_against: Optional[str] = None  # String to handle large numbers
     votes_for: Optional[str] = None  # String to handle large numbers
     bond: Optional[str] = None  # String to handle large numbers
-    # New fields from updated chainhook payload
+    # Fields from updated chainhook payload
     contract_caller: Optional[str] = None
     created_btc: Optional[int] = None
     created_stx: Optional[int] = None

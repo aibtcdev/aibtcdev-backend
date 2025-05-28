@@ -94,7 +94,10 @@ class CoreProposalHandler(BaseProposalHandler):
                 continue
 
             # Check if this is a proposal event
-            if value.get("notification") == "create-proposal":
+            notification = value.get("notification", "")
+            if notification == "create-proposal" or notification.endswith(
+                "/create-proposal"
+            ):
                 payload = value.get("payload", {})
                 if not payload:
                     self.logger.warning("Empty payload in proposal event")
@@ -104,11 +107,28 @@ class CoreProposalHandler(BaseProposalHandler):
                     "proposal": payload.get("proposal"),  # Contract to be deployed
                     "caller": payload.get("caller"),
                     "creator": payload.get("creator"),
-                    "created_at_block": payload.get("createdAt"),
-                    "end_block": payload.get("endBlock"),
-                    "start_block": payload.get("startBlock"),
                     "liquid_tokens": str(payload.get("liquidTokens")),
                     "bond": str(payload.get("bond")),
+                    # Fields from updated payload (if available)
+                    "contract_caller": payload.get("contractCaller"),
+                    "created_btc": payload.get("createdBtc"),
+                    "created_stx": payload.get("createdStx"),
+                    "creator_user_id": payload.get("creatorUserId"),
+                    "exec_end": payload.get("execEnd"),
+                    "exec_start": payload.get("execStart"),
+                    "memo": payload.get("memo"),
+                    "tx_sender": payload.get("txSender"),
+                    "vote_end": payload.get("voteEnd"),
+                    "vote_start": payload.get("voteStart"),
+                    "voting_delay": payload.get("votingDelay"),
+                    "voting_period": payload.get("votingPeriod"),
+                    "voting_quorum": payload.get("votingQuorum"),
+                    "voting_reward": (
+                        str(payload.get("votingReward"))
+                        if payload.get("votingReward") is not None
+                        else None
+                    ),
+                    "voting_threshold": payload.get("votingThreshold"),
                 }
 
         self.logger.warning("Could not find proposal information in transaction events")
@@ -179,11 +199,24 @@ class CoreProposalHandler(BaseProposalHandler):
                     # Add fields from payload
                     caller=proposal_info["caller"],
                     creator=proposal_info["creator"],
-                    created_at_block=proposal_info["created_at_block"],
-                    end_block=proposal_info["end_block"],
-                    start_block=proposal_info["start_block"],
                     liquid_tokens=proposal_info["liquid_tokens"],
                     bond=proposal_info["bond"],
+                    # Fields from updated payload (if available)
+                    contract_caller=proposal_info["contract_caller"],
+                    created_btc=proposal_info["created_btc"],
+                    created_stx=proposal_info["created_stx"],
+                    creator_user_id=proposal_info["creator_user_id"],
+                    exec_end=proposal_info["exec_end"],
+                    exec_start=proposal_info["exec_start"],
+                    memo=proposal_info["memo"],
+                    tx_sender=proposal_info["tx_sender"],
+                    vote_end=proposal_info["vote_end"],
+                    vote_start=proposal_info["vote_start"],
+                    voting_delay=proposal_info["voting_delay"],
+                    voting_period=proposal_info["voting_period"],
+                    voting_quorum=proposal_info["voting_quorum"],
+                    voting_reward=proposal_info["voting_reward"],
+                    voting_threshold=proposal_info["voting_threshold"],
                 )
             )
             self.logger.info(

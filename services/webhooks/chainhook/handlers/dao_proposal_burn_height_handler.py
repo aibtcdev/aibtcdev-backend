@@ -136,18 +136,18 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         start_proposals = [
             p
             for p in proposals
-            if p.start_block is not None
-            and p.end_block is not None
-            and p.start_block == burn_height
+            if p.vote_start is not None
+            and p.vote_end is not None
+            and p.vote_start == burn_height
             and p.parameters is not None  # Ensure parameters exist
         ]
 
         end_proposals = [
             p
             for p in proposals
-            if p.start_block is not None
-            and p.end_block is not None
-            and p.end_block == burn_height
+            if p.vote_start is not None
+            and p.vote_end is not None
+            and p.vote_end == burn_height
             and p.parameters is not None  # Ensure parameters exist
         ]
 
@@ -156,9 +156,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         vote_proposals = [
             p
             for p in proposals
-            if p.start_block is not None
-            and p.end_block is not None
-            and p.start_block - vote_delay == burn_height
+            if p.vote_start is not None
+            and p.vote_end is not None
+            and p.vote_start - vote_delay == burn_height
             and p.parameters is not None  # Ensure parameters exist
         ]
 

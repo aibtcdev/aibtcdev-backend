@@ -109,13 +109,10 @@ class ActionProposalHandler(BaseProposalHandler):
                     "action": payload.get("action"),
                     "caller": payload.get("caller"),
                     "creator": payload.get("creator"),
-                    "created_at_block": payload.get("createdAt"),  # Legacy field
-                    "end_block": payload.get("endBlock"),  # Legacy field
-                    "start_block": payload.get("startBlock"),  # Legacy field
                     "liquid_tokens": str(payload.get("liquidTokens")),
                     "parameters": payload.get("parameters"),
                     "bond": str(payload.get("bond")),
-                    # New fields from updated payload
+                    # Fields from updated payload
                     "contract_caller": payload.get("contractCaller"),
                     "created_btc": payload.get("createdBtc"),
                     "created_stx": payload.get("createdStx"),
@@ -242,13 +239,10 @@ class ActionProposalHandler(BaseProposalHandler):
                         action=proposal_info["action"],
                         caller=proposal_info["caller"],
                         creator=proposal_info["creator"],
-                        created_at_block=proposal_info["created_at_block"],
-                        end_block=proposal_info["end_block"],
-                        start_block=proposal_info["start_block"],
                         liquid_tokens=proposal_info["liquid_tokens"],
                         parameters=parameters,
                         bond=proposal_info["bond"],
-                        # New fields from updated payload
+                        # Fields from updated payload
                         contract_caller=proposal_info["contract_caller"],
                         created_btc=proposal_info["created_btc"],
                         created_stx=proposal_info["created_stx"],
