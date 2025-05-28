@@ -347,6 +347,22 @@ class ProposalBase(CustomBaseModel):
     votes_against: Optional[str] = None  # String to handle large numbers
     votes_for: Optional[str] = None  # String to handle large numbers
     bond: Optional[str] = None  # String to handle large numbers
+    # New fields from updated chainhook payload
+    contract_caller: Optional[str] = None
+    created_btc: Optional[int] = None
+    created_stx: Optional[int] = None
+    creator_user_id: Optional[int] = None
+    exec_end: Optional[int] = None
+    exec_start: Optional[int] = None
+    memo: Optional[str] = None
+    tx_sender: Optional[str] = None
+    vote_end: Optional[int] = None
+    vote_start: Optional[int] = None
+    voting_delay: Optional[int] = None
+    voting_period: Optional[int] = None
+    voting_quorum: Optional[int] = None
+    voting_reward: Optional[str] = None  # String to handle large numbers
+    voting_threshold: Optional[int] = None
 
 
 class ProposalCreate(ProposalBase):
