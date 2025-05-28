@@ -55,7 +55,7 @@ class DAOProposalHandler(ChainhookEventHandler):
 
         if method == "create-proposal":
             await self.core_handler.handle_transaction(transaction)
-        elif method == "propose-action":
+        elif method == "create-action-proposal":
             await self.action_handler.handle_transaction(transaction)
         else:
             self.logger.warning(f"Unknown proposal method: {method}")

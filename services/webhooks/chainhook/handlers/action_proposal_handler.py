@@ -52,9 +52,9 @@ class ActionProposalHandler(BaseProposalHandler):
             )
             return False
 
-        # Check if the method name is exactly "propose-action"
+        # Check if the method name is exactly "create-action-proposal"
         tx_method = tx_data_content.get("method", "")
-        is_proposal_method = tx_method == "propose-action"
+        is_proposal_method = tx_method == "create-action-proposal"
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
@@ -95,7 +95,7 @@ class ActionProposalHandler(BaseProposalHandler):
                 continue
 
             # Check if this is a proposal event
-            if value.get("notification") == "propose-action":
+            if value.get("notification") == "create-action-proposal":
                 payload = value.get("payload", {})
                 if not payload:
                     self.logger.warning("Empty payload in proposal event")
