@@ -24,8 +24,6 @@ from .dao_ext_action_proposals import (
 )
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
-    GetCurrentDaoCharterVersionTool,
-    GetDaoCharterTool,
 )
 from .dao_ext_treasury import GetAllowedAssetTool, IsAllowedAssetTool
 from .database import (
@@ -103,8 +101,10 @@ def initialize_tools(
                 logger.warning(f"Failed to get wallet for agent {agent_id}: {e}")
 
     tools = {
+
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
+        "dao_charter_get_current_charter": GetCurrentDaoCharterTool(wallet_id),
         "database_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
         "database_get_dao_list": GetDAOListTool(),
         "database_get_dao_get_by_name": GetDAOByNameTool(),
