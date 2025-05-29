@@ -88,33 +88,20 @@ class DAOHandler(WebhookHandler):
             # Create extensions for DAO extension contracts
             extension_ids: List[UUID] = []
             for contract in parsed_data.contracts:
-                # Only create extensions for actual DAO extension types
-                # Skip TOKEN type contracts as they are handled separately
-                if contract.type.value in [
-                    "EXTENSIONS",
-                    "ACTIONS",
-                    "PROPOSALS",
-                    "BASE",
-                ]:
-                    extension_create = ExtensionCreate(
-                        dao_id=dao.id,
-                        type=contract.type.value,
-                        subtype=contract.subtype,
-                        contract_principal=contract.contract_principal,
-                        tx_id=contract.tx_id,
-                        status=ContractStatus.DEPLOYED,
-                    )
+                extension_create = ExtensionCreate(
+                    dao_id=dao.id,
+                    type=contract.type.value,
+                    subtype=contract.subtype,
+                    contract_principal=contract.contract_principal,
+                    tx_id=contract.tx_id,
+                    status=ContractStatus.DEPLOYED,
+                )
 
-                    extension = self.db.create_extension(extension_create)
-                    extension_ids.append(extension.id)
-                    self.logger.info(
-                        f"Created extension with ID: {extension.id} for type: {contract.type.value} and subtype: {contract.subtype}"
-                    )
-                else:
-                    self.logger.info(
-                        f"Skipping {contract.type.value} contract: {contract.name}"
-                    )
-
+                extension = self.db.create_extension(extension_create)
+                extension_ids.append(extension.id)
+                self.logger.info(
+                    f"Created extension with ID: {extension.id} for type: {contract.type.value} and subtype: {contract.subtype}"
+                )
             # Prepare response
             response = DAOWebhookResponse(
                 dao_id=dao.id,
