@@ -25,7 +25,6 @@ from .dao_ext_action_proposals import (
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
 )
-from .dao_ext_treasury import GetAllowedAssetTool, IsAllowedAssetTool
 from .database import (
     AddScheduledTaskTool,
     DeleteScheduledTaskTool,
