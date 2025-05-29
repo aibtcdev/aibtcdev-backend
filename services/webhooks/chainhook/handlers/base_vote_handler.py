@@ -76,9 +76,13 @@ class BaseVoteHandler(ChainhookEventHandler):
             )
             return False
 
-        # Check if the method name contains "vote-on-proposal"
+        # Check if the method name contains "vote" and "proposal"
         tx_method = tx_data_content.get("method", "")
-        is_vote_method = tx_method == "vote-on-proposal"
+        is_vote_method = (
+            tx_method == "vote-on-proposal"
+            or "vote-on-action-proposal" in tx_method
+            or "vote-on-core-proposal" in tx_method
+        )
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
@@ -130,6 +134,10 @@ class BaseVoteHandler(ChainhookEventHandler):
                     self.logger.info(
                         f"Extracted vote value from transaction args: {vote_value}"
                     )
+        else:
+            self.logger.info(
+                f"Vote value found directly in event payload: {vote_value}"
+            )
 
         if not proposal_identifier or not voter_address:
             self.logger.warning(

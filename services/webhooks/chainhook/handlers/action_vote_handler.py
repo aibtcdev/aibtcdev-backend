@@ -62,7 +62,9 @@ class ActionVoteHandler(BaseVoteHandler):
                 event_data = event.data
                 value = event_data.get("value", {})
 
-                if value.get("notification") == "vote-on-proposal":
+                # Check for the new notification format
+                notification = value.get("notification", "")
+                if "vote-on-action-proposal" in notification:
                     payload = value.get("payload", {})
                     if not payload:
                         self.logger.warning("Empty payload in vote event")
@@ -73,9 +75,13 @@ class ActionVoteHandler(BaseVoteHandler):
                             "proposalId"
                         ),  # Numeric ID for action proposals
                         "voter": payload.get("voter"),
-                        "caller": payload.get("caller"),
-                        "amount": str(payload.get("amount")),
-                        "vote_value": None,  # Will be extracted from transaction args
+                        "caller": payload.get("contractCaller"),  # Updated field name
+                        "tx_sender": payload.get("txSender"),  # New field
+                        "amount": str(payload.get("amount", 0)),
+                        "vote_value": payload.get(
+                            "vote"
+                        ),  # Vote value is now directly in payload
+                        "voter_user_id": payload.get("voterUserId"),  # New field
                     }
 
         self.logger.warning("Could not find vote information in transaction events")
