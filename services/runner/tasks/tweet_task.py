@@ -42,6 +42,22 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self._pending_messages: Optional[List[QueueMessage]] = None
         self.twitter_service = None
 
+    def _split_text_into_chunks(self, text: str, limit: int = 280) -> List[str]:
+        """Split text into chunks not exceeding the limit without cutting words."""
+        words = text.split()
+        chunks = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + (1 if current else 0) <= limit:
+                current = f"{current} {word}".strip()
+            else:
+                if current:
+                    chunks.append(current)
+                current = word
+        if current:
+            chunks.append(current)
+        return chunks
+
     def _get_extension(self, url: str) -> str:
         path = urlparse(url).path.lower()
         for ext in [".png", ".jpg", ".jpeg", ".gif"]:
@@ -56,9 +72,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         reply_id: Optional[str] = None,
     ):
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0"
-            }
+            headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(image_url, headers=headers, timeout=10)
             response.raise_for_status()
             auth = tweepy.OAuth1UserHandler(
@@ -201,15 +215,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=None,
                 )
 
-            # Check tweet length
-            if len(tweet_text) > 280:  # Twitter's character limit
-                return TweetProcessingResult(
-                    success=False,
-                    message=f"Tweet exceeds character limit: {len(tweet_text)} chars",
-                    tweet_id=message.tweet_id,
-                    dao_id=message.dao_id,
-                )
-
             # No need to modify the message structure, keep it as is
             return None
 
@@ -257,30 +262,35 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 tweet_text = re.sub(re.escape(image_url), "", original_text).strip()
                 tweet_text = re.sub(r"\s+", " ", tweet_text)
 
-            # Prepare tweet parameters
-            tweet_params = {"text": tweet_text}
-            if message.tweet_id:
-                tweet_params["reply_in_reply_to_tweet_id"] = message.tweet_id
+            # Split tweet text if necessary
+            chunks = self._split_text_into_chunks(tweet_text)
+            previous_tweet_id = message.tweet_id
+            tweet_response = None
 
-            if image_url:
-                tweet_response = self._post_tweet_with_media(
-                    image_url=image_url,
-                    text=tweet_text,
-                    reply_id=message.tweet_id,
-                )
-            else:
-                tweet_response = await self.twitter_service._apost_tweet(**tweet_params)
+            for index, chunk in enumerate(chunks):
+                if index == 0 and image_url:
+                    tweet_response = self._post_tweet_with_media(
+                        image_url=image_url,
+                        text=chunk,
+                        reply_id=previous_tweet_id,
+                    )
+                else:
+                    tweet_response = await self.twitter_service._apost_tweet(
+                        text=chunk,
+                        reply_in_reply_to_tweet_id=previous_tweet_id,
+                    )
 
-            if not tweet_response:
-                return TweetProcessingResult(
-                    success=False,
-                    message="Failed to send tweet",
-                    dao_id=message.dao_id,
-                    tweet_id=message.tweet_id,
-                )
+                if not tweet_response:
+                    return TweetProcessingResult(
+                        success=False,
+                        message="Failed to send tweet",
+                        dao_id=message.dao_id,
+                        tweet_id=previous_tweet_id,
+                    )
 
-            logger.info(f"Successfully posted tweet {tweet_response.id}")
-            logger.debug(f"Tweet ID: {tweet_response.id}")
+                logger.info(f"Successfully posted tweet {tweet_response.id}")
+                logger.debug(f"Tweet ID: {tweet_response.id}")
+                previous_tweet_id = tweet_response.id
 
             # Discord Service
             try:
@@ -290,10 +300,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     embeds = None
                     if image_url:
                         embeds = [{"image": {"url": image_url}}]
-                    discord_result = discord_service.send_message(tweet_text, embeds=embeds)
-                    logger.info(
-                        f"Discord message sent: {discord_result['success']}"
+                    discord_result = discord_service.send_message(
+                        tweet_text, embeds=embeds
                     )
+                    logger.info(f"Discord message sent: {discord_result['success']}")
 
             except Exception as e:
                 logger.warning(f"Failed to send Discord message: {str(e)}")
@@ -301,7 +311,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             return TweetProcessingResult(
                 success=True,
                 message="Successfully sent tweet",
-                tweet_id=tweet_response.id,
+                tweet_id=previous_tweet_id,
                 dao_id=message.dao_id,
             )
 

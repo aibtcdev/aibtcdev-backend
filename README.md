@@ -73,6 +73,7 @@ aibtcdev-backend/
 
 ### 3. Social Media Integration
 - Twitter automation and monitoring
+- Tweets longer than 280 characters are automatically threaded
 - Telegram bot integration
 - Discord notifications
 - Automated content generation
