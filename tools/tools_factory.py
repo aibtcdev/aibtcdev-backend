@@ -9,9 +9,7 @@ from lib.logger import configure_logger
 
 from .agent_account import AgentAccountDeployTool
 from .bitflow import BitflowExecuteTradeTool
-from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
-from .dao_deployments import ContractDAODeployTool
 from .dao_ext_action_proposals import (
     ConcludeActionProposalTool,
     GetLiquidSupplyTool,
@@ -102,6 +100,7 @@ def initialize_tools(
     tools = {
 
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
+        "contracts_fetch_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
         "dao_charter_get_current_charter": GetCurrentDaoCharterTool(wallet_id),
         "database_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
