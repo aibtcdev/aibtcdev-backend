@@ -922,8 +922,8 @@ class ConcludeActionProposalTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "conclude-proposal.ts",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+            "conclude-action-proposal.ts",
             *args,
         )
 
