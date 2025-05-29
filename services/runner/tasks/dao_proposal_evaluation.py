@@ -159,26 +159,26 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
             logger.info(f"Created vote record {vote.id} for proposal {proposal_id}")
 
-            # Create a DAO_PROPOSAL_VOTE message with the vote record ID
-            vote_message_data = {"proposal_id": proposal_id, "vote_id": str(vote.id)}
+            # # Create a DAO_PROPOSAL_VOTE message with the vote record ID
+            # vote_message_data = {"proposal_id": proposal_id, "vote_id": str(vote.id)}
 
-            vote_message = backend.create_queue_message(
-                QueueMessageCreate(
-                    type=QueueMessageType.DAO_PROPOSAL_VOTE,
-                    message=vote_message_data,
-                    dao_id=dao_id,
-                    wallet_id=wallet_id,
-                )
-            )
+            # vote_message = backend.create_queue_message(
+            #     QueueMessageCreate(
+            #         type=QueueMessageType.DAO_PROPOSAL_VOTE,
+            #         message=vote_message_data,
+            #         dao_id=dao_id,
+            #         wallet_id=wallet_id,
+            #     )
+            # )
 
-            if not vote_message:
-                logger.error("Failed to create vote queue message")
-                return {
-                    "success": False,
-                    "error": "Failed to create vote queue message",
-                }
+            # if not vote_message:
+            #     logger.error("Failed to create vote queue message")
+            #     return {
+            #         "success": False,
+            #         "error": "Failed to create vote queue message",
+            #     }
 
-            logger.info(f"Created vote queue message {vote_message.id}")
+            # logger.info(f"Created vote queue message {vote_message.id}")
 
             # Mark the evaluation message as processed
             update_data = QueueMessageBase(is_processed=True)
@@ -187,7 +187,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             return {
                 "success": True,
                 "vote_id": str(vote.id),
-                "vote_message_id": str(vote_message.id),
+                # "vote_message_id": str(vote_message.id),
                 "approve": approval,
                 "confidence": confidence,
             }
