@@ -780,7 +780,7 @@ class ProposeActionSetWithdrawalPeriodTool(BaseTool):
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
 
-    action_proposals_voting_extension: str = Field(
+    dao_action_proposal_voting_contract: str = Field(
         ...,
         description="Contract principal where the DAO creates action proposals for voting by DAO members.",
         examples=[
@@ -789,7 +789,7 @@ class VoteOnActionProposalInput(BaseModel):
         ],
     )
     proposal_id: int = Field(..., description="ID of the proposal to vote on")
-    vote: bool = Field(..., description="True for yes/for, False for no/against")
+    vote_for: bool = Field(..., description="True for yes/for, False for no/against")
 
 
 class VoteOnActionProposalTool(BaseTool):
@@ -809,9 +809,9 @@ class VoteOnActionProposalTool(BaseTool):
 
     def _deploy(
         self,
-        action_proposals_voting_extension: str,
+        dao_action_proposal_voting_contract: str,
         proposal_id: int,
-        vote: bool,
+        vote_for: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
@@ -819,40 +819,40 @@ class VoteOnActionProposalTool(BaseTool):
             return {"success": False, "message": "Wallet ID is required", "data": None}
 
         args = [
-            action_proposals_voting_extension,
+            dao_action_proposal_voting_contract,
             str(proposal_id),
-            str(vote).lower(),
+            str(vote_for).lower(),
         ]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "vote-on-proposal.ts",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+            "vote-on-action-proposal.ts",
             *args,
         )
 
     def _run(
         self,
-        action_proposals_voting_extension: str,
+        dao_action_proposal_voting_contract: str,
         proposal_id: int,
-        vote: bool,
+        vote_for: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to vote on an action proposal."""
         return self._deploy(
-            action_proposals_voting_extension, proposal_id, vote, **kwargs
+            dao_action_proposal_voting_contract, proposal_id, vote_for, **kwargs
         )
 
     async def _arun(
         self,
-        action_proposals_voting_extension: str,
+        dao_action_proposal_voting_contract: str,
         proposal_id: int,
-        vote: bool,
+        vote_for: bool,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(
-            action_proposals_voting_extension, proposal_id, vote, **kwargs
+            dao_action_proposal_voting_contract, proposal_id, vote_for, **kwargs
         )
 
 

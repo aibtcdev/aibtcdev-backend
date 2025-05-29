@@ -142,9 +142,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             for vote in unvoted_votes:
                 # Submit the vote
                 vote_result = await voting_tool._arun(
-                    action_proposals_voting_extension=proposal.contract_principal,
+                    dao_action_proposal_voting_contract=proposal.contract_principal,
                     proposal_id=proposal.proposal_id,
-                    vote=vote.answer,
+                    vote_for=vote.answer,
                 )
 
                 if not vote_result.get("success", False):
