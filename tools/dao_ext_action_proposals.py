@@ -12,279 +12,6 @@ class DaoBaseInput(BaseModel):
 
     pass
 
-
-class ProposeActionAddResourceInput(BaseModel):
-    """Input schema for proposing to add a resource action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2"
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2"
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes adding a resource to the DAO.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-add-resource"
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-add-resource"
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    resource_name: str = Field(..., description="Name of the resource to add")
-    resource_description: str = Field(..., description="Description of the resource")
-    resource_price: int = Field(..., description="Price of the resource in microstacks")
-    resource_url: Optional[str] = Field(
-        None,
-        description="Optional URL associated with the resource",
-        examples=["https://www.example.com/resource"],
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Adding a new consultation resource for the DAO"],
-    )
-
-
-class ProposeActionAddResourceTool(BaseTool):
-    name: str = "dao_propose_action_add_resource"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to add the new resource to the "
-        " DAO resource contract with specified name, description, price, and optional URL."
-    )
-    args_schema: Type[BaseModel] = ProposeActionAddResourceInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        resource_description: str,
-        resource_price: int,
-        resource_url: Optional[str] = None,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose adding a resource."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-            resource_description,
-            str(resource_price),
-        ]
-
-        if resource_url:
-            args.append(resource_url)
-
-        if memo:
-            if not resource_url:
-                args.append("")  # Add empty URL if not provided but memo is
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-add-resource.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        resource_description: str,
-        resource_price: int,
-        resource_url: Optional[str] = None,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose adding a resource."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-            resource_description,
-            resource_price,
-            resource_url,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        resource_description: str,
-        resource_price: int,
-        resource_url: Optional[str] = None,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-            resource_description,
-            resource_price,
-            resource_url,
-            memo,
-            **kwargs,
-        )
-
-
-class ProposeActionAllowAssetInput(BaseModel):
-    """Input schema for proposing to allow an asset action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes allowing an asset in the DAO treasury.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-allow-asset",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    dao_token_contract_address_to_allow: str = Field(
-        ...,
-        description="Contract principal of the token to allow",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Allow new token for DAO treasury operations"],
-    )
-
-
-class ProposeActionAllowAssetTool(BaseTool):
-    name: str = "dao_propose_action_allow_asset"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to allow a specific "
-        " token contract to be used within the DAO treasury contract."
-    )
-    args_schema: Type[BaseModel] = ProposeActionAllowAssetInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        dao_token_contract_address_to_allow: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose allowing an asset."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            dao_token_contract_address_to_allow,
-        ]
-
-        if memo:
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-allow-asset.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        dao_token_contract_address_to_allow: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose allowing an asset."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            dao_token_contract_address_to_allow,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        dao_token_contract_address_to_allow: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            dao_token_contract_address_to_allow,
-            memo,
-            **kwargs,
-        )
-
-
 class ProposeActionSendMessageInput(BaseModel):
     """Input schema for proposing to send a message action."""
 
@@ -405,377 +132,6 @@ class ProposeActionSendMessageTool(BaseTool):
             memo,
             **kwargs,
         )
-
-
-class ProposeActionSetAccountHolderInput(BaseModel):
-    """Input schema for proposing to set account holder action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes setting the account holder in a DAO timed vault.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-account-holder",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-account-holder",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    account_holder: str = Field(
-        ...,
-        description="Address of the new account holder",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
-            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
-            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract",
-        ],
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Setting new account holder for DAO vault"],
-    )
-
-
-class ProposeActionSetAccountHolderTool(BaseTool):
-    name: str = "dao_propose_action_set_account_holder"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to change the account holder "
-        "in a DAO timed vault to a specified standard or contract address."
-    )
-    args_schema: Type[BaseModel] = ProposeActionSetAccountHolderInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        account_holder: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new account holder."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            account_holder,
-        ]
-
-        if memo:
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-set-account-holder.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        account_holder: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new account holder."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            account_holder,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        account_holder: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            account_holder,
-            memo,
-            **kwargs,
-        )
-
-
-class ProposeActionSetWithdrawalAmountInput(BaseModel):
-    """Input schema for proposing to set withdrawal amount action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes setting the withdrawal amount in a DAO timed vault.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-amount",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-amount",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    withdrawal_amount: int = Field(
-        ...,
-        description="New withdrawal amount to set in microSTX",
-        examples=["50000000"],  # 50 STX
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Updating withdrawal amount to 50 STX"],
-    )
-
-
-class ProposeActionSetWithdrawalAmountTool(BaseTool):
-    name: str = "dao_propose_action_set_withdrawal_amount"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to change the withdrawal amount "
-        " to a specified number of microSTX in a DAO timed vault."
-    )
-    args_schema: Type[BaseModel] = ProposeActionSetWithdrawalAmountInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_amount: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new withdrawal amount."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            str(withdrawal_amount),
-        ]
-
-        if memo:
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-set-withdrawal-amount.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_amount: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new withdrawal amount."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            withdrawal_amount,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_amount: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            withdrawal_amount,
-            memo,
-            **kwargs,
-        )
-
-
-class ProposeActionSetWithdrawalPeriodInput(BaseModel):
-    """Input schema for proposing to set withdrawal period action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes setting the withdrawal period in a DAO timed vault.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-set-withdrawal-period",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-set-withdrawal-period",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    withdrawal_period: int = Field(
-        ...,
-        description="New withdrawal period to set in Bitcoin blocks",
-        examples=["144"],  # 1 day in BTC blocks
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Updating withdrawal period to 1 day (144 blocks)"],
-    )
-
-
-class ProposeActionSetWithdrawalPeriodTool(BaseTool):
-    name: str = "dao_propose_action_set_withdrawal_period"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to change the withdrawal period "
-        " to a specified number of Bitcoin blocks in a DAO timed vault."
-    )
-    args_schema: Type[BaseModel] = ProposeActionSetWithdrawalPeriodInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_period: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new withdrawal period."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            str(withdrawal_period),
-        ]
-
-        if memo:
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-set-withdrawal-period.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_period: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose setting a new withdrawal period."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            withdrawal_period,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        withdrawal_period: int,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            withdrawal_period,
-            memo,
-            **kwargs,
-        )
-
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
@@ -961,129 +317,6 @@ class ConcludeActionProposalTool(BaseTool):
             **kwargs,
         )
 
-
-class ProposeActionToggleResourceInput(BaseModel):
-    """Input schema for proposing to toggle a resource action."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    action_proposal_contract_to_execute: str = Field(
-        ...,
-        description="Contract principal of the action proposal that executes toggling a resource in the DAO.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-toggle-resource",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-toggle-resource",
-        ],
-    )
-    dao_token_contract_address: str = Field(
-        ...,
-        description="Contract principal of the token used by the DAO for voting",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-faktory",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-faktory",
-        ],
-    )
-    resource_name: str = Field(
-        ...,
-        description="Name of the resource to toggle",
-        examples=["apiv1", "protected-content", "1hr consulting"],
-    )
-    memo: Optional[str] = Field(
-        None,
-        description="Optional memo to include with the proposal",
-        examples=["Toggling availability of consulting resource"],
-    )
-
-
-class ProposeActionToggleResourceTool(BaseTool):
-    name: str = "dao_propose_action_toggle_resource"
-    description: str = (
-        "This creates a proposal that DAO members can vote on to enable or disable "
-        "whether a specific resource can be paid for in the DAO resource contract."
-    )
-    args_schema: Type[BaseModel] = ProposeActionToggleResourceInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose toggling a resource."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-        ]
-
-        if memo:
-            args.append(memo)
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/public",
-            "propose-action-toggle-resource-by-name.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to propose toggling a resource."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-            memo,
-            **kwargs,
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        action_proposal_contract_to_execute: str,
-        dao_token_contract_address: str,
-        resource_name: str,
-        memo: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension,
-            action_proposal_contract_to_execute,
-            dao_token_contract_address,
-            resource_name,
-            memo,
-            **kwargs,
-        )
-
-
 class GetLiquidSupplyInput(BaseModel):
     """Input schema for getting the liquid supply."""
 
@@ -1131,7 +364,7 @@ class GetLiquidSupplyTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
             "get-liquid-supply.ts",
             *args,
         )
@@ -1204,7 +437,7 @@ class GetProposalTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
             "get-proposal.ts",
             *args,
         )
@@ -1226,84 +459,6 @@ class GetProposalTool(BaseTool):
     ) -> Dict[str, Any]:
         """Async version of the tool."""
         return self._deploy(action_proposals_voting_extension, proposal_id, **kwargs)
-
-
-class GetTotalVotesInput(BaseModel):
-    """Input schema for getting total votes for a voter."""
-
-    action_proposals_voting_extension: str = Field(
-        ...,
-        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
-        examples=[
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
-            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
-        ],
-    )
-    proposal_id: int = Field(..., description="ID of the proposal to check")
-    voter_address: str = Field(..., description="Address of the voter to check")
-
-
-class GetTotalVotesTool(BaseTool):
-    name: str = "dao_action_get_total_votes"
-    description: str = (
-        "Get the total votes cast by a specific voter on a proposal. "
-        "Returns the number of votes the voter has cast on the given proposal."
-    )
-    args_schema: Type[BaseModel] = GetTotalVotesInput
-    return_direct: bool = False
-    wallet_id: Optional[UUID] = None
-
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.wallet_id = wallet_id
-
-    def _deploy(
-        self,
-        action_proposals_voting_extension: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get total votes."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
-
-        args = [
-            action_proposals_voting_extension,
-            str(proposal_id),
-            voter_address,
-        ]
-
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
-            "get-total-votes.ts",
-            *args,
-        )
-
-    def _run(
-        self,
-        action_proposals_voting_extension: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Execute the tool to get total votes."""
-        return self._deploy(
-            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
-        )
-
-    async def _arun(
-        self,
-        action_proposals_voting_extension: str,
-        proposal_id: int,
-        voter_address: str,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Async version of the tool."""
-        return self._deploy(
-            action_proposals_voting_extension, proposal_id, voter_address, **kwargs
-        )
 
 
 class GetVotingConfigurationInput(BaseModel):
@@ -1348,7 +503,7 @@ class GetVotingConfigurationTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
             "get-voting-configuration.ts",
             *args,
         )
@@ -1364,7 +519,6 @@ class GetVotingConfigurationTool(BaseTool):
     async def _arun(
         self,
         action_proposals_voting_extension: str,
-        dao_token_contract_address: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
@@ -1423,7 +577,7 @@ class GetVotingPowerTool(BaseTool):
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
-            "aibtc-dao/extensions/action-proposals/read-only",
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
             "get-voting-power.ts",
             *args,
         )
@@ -1438,6 +592,409 @@ class GetVotingPowerTool(BaseTool):
         """Execute the tool to get voting power."""
         return self._deploy(
             action_proposals_voting_extension, proposal_id, voter_address, **kwargs
+        )
+
+
+class VetoActionProposalInput(BaseModel):
+    """Input schema for vetoing an action proposal."""
+
+    dao_action_proposal_voting_contract: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to veto")
+
+
+class VetoActionProposalTool(BaseTool):
+    name: str = "dao_action_veto_proposal"
+    description: str = (
+        "Veto an existing action proposal in the DAO. "
+        "Allows casting a veto vote on a specific proposal ID "
+        "in the provided action proposals contract."
+    )
+    args_schema: Type[BaseModel] = VetoActionProposalInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to veto an action proposal."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            dao_action_proposal_voting_contract,
+            str(proposal_id),
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+            "veto-action-proposal.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to veto an action proposal."""
+        return self._deploy(
+            dao_action_proposal_voting_contract, proposal_id, **kwargs
+        )
+
+    async def _arun(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            dao_action_proposal_voting_contract, proposal_id, **kwargs
+        )
+
+
+class GetTotalProposalsInput(BaseModel):
+    """Input schema for getting total proposals data."""
+
+    dao_action_proposal_voting_contract: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+
+
+class GetTotalProposalsTool(BaseTool):
+    name: str = "dao_action_get_total_proposals"
+    description: str = (
+        "Get the total proposals data from the DAO action proposals contract. "
+        "Returns counts of proposals and last proposal block information."
+    )
+    args_schema: Type[BaseModel] = GetTotalProposalsInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dao_action_proposal_voting_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total proposals data."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            dao_action_proposal_voting_contract,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
+            "get-total-proposals.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        dao_action_proposal_voting_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get total proposals data."""
+        return self._deploy(dao_action_proposal_voting_contract, **kwargs)
+
+    async def _arun(
+        self,
+        dao_action_proposal_voting_contract: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(dao_action_proposal_voting_contract, **kwargs)
+
+
+class GetVetoVoteRecordInput(BaseModel):
+    """Input schema for getting a veto vote record."""
+
+    dao_action_proposal_voting_contract: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(
+        ...,
+        description="Address of the voter to check the veto vote record for",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
+    )
+
+
+class GetVetoVoteRecordTool(BaseTool):
+    name: str = "dao_action_get_veto_vote_record"
+    description: str = (
+        "Get the veto vote record for a specific voter on a proposal. "
+        "Returns the amount of veto votes if a record exists, otherwise null."
+    )
+    args_schema: Type[BaseModel] = GetVetoVoteRecordInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get a veto vote record."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            dao_action_proposal_voting_contract,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
+            "get-veto-vote-record.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get a veto vote record."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
+        )
+
+    async def _arun(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
+        )
+
+
+class GetVoteRecordInput(BaseModel):
+    """Input schema for getting a vote record."""
+
+    dao_action_proposal_voting_contract: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(
+        ...,
+        description="Address of the voter to check the vote record for",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
+    )
+
+
+class GetVoteRecordTool(BaseTool):
+    name: str = "dao_action_get_vote_record"
+    description: str = (
+        "Get the vote record for a specific voter on a proposal. "
+        "Returns the vote (true/false) and amount if a record exists, otherwise null."
+    )
+    args_schema: Type[BaseModel] = GetVoteRecordInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get a vote record."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            dao_action_proposal_voting_contract,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
+            "get-vote-record.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get a vote record."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
+        )
+
+    async def _arun(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
+        )
+
+
+class GetVoteRecordsInput(BaseModel):
+    """Input schema for getting vote records (vote and veto vote)."""
+
+    dao_action_proposal_voting_contract: str = Field(
+        ...,
+        description="Contract principal where the DAO creates action proposals for voting by DAO members.",
+        examples=[
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-action-proposals-v2",
+            "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.t3st-action-proposals-v2",
+        ],
+    )
+    proposal_id: int = Field(..., description="ID of the proposal to check")
+    voter_address: str = Field(
+        ...,
+        description="Address of the voter to check vote records for",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18"],
+    )
+
+
+class GetVoteRecordsTool(BaseTool):
+    name: str = "dao_action_get_vote_records"
+    description: str = (
+        "Get both the regular vote record and veto vote record for a specific voter on a proposal. "
+        "Returns an object containing 'voteRecord' (vote and amount, or null) and "
+        "'vetoVoteRecord' (amount, or null)."
+    )
+    args_schema: Type[BaseModel] = GetVoteRecordsInput
+    return_direct: bool = False
+    wallet_id: Optional[UUID] = None
+
+    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.wallet_id = wallet_id
+
+    def _deploy(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get vote records."""
+        if self.wallet_id is None:
+            return {"success": False, "message": "Wallet ID is required", "data": None}
+
+        args = [
+            dao_action_proposal_voting_contract,
+            str(proposal_id),
+            voter_address,
+        ]
+
+        return BunScriptRunner.bun_run(
+            self.wallet_id,
+            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/read-only",
+            "get-vote-records.ts",
+            *args,
+        )
+
+    def _run(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute the tool to get vote records."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
+        )
+
+    async def _arun(
+        self,
+        dao_action_proposal_voting_contract: str,
+        proposal_id: int,
+        voter_address: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Async version of the tool."""
+        return self._deploy(
+            dao_action_proposal_voting_contract,
+            proposal_id,
+            voter_address,
+            **kwargs,
         )
 
     async def _arun(

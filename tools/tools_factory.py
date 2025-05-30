@@ -9,44 +9,24 @@ from lib.logger import configure_logger
 
 from .agent_account import AgentAccountDeployTool
 from .bitflow import BitflowExecuteTradeTool
-from .coinmarketcap import GetBitcoinData
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
-from .dao_deployments import ContractDAODeployTool
 from .dao_ext_action_proposals import (
     ConcludeActionProposalTool,
     GetLiquidSupplyTool,
     GetProposalTool,
-    GetTotalVotesTool,
+    GetTotalProposalsTool,
+    GetVoteRecordTool,
+    GetVoteRecordsTool,
+    GetVetoVoteRecordTool,
     GetVotingConfigurationTool,
     GetVotingPowerTool,
-    ProposeActionAddResourceTool,
-    ProposeActionAllowAssetTool,
     ProposeActionSendMessageTool,
-    ProposeActionSetAccountHolderTool,
-    ProposeActionSetWithdrawalAmountTool,
-    ProposeActionSetWithdrawalPeriodTool,
-    ProposeActionToggleResourceTool,
+    VetoActionProposalTool,
     VoteOnActionProposalTool,
 )
 from .dao_ext_charter import (
     GetCurrentDaoCharterTool,
-    GetCurrentDaoCharterVersionTool,
-    GetDaoCharterTool,
 )
-from .dao_ext_core_proposals import (
-    DeployCoreProposalTool,
-    GenerateCoreProposalTool,
-)
-from .dao_ext_payments_invoices import (
-    GetInvoiceTool,
-    GetResourceByNameTool,
-    GetResourceTool,
-    PayInvoiceByResourceNameTool,
-    PayInvoiceTool,
-)
-from .dao_ext_timed_vault import DepositSTXTool as TimedVaultDepositSTXTool
-from .dao_ext_timed_vault import GetAccountTermsTool, WithdrawSTXTool
-from .dao_ext_treasury import GetAllowedAssetTool, IsAllowedAssetTool
 from .database import (
     AddScheduledTaskTool,
     DeleteScheduledTaskTool,
@@ -70,7 +50,6 @@ from .lunarcrush import (
 from .telegram import SendTelegramNotificationTool
 from .transactions import (
     StacksTransactionByAddressTool,
-    StacksTransactionStatusTool,
     StacksTransactionTool,
 )
 from .twitter import TwitterPostTweetTool
@@ -123,56 +102,23 @@ def initialize_tools(
                 logger.warning(f"Failed to get wallet for agent {agent_id}: {e}")
 
     tools = {
-        "coinmarketcap_get_market_data": GetBitcoinData(),
+
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
-        "contracts_get_sip10_info": ContractSIP10InfoTool(wallet_id),
-        "contracts_deploy_dao": ContractDAODeployTool(wallet_id),
+        "contracts_fetch_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),
-        "dao_coreproposals_generate_proposal": GenerateCoreProposalTool(wallet_id),
-        "dao_coreproposals_deploy_proposal": DeployCoreProposalTool(wallet_id),
-        "dao_actionproposals_conclude_proposal": ConcludeActionProposalTool(wallet_id),
-        "dao_actionproposals_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
-        "dao_actionproposals_get_proposal": GetProposalTool(wallet_id),
-        "dao_actionproposals_get_total_votes": GetTotalVotesTool(wallet_id),
-        "dao_actionproposals_get_voting_configuration": GetVotingConfigurationTool(
-            wallet_id
-        ),
-        "dao_actionproposals_get_voting_power": GetVotingPowerTool(wallet_id),
-        "dao_actionproposals_vote_on_proposal": VoteOnActionProposalTool(wallet_id),
-        "dao_actionproposals_propose_add_resource": ProposeActionAddResourceTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_allow_asset": ProposeActionAllowAssetTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_send_message": ProposeActionSendMessageTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_set_account_holder": ProposeActionSetAccountHolderTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_set_withdrawal_amount": ProposeActionSetWithdrawalAmountTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_set_withdrawal_period": ProposeActionSetWithdrawalPeriodTool(
-            wallet_id
-        ),
-        "dao_actionproposals_propose_toggle_resource": ProposeActionToggleResourceTool(
-            wallet_id
-        ),
-        "dao_timedvault_get_account_terms": GetAccountTermsTool(wallet_id),
-        "dao_timedvault_deposit_stx": TimedVaultDepositSTXTool(wallet_id),
-        "dao_timedvault_withdraw_stx": WithdrawSTXTool(wallet_id),
-        "dao_charter_get_current": GetCurrentDaoCharterTool(wallet_id),
-        "dao_charter_get_current_version": GetCurrentDaoCharterVersionTool(wallet_id),
-        "dao_charter_get_version": GetDaoCharterTool(wallet_id),
-        "dao_payments_get_invoice": GetInvoiceTool(wallet_id),
-        "dao_payments_get_resource": GetResourceTool(wallet_id),
-        "dao_payments_get_resource_by_name": GetResourceByNameTool(wallet_id),
-        "dao_payments_pay_invoice": PayInvoiceTool(wallet_id),
-        "dao_payments_pay_invoice_by_resource": PayInvoiceByResourceNameTool(wallet_id),
-        "dao_treasury_get_allowed_asset": GetAllowedAssetTool(wallet_id),
-        "dao_treasury_is_allowed_asset": IsAllowedAssetTool(wallet_id),
+        "dao_action_conclude_proposal": ConcludeActionProposalTool(wallet_id),
+        "dao_action_get_liquid_supply": GetLiquidSupplyTool(wallet_id),
+        "dao_action_get_proposal": GetProposalTool(wallet_id),
+        "dao_action_get_total_proposals": GetTotalProposalsTool(wallet_id),
+        "dao_action_get_veto_vote_record": GetVetoVoteRecordTool(wallet_id),
+        "dao_action_get_vote_record": GetVoteRecordTool(wallet_id),
+        "dao_action_get_vote_records": GetVoteRecordsTool(wallet_id),
+        "dao_action_get_voting_configuration": GetVotingConfigurationTool(wallet_id),
+        "dao_action_get_voting_power": GetVotingPowerTool(wallet_id),
+        "dao_action_veto_proposal": VetoActionProposalTool(wallet_id),
+        "dao_action_vote_on_proposal": VoteOnActionProposalTool(wallet_id),
+        "dao_charter_get_current_charter": GetCurrentDaoCharterTool(wallet_id),
+        "dao_propose_action_send_message": ProposeActionSendMessageTool(wallet_id),
         "database_add_scheduled_task": AddScheduledTaskTool(profile_id, agent_id),
         "database_get_dao_list": GetDAOListTool(),
         "database_get_dao_get_by_name": GetDAOByNameTool(),
@@ -186,7 +132,6 @@ def initialize_tools(
         "lunarcrush_get_token_metrics": LunarCrushTokenMetricsTool(),
         "lunarcrush_search": SearchLunarCrushTool(),
         "lunarcrush_get_token_metadata": LunarCrushTokenMetadataTool(),
-        "stacks_get_transaction_status": StacksTransactionStatusTool(wallet_id),
         "stacks_get_transaction_details": StacksTransactionTool(wallet_id),
         "stacks_get_transactions_by_address": StacksTransactionByAddressTool(wallet_id),
         "stacks_get_contract_info": STXGetContractInfoTool(),
