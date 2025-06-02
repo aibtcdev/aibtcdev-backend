@@ -24,17 +24,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://sprint.aibtc.dev",
-        "https://sprint-faster.aibtc.dev",
-        "https://*.aibtcdev-frontend.pages.dev",
-        "http://localhost:3000",
-        "https://staging.aibtc.chat",
-        "https://app.aibtc.dev",
-        "https://aibtc.dev",
-        "https://app-staging.aibtc.dev",
-        "https://ui-redesign.aibtcdev-frontend-staging.pages.dev",
-    ],
+    allow_origin_regex=r"^(https://((sprint|sprint-faster|app|app-staging)\.aibtc\.dev|aibtc\.dev|staging\.aibtc\.chat|[^.]+\.aibtcdev-frontend(-staging)?\.pages\.dev)|http://localhost:3000)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
