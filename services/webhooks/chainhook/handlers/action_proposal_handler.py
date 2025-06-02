@@ -260,7 +260,7 @@ class ActionProposalHandler(BaseProposalHandler):
                     ProposalCreate(
                         dao_id=dao_data["id"],
                         title=proposal_title,
-                        description=f"Action proposal {proposal_info['proposal_id']} for {dao_data['name']}",
+                        content=f"Action proposal {proposal_info['proposal_id']} for {dao_data['name']}. Parameters: {parameters}",
                         contract_principal=contract_identifier,
                         tx_id=tx_id,
                         proposal_id=proposal_info["proposal_id"],
@@ -271,7 +271,6 @@ class ActionProposalHandler(BaseProposalHandler):
                         caller=proposal_info["caller"],
                         creator=proposal_info["creator"],
                         liquid_tokens=proposal_info["liquid_tokens"],
-                        parameters=parameters,
                         bond=proposal_info["bond"],
                         # Fields from updated payload
                         contract_caller=proposal_info["contract_caller"],

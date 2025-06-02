@@ -125,7 +125,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             approval = evaluation.get("approve", False)
             confidence = evaluation.get("confidence_score", 0.0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
-            formatted_prompt = result.get("formatted_prompt", "No prompt provided")
+            formatted_prompt = result.get("formatted_prompt", "")
             total_cost = result.get("total_overall_cost", 0.0)
             model = result.get("evaluation_model_info", {}).get("name", "Unknown")
 
@@ -140,7 +140,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             vote_data = VoteCreate(
                 wallet_id=wallet_id,
                 dao_id=dao_id,
-                agent_id=None,  # This will be set from the wallet if it exists
+                agent_id=wallet.agent_id,  # This will be set from the wallet if it exists
                 proposal_id=proposal_id,
                 answer=approval,
                 reasoning=reasoning,

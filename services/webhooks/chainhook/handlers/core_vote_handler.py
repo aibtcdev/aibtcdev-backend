@@ -30,7 +30,6 @@ class CoreVoteHandler(BaseVoteHandler):
         proposals = backend.list_proposals(
             filters=ProposalFilter(
                 contract_principal=contract_identifier,
-                proposal_contract=proposal_identifier,
                 type=ProposalType.CORE,
             )
         )

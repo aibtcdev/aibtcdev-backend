@@ -321,20 +321,16 @@ class Profile(ProfileBase):
 class ProposalBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     title: Optional[str] = None
-    description: Optional[str] = None
+    content: Optional[str] = None  # Replaces both description and parameters
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     proposal_id: Optional[int] = None  # On-chain proposal ID if its an action proposal
-    proposal_contract: Optional[str] = (
-        None  # Contract address of the proposal if its a core contract proposal
-    )
     type: Optional[ProposalType] = ProposalType.ACTION
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
-    parameters: Optional[str] = None
     # Additional fields from blockchain data
     concluded_by: Optional[str] = None
     executed: Optional[bool] = None
@@ -594,7 +590,6 @@ class ProposalFilter(CustomBaseModel):
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
     type: Optional[ProposalType] = None
-    proposal_contract: Optional[str] = None
 
 
 class StepFilter(CustomBaseModel):

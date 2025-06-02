@@ -178,7 +178,6 @@ class CoreProposalHandler(BaseProposalHandler):
             filters=ProposalFilter(
                 dao_id=dao_data["id"],
                 contract_principal=contract_identifier,
-                proposal_contract=proposal_info["proposal"],
                 type=ProposalType.CORE,
             )
         )
@@ -190,12 +189,11 @@ class CoreProposalHandler(BaseProposalHandler):
                 ProposalCreate(
                     dao_id=dao_data["id"],
                     title=proposal_title,
-                    description=f"Core contract proposal for {proposal_info['proposal']}",
+                    content=f"Core contract proposal for {proposal_info['proposal']}",
                     contract_principal=contract_identifier,
                     tx_id=tx_id,
                     status=ContractStatus.DEPLOYED,  # Since it's already on-chain
                     type=ProposalType.CORE,
-                    proposal_contract=proposal_info["proposal"],
                     # Add fields from payload
                     caller=proposal_info["caller"],
                     creator=proposal_info["creator"],

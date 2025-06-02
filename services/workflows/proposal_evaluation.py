@@ -463,7 +463,7 @@ async def evaluate_and_vote_on_proposal(
         logger.info(f"Starting evaluation of proposal {proposal_id}")
         evaluation_result = await evaluate_proposal(
             proposal_id=str(proposal_id),
-            proposal_data=proposal.parameters,
+            proposal_data=proposal.content,
             config=config,
         )
 

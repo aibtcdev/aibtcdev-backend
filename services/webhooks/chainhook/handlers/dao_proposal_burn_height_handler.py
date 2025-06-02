@@ -139,7 +139,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             if p.vote_start is not None
             and p.vote_end is not None
             and p.vote_start == burn_height
-            and p.parameters is not None  # Ensure parameters exist
+            and p.content is not None  # Ensure content exists
         ]
 
         end_proposals = [
@@ -148,7 +148,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             if p.vote_start is not None
             and p.vote_end is not None
             and p.vote_end == burn_height
-            and p.parameters is not None  # Ensure parameters exist
+            and p.content is not None  # Ensure content exists
         ]
 
         if not vote_proposals and not end_proposals:

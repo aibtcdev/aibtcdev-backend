@@ -85,7 +85,7 @@ class HistoricalContextAgent(
                 [
                     f'<proposal id="{i+1}">\n'
                     f"  <title>{proposal.title or 'Untitled'}</title>\n"
-                    f"  <description>{proposal.description or 'No description'}</description>\n"
+                    f"  <content>{proposal.content or 'No content'}</content>\n"
                     f"  <status>{proposal.status or 'Unknown'}</status>\n"
                     f"  <type>{proposal.type or 'Unknown'}</type>\n"
                     f"  <created_at>{proposal.created_at.strftime('%Y-%m-%d') if proposal.created_at else 'Unknown'}</created_at>\n"

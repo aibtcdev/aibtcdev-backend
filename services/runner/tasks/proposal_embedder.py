@@ -49,13 +49,11 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
         """Format proposal data into a string for embedding."""
         parts = [
             f"Title: {proposal.title or 'N/A'}",
-            f"Description: {proposal.description or 'N/A'}",
+            f"Content: {proposal.content or 'N/A'}",
             f"Type: {proposal.type.value if proposal.type else 'N/A'}",
         ]
         if proposal.action:
             parts.append(f"Action: {proposal.action}")
-        if proposal.parameters:
-            parts.append(f"Parameters: {proposal.parameters}")
         # Add more relevant fields as needed
         return "\n".join(parts)
 
