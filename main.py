@@ -33,7 +33,7 @@ app.add_middleware(
         "https://app.aibtc.dev",
         "https://aibtc.dev",
         "https://app-staging.aibtc.dev",
-        "https://*.aibtcdev-frontend-staging.pages.dev",
+        "https://ui-redesign.aibtcdev-frontend-staging.pages.dev",
     ],
     allow_credentials=True,
     allow_methods=["*"],
