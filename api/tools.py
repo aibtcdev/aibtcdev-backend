@@ -81,7 +81,7 @@ class VetoActionProposalRequest(BaseModel):
         ...,
         description="Contract principal where the DAO creates action proposals for voting by DAO members.",
     )
-    proposal_id: int = Field(
+    proposal_id: str = Field(
         ...,
         description="ID of the proposal to veto.",
     )
@@ -418,10 +418,19 @@ async def veto_dao_action_proposal(
             f"Using wallet {wallet.id} for profile {profile.id} to veto DAO action proposal {payload.proposal_id}."
         )
 
+        # get proposal from id
+        proposal = backend.get_proposal(payload.proposal_id)
+        if not proposal:
+            logger.error(f"No proposal found for ID: {payload.proposal_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No proposal found for ID: {payload.proposal_id}",
+            )
+
         tool = VetoActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
             dao_action_proposal_voting_contract=payload.dao_action_proposal_voting_contract,
-            proposal_id=payload.proposal_id,
+            proposal_id=proposal.proposal_id,
         )
 
         logger.debug(
