@@ -534,6 +534,23 @@ class WalletFilter(CustomBaseModel):
     testnet_address: Optional[str] = None
 
 
+class WalletFilterN(CustomBaseModel):
+    """Enhanced wallet filter with support for batch operations using 'in_' queries."""
+
+    # Standard equality filters (same as WalletFilter)
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
+
+    # Batch filters using 'in_' operations
+    ids: Optional[List[UUID]] = None
+    agent_ids: Optional[List[UUID]] = None
+    profile_ids: Optional[List[UUID]] = None
+    mainnet_addresses: Optional[List[str]] = None
+    testnet_addresses: Optional[List[str]] = None
+
+
 class QueueMessageFilter(CustomBaseModel):
     type: Optional[QueueMessageType] = None
     is_processed: Optional[bool] = None
@@ -591,6 +608,36 @@ class ProposalFilter(CustomBaseModel):
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
     type: Optional[ProposalType] = None
+
+
+class ProposalFilterN(CustomBaseModel):
+    """Enhanced proposal filter with support for batch operations using 'in_' queries."""
+
+    # Standard equality filters (same as ProposalFilter)
+    dao_id: Optional[UUID] = None
+    status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
+    proposal_id: Optional[int] = None
+    executed: Optional[bool] = None
+    passed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
+    type: Optional[ProposalType] = None
+
+    # Batch filters using 'in_' operations
+    dao_ids: Optional[List[UUID]] = None
+    proposal_ids: Optional[List[int]] = None
+    statuses: Optional[List[ContractStatus]] = None
+    contract_principals: Optional[List[str]] = None
+    types: Optional[List[ProposalType]] = None
+
+    # Range filters for numeric fields
+    proposal_id_gte: Optional[int] = None  # greater than or equal
+    proposal_id_lte: Optional[int] = None  # less than or equal
+
+    # Text search (if supported by backend)
+    title_contains: Optional[str] = None
+    content_contains: Optional[str] = None
 
 
 class StepFilter(CustomBaseModel):

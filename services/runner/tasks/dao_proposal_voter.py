@@ -2,16 +2,18 @@
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set
 
 from backend.factory import backend
 from backend.models import (
+    ProposalFilterN,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
     VoteBase,
     VoteFilter,
+    WalletFilterN,
 )
 from config import config
 from lib.logger import configure_logger
@@ -33,59 +35,132 @@ class DAOProposalVoteResult(RunnerResult):
         self.errors = self.errors or []
 
 
+@dataclass
+class VotingContext:
+    """Cached context for voting operations to avoid redundant queries."""
+
+    pending_messages: List[QueueMessage]
+    proposal_ids: Set[str]
+    proposals_by_id: Dict[str, Any]
+    wallets_by_id: Dict[str, Any]
+    unvoted_votes_by_proposal: Dict[str, List[Any]]
+
+
 class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     """Task runner for processing and voting on DAO proposals."""
 
     QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_VOTE
 
-    async def _validate_task_specific(self, context: JobContext) -> bool:
-        """Validate task-specific conditions."""
+    async def _build_voting_context(self) -> Optional[VotingContext]:
+        """Build a comprehensive context with all necessary data to minimize database calls."""
         try:
-            # Get pending messages from the queue
+            # 1. Get all pending messages
             pending_messages = await self.get_pending_messages()
-            message_count = len(pending_messages)
-            logger.debug(f"Found {message_count} pending proposal voting messages")
-
-            if message_count == 0:
+            if not pending_messages:
                 logger.info("No pending proposal voting messages found")
-                return False
+                return None
 
-            # Validate that at least one message has a valid proposal ID
+            # 2. Extract all proposal IDs from messages
+            proposal_ids = set()
+            wallet_ids = set()
+
             for message in pending_messages:
                 message_data = message.message or {}
                 proposal_id = message_data.get("proposal_id")
+                if proposal_id:
+                    proposal_ids.add(proposal_id)
+                if message.wallet_id:
+                    wallet_ids.add(message.wallet_id)
 
-                if not proposal_id:
-                    logger.warning(f"Message {message.id} missing proposal_id")
-                    continue
+            if not proposal_ids:
+                logger.warning("No valid proposal IDs found in pending messages")
+                return None
 
-                # Check if the proposal exists in the database
-                proposal = backend.get_proposal(proposal_id)
-                if proposal:
-                    # Check if there are any unvoted votes for this proposal
-                    unvoted_votes = backend.list_votes(
-                        VoteFilter(
-                            proposal_id=proposal_id,
-                            voted=False,
-                        )
-                    )
+                # 3. Batch fetch all proposals using enhanced list_proposals_n method
+            proposals_by_id = {}
+            if proposal_ids:
+                # Convert proposal_ids to integers and use enhanced batch fetch
+                int_proposal_ids = []
+                for proposal_id in proposal_ids:
+                    if proposal_id.isdigit():
+                        int_proposal_ids.append(int(proposal_id))
 
-                    if unvoted_votes:
-                        logger.info(
-                            f"Found valid proposal {proposal_id} with {len(unvoted_votes)} unvoted votes to process"
-                        )
-                        return True
-                    else:
-                        logger.warning(
-                            f"No unvoted votes found for proposal {proposal_id}"
-                        )
-                else:
-                    logger.warning(f"Proposal {proposal_id} not found in database")
+                if int_proposal_ids:
+                    enhanced_filter = ProposalFilterN(proposal_ids=int_proposal_ids)
+                    proposals = backend.list_proposals_n(enhanced_filter)
+                    proposals_by_id = {
+                        str(p.proposal_id): p
+                        for p in proposals
+                        if p.proposal_id is not None
+                    }
 
-            logger.warning(
-                "No valid proposals with unvoted votes found in pending messages"
+            # 4. Batch fetch all wallets using enhanced list_wallets_n method
+            wallets_by_id = {}
+            if wallet_ids:
+                enhanced_wallet_filter = WalletFilterN(ids=list(wallet_ids))
+                wallets = backend.list_wallets_n(enhanced_wallet_filter)
+                wallets_by_id = {str(w.id): w for w in wallets}
+
+            # 5. Batch fetch all unvoted votes for all proposals
+            unvoted_votes_by_proposal = {}
+            if proposal_ids:
+                # Get all unvoted votes for all proposals at once
+                all_unvoted_votes = backend.list_votes(VoteFilter(voted=False))
+
+                # Group by proposal_id
+                for vote in all_unvoted_votes:
+                    if vote.proposal_id:
+                        proposal_key = str(vote.proposal_id)
+                        if proposal_key in proposal_ids:
+                            if proposal_key not in unvoted_votes_by_proposal:
+                                unvoted_votes_by_proposal[proposal_key] = []
+                            unvoted_votes_by_proposal[proposal_key].append(vote)
+
+            return VotingContext(
+                pending_messages=pending_messages,
+                proposal_ids=proposal_ids,
+                proposals_by_id=proposals_by_id,
+                wallets_by_id=wallets_by_id,
+                unvoted_votes_by_proposal=unvoted_votes_by_proposal,
             )
-            return False
+
+        except Exception as e:
+            logger.error(f"Error building voting context: {str(e)}", exc_info=True)
+            return None
+
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate task-specific conditions using optimized batch queries."""
+        try:
+            voting_context = await self._build_voting_context()
+            if not voting_context:
+                return False
+
+            # Check if we have valid proposals with unvoted votes
+            valid_proposals_found = False
+            for proposal_id in voting_context.proposal_ids:
+                if (
+                    proposal_id in voting_context.proposals_by_id
+                    and proposal_id in voting_context.unvoted_votes_by_proposal
+                    and voting_context.unvoted_votes_by_proposal[proposal_id]
+                ):
+
+                    unvoted_count = len(
+                        voting_context.unvoted_votes_by_proposal[proposal_id]
+                    )
+                    logger.info(
+                        f"Found valid proposal {proposal_id} with {unvoted_count} unvoted votes to process"
+                    )
+                    valid_proposals_found = True
+                    break
+
+            if not valid_proposals_found:
+                logger.warning(
+                    "No valid proposals with unvoted votes found in pending messages"
+                )
+
+            # Cache the context for later use in execution
+            self._voting_context = voting_context
+            return valid_proposals_found
 
         except Exception as e:
             logger.error(
@@ -93,12 +168,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             )
             return False
 
-    async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single DAO proposal voting message."""
+    async def process_message(
+        self, message: QueueMessage, voting_context: VotingContext
+    ) -> Dict[str, Any]:
+        """Process a single DAO proposal voting message using cached context."""
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
-        dao_id = message.dao_id
 
         logger.debug(
             f"Processing proposal voting message {message_id} for wallet {wallet_id}"
@@ -113,24 +189,32 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             return {"success": False, "error": error_msg}
 
         try:
-            # Get the proposal details from the database
-            proposal = backend.get_proposal(proposal_id)
+            # Use cached proposal data
+            proposal = voting_context.proposals_by_id.get(proposal_id)
             if not proposal:
                 error_msg = f"Proposal {proposal_id} not found in database"
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Get unvoted votes for this proposal and wallet
-            unvoted_votes = backend.list_votes(
-                VoteFilter(
-                    proposal_id=proposal_id,
-                    wallet_id=wallet_id,
-                    voted=False,
-                )
+            # Get unvoted votes from cached data
+            all_unvoted_votes = voting_context.unvoted_votes_by_proposal.get(
+                proposal_id, []
             )
+
+            # Filter for this specific wallet
+            unvoted_votes = [
+                vote for vote in all_unvoted_votes if vote.wallet_id == wallet_id
+            ]
 
             if not unvoted_votes:
                 error_msg = f"No unvoted votes found for proposal {proposal_id} and wallet {wallet_id}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+
+            # Use cached wallet data
+            wallet = voting_context.wallets_by_id.get(str(wallet_id))
+            if not wallet:
+                error_msg = f"Wallet {wallet_id} not found"
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
@@ -189,9 +273,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                # Log the txid for debugging
-                ## Get the correct address based on network configuration
-                wallet = backend.get_wallet(wallet_id)
+                # Get the correct address based on network configuration
                 address = (
                     wallet.mainnet_address
                     if config.network.network == "mainnet"
@@ -207,6 +289,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.debug(
                     f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"
                 )
+
                 try:
                     # Log the current vote state before update
                     current_vote = backend.get_vote(vote.id)
@@ -237,6 +320,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         }
                     )
                     continue
+
                 results.append(
                     {
                         "success": True,
@@ -276,12 +360,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         return backend.list_queue_messages(filters=filters)
 
     async def _execute_impl(self, context: JobContext) -> List[DAOProposalVoteResult]:
-        """Run the DAO proposal voter task."""
-        pending_messages = await self.get_pending_messages()
-        message_count = len(pending_messages)
-        logger.debug(f"Found {message_count} pending proposal voting messages")
+        """Run the DAO proposal voter task using cached context."""
+        # Use cached context from validation if available
+        voting_context = getattr(self, "_voting_context", None)
+        if not voting_context:
+            voting_context = await self._build_voting_context()
 
-        if not pending_messages:
+        if not voting_context or not voting_context.pending_messages:
             return [
                 DAOProposalVoteResult(
                     success=True,
@@ -291,13 +376,16 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 )
             ]
 
+        message_count = len(voting_context.pending_messages)
+        logger.debug(f"Found {message_count} pending proposal voting messages")
+
         # Process each message
         processed_count = 0
         voted_count = 0
         errors = []
 
-        for message in pending_messages:
-            result = await self.process_message(message)
+        for message in voting_context.pending_messages:
+            result = await self.process_message(message, voting_context)
             processed_count += 1
 
             if result.get("success"):
@@ -316,6 +404,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             f"Task metrics - Processed: {processed_count}, "
             f"Voted: {voted_count}, Errors: {len(errors)}"
         )
+
+        # Clear cached context
+        if hasattr(self, "_voting_context"):
+            delattr(self, "_voting_context")
 
         return [
             DAOProposalVoteResult(

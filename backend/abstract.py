@@ -43,6 +43,7 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    ProposalFilterN,
     QueueMessage,
     QueueMessageBase,
     QueueMessageCreate,
@@ -77,6 +78,7 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletFilterN,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -289,6 +291,11 @@ class AbstractBackend(ABC):
         pass
 
     @abstractmethod
+    def list_wallets_n(self, filters: Optional[WalletFilterN] = None) -> List[Wallet]:
+        """Enhanced wallets listing with support for batch operations and advanced filtering."""
+        pass
+
+    @abstractmethod
     def update_wallet(
         self, wallet_id: UUID, update_data: WalletBase
     ) -> Optional[Wallet]:
@@ -466,6 +473,13 @@ class AbstractBackend(ABC):
     def list_proposals(
         self, filters: Optional[ProposalFilter] = None
     ) -> List[Proposal]:
+        pass
+
+    @abstractmethod
+    def list_proposals_n(
+        self, filters: Optional[ProposalFilterN] = None
+    ) -> List[Proposal]:
+        """Enhanced proposals listing with support for batch operations and advanced filtering."""
         pass
 
     @abstractmethod
