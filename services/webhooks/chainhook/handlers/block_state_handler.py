@@ -78,6 +78,7 @@ class BlockStateHandler(ChainhookEventHandler):
             # Extract block info
             block_height = block.block_identifier.index
             block_hash = block.block_identifier.hash
+            bitcoin_block_height = block.metadata.bitcoin_anchor_block_identifier.index
             self.logger.info(
                 f"Processing block: height={block_height}, hash={block_hash}"
             )
@@ -102,6 +103,7 @@ class BlockStateHandler(ChainhookEventHandler):
                         block_height=block_height,
                         block_hash=block_hash,
                         network=current_state.network,
+                        bitcoin_block_height=bitcoin_block_height,
                     ),
                 )
                 if not updated:
@@ -126,6 +128,7 @@ class BlockStateHandler(ChainhookEventHandler):
                         block_height=block_height,
                         block_hash=block_hash,
                         network=config.network.network,
+                        bitcoin_block_height=bitcoin_block_height,
                     )
                 )
                 if not created:
