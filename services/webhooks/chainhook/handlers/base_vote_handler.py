@@ -194,7 +194,13 @@ class BaseVoteHandler(ChainhookEventHandler):
             update_data = VoteBase(tx_id=tx_id)
             if amount and not vote.amount:
                 update_data.amount = amount
+                self.logger.info(f"[DEBUG] Setting amount in update_data: {amount}")
+            else:
+                self.logger.info(
+                    f"[DEBUG] Not setting amount - amount: {amount}, existing vote.amount: {vote.amount}"
+                )
 
+            self.logger.info(f"[DEBUG] Update data: {update_data.model_dump()}")
             backend.update_vote(vote.id, update_data)
             self.logger.info(f"Updated vote {vote.id}")
         else:
@@ -217,8 +223,19 @@ class BaseVoteHandler(ChainhookEventHandler):
                 amount=amount,
             )
 
+            self.logger.info(
+                f"[DEBUG] Creating vote with data: {new_vote.model_dump()}"
+            )
+
             try:
                 vote = backend.create_vote(new_vote)
                 self.logger.info(f"Created new vote record with ID: {vote.id}")
+                self.logger.info(f"[DEBUG] Created vote details: {vote.model_dump()}")
             except Exception as e:
                 self.logger.error(f"Failed to create vote record: {str(e)}")
+                self.logger.error(
+                    f"[DEBUG] Vote data that failed: {new_vote.model_dump()}"
+                )
+                import traceback
+
+                self.logger.error(f"[DEBUG] Full traceback: {traceback.format_exc()}")

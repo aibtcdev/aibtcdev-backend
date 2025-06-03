@@ -70,6 +70,14 @@ class ActionVoteHandler(BaseVoteHandler):
                         self.logger.warning("Empty payload in vote event")
                         return None
 
+                    self.logger.info(
+                        f"[DEBUG] Found vote event with payload: {payload}"
+                    )
+                    raw_amount = payload.get("amount")
+                    self.logger.info(
+                        f"[DEBUG] Raw amount from payload: {raw_amount} (type: {type(raw_amount)})"
+                    )
+
                     return {
                         "proposal_identifier": payload.get(
                             "proposalId"
@@ -96,12 +104,22 @@ class ActionVoteHandler(BaseVoteHandler):
         Returns:
             str: The amount as a string, or "0" if None
         """
+        self.logger.info(
+            f"[DEBUG] _extract_amount called with: {amount} (type: {type(amount)})"
+        )
+
         if amount is None:
+            self.logger.info("[DEBUG] Amount is None, returning '0'")
             return "0"
 
         amount_str = str(amount)
+        self.logger.info(f"[DEBUG] Amount converted to string: '{amount_str}'")
+
         if amount_str.startswith("u"):
             # Remove the 'u' prefix and return as string
-            return amount_str[1:]
+            result = amount_str[1:]
+            self.logger.info(f"[DEBUG] Removed 'u' prefix, returning: '{result}'")
+            return result
         else:
+            self.logger.info(f"[DEBUG] No 'u' prefix, returning: '{amount_str}'")
             return amount_str
