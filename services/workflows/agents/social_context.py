@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from pydantic import BaseModel, Field
 
 from lib.logger import configure_logger
 from services.workflows.capability_mixins import BaseCapabilityMixin

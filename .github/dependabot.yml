@@ -17,3 +17,5 @@ updates:
     ignore:
       - dependency-name: "pgvector"
         versions: [">=0.3.1"]
+      - dependency-name: "starlette"
+        versions: [">=0.46.0" , "<=0.47.0"]

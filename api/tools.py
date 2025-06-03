@@ -16,6 +16,11 @@ from backend.models import (  # Added Profile, AgentFilter
 )
 from lib.logger import configure_logger
 from lib.tools import Tool, get_available_tools
+
+# Import the proposal recommendation agent
+from services.workflows.agents.proposal_recommendation import (
+    ProposalRecommendationAgent,
+)
 from tools.dao_ext_action_proposals import (
     ProposeActionSendMessageTool,  # Added ProposeActionSendMessageTool
     VetoActionProposalTool,  # Added VetoActionProposalTool
@@ -84,6 +89,33 @@ class VetoActionProposalRequest(BaseModel):
     proposal_id: str = Field(
         ...,
         description="ID of the proposal to veto.",
+    )
+
+
+class ProposalRecommendationRequest(BaseModel):
+    """Request body for getting a proposal recommendation."""
+
+    dao_id: UUID = Field(
+        ...,
+        description="The ID of the DAO to generate a proposal recommendation for.",
+    )
+    focus_area: Optional[str] = Field(
+        default="general improvement",
+        description="Specific area of focus for the recommendation (e.g., 'community growth', 'technical development', 'partnerships')",
+    )
+    specific_needs: Optional[str] = Field(
+        default="",
+        description="Any specific needs or requirements to consider in the recommendation",
+    )
+    model_name: Optional[str] = Field(
+        default="gpt-4.1",
+        description="LLM model to use for generation (e.g., 'gpt-4.1', 'gpt-4o', 'gpt-3.5-turbo')",
+    )
+    temperature: Optional[float] = Field(
+        default=0.1,
+        description="Temperature for LLM generation (0.0-2.0). Lower = more focused, Higher = more creative",
+        ge=0.0,
+        le=2.0,
     )
 
 
@@ -448,4 +480,81 @@ async def veto_dao_action_proposal(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to veto DAO action proposal: {str(e)}",
+        )
+
+
+@router.post("/dao/proposal_recommendations/generate")
+async def generate_proposal_recommendation(
+    request: Request,
+    payload: ProposalRecommendationRequest,
+    profile: Profile = Depends(verify_profile_from_token),
+) -> JSONResponse:
+    """Generate a proposal recommendation for a DAO.
+
+    This endpoint allows an authenticated user to get AI-generated proposal
+    recommendations based on the DAO's mission, description, and previous proposals.
+
+    Args:
+        request: The FastAPI request object.
+        payload: The request body containing dao_id and optional parameters.
+        profile: The authenticated user's profile.
+
+    Returns:
+        JSONResponse: The generated proposal recommendation.
+
+    Raises:
+        HTTPException: If there's an error, or if the DAO is not found.
+    """
+    try:
+        logger.info(
+            f"Proposal recommendation request received from {request.client.host if request.client else 'unknown'} for profile {profile.id} and DAO {payload.dao_id}"
+        )
+
+        # Verify that the DAO exists
+        dao = backend.get_dao(payload.dao_id)
+        if not dao:
+            logger.error(f"DAO with ID {payload.dao_id} not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"DAO with ID {payload.dao_id} not found",
+            )
+
+        logger.info(
+            f"Generating proposal recommendation for DAO {dao.name} (ID: {payload.dao_id})"
+        )
+
+        # Create the proposal recommendation agent with model configuration
+        config = {
+            "model_name": "gpt-4.1-mini",  # Use model from request or default
+            "temperature": 0.1,  # Use temperature from request or default
+            "streaming": True,  # Enable streaming responses
+            "callbacks": [],  # Optional callback handlers
+        }
+        agent = ProposalRecommendationAgent(config=config)
+
+        # Prepare state for the agent
+        state = {
+            "dao_id": payload.dao_id,
+            "focus_area": payload.focus_area,
+            "specific_needs": payload.specific_needs,
+        }
+
+        # Get the recommendation
+        result = await agent.process(state)
+
+        logger.debug(
+            f"Proposal recommendation result for DAO {payload.dao_id}: {result.get('title', 'Unknown')}"
+        )
+        return JSONResponse(content=result)
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(
+            f"Failed to generate proposal recommendation for DAO {payload.dao_id}",
+            exc_info=e,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate proposal recommendation: {str(e)}",
         )

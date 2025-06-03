@@ -3,7 +3,6 @@ from uuid import UUID
 
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from pydantic import BaseModel, Field
 
 from backend.factory import backend
 from backend.models import Proposal, ProposalFilter

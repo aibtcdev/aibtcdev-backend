@@ -1,3 +1,6 @@
+from services.workflows.agents.proposal_recommendation import (
+    ProposalRecommendationAgent,
+)
 from services.workflows.base import (
     BaseWorkflow,
     BaseWorkflowMixin,
@@ -64,6 +67,7 @@ __all__ = [
     "ReactWorkflow",
     "execute_langgraph_stream",
     "ProposalEvaluationWorkflow",
+    "ProposalRecommendationAgent",
     "TweetAnalysisWorkflow",
     "TweetGeneratorWorkflow",
     "analyze_tweet",

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,3 +29,20 @@ class ProposalEvaluationOutput(BaseModel):
         description="Confidence score for the decision (0.0-1.0)"
     )
     reasoning: str = Field(description="The reasoning behind the evaluation decision")
+
+
+class ProposalRecommendationOutput(BaseModel):
+    """Output model for proposal recommendations."""
+
+    title: str = Field(description="Recommended proposal title")
+    content: str = Field(description="Recommended proposal content/description")
+    rationale: str = Field(
+        description="Explanation of why this proposal is recommended"
+    )
+    priority: str = Field(
+        description="Priority level: high, medium, low", pattern="^(high|medium|low)$"
+    )
+    estimated_impact: str = Field(description="Expected impact on the DAO")
+    suggested_action: Optional[str] = Field(
+        description="Specific action or next steps if applicable", default=None
+    )

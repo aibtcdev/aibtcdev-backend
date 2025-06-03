@@ -1,11 +1,10 @@
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
-from pydantic import BaseModel, Field
 
 from lib.logger import configure_logger
 from services.workflows.capability_mixins import BaseCapabilityMixin
@@ -16,14 +15,6 @@ from services.workflows.utils.state_reducers import update_state_with_agent_resu
 from services.workflows.utils.token_usage import TokenUsageMixin
 
 logger = configure_logger(__name__)
-
-
-class FinalOutput(BaseModel):
-    """Schema for final decision output."""
-
-    score: int = Field(..., description="Final score between 0-100")
-    decision: str = Field(..., description="Approve or Reject")
-    explanation: str = Field(..., description="Reasoning for the decision")
 
 
 class ReasoningAgent(BaseCapabilityMixin, PlanningCapability, TokenUsageMixin):
