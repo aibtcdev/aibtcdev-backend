@@ -146,8 +146,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             p
             for p in proposals
             if p.vote_start is not None
-            and p.vote_end is not None
-            and p.vote_end == burn_height
+            and p.exec_start is not None
+            and p.exec_start == burn_height
             and p.content is not None  # Ensure content exists
         ]
 
