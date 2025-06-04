@@ -107,16 +107,26 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 return {"success": False, "error": error_msg}
 
             # Get unvoted votes for this specific proposal and wallet
-            unvoted_votes = backend.list_votes(
-                VoteFilter(proposal_id=proposal_uuid, wallet_id=wallet_id, voted=False)
+            votes = backend.list_votes(
+                VoteFilter(proposal_id=proposal_uuid, wallet_id=wallet_id)
             )
+            if not votes:
+                error_msg = (
+                    f"No votes found for proposal {proposal_id} and wallet {wallet_id}"
+                )
+                logger.warning(error_msg)
+                return {
+                    "success": True,
+                    "message": "No votes to process",
+                    "votes_processed": 0,
+                }
+
+            # Filter out already voted votes
+            unvoted_votes = [vote for vote in votes if not vote.voted]
 
             if not unvoted_votes:
                 error_msg = f"No unvoted votes found for proposal {proposal_id} and wallet {wallet_id}"
                 logger.warning(error_msg)
-                # Mark message as processed since there's nothing to vote on
-                update_data = QueueMessageBase(is_processed=True)
-                backend.update_queue_message(message_id, update_data)
                 return {
                     "success": True,
                     "message": "No votes to process",
