@@ -8,12 +8,11 @@ from services.workflows.capability_mixins import BaseCapabilityMixin
 from services.workflows.utils.models import AgentOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin
-from services.workflows.web_search_mixin import WebSearchCapability
 
 logger = configure_logger(__name__)
 
 
-class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability, TokenUsageMixin):
+class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
     """Social Context Agent evaluates social and community aspects of proposals."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -23,18 +22,8 @@ class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability, TokenUsageMix
             config: Optional configuration dictionary
         """
         BaseCapabilityMixin.__init__(self, config=config, state_key="social_score")
-        WebSearchCapability.__init__(self)
         TokenUsageMixin.__init__(self)
         self.initialize()
-        self._initialize_web_search_capability()
-
-    def _initialize_web_search_capability(self):
-        """Initialize the web search capability if not already initialized."""
-        if not hasattr(self, "web_search"):
-            self.web_search = WebSearchCapability.web_search.__get__(
-                self, self.__class__
-            )
-            self.logger.info("Initialized web search capability for SocialContextAgent")
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Process the proposal's social context.
@@ -45,7 +34,6 @@ class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability, TokenUsageMix
         Returns:
             Dictionary containing social evaluation results
         """
-        self._initialize_web_search_capability()
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
 
@@ -53,67 +41,8 @@ class SocialContextAgent(BaseCapabilityMixin, WebSearchCapability, TokenUsageMix
         if "token_usage" not in state:
             state["token_usage"] = {}
 
-        # Extract key concepts for web search
-        search_results = []
-        try:
-            # First try to identify key search terms
-            key_concepts_prompt = PromptTemplate(
-                input_variables=["proposal"],
-                template="""Extract 2-3 key topics from this proposal that would benefit from external information:
-
-{proposal}
-
-Return only the key topics as a comma-separated list. Be specific and concise.
-""",
-            )
-
-            key_concepts_result = await self.llm.ainvoke(
-                key_concepts_prompt.format(proposal=proposal_content[:1500])
-            )
-
-            # Use these concepts for web search
-            key_concepts = key_concepts_result.content.strip()
-            self.logger.info(
-                f"[DEBUG:SocialAgent:{proposal_id}] Extracted key concepts: {key_concepts}"
-            )
-
-            if key_concepts:
-                dao_name = self.config.get("dao_name", "DAO")
-                search_query = (
-                    f"{key_concepts} {dao_name} bitcoin community perspective"
-                )
-                self.logger.info(
-                    f"[DEBUG:SocialAgent:{proposal_id}] Searching: {search_query}"
-                )
-
-                search_results, token_usage = await self.web_search(
-                    query=search_query,
-                    num_results=3,
-                )
-        except Exception as e:
-            self.logger.error(
-                f"[DEBUG:SocialAgent:{proposal_id}] Error in web search: {str(e)}"
-            )
-            search_results = []
-
-        # Format search results for inclusion in the prompt
-        search_results_text = ""
-        if search_results:
-            search_results_text = "Web search results relevant to this proposal:\n\n"
-            for i, doc in enumerate(search_results):
-                page_content = doc.get("page_content", "No content available")
-                source_urls = doc.get("metadata", {}).get("source_urls", [])
-
-                if source_urls:
-                    for j, source in enumerate(source_urls):
-                        search_results_text += (
-                            f"Source {i+1}.{j+1}: {source.get('title', 'Unknown')}\n"
-                        )
-                        search_results_text += f"URL: {source.get('url', 'Unknown')}\n"
-
-                search_results_text += f"Summary: {page_content[:300]}...\n\n"
-        else:
-            search_results_text = "No relevant web search results available.\n"
+        # Web search is disabled for social context evaluation
+        search_results_text = "Web search is disabled for social context evaluation.\n"
 
         # Get community info from config
         community_context = self.config.get("community_context", {})

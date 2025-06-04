@@ -1,0 +1,15 @@
+{
+  "user": "cursor",
+  "install": "./.cursor/install.sh",
+  "start": "echo 'Environment ready for aibtcdev-backend'",
+  "build": {
+    "context": ".",
+    "dockerfile": "Dockerfile"
+  },
+  "terminals": [
+    {
+      "name": "bash",
+      "command": "bash"
+    }
+  ]
+}
