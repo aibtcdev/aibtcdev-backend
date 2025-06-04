@@ -45,7 +45,7 @@ The service includes several specialized handlers for different types of blockch
 - `SellEventHandler`: Processes sale-related events
 - `DAOProposalHandler`: Manages DAO proposal events
 - `DAOVoteHandler`: Handles DAO voting events
-- `ContractMessageHandler`: Processes smart contract messages
+- `ActionConcluderHandler`: Processes action proposal conclusions and updates proposal records
 - `DAOProposalBurnHeightHandler`: Handles proposal burn height events
 - `DAOProposalConclusionHandler`: Processes proposal conclusions
 

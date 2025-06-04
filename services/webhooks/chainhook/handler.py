@@ -4,11 +4,11 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
+from services.webhooks.chainhook.handlers.action_concluder_handler import (
+    ActionConcluderHandler,
+)
 from services.webhooks.chainhook.handlers.block_state_handler import BlockStateHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
-from services.webhooks.chainhook.handlers.contract_message_handler import (
-    ContractMessageHandler,
-)
 from services.webhooks.chainhook.handlers.dao_proposal_burn_height_handler import (
     DAOProposalBurnHeightHandler,
 )
@@ -40,7 +40,7 @@ class ChainhookHandler(WebhookHandler):
         # Initialize BlockStateHandler first as it needs to validate block heights
         self.block_state_handler = BlockStateHandler()
         self.handlers = [
-            ContractMessageHandler(),
+            ActionConcluderHandler(),
             BuyEventHandler(),
             SellEventHandler(),
             DAOProposalHandler(),
