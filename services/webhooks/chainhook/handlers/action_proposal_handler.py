@@ -17,6 +17,7 @@ from services.webhooks.chainhook.handlers.base_proposal_handler import (
     BaseProposalHandler,
 )
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
+from services.workflows.agents import ProposalSummarizationAgent
 
 
 class ActionProposalHandler(BaseProposalHandler):
@@ -190,6 +191,62 @@ class ActionProposalHandler(BaseProposalHandler):
 
         return agents_with_tokens
 
+    async def _generate_proposal_title_and_summary(
+        self, parameters: str, dao_name: str, proposal_id: str
+    ) -> Dict[str, str]:
+        """Generate a better title and summary for the proposal using the summarization agent.
+
+        Args:
+            parameters: The decoded proposal parameters/content
+            dao_name: Name of the DAO
+            proposal_id: The proposal ID
+
+        Returns:
+            Dict containing 'title' and 'summary' keys
+        """
+        try:
+            # Initialize the summarization agent
+            summarization_agent = ProposalSummarizationAgent()
+
+            # Prepare the content for summarization
+            proposal_content = parameters or f"Action proposal {proposal_id}"
+
+            # Create state for the agent
+            state = {
+                "proposal_content": proposal_content,
+                "dao_name": dao_name,
+                "proposal_type": "action",
+            }
+
+            # Generate title and summary
+            result = await summarization_agent.process(state)
+
+            if "error" not in result:
+                self.logger.info(
+                    f"Generated title for proposal {proposal_id}: {result.get('title', 'Unknown')}"
+                )
+                return {
+                    "title": result.get("title", f"Action Proposal #{proposal_id}"),
+                    "summary": result.get("summary", ""),
+                }
+            else:
+                self.logger.warning(
+                    f"Error generating title for proposal {proposal_id}: {result['error']}"
+                )
+                return {
+                    "title": f"Action Proposal #{proposal_id}",
+                    "summary": "",
+                }
+
+        except Exception as e:
+            self.logger.error(
+                f"Error in title generation for proposal {proposal_id}: {str(e)}"
+            )
+            return {
+                "title": f"Action Proposal #{proposal_id}",
+                "summary": "",
+            }
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle action proposal transactions.
 
@@ -254,13 +311,17 @@ class ActionProposalHandler(BaseProposalHandler):
                     parameters = proposal_info["parameters"]
                     self.logger.debug("Using original parameters (hex decoding failed)")
 
+                # Generate a better title and summary using the summarization agent
+                title_and_summary = await self._generate_proposal_title_and_summary(
+                    parameters, dao_data["name"], str(proposal_info["proposal_id"])
+                )
                 # Create a new proposal record in the database
-                proposal_title = f"Action Proposal #{proposal_info['proposal_id']}"
                 proposal = backend.create_proposal(
                     ProposalCreate(
                         dao_id=dao_data["id"],
-                        title=proposal_title,
-                        content=f"Action proposal {proposal_info['proposal_id']} for {dao_data['name']}. Parameters: {parameters}",
+                        title=title_and_summary["title"],
+                        content=parameters,
+                        summary=title_and_summary["summary"],
                         contract_principal=contract_identifier,
                         tx_id=tx_id,
                         proposal_id=proposal_info["proposal_id"],

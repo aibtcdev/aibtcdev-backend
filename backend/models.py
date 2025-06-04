@@ -357,6 +357,7 @@ class ProposalBase(CustomBaseModel):
     voting_quorum: Optional[int] = None
     voting_reward: Optional[str] = None  # String to handle large numbers
     voting_threshold: Optional[int] = None
+    summary: Optional[str] = None
 
 
 class ProposalCreate(ProposalBase):

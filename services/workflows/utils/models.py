@@ -46,3 +46,15 @@ class ProposalRecommendationOutput(BaseModel):
     suggested_action: Optional[str] = Field(
         description="Specific action or next steps if applicable", default=None
     )
+
+
+class ProposalSummarizationOutput(BaseModel):
+    """Output model for proposal title and summary generation."""
+
+    title: str = Field(
+        description="Generated proposal title (max 100 characters)", max_length=100
+    )
+    summary: str = Field(
+        description="Short summary of the proposal (2-3 sentences, max 500 characters)",
+        max_length=500,
+    )
