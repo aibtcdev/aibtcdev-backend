@@ -77,7 +77,7 @@ class ActionVoteHandler(BaseVoteHandler):
                         "voter": payload.get("voter"),
                         "caller": payload.get("contractCaller"),  # Updated field name
                         "tx_sender": payload.get("txSender"),  # New field
-                        "amount": self._extract_amount(payload.get("amount")),
+                        "amount": payload.get("amount"),
                         "vote_value": payload.get(
                             "vote"
                         ),  # Vote value is now directly in payload
@@ -86,24 +86,3 @@ class ActionVoteHandler(BaseVoteHandler):
 
         self.logger.warning("Could not find vote information in transaction events")
         return None
-
-    def _extract_amount(self, amount) -> str:
-        """Extract and convert the amount from Clarity format to a string.
-
-        Args:
-            amount: The amount value which could be a string with 'u' prefix, integer, or None
-
-        Returns:
-            str: The amount as a string, or "0" if None
-        """
-        if amount is None:
-            return "0"
-
-        amount_str = str(amount)
-
-        if amount_str.startswith("u"):
-            # Remove the 'u' prefix and return as string
-            result = amount_str[1:]
-            return result
-        else:
-            return amount_str

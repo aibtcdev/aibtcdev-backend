@@ -134,9 +134,9 @@ class DAOVoteHandler(ChainhookEventHandler):
         contract_identifier = tx_data_content.get("contract_identifier", "")
 
         # Check if this is a core or action proposal vote based on the contract name
-        if "core-proposals" in contract_identifier:
+        if "core-proposal" in contract_identifier:
             await self.core_handler.handle_transaction(transaction)
-        elif "action-proposals" in contract_identifier:
+        elif "action-proposal" in contract_identifier:
             await self.action_handler.handle_transaction(transaction)
         else:
             self.logger.warning(
