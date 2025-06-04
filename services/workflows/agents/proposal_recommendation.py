@@ -50,7 +50,7 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
             return None
 
     async def _fetch_dao_proposals(
-        self, dao_id: UUID, limit: int = 10
+        self, dao_id: UUID, limit: int = 50
     ) -> List[Proposal]:
         """Fetch recent proposals for a specific DAO from the database.
 
