@@ -8,6 +8,7 @@ from backend.models import (
     ContractStatus,
     ProposalFilter,
     QueueMessageCreate,
+    QueueMessageFilter,
     QueueMessageType,
 )
 from config import config
@@ -107,6 +108,41 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
         return agents_with_tokens
 
+    def _queue_message_exists(
+        self,
+        message_type: QueueMessageType,
+        proposal_id: UUID,
+        dao_id: UUID,
+        wallet_id: Optional[UUID] = None,
+    ) -> bool:
+        """Check if a queue message already exists for the given parameters.
+
+        Args:
+            message_type: Type of queue message
+            proposal_id: The proposal ID
+            dao_id: The DAO ID
+            wallet_id: Optional wallet ID for vote messages
+
+        Returns:
+            bool: True if message exists, False otherwise
+        """
+        filters = QueueMessageFilter(
+            type=message_type,
+            dao_id=dao_id,
+            is_processed=False,
+        )
+
+        if wallet_id:
+            filters.wallet_id = wallet_id
+
+        existing_messages = backend.list_queue_messages(filters=filters)
+
+        # Check if any existing message is for this specific proposal
+        return any(
+            msg.message and msg.message.get("proposal_id") == str(proposal_id)
+            for msg in existing_messages
+        )
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle burn height check transactions.
 
@@ -168,6 +204,15 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 self.logger.warning(f"No DAO found for proposal {proposal.id}")
                 continue
 
+            # Check if a conclude message already exists for this proposal
+            if self._queue_message_exists(
+                QueueMessageType.DAO_PROPOSAL_CONCLUDE, proposal.id, dao.id
+            ):
+                self.logger.debug(
+                    f"Conclude queue message already exists for proposal {proposal.id}, skipping"
+                )
+                continue
+
             # For conclude messages, we only need to create one message per proposal
             message_data = {
                 "proposal_id": proposal.id,
@@ -202,6 +247,19 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Create vote queue messages for each agent
             for agent in agents:
+                # Check if a queue message already exists for this proposal+wallet combination
+                if self._queue_message_exists(
+                    QueueMessageType.DAO_PROPOSAL_VOTE,
+                    proposal.id,
+                    dao.id,
+                    agent["wallet_id"],
+                ):
+                    self.logger.debug(
+                        f"Queue message already exists for proposal {proposal.id} "
+                        f"and wallet {agent['wallet_id']}, skipping"
+                    )
+                    continue
+
                 message_data = {
                     "proposal_id": proposal.id,
                 }

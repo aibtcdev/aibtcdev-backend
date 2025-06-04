@@ -232,13 +232,21 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         }
                     )
 
-            # Mark the message as processed if all votes were handled successfully
+            # Mark the message as processed ONLY if ALL votes were handled successfully
             successful_votes = len([r for r in results if r["success"]])
-            if successful_votes > 0:
+            if successful_votes == len(results) and successful_votes > 0:
                 update_data = QueueMessageBase(is_processed=True)
                 backend.update_queue_message(message_id, update_data)
                 logger.info(
-                    f"Successfully processed {successful_votes}/{len(results)} votes for message {message_id}"
+                    f"Successfully processed all {successful_votes} votes for message {message_id} - marking as processed"
+                )
+            elif successful_votes > 0:
+                logger.warning(
+                    f"Only {successful_votes}/{len(results)} votes succeeded for message {message_id} - leaving unprocessed for retry"
+                )
+            else:
+                logger.error(
+                    f"No votes succeeded for message {message_id} - leaving unprocessed for retry"
                 )
 
             return {
