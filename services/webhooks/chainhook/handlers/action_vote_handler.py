@@ -77,7 +77,7 @@ class ActionVoteHandler(BaseVoteHandler):
                         "voter": payload.get("voter"),
                         "caller": payload.get("contractCaller"),  # Updated field name
                         "tx_sender": payload.get("txSender"),  # New field
-                        "amount": payload.get("amount"),
+                        "amount": str(payload.get("amount")),
                         "vote_value": payload.get(
                             "vote"
                         ),  # Vote value is now directly in payload
