@@ -207,11 +207,15 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
   <output_format>
     Provide a JSON object with:
     <title>A clear, compelling proposal title (max 100 characters)</title>
-    <content>Detailed proposal content with specific objectives, deliverables, timeline, and success metrics (max 2048 characters)</content>
+    <content>Detailed proposal content with specific objectives, deliverables, timeline, and success metrics (max 1800 characters)</content>
     <rationale>Explanation of why this proposal is recommended based on the DAO's context</rationale>
     <priority>Priority level: high, medium, or low</priority>
     <estimated_impact>Expected positive impact on the DAO</estimated_impact>
     <suggested_action>Specific next steps or actions to implement (optional)</suggested_action>
+    
+    <encoding_requirement>
+      IMPORTANT: Use only ASCII characters (characters 0-127) in all fields. Avoid any Unicode characters, emojis, special symbols, or non-ASCII punctuation. Use standard English letters, numbers, and basic punctuation only.
+    </encoding_requirement>
   </output_format>
 </proposal_recommendation_task>""",
         )
