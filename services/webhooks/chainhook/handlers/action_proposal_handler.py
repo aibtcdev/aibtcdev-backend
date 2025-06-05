@@ -517,36 +517,30 @@ class ActionProposalHandler(BaseProposalHandler):
                 )
 
                 # Check if we need to queue evaluation messages for agents
-                # Only queue if the proposal wasn't already in DEPLOYED status
-                if existing_proposal.status != ContractStatus.DEPLOYED:
-                    agents = self._get_agent_token_holders(dao_data["id"])
-                    if agents:
-                        for agent in agents:
-                            # Create message with only the proposal ID
-                            message_data = {
-                                "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
-                            }
+                agents = self._get_agent_token_holders(dao_data["id"])
+                if agents:
+                    for agent in agents:
+                        # Create message with only the proposal ID
+                        message_data = {
+                            "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
+                        }
 
-                            backend.create_queue_message(
-                                QueueMessageCreate(
-                                    type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
-                                    message=message_data,
-                                    dao_id=dao_data["id"],
-                                    wallet_id=agent["wallet_id"],
-                                )
+                        backend.create_queue_message(
+                            QueueMessageCreate(
+                                type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
+                                message=message_data,
+                                dao_id=dao_data["id"],
+                                wallet_id=agent["wallet_id"],
                             )
+                        )
 
-                            self.logger.info(
-                                f"Created evaluation queue message for agent {agent['agent_id']} "
-                                f"to evaluate updated proposal {updated_proposal.id}"
-                            )
-                    else:
-                        self.logger.warning(
-                            f"No agents found holding tokens for DAO {dao_data['id']}"
+                        self.logger.info(
+                            f"Created evaluation queue message for agent {agent['agent_id']} "
+                            f"to evaluate updated proposal {updated_proposal.id}"
                         )
                 else:
-                    self.logger.debug(
-                        f"Proposal {updated_proposal.id} was already deployed, skipping agent evaluation queue"
+                    self.logger.warning(
+                        f"No agents found holding tokens for DAO {dao_data['id']}"
                     )
 
             except Exception as e:
