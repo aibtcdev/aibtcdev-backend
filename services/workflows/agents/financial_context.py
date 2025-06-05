@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
 from services.workflows.utils.models import AgentOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin
@@ -12,7 +12,7 @@ from services.workflows.utils.token_usage import TokenUsageMixin
 logger = configure_logger(__name__)
 
 
-class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
+class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability):
     """Financial Context Agent evaluates financial aspects of proposals."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -23,6 +23,7 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
         """
         BaseCapabilityMixin.__init__(self, config=config, state_key="financial_score")
         TokenUsageMixin.__init__(self)
+        PromptCapability.__init__(self)
         self.initialize()
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -36,6 +37,9 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
         """
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
+        dao_id = state.get("dao_id")
+        agent_id = state.get("agent_id")
+        profile_id = state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:
@@ -48,15 +52,8 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
         funding_priorities = dao_financial_context.get("funding_priorities", [])
         financial_constraints = dao_financial_context.get("financial_constraints", [])
 
-        prompt = PromptTemplate(
-            input_variables=[
-                "proposal_data",
-                "treasury_balance",
-                "monthly_budget",
-                "funding_priorities",
-                "financial_constraints",
-            ],
-            template="""<system>
+        # Default prompt template
+        default_template = """<system>
   <reminder>
     You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
   </reminder>
@@ -107,7 +104,22 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin):
     <summary>Brief summary of your financial evaluation</summary>
     Only return a JSON object with these three fields: score, flags (array), and summary.
   </output_format>
-</financial_context_evaluation>""",
+</financial_context_evaluation>"""
+
+        # Create prompt with custom injection
+        prompt = self.create_prompt_with_custom_injection(
+            default_template=default_template,
+            input_variables=[
+                "proposal_data",
+                "treasury_balance",
+                "monthly_budget",
+                "funding_priorities",
+                "financial_constraints",
+            ],
+            dao_id=dao_id,
+            agent_id=agent_id,
+            profile_id=profile_id,
+            prompt_type="financial_context_evaluation",
         )
 
         try:

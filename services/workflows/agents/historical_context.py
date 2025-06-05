@@ -7,7 +7,7 @@ from langchain_core.messages import HumanMessage
 from backend.factory import backend
 from backend.models import Proposal, ProposalFilter
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
 from services.workflows.utils.models import AgentOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin
@@ -17,7 +17,7 @@ logger = configure_logger(__name__)
 
 
 class HistoricalContextAgent(
-    BaseCapabilityMixin, VectorRetrievalCapability, TokenUsageMixin
+    BaseCapabilityMixin, VectorRetrievalCapability, TokenUsageMixin, PromptCapability
 ):
     """Historical Context Agent evaluates proposals against DAO historical context and past decisions."""
 
@@ -30,6 +30,7 @@ class HistoricalContextAgent(
         BaseCapabilityMixin.__init__(self, config=config, state_key="historical_score")
         VectorRetrievalCapability.__init__(self)
         TokenUsageMixin.__init__(self)
+        PromptCapability.__init__(self)
         self.initialize()
         self._initialize_vector_capability()
 
@@ -115,6 +116,8 @@ class HistoricalContextAgent(
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
         dao_id = state.get("dao_id")
+        agent_id = state.get("agent_id")
+        profile_id = state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:
@@ -166,9 +169,8 @@ class HistoricalContextAgent(
                 else past_proposals_vector_text
             )
 
-        prompt = PromptTemplate(
-            input_variables=["proposal_data", "past_proposals"],
-            template="""<system>
+        # Default prompt template
+        default_template = """<system>
   <reminder>
     You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
   </reminder>
@@ -228,7 +230,16 @@ class HistoricalContextAgent(
     <sequence_analysis>Identify any proposal sequences and explain how this proposal might relate to others</sequence_analysis>
     Only return a JSON object with these four fields: score, flags (array), summary, and sequence_analysis.
   </output_format>
-</historical_context_evaluation>""",
+</historical_context_evaluation>"""
+
+        # Create prompt with custom injection
+        prompt = self.create_prompt_with_custom_injection(
+            default_template=default_template,
+            input_variables=["proposal_data", "past_proposals"],
+            dao_id=dao_id,
+            agent_id=agent_id,
+            profile_id=profile_id,
+            prompt_type="historical_context_evaluation",
         )
 
         try:

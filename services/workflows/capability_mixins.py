@@ -5,13 +5,17 @@ capabilities into LangGraph workflows through a mixin system.
 """
 
 import asyncio
+import os
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
+from langchain.prompts import PromptTemplate
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
+from backend.factory import backend
+from backend.models import PromptFilter
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -226,3 +230,173 @@ class ComposableWorkflowMixin(CapabilityMixin):
             **kwargs: Additional arguments
         """
         raise NotImplementedError("Subclasses must implement add_to_graph")
+
+
+class PromptCapability:
+    """Mixin that provides custom prompt functionality for agents."""
+
+    def __init__(self):
+        """Initialize the prompt capability."""
+        if not hasattr(self, "logger"):
+            self.logger = configure_logger(self.__class__.__name__)
+
+    def get_custom_prompt(
+        self,
+        dao_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        profile_id: Optional[str] = None,
+        prompt_type: str = "evaluation",
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch custom prompt for the given context.
+
+        Args:
+            dao_id: Optional DAO ID to find DAO-specific prompts
+            agent_id: Optional agent ID to find agent-specific prompts
+            profile_id: Optional profile ID to find user-specific prompts
+            prompt_type: Type of prompt (used in prompt_text search)
+
+        Returns:
+            Dictionary containing prompt_text, model, and temperature if found
+        """
+        try:
+            # Create filter based on available IDs, prioritizing specificity
+            filters = PromptFilter(is_active=True)
+
+            # Try to find prompts in order of specificity:
+            # 1. Agent-specific prompts
+            # 2. DAO-specific prompts
+            # 3. Profile-specific prompts
+
+            prompt_candidates = []
+
+            if agent_id:
+                agent_filter = PromptFilter(agent_id=agent_id, is_active=True)
+                agent_prompts = backend.list_prompts(agent_filter)
+                prompt_candidates.extend(
+                    [(prompt, "agent") for prompt in agent_prompts]
+                )
+
+            if dao_id:
+                dao_filter = PromptFilter(dao_id=dao_id, is_active=True)
+                dao_prompts = backend.list_prompts(dao_filter)
+                prompt_candidates.extend([(prompt, "dao") for prompt in dao_prompts])
+
+            if profile_id:
+                profile_filter = PromptFilter(profile_id=profile_id, is_active=True)
+                profile_prompts = backend.list_prompts(profile_filter)
+                prompt_candidates.extend(
+                    [(prompt, "profile") for prompt in profile_prompts]
+                )
+
+            # Filter prompts that might be relevant to this prompt type
+            relevant_prompts = []
+            for prompt, source in prompt_candidates:
+                if prompt.prompt_text and (
+                    prompt_type.lower() in prompt.prompt_text.lower()
+                    or "evaluation" in prompt.prompt_text.lower()
+                    or len(prompt.prompt_text) > 100  # Assume longer prompts are custom
+                ):
+                    relevant_prompts.append((prompt, source))
+
+            if relevant_prompts:
+                # Use the most specific prompt (agent > dao > profile)
+                priority_order = {"agent": 1, "dao": 2, "profile": 3}
+                best_prompt = min(relevant_prompts, key=lambda x: priority_order[x[1]])[
+                    0
+                ]
+
+                self.logger.info(
+                    f"Using custom prompt for {prompt_type} from {best_prompt.dao_id or best_prompt.agent_id or best_prompt.profile_id}"
+                )
+
+                return {
+                    "prompt_text": best_prompt.prompt_text,
+                    "model": best_prompt.model or "gpt-4o",
+                    "temperature": best_prompt.temperature or 0.1,
+                }
+
+        except Exception as e:
+            self.logger.error(f"Error fetching custom prompt: {str(e)}")
+
+        return None
+
+    def apply_custom_prompt_settings(self, custom_prompt_data: Dict[str, Any]):
+        """Apply custom model and temperature settings if available.
+
+        Args:
+            custom_prompt_data: Dictionary containing model and temperature settings
+        """
+        try:
+            if hasattr(self, "llm") and custom_prompt_data:
+                # Update LLM with custom settings
+                model = custom_prompt_data.get("model", "gpt-4.1")
+                temperature = custom_prompt_data.get("temperature", 0.1)
+
+                if model != self.llm.model_name or temperature != self.llm.temperature:
+                    self.llm = ChatOpenAI(
+                        model=model,
+                        temperature=temperature,
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                    )
+                    self.logger.info(
+                        f"Updated LLM settings: model={model}, temperature={temperature}"
+                    )
+        except Exception as e:
+            self.logger.error(f"Error applying custom prompt settings: {str(e)}")
+
+    def create_prompt_with_custom_injection(
+        self,
+        default_template: str,
+        input_variables: List[str],
+        dao_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        profile_id: Optional[str] = None,
+        prompt_type: str = "evaluation",
+    ) -> PromptTemplate:
+        """Create a prompt template, injecting custom prompt at the top if available.
+
+        Args:
+            default_template: Default template to use
+            input_variables: List of input variable names for the template
+            dao_id: Optional DAO ID for custom prompt lookup
+            agent_id: Optional agent ID for custom prompt lookup
+            profile_id: Optional profile ID for custom prompt lookup
+            prompt_type: Type of prompt for filtering
+
+        Returns:
+            PromptTemplate with custom prompt injected at top or just default template
+        """
+        # Try to get custom prompt
+        custom_prompt_data = self.get_custom_prompt(
+            dao_id=dao_id,
+            agent_id=agent_id,
+            profile_id=profile_id,
+            prompt_type=prompt_type,
+        )
+
+        if custom_prompt_data:
+            # Apply custom model/temperature settings
+            self.apply_custom_prompt_settings(custom_prompt_data)
+
+            # Inject custom prompt at the top of the default template
+            custom_prompt_text = custom_prompt_data["prompt_text"]
+
+            # Add custom prompt section at the top
+            enhanced_template = f"""<custom_instructions>
+{custom_prompt_text}
+</custom_instructions>
+
+{default_template}"""
+
+            self.logger.info(
+                f"Injecting custom prompt at top of {prompt_type} template"
+            )
+            return PromptTemplate(
+                input_variables=input_variables, template=enhanced_template
+            )
+        else:
+            # Use default template as-is
+            self.logger.debug(f"Using default prompt template for {prompt_type}")
+            return PromptTemplate(
+                input_variables=input_variables, template=default_template
+            )

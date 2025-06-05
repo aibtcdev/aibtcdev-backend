@@ -4,22 +4,10 @@ import uuid
 from typing import Annotated, Any, Dict, List, Optional, TypedDict, Union
 
 from langchain.prompts import PromptTemplate
-from langgraph.channels import LastValue
-from langgraph.graph import END, Graph, StateGraph
+from langgraph.graph import END, StateGraph
 
 from backend.factory import backend
-from backend.models import (
-    UUID,
-    ExtensionFilter,
-    Profile,
-    PromptFilter,
-    ProposalBase,
-    ProposalFilter,
-    ProposalType,
-    QueueMessageFilter,
-    QueueMessageType,
-)
-from lib.hiro import HiroApi
+from backend.models import UUID, Profile
 from lib.logger import configure_logger
 from services.workflows.agents.core_context import CoreContextAgent
 from services.workflows.agents.financial_context import FinancialContextAgent
@@ -28,18 +16,14 @@ from services.workflows.agents.image_processing import ImageProcessingNode
 from services.workflows.agents.reasoning import ReasoningAgent
 from services.workflows.agents.social_context import SocialContextAgent
 from services.workflows.base import BaseWorkflow
-from services.workflows.chat import ChatService, StreamingCallbackHandler
 from services.workflows.hierarchical_workflows import (
     HierarchicalTeamWorkflow,
     append_list_fn,
-    merge_dict_fn,
 )
-from services.workflows.utils.models import FinalOutput, ProposalEvaluationOutput
 from services.workflows.utils.state_reducers import (
     merge_dicts,
     no_update_reducer,
     set_once,
-    update_state_with_agent_result,
 )
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
@@ -52,6 +36,9 @@ class ProposalEvaluationState(TypedDict):
 
     proposal_id: Annotated[str, no_update_reducer]
     proposal_data: Annotated[str, no_update_reducer]
+    dao_id: Annotated[Optional[str], no_update_reducer]
+    agent_id: Annotated[Optional[str], no_update_reducer]
+    profile_id: Annotated[Optional[str], no_update_reducer]
     core_score: Annotated[Optional[Dict[str, Any]], set_once]
     historical_score: Annotated[Optional[Dict[str, Any]], set_once]
     financial_score: Annotated[Optional[Dict[str, Any]], set_once]
@@ -138,14 +125,6 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         # If it exists (even if it's an empty list), we consider images processed
         if "proposal_images" not in state:
             logger.debug("[DEBUG:SupervisorLogic] Need to process images first")
-            # Process images and ensure the key exists in state, even if empty
-            result = state.get("image_processor", [])
-            if isinstance(result, list):
-                # Update state with empty list if no images were found
-                state["proposal_images"] = result
-            else:
-                # Ensure we always have the key to prevent infinite loops
-                state["proposal_images"] = []
             return "image_processor"
 
         # Check if core context evaluation is done
@@ -233,12 +212,6 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         # Don't halt by default
         return False
 
-    def _create_prompt(self) -> PromptTemplate:
-        """Create the base prompt for the workflow."""
-        raise NotImplementedError(
-            "This method is not used in the hierarchical workflow"
-        )
-
     def _create_graph(self) -> StateGraph:
         """Create the workflow graph.
 
@@ -269,6 +242,9 @@ async def evaluate_proposal(
     proposal_id: str,
     proposal_data: str,
     config: Optional[Dict[str, Any]] = None,
+    dao_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    profile_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Evaluate a proposal using the ProposalEvaluationWorkflow.
 
@@ -293,6 +269,9 @@ async def evaluate_proposal(
     initial_state = {
         "proposal_id": proposal_id,
         "proposal_data": proposal_data,
+        "dao_id": dao_id,
+        "agent_id": agent_id,
+        "profile_id": profile_id,
         "flags": [],
         "summaries": {},
         "token_usage": {},
@@ -459,12 +438,26 @@ async def evaluate_and_vote_on_proposal(
             config["veto_threshold"] = 30
             config["consensus_threshold"] = 10
 
+        # Extract context for personalized evaluation
+        evaluation_dao_id = str(proposal.dao_id) if proposal.dao_id else None
+        evaluation_agent_id = str(agent_id) if agent_id else None
+
+        # Get profile_id from wallet if available
+        evaluation_profile_id = None
+        if wallet_id:
+            wallet = backend.get_wallet(wallet_id)
+            if wallet and wallet.profile_id:
+                evaluation_profile_id = str(wallet.profile_id)
+
         # Evaluate the proposal
         logger.info(f"Starting evaluation of proposal {proposal_id}")
         evaluation_result = await evaluate_proposal(
             proposal_id=str(proposal_id),
             proposal_data=proposal.content,
             config=config,
+            dao_id=evaluation_dao_id,
+            agent_id=evaluation_agent_id,
+            profile_id=evaluation_profile_id,
         )
 
         # Check if auto voting is enabled
@@ -491,10 +484,19 @@ async def evaluate_and_vote_on_proposal(
                     f"Auto-voting {vote_direction} proposal {proposal_id} with confidence {confidence_score}"
                 )
 
-                # Get the voting tool
-                profile = await backend.get_profile(
-                    wallet_id=wallet_id, agent_id=agent_id
-                )
+                # Get the profile by finding the wallet first
+                profile = None
+                if wallet_id:
+                    wallet = backend.get_wallet(wallet_id)
+                    if wallet and wallet.profile_id:
+                        profile = backend.get_profile(wallet.profile_id)
+                elif agent_id:
+                    # Try to find wallet by agent_id
+                    from backend.models import WalletFilter
+
+                    wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
+                    if wallets and wallets[0].profile_id:
+                        profile = backend.get_profile(wallets[0].profile_id)
                 tools = get_proposal_evaluation_tools(profile, agent_id)
                 vote_tool = next(
                     (t for t in tools if isinstance(t, VoteOnActionProposalTool)), None

@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
 from services.workflows.utils.models import AgentOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin
@@ -13,7 +13,9 @@ from services.workflows.vector_mixin import VectorRetrievalCapability
 logger = configure_logger(__name__)
 
 
-class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability, TokenUsageMixin):
+class CoreContextAgent(
+    BaseCapabilityMixin, VectorRetrievalCapability, TokenUsageMixin, PromptCapability
+):
     """Core Context Agent evaluates proposals against DAO mission and standards."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -25,6 +27,7 @@ class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability, TokenUsag
         BaseCapabilityMixin.__init__(self, config=config, state_key="core_score")
         VectorRetrievalCapability.__init__(self)
         TokenUsageMixin.__init__(self)
+        PromptCapability.__init__(self)
         self.initialize()
         self._initialize_vector_capability()
 
@@ -52,6 +55,9 @@ class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability, TokenUsag
         self._initialize_vector_capability()
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
+        dao_id = state.get("dao_id")
+        agent_id = state.get("agent_id")
+        profile_id = state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:
@@ -78,9 +84,8 @@ class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability, TokenUsag
                 )
                 dao_mission_text = "Elevate human potential through AI on Bitcoin"
 
-        prompt = PromptTemplate(
-            input_variables=["proposal_data", "dao_mission"],
-            template="""<system>
+        # Default prompt template
+        default_template = """<system>
   <reminder>
     You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
   </reminder>
@@ -120,7 +125,16 @@ class CoreContextAgent(BaseCapabilityMixin, VectorRetrievalCapability, TokenUsag
     <summary>Brief summary of your evaluation</summary>
     Only return a JSON object with these three fields: score, flags (array), and summary.
   </output_format>
-</core_context_evaluation>""",
+</core_context_evaluation>"""
+
+        # Create prompt with custom injection
+        prompt = self.create_prompt_with_custom_injection(
+            default_template=default_template,
+            input_variables=["proposal_data", "dao_mission"],
+            dao_id=dao_id,
+            agent_id=agent_id,
+            profile_id=profile_id,
+            prompt_type="core_context_evaluation",
         )
 
         try:
