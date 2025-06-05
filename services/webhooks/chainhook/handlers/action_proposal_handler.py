@@ -487,6 +487,7 @@ class ActionProposalHandler(BaseProposalHandler):
                     action=proposal_info["action"],
                     caller=proposal_info["caller"],
                     creator=proposal_info["creator"],
+                    proposal_id=proposal_info["proposal_id"],
                     liquid_tokens=proposal_info["liquid_tokens"],
                     bond=proposal_info["bond"],
                     # Fields from updated payload
