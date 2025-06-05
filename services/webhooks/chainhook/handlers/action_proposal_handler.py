@@ -6,6 +6,7 @@ from uuid import UUID
 from backend.factory import backend
 from backend.models import (
     ContractStatus,
+    ProposalBase,
     ProposalCreate,
     ProposalFilter,
     ProposalType,
@@ -477,34 +478,34 @@ class ActionProposalHandler(BaseProposalHandler):
                 )
 
                 # Prepare update data with new information from chainhook
-                update_data = {
-                    "title": metadata["title"],
-                    "content": parameters,
-                    "summary": metadata["summary"],
-                    "status": ContractStatus.DEPLOYED,  # Ensure status reflects on-chain state
+                update_data = ProposalBase(
+                    title=metadata["title"],
+                    content=parameters,
+                    summary=metadata["summary"],
+                    status=ContractStatus.DEPLOYED,  # Ensure status reflects on-chain state
                     # Update fields from payload
-                    "action": proposal_info["action"],
-                    "caller": proposal_info["caller"],
-                    "creator": proposal_info["creator"],
-                    "liquid_tokens": proposal_info["liquid_tokens"],
-                    "bond": proposal_info["bond"],
+                    action=proposal_info["action"],
+                    caller=proposal_info["caller"],
+                    creator=proposal_info["creator"],
+                    liquid_tokens=proposal_info["liquid_tokens"],
+                    bond=proposal_info["bond"],
                     # Fields from updated payload
-                    "contract_caller": proposal_info["contract_caller"],
-                    "created_btc": proposal_info["created_btc"],
-                    "created_stx": proposal_info["created_stx"],
-                    "creator_user_id": proposal_info["creator_user_id"],
-                    "exec_end": proposal_info["exec_end"],
-                    "exec_start": proposal_info["exec_start"],
-                    "memo": proposal_info["memo"],
-                    "tx_sender": proposal_info["tx_sender"],
-                    "vote_end": proposal_info["vote_end"],
-                    "vote_start": proposal_info["vote_start"],
-                    "voting_delay": proposal_info["voting_delay"],
-                    "voting_period": proposal_info["voting_period"],
-                    "voting_quorum": proposal_info["voting_quorum"],
-                    "voting_reward": proposal_info["voting_reward"],
-                    "voting_threshold": proposal_info["voting_threshold"],
-                }
+                    contract_caller=proposal_info["contract_caller"],
+                    created_btc=proposal_info["created_btc"],
+                    created_stx=proposal_info["created_stx"],
+                    creator_user_id=proposal_info["creator_user_id"],
+                    exec_end=proposal_info["exec_end"],
+                    exec_start=proposal_info["exec_start"],
+                    memo=proposal_info["memo"],
+                    tx_sender=proposal_info["tx_sender"],
+                    vote_end=proposal_info["vote_end"],
+                    vote_start=proposal_info["vote_start"],
+                    voting_delay=proposal_info["voting_delay"],
+                    voting_period=proposal_info["voting_period"],
+                    voting_quorum=proposal_info["voting_quorum"],
+                    voting_reward=proposal_info["voting_reward"],
+                    voting_threshold=proposal_info["voting_threshold"],
+                )
 
                 # Update the existing proposal
                 updated_proposal = backend.update_proposal(
