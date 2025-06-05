@@ -1366,6 +1366,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("met_threshold", filters.met_threshold)
             if filters.type is not None:
                 query = query.eq("type", filters.type)
+            if filters.tx_id is not None:
+                query = query.eq("tx_id", filters.tx_id)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]

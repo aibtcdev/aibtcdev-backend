@@ -610,6 +610,7 @@ class ProposalFilter(CustomBaseModel):
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
     type: Optional[ProposalType] = None
+    tx_id: Optional[str] = None
 
 
 class ProposalFilterN(CustomBaseModel):

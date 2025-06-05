@@ -358,10 +358,7 @@ class ActionProposalHandler(BaseProposalHandler):
         # Check if the proposal already exists in the database
         existing_proposals = backend.list_proposals(
             filters=ProposalFilter(
-                dao_id=dao_data["id"],
-                contract_principal=contract_identifier,
-                proposal_id=proposal_info["proposal_id"],
-                type=ProposalType.ACTION,
+                tx_id=tx_id,
             )
         )
 

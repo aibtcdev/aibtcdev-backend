@@ -8,7 +8,7 @@ from api.dependencies import (
     verify_profile_from_token,  # Added verify_profile_from_token
 )
 from backend.factory import backend  # Added backend factory
-from backend.models import (  # Added Profile, AgentFilter
+from backend.models import (  # Added Profile, AgentFilter, Wallet
     UUID,
     AgentFilter,
     ContractStatus,
@@ -17,8 +17,10 @@ from backend.models import (  # Added Profile, AgentFilter
     Proposal,
     ProposalCreate,
     ProposalType,
+    Wallet,
     WalletFilter,
 )
+from config import config  # Added config import
 from lib.logger import configure_logger
 from lib.tools import Tool, get_available_tools
 from services.workflows.agents.proposal_metadata import (
@@ -53,6 +55,7 @@ async def _create_proposal_from_tool_result(
     summary: str,
     tags: List[str],
     profile: "Profile",
+    wallet: "Wallet",
 ) -> Optional["Proposal"]:
     """Create a proposal record from successful tool execution result.
 
@@ -64,6 +67,7 @@ async def _create_proposal_from_tool_result(
         summary: The generated summary for the proposal
         tags: The generated tags for the proposal
         profile: The user's profile
+        wallet: The agent's wallet
 
     Returns:
         The created proposal or None if creation failed
@@ -120,6 +124,13 @@ async def _create_proposal_from_tool_result(
             )
             return None
 
+        # Get the appropriate wallet address based on network configuration
+        creator_address = (
+            wallet.mainnet_address
+            if config.network.network == "mainnet"
+            else wallet.testnet_address
+        )
+
         # Create the proposal record
         proposal_data = ProposalCreate(
             dao_id=dao_id,
@@ -132,7 +143,7 @@ async def _create_proposal_from_tool_result(
             tx_id=tx_id,
             type=ProposalType.ACTION,
             # Additional fields that might be available
-            creator=profile.email or "Unknown",
+            creator=creator_address or "Unknown",
             memo=payload.memo,
         )
 
@@ -539,6 +550,7 @@ async def propose_dao_action_send_message(
                     summary if "summary" in locals() else "",
                     metadata_tags if "metadata_tags" in locals() else [],
                     profile,
+                    wallet,
                 )
             except Exception as e:
                 logger.error(f"Failed to create proposal record: {str(e)}")
