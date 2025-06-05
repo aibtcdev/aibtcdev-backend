@@ -451,6 +451,103 @@ class ActionProposalHandler(BaseProposalHandler):
                 self.logger.error(f"Error creating proposal in database: {str(e)}")
                 raise
         else:
+            # Update existing proposal with new data from chainhook
+            existing_proposal = existing_proposals[0]
             self.logger.info(
-                f"Action proposal already exists in database: {existing_proposals[0].id}"
+                f"Updating existing action proposal in database: {existing_proposal.id}"
             )
+
+            try:
+                # First try to decode parameters as hex
+                decoded_parameters = decode_hex_parameters(proposal_info["parameters"])
+
+                # Sanitize the decoded parameters to remove null bytes and invalid characters
+                if decoded_parameters is not None:
+                    parameters = self._sanitize_string(decoded_parameters)
+                    self.logger.debug(
+                        f"Decoded and sanitized parameters: {parameters[:100]}..."
+                    )
+                else:
+                    parameters = proposal_info["parameters"]
+                    self.logger.debug("Using original parameters (hex decoding failed)")
+
+                # Parse title/tags from content and generate summary using AI
+                metadata = await self._parse_and_generate_proposal_metadata(
+                    parameters, dao_data["name"], str(proposal_info["proposal_id"])
+                )
+
+                # Prepare update data with new information from chainhook
+                update_data = {
+                    "title": metadata["title"],
+                    "content": parameters,
+                    "summary": metadata["summary"],
+                    "status": ContractStatus.DEPLOYED,  # Ensure status reflects on-chain state
+                    # Update fields from payload
+                    "action": proposal_info["action"],
+                    "caller": proposal_info["caller"],
+                    "creator": proposal_info["creator"],
+                    "liquid_tokens": proposal_info["liquid_tokens"],
+                    "bond": proposal_info["bond"],
+                    # Fields from updated payload
+                    "contract_caller": proposal_info["contract_caller"],
+                    "created_btc": proposal_info["created_btc"],
+                    "created_stx": proposal_info["created_stx"],
+                    "creator_user_id": proposal_info["creator_user_id"],
+                    "exec_end": proposal_info["exec_end"],
+                    "exec_start": proposal_info["exec_start"],
+                    "memo": proposal_info["memo"],
+                    "tx_sender": proposal_info["tx_sender"],
+                    "vote_end": proposal_info["vote_end"],
+                    "vote_start": proposal_info["vote_start"],
+                    "voting_delay": proposal_info["voting_delay"],
+                    "voting_period": proposal_info["voting_period"],
+                    "voting_quorum": proposal_info["voting_quorum"],
+                    "voting_reward": proposal_info["voting_reward"],
+                    "voting_threshold": proposal_info["voting_threshold"],
+                }
+
+                # Update the existing proposal
+                updated_proposal = backend.update_proposal(
+                    existing_proposal.id, update_data
+                )
+
+                self.logger.info(
+                    f"Successfully updated action proposal {updated_proposal.id} with chainhook data"
+                )
+
+                # Check if we need to queue evaluation messages for agents
+                # Only queue if the proposal wasn't already in DEPLOYED status
+                if existing_proposal.status != ContractStatus.DEPLOYED:
+                    agents = self._get_agent_token_holders(dao_data["id"])
+                    if agents:
+                        for agent in agents:
+                            # Create message with only the proposal ID
+                            message_data = {
+                                "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
+                            }
+
+                            backend.create_queue_message(
+                                QueueMessageCreate(
+                                    type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
+                                    message=message_data,
+                                    dao_id=dao_data["id"],
+                                    wallet_id=agent["wallet_id"],
+                                )
+                            )
+
+                            self.logger.info(
+                                f"Created evaluation queue message for agent {agent['agent_id']} "
+                                f"to evaluate updated proposal {updated_proposal.id}"
+                            )
+                    else:
+                        self.logger.warning(
+                            f"No agents found holding tokens for DAO {dao_data['id']}"
+                        )
+                else:
+                    self.logger.debug(
+                        f"Proposal {updated_proposal.id} was already deployed, skipping agent evaluation queue"
+                    )
+
+            except Exception as e:
+                self.logger.error(f"Error updating proposal in database: {str(e)}")
+                raise
