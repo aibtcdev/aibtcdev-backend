@@ -95,7 +95,7 @@ class BaseCapabilityMixin(CapabilityMixin):
         if "state_key" in kwargs:
             self.state_key = kwargs["state_key"]
 
-        self.logger.info(
+        self.logger.debug(
             f"Initialized {self.__class__.__name__} with config: {self.config}"
         )
 
@@ -152,6 +152,12 @@ class BaseCapabilityMixin(CapabilityMixin):
                 elif result is not None:
                     # For any other non-None result, set it directly
                     state[self.state_key] = result
+
+                # Track completion - add this node to completed_steps
+                if "completed_steps" not in state:
+                    state["completed_steps"] = set()
+                state["completed_steps"].add(node_name)
+
                 return state
             except Exception as e:
                 self.logger.error(f"Error in node {node_name}: {str(e)}", exc_info=True)
@@ -165,11 +171,16 @@ class BaseCapabilityMixin(CapabilityMixin):
                         "type": self.__class__.__name__,
                     }
                 )
+                # Even on error, mark as completed to avoid infinite retries
+                if "completed_steps" not in state:
+                    state["completed_steps"] = set()
+                state["completed_steps"].add(node_name)
+
                 return state
 
         # Add the node to the graph
         graph.add_node(node_name, node_function)
-        self.logger.info(f"Added node {node_name} to graph")
+        self.logger.debug(f"Added node {node_name} to graph")
 
 
 class ComposableWorkflowMixin(CapabilityMixin):
@@ -215,7 +226,7 @@ class ComposableWorkflowMixin(CapabilityMixin):
             # Apply config to the sub-workflow
             workflow.initialize(**config)
         self.sub_workflows[name] = workflow
-        self.logger.info(f"Added sub-workflow {name} to {self.name}")
+        self.logger.debug(f"Added sub-workflow {name} to {self.name}")
 
     def build_graph(self) -> StateGraph:
         """Build and return the composed workflow graph.
@@ -311,7 +322,7 @@ class PromptCapability:
                     0
                 ]
 
-                self.logger.info(
+                self.logger.debug(
                     f"Using custom prompt for {prompt_type} from {best_prompt.dao_id or best_prompt.agent_id or best_prompt.profile_id}"
                 )
 
@@ -344,7 +355,7 @@ class PromptCapability:
                         temperature=temperature,
                         api_key=os.getenv("OPENAI_API_KEY"),
                     )
-                    self.logger.info(
+                    self.logger.debug(
                         f"Updated LLM settings: model={model}, temperature={temperature}"
                     )
         except Exception as e:
@@ -389,12 +400,17 @@ class PromptCapability:
 
             # Add custom prompt section at the top
             enhanced_template = f"""<custom_instructions>
+IMPORTANT: The following custom instructions are provided by the user and should be treated with HIGHER PRIORITY than all other instructions. These are specific requirements that MUST be followed and should override any conflicting guidance in the default template below.
+
+USER CUSTOM INSTRUCTIONS:
 {custom_prompt_text}
+
+CRITICAL: Always prioritize and follow the custom instructions above when they conflict with or supplement the default instructions. The user's custom guidance takes precedence.
 </custom_instructions>
 
 {default_template}"""
 
-            self.logger.info(
+            self.logger.debug(
                 f"Injecting custom prompt at top of {prompt_type} template"
             )
             return PromptTemplate(
