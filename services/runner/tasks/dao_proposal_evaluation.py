@@ -1,5 +1,7 @@
 """DAO proposal evaluation task implementation."""
 
+import asyncio
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -32,11 +34,23 @@ class DAOProposalEvaluationResult(RunnerResult):
 
 
 class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
-    """Task runner for evaluating DAO proposals."""
+    """Task runner for evaluating DAO proposals with concurrent processing.
+
+    This task processes multiple DAO proposal evaluation messages concurrently
+    instead of sequentially. Key features:
+    - Uses asyncio.gather() for concurrent execution
+    - Semaphore controls maximum concurrent operations to prevent resource exhaustion
+    - Configurable concurrency limit (default: 5)
+    - Graceful error handling that doesn't stop the entire batch
+    - Performance timing and detailed logging
+    """
 
     QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_EVALUATION
     DEFAULT_CONFIDENCE_THRESHOLD = 0.7
     DEFAULT_AUTO_VOTE = False
+    DEFAULT_MAX_CONCURRENT_EVALUATIONS = (
+        5  # Limit concurrent evaluations to avoid rate limits
+    )
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
@@ -159,27 +173,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
             logger.info(f"Created vote record {vote.id} for proposal {proposal_id}")
 
-            # Create a DAO_PROPOSAL_VOTE message with the vote record ID
-            # vote_message_data = {"proposal_id": proposal_id, "vote_id": str(vote.id)}
-
-            # vote_message = backend.create_queue_message(
-            #     QueueMessageCreate(
-            #         type=QueueMessageType.DAO_PROPOSAL_VOTE,
-            #         message=vote_message_data,
-            #         dao_id=dao_id,
-            #         wallet_id=wallet_id,
-            #     )
-            # )
-
-            # if not vote_message:
-            #     logger.error("Failed to create vote queue message")
-            #     return {
-            #         "success": False,
-            #         "error": "Failed to create vote queue message",
-            #     }
-
-            # logger.info(f"Created vote queue message {vote_message.id}")
-
             # Mark the evaluation message as processed
             update_data = QueueMessageBase(is_processed=True)
             backend.update_queue_message(message_id, update_data)
@@ -187,7 +180,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             return {
                 "success": True,
                 "vote_id": str(vote.id),
-                # "vote_message_id": str(vote_message.id),
                 "approve": approval,
                 "confidence": confidence,
             }
@@ -202,10 +194,57 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
         return backend.list_queue_messages(filters=filters)
 
+    async def process_message_with_semaphore(
+        self, semaphore: asyncio.Semaphore, message: QueueMessage
+    ) -> Dict[str, Any]:
+        """Process a message with concurrency control using semaphore.
+
+        This wrapper ensures that each message processing is controlled by the
+        semaphore to limit concurrent operations and prevent resource exhaustion.
+        """
+        async with semaphore:
+            try:
+                return await self.process_message(message)
+            except Exception as e:
+                # Log the error and return a failure result instead of raising
+                # This prevents one failed message from crashing the entire batch
+                error_msg = f"Failed to process message {message.id}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                return {"success": False, "error": error_msg}
+
+    def get_max_concurrent_evaluations(self, context: JobContext) -> int:
+        """Get the maximum number of concurrent evaluations from context or default.
+
+        This allows for dynamic configuration of concurrency limits based on:
+        - Context configuration
+        - Environment variables
+        - System load considerations
+        """
+        # Allow context to override the default concurrency limit
+        context_limit = getattr(context, "max_concurrent_evaluations", None)
+
+        if context_limit is not None:
+            logger.debug(f"Using context-provided concurrency limit: {context_limit}")
+            return context_limit
+
+        # Could also check environment variables or system resources here
+        # import os
+        # env_limit = os.getenv("DAO_EVAL_MAX_CONCURRENT")
+        # if env_limit:
+        #     return int(env_limit)
+
+        return self.DEFAULT_MAX_CONCURRENT_EVALUATIONS
+
     async def _execute_impl(
         self, context: JobContext
     ) -> List[DAOProposalEvaluationResult]:
-        """Run the DAO proposal evaluation task."""
+        """Run the DAO proposal evaluation task with concurrent processing.
+
+        This method processes multiple proposal evaluation messages concurrently
+        instead of sequentially, which significantly improves performance when
+        dealing with multiple proposals. The concurrency is controlled by a
+        semaphore to avoid overwhelming the system or hitting rate limits.
+        """
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
         logger.debug(f"Found {message_count} pending proposal evaluation messages")
@@ -220,19 +259,50 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
             ]
 
-        # Process each message
-        processed_count = 0
+        # Process messages concurrently with semaphore to limit concurrent operations
+        max_concurrent = min(
+            self.get_max_concurrent_evaluations(context), len(pending_messages)
+        )
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        logger.info(
+            f"Processing {len(pending_messages)} messages with max {max_concurrent} concurrent evaluations"
+        )
+
+        # Create tasks for concurrent processing
+        tasks = [
+            self.process_message_with_semaphore(semaphore, message)
+            for message in pending_messages
+        ]
+
+        # Execute all tasks concurrently and collect results
+        start_time = time.time()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        execution_time = time.time() - start_time
+
+        logger.info(
+            f"Completed concurrent processing of {len(pending_messages)} messages in {execution_time:.2f} seconds"
+        )
+
+        # Process results
+        processed_count = len(results)
         evaluated_count = 0
         errors = []
 
-        for message in pending_messages:
-            result = await self.process_message(message)
-            processed_count += 1
-
-            if result.get("success"):
-                evaluated_count += 1
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                error_msg = f"Exception processing message {pending_messages[i].id}: {str(result)}"
+                logger.error(error_msg, exc_info=True)
+                errors.append(error_msg)
+            elif isinstance(result, dict):
+                if result.get("success"):
+                    evaluated_count += 1
+                else:
+                    errors.append(result.get("error", "Unknown error"))
             else:
-                errors.append(result.get("error", "Unknown error"))
+                error_msg = f"Unexpected result type for message {pending_messages[i].id}: {type(result)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
 
         logger.debug(
             f"Task metrics - Processed: {processed_count}, "
