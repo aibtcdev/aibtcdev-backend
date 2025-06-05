@@ -116,12 +116,13 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         if "core_agent_invocations" not in state:
             state["core_agent_invocations"] = 0
 
-        # Initialize supervisor invocations counter if not present
+            # Initialize supervisor invocations counter if not present
         if "supervisor_invocations" not in state:
             state["supervisor_invocations"] = 0
 
-        # Increment supervisor invocations counter
-        state["supervisor_invocations"] += 1
+        # Only increment supervisor invocations counter if we're stuck on image processing
+        if "proposal_images" not in state:
+            state["supervisor_invocations"] += 1
 
         # Debug counter behavior
         logger.debug(
@@ -228,18 +229,27 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
             ]
             return True
 
-        # Add halt condition for image processor loops
-        # Count how many times we've been in the supervisor logic without progress
+        # Add halt condition only for truly stuck scenarios
         supervisor_invocations = state.get("supervisor_invocations", 0)
-        max_supervisor_invocations = 10
-        if supervisor_invocations > max_supervisor_invocations:
+        max_supervisor_invocations = (
+            100  # Very high limit, only for true infinite loops
+        )
+
+        # Only halt if we're clearly in an infinite loop (very high count with no progress)
+        if (
+            supervisor_invocations > max_supervisor_invocations
+            and "proposal_images" not in state
+        ):
             logger.warning(
-                f"[DEBUG:HaltCondition] Halting due to too many supervisor invocations: {supervisor_invocations}"
+                f"[DEBUG:HaltCondition] Halting due to infinite loop in image processing: {supervisor_invocations} invocations"
             )
+            # Force set proposal_images to empty list to allow workflow to continue
+            state["proposal_images"] = []
             state["flags"] = state.get("flags", []) + [
-                f"Workflow halted: Too many supervisor invocations ({supervisor_invocations})"
+                f"Workflow recovered from image processing loop ({supervisor_invocations} invocations)"
             ]
-            return True
+            # Don't halt, just fix the state and continue
+            return False
 
         # Don't halt by default
         return False
