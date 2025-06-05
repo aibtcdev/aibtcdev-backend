@@ -48,8 +48,8 @@ class ProposalRecommendationOutput(BaseModel):
     )
 
 
-class ProposalSummarizationOutput(BaseModel):
-    """Output model for proposal title and summary generation."""
+class ProposalMetadataOutput(BaseModel):
+    """Output model for proposal metadata generation."""
 
     title: str = Field(
         description="Generated proposal title (max 100 characters)", max_length=100
@@ -57,4 +57,9 @@ class ProposalSummarizationOutput(BaseModel):
     summary: str = Field(
         description="Short summary of the proposal (2-3 sentences, max 500 characters)",
         max_length=500,
+    )
+    tags: List[str] = Field(
+        description="Array of 3-5 relevant tags that categorize the proposal content",
+        min_length=3,
+        max_length=5,
     )

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Example usage of the ProposalSummarizationAgent.
+Example usage of the ProposalMetadataAgent.
 
-This script demonstrates how to use the ProposalSummarizationAgent to generate
-titles and summaries for proposal content.
+This script demonstrates how to use the ProposalMetadataAgent to generate
+titles, summaries, and tags for proposal content.
 """
 
 import asyncio
 from typing import Any, Dict
 
-from services.workflows.agents import ProposalSummarizationAgent
+from services.workflows.agents import ProposalMetadataAgent
 
 
-async def example_proposal_summarization():
-    """Example of using the ProposalSummarizationAgent."""
+async def example_proposal_metadata():
+    """Example of using the ProposalMetadataAgent."""
 
     # Initialize the agent
-    agent = ProposalSummarizationAgent()
+    agent = ProposalMetadataAgent()
 
     # Example proposal content
     sample_proposal_content = """
@@ -46,7 +46,7 @@ async def example_proposal_summarization():
         "proposal_type": "treasury_management",
     }
 
-    print("🤖 Running Proposal Summarization Agent...")
+    print("🤖 Running Proposal Metadata Agent...")
     print(f"📄 Input content length: {len(sample_proposal_content)} characters")
     print()
 
@@ -57,14 +57,16 @@ async def example_proposal_summarization():
     if "error" in result:
         print(f"❌ Error: {result['error']}")
     else:
-        print("✅ Generated Title and Summary:")
+        print("✅ Generated Title, Summary, and Tags:")
         print(f"📝 Title: {result['title']}")
         print(f"📋 Summary: {result['summary']}")
+        print(f"🏷️ Tags: {', '.join(result.get('tags', []))}")
         print()
         print("📊 Metadata:")
         print(f"   • Content Length: {result.get('content_length', 'N/A')} characters")
         print(f"   • DAO Name: {result.get('dao_name', 'N/A')}")
         print(f"   • Proposal Type: {result.get('proposal_type', 'N/A')}")
+        print(f"   • Tags Count: {result.get('tags_count', 'N/A')}")
 
         if "token_usage" in result:
             token_info = result["token_usage"]
@@ -76,7 +78,7 @@ async def example_proposal_summarization():
 async def example_multiple_proposals():
     """Example of processing multiple different types of proposals."""
 
-    agent = ProposalSummarizationAgent()
+    agent = ProposalMetadataAgent()
 
     proposals = [
         {
@@ -112,18 +114,19 @@ async def example_multiple_proposals():
         if "error" not in result:
             print(f"   Title: {result['title']}")
             print(f"   Summary: {result['summary']}")
+            print(f"   Tags: {', '.join(result.get('tags', []))}")
         else:
             print(f"   Error: {result['error']}")
         print()
 
 
 if __name__ == "__main__":
-    print("🚀 Proposal Summarization Agent Examples")
+    print("🚀 Proposal Metadata Agent Examples")
     print("=" * 50)
     print()
 
     # Run the basic example
-    asyncio.run(example_proposal_summarization())
+    asyncio.run(example_proposal_metadata())
 
     print("\n" + "=" * 50)
     print()

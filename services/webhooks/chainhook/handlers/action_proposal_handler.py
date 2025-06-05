@@ -17,7 +17,7 @@ from services.webhooks.chainhook.handlers.base_proposal_handler import (
     BaseProposalHandler,
 )
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
-from services.workflows.agents import ProposalSummarizationAgent
+from services.workflows.agents import ProposalMetadataAgent
 
 
 class ActionProposalHandler(BaseProposalHandler):
@@ -191,10 +191,18 @@ class ActionProposalHandler(BaseProposalHandler):
 
         return agents_with_tokens
 
-    async def _generate_proposal_title_and_summary(
+    async def _parse_and_generate_proposal_metadata(
         self, parameters: str, dao_name: str, proposal_id: str
     ) -> Dict[str, str]:
-        """Generate a better title and summary for the proposal using the summarization agent.
+        """Parse proposal content for title/tags and generate summary using AI agent.
+
+        First parses the proposal content looking for the structured format:
+        - Original message
+        - "\n\n--- Metadata ---" (metadata section marker)
+        - "\nTitle: {title}" if there's a title
+        - "\nTags: {tags_string}" where tags_string is tags joined by "|"
+
+        Then uses ProposalMetadataAgent to generate a summary and fill in missing components.
 
         Args:
             parameters: The decoded proposal parameters/content
@@ -202,49 +210,110 @@ class ActionProposalHandler(BaseProposalHandler):
             proposal_id: The proposal ID
 
         Returns:
-            Dict containing 'title' and 'summary' keys
+            Dict containing 'title', 'summary', and 'tags' keys
         """
+        if not parameters:
+            return {
+                "title": f"Action Proposal #{proposal_id}",
+                "summary": "",
+                "tags": [],
+            }
+
+        # Parse content for structured metadata section
+        parsed_title = ""
+        parsed_tags = []
+        base_content = parameters
+
+        # Look for metadata section: "--- Metadata ---"
+        metadata_marker = "--- Metadata ---"
+        if metadata_marker in parameters:
+            parts = parameters.split(metadata_marker, 1)
+            if len(parts) == 2:
+                base_content = parts[0].strip()
+                metadata_section = parts[1].strip()
+
+                # Parse metadata section line by line
+                for line in metadata_section.split("\n"):
+                    line = line.strip()
+                    if line.startswith("Title: "):
+                        parsed_title = line[7:].strip()  # Remove "Title: " prefix
+                    elif line.startswith("Tags: "):
+                        tags_string = line[6:].strip()  # Remove "Tags: " prefix
+                        if "|" in tags_string:
+                            parsed_tags = [
+                                tag.strip()
+                                for tag in tags_string.split("|")
+                                if tag.strip()
+                            ]
+
+        # Clean base content for AI processing
+        clean_content = base_content.strip()
+
+        # Use ProposalMetadataAgent to generate summary and fill missing components
         try:
-            # Initialize the summarization agent
-            summarization_agent = ProposalSummarizationAgent()
+            metadata_agent = ProposalMetadataAgent()
 
-            # Prepare the content for summarization
-            proposal_content = parameters or f"Action proposal {proposal_id}"
+            # Use clean content for AI processing
+            proposal_content = clean_content or f"Action proposal {proposal_id}"
 
-            # Create state for the agent
             state = {
                 "proposal_content": proposal_content,
                 "dao_name": dao_name,
                 "proposal_type": "action",
             }
 
-            # Generate title and summary
-            result = await summarization_agent.process(state)
+            # Generate metadata using AI
+            ai_result = await metadata_agent.process(state)
 
-            if "error" not in result:
-                self.logger.info(
-                    f"Generated title for proposal {proposal_id}: {result.get('title', 'Unknown')}"
+            # Combine parsed and AI-generated results
+            final_title = (
+                parsed_title
+                if parsed_title
+                else (
+                    ai_result.get("title", f"Action Proposal #{proposal_id}")
+                    if "error" not in ai_result
+                    else f"Action Proposal #{proposal_id}"
                 )
-                return {
-                    "title": result.get("title", f"Action Proposal #{proposal_id}"),
-                    "summary": result.get("summary", ""),
-                }
-            else:
-                self.logger.warning(
-                    f"Error generating title for proposal {proposal_id}: {result['error']}"
-                )
-                return {
-                    "title": f"Action Proposal #{proposal_id}",
-                    "summary": "",
-                }
+            )
+
+            final_tags = (
+                parsed_tags
+                if parsed_tags
+                else (ai_result.get("tags", []) if "error" not in ai_result else [])
+            )
+
+            # Always use AI-generated summary as it's specifically designed for summarization
+            final_summary = (
+                ai_result.get("summary", clean_content)
+                if "error" not in ai_result
+                else clean_content
+            )
+
+            self.logger.info(
+                f"Combined metadata for proposal {proposal_id} - "
+                f"Title: '{final_title}' (parsed: {bool(parsed_title)}), "
+                f"Tags: {final_tags} (parsed: {bool(parsed_tags)}), "
+                f"Summary: AI-generated"
+            )
+
+            return {
+                "title": final_title,
+                "summary": final_summary,
+                "tags": final_tags,
+            }
 
         except Exception as e:
             self.logger.error(
-                f"Error in title generation for proposal {proposal_id}: {str(e)}"
+                f"Error in AI metadata generation for proposal {proposal_id}: {str(e)}"
             )
+
+            # Fallback to parsed results with defaults
             return {
-                "title": f"Action Proposal #{proposal_id}",
-                "summary": "",
+                "title": (
+                    parsed_title if parsed_title else f"Action Proposal #{proposal_id}"
+                ),
+                "summary": clean_content,
+                "tags": parsed_tags,
             }
 
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
@@ -311,17 +380,17 @@ class ActionProposalHandler(BaseProposalHandler):
                     parameters = proposal_info["parameters"]
                     self.logger.debug("Using original parameters (hex decoding failed)")
 
-                # Generate a better title and summary using the summarization agent
-                title_and_summary = await self._generate_proposal_title_and_summary(
+                # Parse title/tags from content and generate summary using AI
+                metadata = await self._parse_and_generate_proposal_metadata(
                     parameters, dao_data["name"], str(proposal_info["proposal_id"])
                 )
                 # Create a new proposal record in the database
                 proposal = backend.create_proposal(
                     ProposalCreate(
                         dao_id=dao_data["id"],
-                        title=title_and_summary["title"],
+                        title=metadata["title"],
                         content=parameters,
-                        summary=title_and_summary["summary"],
+                        summary=metadata["summary"],
                         contract_principal=contract_identifier,
                         tx_id=tx_id,
                         proposal_id=proposal_info["proposal_id"],

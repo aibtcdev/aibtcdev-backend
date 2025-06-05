@@ -11,13 +11,21 @@ from backend.factory import backend  # Added backend factory
 from backend.models import (  # Added Profile, AgentFilter
     UUID,
     AgentFilter,
+    ContractStatus,
+    DAOFilter,
     Profile,
+    Proposal,
+    ProposalCreate,
+    ProposalType,
     WalletFilter,
 )
 from lib.logger import configure_logger
 from lib.tools import Tool, get_available_tools
+from services.workflows.agents.proposal_metadata import (
+    ProposalMetadataAgent,
+)
 
-# Import the proposal recommendation agent
+# Import the proposal recommendation agent and metadata agent
 from services.workflows.agents.proposal_recommendation import (
     ProposalRecommendationAgent,
 )
@@ -35,6 +43,106 @@ router = APIRouter(prefix="/tools", tags=["tools"])
 
 # Initialize tools once at startup
 available_tools = get_available_tools()
+
+
+async def _create_proposal_from_tool_result(
+    tool_result: dict,
+    payload: "ProposeSendMessageRequest",
+    enhanced_message: str,
+    title: str,
+    summary: str,
+    tags: List[str],
+    profile: "Profile",
+) -> Optional["Proposal"]:
+    """Create a proposal record from successful tool execution result.
+
+    Args:
+        tool_result: The result from ProposeActionSendMessageTool execution
+        payload: The original request payload
+        enhanced_message: The enhanced message with title and tags
+        title: The generated title for the proposal
+        summary: The generated summary for the proposal
+        tags: The generated tags for the proposal
+        profile: The user's profile
+
+    Returns:
+        The created proposal or None if creation failed
+    """
+    import re
+
+    try:
+        output = tool_result.get("output", "")
+        if not output:
+            logger.warning("No output in tool result")
+            return None
+
+        # Extract transaction ID from the output
+        tx_id_match = re.search(
+            r"Transaction broadcasted successfully: (0x[a-fA-F0-9]+)", output
+        )
+        if not tx_id_match:
+            logger.warning("Could not extract transaction ID from tool output")
+            return None
+
+        tx_id = tx_id_match.group(1)
+
+        # Extract voting contract (this will be our contract_principal)
+        voting_contract_match = re.search(
+            r"DAO Action Proposal Voting Contract: ([^\n]+)", output
+        )
+        if not voting_contract_match:
+            logger.warning("Could not extract voting contract from tool output")
+            return None
+
+        voting_contract = voting_contract_match.group(1).strip()
+
+        # Find the DAO based on the voting contract or token contract
+        # First try to find by the voting contract in extensions
+        extensions = backend.list_extensions()
+        dao_id = None
+
+        for extension in extensions:
+            if extension.contract_principal == voting_contract:
+                dao_id = extension.dao_id
+                break
+
+        # If not found in extensions, try to find by token contract
+        if not dao_id:
+            tokens = backend.list_tokens()
+            for token in tokens:
+                if token.contract_principal == payload.dao_token_contract_address:
+                    dao_id = token.dao_id
+                    break
+
+        if not dao_id:
+            logger.warning(
+                f"Could not find DAO for contracts: {voting_contract}, {payload.dao_token_contract_address}"
+            )
+            return None
+
+        # Create the proposal record
+        proposal_data = ProposalCreate(
+            dao_id=dao_id,
+            title=title if title else "Action Proposal",
+            content=enhanced_message,
+            summary=summary,
+            tags=tags,
+            status=ContractStatus.DEPLOYED,  # Since transaction was successful
+            contract_principal=voting_contract,
+            tx_id=tx_id,
+            type=ProposalType.ACTION,
+            # Additional fields that might be available
+            creator=profile.email or "Unknown",
+            memo=payload.memo,
+        )
+
+        proposal = backend.create_proposal(proposal_data)
+        logger.info(f"Created proposal record {proposal.id} for transaction {tx_id}")
+        return proposal
+
+    except Exception as e:
+        logger.error(f"Error creating proposal from tool result: {str(e)}")
+        return None
 
 
 class FaktoryBuyTokenRequest(BaseModel):
@@ -370,18 +478,72 @@ async def propose_dao_action_send_message(
             f"Using wallet {wallet.id} for profile {profile.id} to propose DAO send message action."
         )
 
+        # Generate title, summary, and tags for the message before sending
+        try:
+            metadata_agent = ProposalMetadataAgent()
+            metadata_state = {
+                "proposal_content": payload.message,
+                "dao_name": "",  # Could be enhanced to fetch DAO name if available
+                "proposal_type": "action_proposal",
+            }
+
+            metadata_result = await metadata_agent.process(metadata_state)
+            title = metadata_result.get("title", "")
+            summary = metadata_result.get("summary", "")
+            metadata_tags = metadata_result.get("tags", [])
+
+            # Enhance message with title and tags using structured format
+            enhanced_message = payload.message
+
+            # Add metadata section if we have title or tags
+            if title or metadata_tags:
+                enhanced_message = f"{payload.message}\n\n--- Metadata ---"
+
+                if title:
+                    enhanced_message += f"\nTitle: {title}"
+                    logger.info(f"Enhanced message with title: {title}")
+
+                if metadata_tags:
+                    tags_string = "|".join(metadata_tags)
+                    enhanced_message += f"\nTags: {tags_string}"
+                    logger.info(f"Enhanced message with tags: {metadata_tags}")
+            else:
+                logger.warning("No title or tags generated for the message")
+
+        except Exception as e:
+            logger.error(f"Failed to generate title and metadata: {str(e)}")
+            # Continue with original message if enhancement fails
+            enhanced_message = payload.message
+
         tool = ProposeActionSendMessageTool(wallet_id=wallet.id)
         result = await tool._arun(
             action_proposals_voting_extension=payload.action_proposals_voting_extension,
             action_proposal_contract_to_execute=payload.action_proposal_contract_to_execute,
             dao_token_contract_address=payload.dao_token_contract_address,
-            message=payload.message,
+            message=enhanced_message,
             memo=payload.memo,
         )
 
         logger.debug(
             f"DAO propose send message result for wallet {wallet.id} (profile {profile.id}): {result}"
         )
+
+        # Create proposal record if tool execution was successful
+        if result.get("success") and result.get("output"):
+            try:
+                await _create_proposal_from_tool_result(
+                    result,
+                    payload,
+                    enhanced_message,
+                    title if "title" in locals() else "",
+                    summary if "summary" in locals() else "",
+                    metadata_tags if "metadata_tags" in locals() else [],
+                    profile,
+                )
+            except Exception as e:
+                logger.error(f"Failed to create proposal record: {str(e)}")
+                # Don't fail the entire request if proposal creation fails
+
         return JSONResponse(content=result)
 
     except HTTPException as he:

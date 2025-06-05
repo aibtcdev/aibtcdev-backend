@@ -5,35 +5,33 @@ from langchain_core.messages import HumanMessage
 
 from lib.logger import configure_logger
 from services.workflows.capability_mixins import BaseCapabilityMixin
-from services.workflows.utils.models import ProposalSummarizationOutput
+from services.workflows.utils.models import ProposalMetadataOutput
 from services.workflows.utils.token_usage import TokenUsageMixin
 
 logger = configure_logger(__name__)
 
 
-class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
-    """Agent that generates titles and summaries for proposal content."""
+class ProposalMetadataAgent(BaseCapabilityMixin, TokenUsageMixin):
+    """Agent that generates title, summary, and metadata tags for proposal content."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the Proposal Summarization Agent.
+        """Initialize the Proposal Metadata Agent.
 
         Args:
             config: Optional configuration dictionary
         """
-        BaseCapabilityMixin.__init__(
-            self, config=config, state_key="proposal_summarization"
-        )
+        BaseCapabilityMixin.__init__(self, config=config, state_key="proposal_metadata")
         TokenUsageMixin.__init__(self)
         self.initialize()
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate a title and summary for the given proposal content.
+        """Generate title, summary, and metadata tags for the given proposal content.
 
         Args:
             state: The current workflow state containing proposal_content
 
         Returns:
-            Dictionary containing the generated title and summary
+            Dictionary containing the generated title, summary, tags, and metadata
         """
         proposal_content = state.get("proposal_content")
         if not proposal_content:
@@ -42,6 +40,7 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
                 "error": "proposal_content is required",
                 "title": "",
                 "summary": "",
+                "tags": [],
             }
 
         # Initialize token usage tracking in state if not present
@@ -60,11 +59,11 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
             ],
             template="""<system>
   <reminder>
-    You are an expert at creating clear, concise titles and summaries for DAO proposals. Generate a compelling title and brief summary that captures the essence of the proposal content.
+    You are an expert at analyzing DAO proposals and generating comprehensive metadata including titles, summaries, and tags. Create content that accurately represents and categorizes the proposal to help with organization and discoverability.
   </reminder>
 </system>
 
-<proposal_summarization_task>
+<proposal_metadata_task>
   <input_content>
     <proposal_content>{proposal_content}</proposal_content>
     <dao_name>{dao_name}</dao_name>
@@ -76,6 +75,7 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
     
     1. A clear, compelling title that captures the main purpose of the proposal
     2. A concise summary (2-3 sentences) that explains what the proposal is about and its key objectives
+    3. 3-5 relevant tags that categorize and describe the proposal
     
     <guidelines>
       <title_guidelines>
@@ -93,6 +93,31 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
         <guideline>Use clear, accessible language</guideline>
         <guideline>Highlight the main benefit to the DAO community</guideline>
       </summary_guidelines>
+      
+      <tag_guidelines>
+        <guideline>Generate exactly 3-5 tags (no more, no less)</guideline>
+        <guideline>Each tag should be 1-3 words maximum</guideline>
+        <guideline>Use lowercase for consistency</guideline>
+        <guideline>Focus on the main themes, topics, and purpose of the proposal</guideline>
+        <guideline>Include category-based tags (e.g., "governance", "treasury", "technical")</guideline>
+        <guideline>Include action-based tags (e.g., "funding", "upgrade", "partnership")</guideline>
+        <guideline>Avoid overly generic tags like "proposal" or "dao"</guideline>
+        <guideline>Be specific but not too narrow - tags should be useful for filtering</guideline>
+        <guideline>Consider the scope and impact of the proposal</guideline>
+      </tag_guidelines>
+      
+      <common_categories>
+        <category>governance - for proposals about DAO structure, voting, rules</category>
+        <category>treasury - for proposals about financial management, budgets</category>
+        <category>technical - for proposals about code, infrastructure, upgrades</category>
+        <category>partnerships - for proposals about collaborations, integrations</category>
+        <category>community - for proposals about community building, outreach</category>
+        <category>security - for proposals about safety, audits, risk management</category>
+        <category>tokenomics - for proposals about token mechanics, rewards</category>
+        <category>development - for proposals about product development, features</category>
+        <category>marketing - for proposals about promotion, brand, awareness</category>
+        <category>operations - for proposals about day-to-day functioning</category>
+      </common_categories>
     </guidelines>
   </task>
   
@@ -100,8 +125,9 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
     Provide a JSON object with:
     <title>Generated proposal title (max 100 characters)</title>
     <summary>Brief summary explaining the proposal (2-3 sentences, max 500 characters)</summary>
+    <tags>Array of 3-5 relevant tags as strings</tags>
   </output_format>
-</proposal_summarization_task>""",
+</proposal_metadata_task>""",
         )
 
         try:
@@ -115,32 +141,35 @@ class ProposalSummarizationAgent(BaseCapabilityMixin, TokenUsageMixin):
 
             # Get structured output from the LLM
             result = await self.llm.with_structured_output(
-                ProposalSummarizationOutput
+                ProposalMetadataOutput
             ).ainvoke([llm_input_message])
             result_dict = result.model_dump()
 
             # Track token usage
             token_usage_data = self.track_token_usage(formatted_prompt_text, result)
-            state["token_usage"]["proposal_summarization_agent"] = token_usage_data
+            state["token_usage"]["proposal_metadata_agent"] = token_usage_data
             result_dict["token_usage"] = token_usage_data
 
             # Add metadata
             result_dict["content_length"] = len(proposal_content)
             result_dict["dao_name"] = dao_name
             result_dict["proposal_type"] = proposal_type
+            result_dict["tags_count"] = len(result_dict.get("tags", []))
 
             self.logger.info(
-                f"Generated title and summary for proposal: {result_dict.get('title', 'Unknown')}"
+                f"Generated title, summary, and {len(result_dict.get('tags', []))} tags for proposal: {result_dict.get('title', 'Unknown')}"
             )
             return result_dict
 
         except Exception as e:
-            self.logger.error(f"Error generating proposal title and summary: {str(e)}")
+            self.logger.error(f"Error generating proposal metadata: {str(e)}")
             return {
                 "error": str(e),
                 "title": "",
                 "summary": f"Error generating summary: {str(e)}",
+                "tags": [],
                 "content_length": len(proposal_content) if proposal_content else 0,
                 "dao_name": dao_name,
                 "proposal_type": proposal_type,
+                "tags_count": 0,
             }
