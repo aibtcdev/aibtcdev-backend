@@ -146,6 +146,12 @@ class BaseCapabilityMixin(CapabilityMixin):
                 if isinstance(result, dict):
                     # If returning a dict, merge with state using the state_key
                     state[self.state_key] = result
+                elif isinstance(result, list):
+                    # If returning a list, set it directly to the state_key
+                    state[self.state_key] = result
+                elif result is not None:
+                    # For any other non-None result, set it directly
+                    state[self.state_key] = result
                 return state
             except Exception as e:
                 self.logger.error(f"Error in node {node_name}: {str(e)}", exc_info=True)

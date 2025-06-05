@@ -52,6 +52,7 @@ class ProposalEvaluationState(TypedDict):
         Dict[str, Dict[str, int]], merge_dicts
     ]  # Properly merges dictionaries
     core_agent_invocations: Annotated[int, operator.add]
+    supervisor_invocations: Annotated[int, operator.add]
     proposal_images: Annotated[Optional[List[Dict]], set_once]
 
 
@@ -115,9 +116,19 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         if "core_agent_invocations" not in state:
             state["core_agent_invocations"] = 0
 
+        # Initialize supervisor invocations counter if not present
+        if "supervisor_invocations" not in state:
+            state["supervisor_invocations"] = 0
+
+        # Increment supervisor invocations counter
+        state["supervisor_invocations"] += 1
+
         # Debug counter behavior
         logger.debug(
             f"[DEBUG:CoreCounter] Current invocations count: {state.get('core_agent_invocations', 0)}"
+        )
+        logger.debug(
+            f"[DEBUG:SupervisorCounter] Current supervisor invocations: {state.get('supervisor_invocations', 0)}"
         )
 
         # Check if state has images processed
@@ -125,7 +136,15 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         # If it exists (even if it's an empty list), we consider images processed
         if "proposal_images" not in state:
             logger.debug("[DEBUG:SupervisorLogic] Need to process images first")
+            logger.debug(f"[DEBUG:SupervisorLogic] State keys: {list(state.keys())}")
             return "image_processor"
+        else:
+            logger.debug(
+                f"[DEBUG:SupervisorLogic] Images already processed: {state.get('proposal_images')}"
+            )
+            logger.debug(
+                f"[DEBUG:SupervisorLogic] proposal_images type: {type(state.get('proposal_images'))}"
+            )
 
         # Check if core context evaluation is done
         if "core_score" not in state:
@@ -209,6 +228,19 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
             ]
             return True
 
+        # Add halt condition for image processor loops
+        # Count how many times we've been in the supervisor logic without progress
+        supervisor_invocations = state.get("supervisor_invocations", 0)
+        max_supervisor_invocations = 10
+        if supervisor_invocations > max_supervisor_invocations:
+            logger.warning(
+                f"[DEBUG:HaltCondition] Halting due to too many supervisor invocations: {supervisor_invocations}"
+            )
+            state["flags"] = state.get("flags", []) + [
+                f"Workflow halted: Too many supervisor invocations ({supervisor_invocations})"
+            ]
+            return True
+
         # Don't halt by default
         return False
 
@@ -276,6 +308,7 @@ async def evaluate_proposal(
         "summaries": {},
         "token_usage": {},
         "core_agent_invocations": 0,
+        "supervisor_invocations": 0,
         "halt": False,
     }
 
