@@ -141,7 +141,11 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             reasoning = evaluation.get("reasoning", "No reasoning provided")
             formatted_prompt = result.get("formatted_prompt", "")
             total_cost = result.get("total_overall_cost", 0.0)
-            model = result.get("evaluation_model_info", {}).get("name", "Unknown")
+            model = evaluation.get("model_name", "Unknown")
+            evaluation_scores = evaluation.get(
+                "scores", {}
+            )  # Extract the full scores data
+            evaluation_flags = evaluation.get("flags", [])  # Extract the flags data
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
@@ -163,6 +167,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 cost=total_cost,
                 model=model,
                 profile_id=wallet.profile_id,
+                evaluation_score=evaluation_scores,  # Store the complete evaluation scores
+                flags=evaluation_flags,  # Store the evaluation flags
             )
 
             # Create the vote record

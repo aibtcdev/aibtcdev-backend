@@ -65,10 +65,10 @@ async def execute_runner_job(
         runner = runner_class()
 
         # Validate and execute
-        logger.info(f"Starting {job_type} runner")
+        logger.debug(f"Starting {job_type} runner")
         if await runner.validate(context):
             results = await runner.execute(context)
-            logger.info(f"Completed {job_type} runner")
+            logger.debug(f"Completed {job_type} runner")
             return results
         else:
             logger.warning(f"Validation failed for {job_type} runner")

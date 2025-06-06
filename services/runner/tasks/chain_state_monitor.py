@@ -293,7 +293,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
             # Get current chain height from API
             try:
-                logger.info("Fetching current chain info from API")
+                logger.debug("Fetching current chain info from API")
                 api_info = self.hiro_api.get_info()
 
                 # Handle different response types

@@ -47,14 +47,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
 
             if message_count == 0:
-                logger.info("No pending agent account deployment messages found")
+                logger.debug("No pending agent account deployment messages found")
                 return False
 
             # Validate that at least one message has valid deployment data
             for message in pending_messages:
                 message_data = self._parse_message_data(message.message)
                 if self._validate_message_data(message_data):
-                    logger.info("Found valid agent account deployment message")
+                    logger.debug("Found valid agent account deployment message")
                     return True
 
             logger.warning("No valid deployment data found in pending messages")

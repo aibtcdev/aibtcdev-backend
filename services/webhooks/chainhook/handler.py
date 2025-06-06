@@ -130,7 +130,7 @@ class ChainhookHandler(WebhookHandler):
             for handler in self.handlers:
                 await handler.post_block_processing()
 
-            self.logger.info(
+            self.logger.debug(
                 "Finished processing all blocks and transactions in webhook"
             )
             return {
