@@ -105,14 +105,18 @@ class BlockStateHandler(ChainhookEventHandler):
                     f"Updating chain state from height {current_state.block_height} "
                     f"to {block_height}"
                 )
+                # Prepare update data, omitting bitcoin_block_height if None
+                update_data = {
+                    "block_height": block_height,
+                    "block_hash": block_hash,
+                    "network": current_state.network,
+                }
+                if bitcoin_block_height is not None:
+                    update_data["bitcoin_block_height"] = bitcoin_block_height
+
                 updated = backend.update_chain_state(
                     current_state.id,
-                    ChainStateBase(
-                        block_height=block_height,
-                        block_hash=block_hash,
-                        network=current_state.network,
-                        bitcoin_block_height=bitcoin_block_height,
-                    ),
+                    ChainStateBase(**update_data),
                 )
                 if not updated:
                     self.logger.error(
