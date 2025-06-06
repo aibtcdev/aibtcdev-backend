@@ -69,6 +69,7 @@ class BlockStateHandler(ChainhookEventHandler):
             block: The block to handle
         """
         try:
+            self.logger.debug(f"Received block metadata: {block.metadata}")
             # Get current chain state
             current_state = backend.get_latest_chain_state(
                 network=config.network.network
@@ -85,6 +86,9 @@ class BlockStateHandler(ChainhookEventHandler):
                 bitcoin_block_height = (
                     block.metadata.bitcoin_anchor_block_identifier.index
                 )
+            self.logger.debug(
+                f"Extracted bitcoin_block_height: {bitcoin_block_height} for block_hash {block.block_identifier.hash}"
+            )
 
             self.logger.info(
                 f"Processing block: height={block_height}, hash={block_hash}, "
@@ -114,6 +118,9 @@ class BlockStateHandler(ChainhookEventHandler):
                 if bitcoin_block_height is not None:
                     update_data["bitcoin_block_height"] = bitcoin_block_height
 
+                self.logger.debug(
+                    f"Updating chain_state {current_state.id} with update_data: {update_data}"
+                )
                 updated = backend.update_chain_state(
                     current_state.id,
                     ChainStateBase(**update_data),
@@ -135,14 +142,16 @@ class BlockStateHandler(ChainhookEventHandler):
                     f"No existing chain state found. Creating first record for "
                     f"block {block_height}"
                 )
-                created = backend.create_chain_state(
-                    ChainStateCreate(
-                        block_height=block_height,
-                        block_hash=block_hash,
-                        network=config.network.network,
-                        bitcoin_block_height=bitcoin_block_height,
-                    )
+                chain_state_create_payload = ChainStateCreate(
+                    block_height=block_height,
+                    block_hash=block_hash,
+                    network=config.network.network,
+                    bitcoin_block_height=bitcoin_block_height,
                 )
+                self.logger.debug(
+                    f"Creating new chain_state with payload: {chain_state_create_payload.model_dump_json()}"
+                )
+                created = backend.create_chain_state(chain_state_create_payload)
                 if not created:
                     self.logger.error(
                         f"Failed to create chain state for block {block_height}"
