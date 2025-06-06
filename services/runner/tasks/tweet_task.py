@@ -230,6 +230,12 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
+    def _strip_metadata_section(self, text: str) -> str:
+        """Remove metadata section starting with '--- Metadata ---' to the end of the text."""
+        metadata_pattern = r"--- Metadata ---.*$"
+        # Remove from '--- Metadata ---' to the end, including the marker
+        return re.sub(metadata_pattern, "", text, flags=re.DOTALL).rstrip()
+
     async def _process_tweet_message(
         self, message: QueueMessage
     ) -> TweetProcessingResult:
@@ -250,16 +256,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             # Extract tweet text directly from the message format
             original_text = message.message["message"]
+            # Strip metadata section if present
+            clean_text = self._strip_metadata_section(original_text)
             logger.info(f"Sending tweet for DAO {message.dao_id}")
-            logger.debug(f"Tweet content: {original_text}")
+            logger.debug(f"Tweet content: {clean_text}")
 
             # Look for image URLs in the text
-            image_urls = extract_image_urls(original_text)
+            image_urls = extract_image_urls(clean_text)
             image_url = image_urls[0] if image_urls else None
-            tweet_text = original_text
+            tweet_text = clean_text
 
             if image_url:
-                tweet_text = re.sub(re.escape(image_url), "", original_text).strip()
+                tweet_text = re.sub(re.escape(image_url), "", clean_text).strip()
                 tweet_text = re.sub(r"\s+", " ", tweet_text)
 
             # Split tweet text if necessary
