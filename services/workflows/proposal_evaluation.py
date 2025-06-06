@@ -51,8 +51,11 @@ class ProposalEvaluationState(TypedDict):
     token_usage: Annotated[
         Dict[str, Dict[str, int]], merge_dicts
     ]  # Properly merges dictionaries
-    core_agent_invocations: Annotated[int, operator.add]
-    supervisor_invocations: Annotated[int, operator.add]
+    # Improved state tracking
+    workflow_step: Annotated[str, lambda x, y: y[-1] if y else x]  # Track current step
+    completed_steps: Annotated[
+        set[str], lambda x, y: x.union(set(y)) if y else x
+    ]  # Track completed steps
     proposal_images: Annotated[Optional[List[Dict]], set_once]
 
 
@@ -71,7 +74,9 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
             name="ProposalEvaluation",
             config={
                 "state_type": ProposalEvaluationState,
-                "recursion_limit": self.config.get("recursion_limit", 20),
+                "recursion_limit": self.config.get(
+                    "recursion_limit", 15
+                ),  # Reduced limit
             },
         )
 
@@ -106,105 +111,109 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
     ) -> Union[str, List[str]]:
         """Determine which agent(s) to run next based on current state.
 
+        Improved logic to prevent infinite loops and unnecessary re-executions.
+
         Args:
             state: Current workflow state
 
         Returns:
             String or list of strings identifying next agent(s) to run
         """
-        # Initialize core agent invocations counter if not present
-        if "core_agent_invocations" not in state:
-            state["core_agent_invocations"] = 0
+        # Initialize workflow tracking
+        if "workflow_step" not in state:
+            state["workflow_step"] = "start"
+        if "completed_steps" not in state:
+            state["completed_steps"] = set()
 
-            # Initialize supervisor invocations counter if not present
-        if "supervisor_invocations" not in state:
-            state["supervisor_invocations"] = 0
+        proposal_id = state.get("proposal_id", "unknown")
+        completed_steps = state.get("completed_steps", set())
 
-        # Only increment supervisor invocations counter if we're stuck on image processing
-        if "proposal_images" not in state:
-            state["supervisor_invocations"] += 1
-
-        # Debug counter behavior
-        logger.debug(
-            f"[DEBUG:CoreCounter] Current invocations count: {state.get('core_agent_invocations', 0)}"
-        )
-        logger.debug(
-            f"[DEBUG:SupervisorCounter] Current supervisor invocations: {state.get('supervisor_invocations', 0)}"
+        logger.info(
+            f"[DEBUG:SupervisorLogic:{proposal_id}] Current step: {state.get('workflow_step')}, "
+            f"Completed: {completed_steps}"
         )
 
-        # Check if state has images processed
-        # If proposal_images key doesn't exist, we need to process images
-        # If it exists (even if it's an empty list), we consider images processed
-        if "proposal_images" not in state:
-            logger.debug("[DEBUG:SupervisorLogic] Need to process images first")
-            logger.debug(f"[DEBUG:SupervisorLogic] State keys: {list(state.keys())}")
+        # Step 1: Image processing (required first step)
+        if "proposal_images" not in state and "image_processor" not in completed_steps:
+            logger.debug(
+                f"[DEBUG:SupervisorLogic:{proposal_id}] Starting image processing"
+            )
+            state["workflow_step"] = "image_processing"
             return "image_processor"
-        else:
-            logger.debug(
-                f"[DEBUG:SupervisorLogic] Images already processed: {state.get('proposal_images')}"
-            )
-            logger.debug(
-                f"[DEBUG:SupervisorLogic] proposal_images type: {type(state.get('proposal_images'))}"
-            )
 
-        # Check if core context evaluation is done
-        if "core_score" not in state:
-            logger.debug("[DEBUG:SupervisorLogic] Need core context evaluation")
-            old_count = state.get("core_agent_invocations", 0)
-            state["core_agent_invocations"] = old_count + 1
+        # Step 2: Core context evaluation (required after images)
+        if "core_score" not in state and "core_agent" not in completed_steps:
+            # Ensure images are processed first
+            if "proposal_images" not in state:
+                logger.warning(
+                    f"[DEBUG:SupervisorLogic:{proposal_id}] Images not processed, but core agent requested"
+                )
+                state["proposal_images"] = []  # Set empty images to proceed
+
             logger.debug(
-                f"[DEBUG:CoreCounter] Incremented invocations: {old_count} -> {state['core_agent_invocations']}"
+                f"[DEBUG:SupervisorLogic:{proposal_id}] Starting core evaluation"
             )
+            state["workflow_step"] = "core_evaluation"
             return "core_agent"
 
-        # Run specialized agents in parallel if they haven't run yet
-        agents_to_run = []
+        # Step 3: Parallel evaluation of specialized agents
+        specialized_agents = ["historical_agent", "financial_agent", "social_agent"]
+        specialized_scores = ["historical_score", "financial_score", "social_score"]
 
-        if "historical_score" not in state:
-            agents_to_run.append("historical_agent")
+        # Check if core evaluation is complete
+        if "core_score" in state:
+            # Find which specialized agents haven't completed yet
+            pending_agents = []
+            for agent, score_key in zip(specialized_agents, specialized_scores):
+                if score_key not in state and agent not in completed_steps:
+                    pending_agents.append(agent)
 
-        if "financial_score" not in state:
-            agents_to_run.append("financial_agent")
+            if pending_agents:
+                logger.debug(
+                    f"[DEBUG:SupervisorLogic:{proposal_id}] Running specialized agents: {pending_agents}"
+                )
+                state["workflow_step"] = "specialized_evaluation"
+                # Return all pending agents for parallel execution
+                return pending_agents
 
-        if "social_score" not in state:
-            agents_to_run.append("social_agent")
+        # Step 4: Final reasoning (only after all evaluations are complete)
+        all_scores_present = all(
+            score_key in state for score_key in ["core_score"] + specialized_scores
+        )
 
-        if agents_to_run:
+        if (
+            all_scores_present
+            and "final_score" not in state
+            and "reasoning_agent" not in completed_steps
+        ):
             logger.debug(
-                f"[DEBUG:SupervisorLogic] Running specialized agents: {agents_to_run}"
+                f"[DEBUG:SupervisorLogic:{proposal_id}] Starting final reasoning"
             )
-            return agents_to_run
-
-        # If all specialized agents have run, run the reasoning agent for final decision
-        if "final_score" not in state:
-            logger.debug(
-                "[DEBUG:SupervisorLogic] All specialized agents done, running reasoning agent"
-            )
-            logger.info(
-                f"[DEBUG:DIAGNOSIS] About to run reasoning_agent, state keys: {list(state.keys())}"
-            )
+            state["workflow_step"] = "final_reasoning"
             return "reasoning_agent"
 
-        # If reasoning agent has run, we're done
-        logger.debug("[DEBUG:SupervisorLogic] Workflow complete")
+        # Step 5: Workflow complete
+        if "final_score" in state:
+            logger.info(f"[DEBUG:SupervisorLogic:{proposal_id}] Workflow complete")
+            state["workflow_step"] = "complete"
+            return END
 
-        # Add diagnosis logging
-        logger.info(
-            f"[DEBUG:DIAGNOSIS] Workflow complete, final_score type: {type(state.get('final_score'))}"
+        # Error state - should not reach here
+        logger.error(
+            f"[DEBUG:SupervisorLogic:{proposal_id}] Unexpected state - "
+            f"core_score: {'core_score' in state}, "
+            f"specialized scores: {[key in state for key in specialized_scores]}, "
+            f"final_score: {'final_score' in state}, "
+            f"completed_steps: {completed_steps}"
         )
-        logger.info(
-            f"[DEBUG:DIAGNOSIS] Final score contents: {state.get('final_score')}"
-        )
 
-        # Log the entire state and final reasoning as JSON
-        import json
-
-        logger.info(f"[DEBUG:FinalState] {json.dumps(state, default=str, indent=2)}")
-
+        # Force completion if we're in an unexpected state
         return END
 
     def _halt_condition(self, state: ProposalEvaluationState) -> bool:
         """Determine if the workflow should halt early.
+
+        Improved halt condition with better error detection.
 
         Args:
             state: Current workflow state
@@ -212,46 +221,76 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         Returns:
             True if workflow should halt, False otherwise
         """
+        proposal_id = state.get("proposal_id", "unknown")
+
         # Halt if explicitly set
         if state.get("halt", False):
-            logger.info("[DEBUG:HaltCondition] Halting due to explicit halt flag")
-            return True
-
-        # Halt if we've run the core agent too many times (prevent loops)
-        core_agent_invocations = state.get("core_agent_invocations", 0)
-        max_core_invocations = 50
-        if core_agent_invocations > max_core_invocations:
-            logger.warning(
-                f"[DEBUG:HaltCondition] Halting due to too many core agent invocations: {core_agent_invocations}"
+            logger.info(
+                f"[DEBUG:HaltCondition:{proposal_id}] Halting due to explicit halt flag"
             )
-            state["flags"] = state.get("flags", []) + [
-                f"Workflow halted: Too many core agent invocations ({core_agent_invocations})"
-            ]
             return True
 
-        # Add halt condition only for truly stuck scenarios
-        supervisor_invocations = state.get("supervisor_invocations", 0)
-        max_supervisor_invocations = (
-            100  # Very high limit, only for true infinite loops
-        )
+        # Check for circular dependencies or infinite loops
+        workflow_step = state.get("workflow_step", "start")
+        completed_steps = state.get("completed_steps", set())
 
-        # Only halt if we're clearly in an infinite loop (very high count with no progress)
+        # Define the expected workflow sequence
+        expected_sequence = [
+            "image_processing",
+            "core_evaluation",
+            "specialized_evaluation",
+            "final_reasoning",
+            "complete",
+        ]
+
+        # If we've been on the same step too long, something is wrong
+        if hasattr(state, "_step_attempts"):
+            state["_step_attempts"][workflow_step] = (
+                state["_step_attempts"].get(workflow_step, 0) + 1
+            )
+            if state["_step_attempts"][workflow_step] > 3:
+                logger.error(
+                    f"[DEBUG:HaltCondition:{proposal_id}] Too many attempts on step {workflow_step}"
+                )
+                state["flags"] = state.get("flags", []) + [
+                    f"Workflow halted: Too many attempts on step {workflow_step}"
+                ]
+                return True
+        else:
+            state["_step_attempts"] = {workflow_step: 1}
+
+        # Check for agent completion tracking
+        required_agents = {
+            "image_processor",
+            "core_agent",
+            "historical_agent",
+            "financial_agent",
+            "social_agent",
+            "reasoning_agent",
+        }
+
+        # If we have all required scores but final score is missing and reasoning agent hasn't run
         if (
-            supervisor_invocations > max_supervisor_invocations
-            and "proposal_images" not in state
-        ):
-            logger.warning(
-                f"[DEBUG:HaltCondition] Halting due to infinite loop in image processing: {supervisor_invocations} invocations"
+            all(
+                key in state
+                for key in [
+                    "core_score",
+                    "historical_score",
+                    "financial_score",
+                    "social_score",
+                ]
             )
-            # Force set proposal_images to empty list to allow workflow to continue
-            state["proposal_images"] = []
+            and "final_score" not in state
+            and "reasoning_agent" in completed_steps
+        ):
+            logger.error(
+                f"[DEBUG:HaltCondition:{proposal_id}] Reasoning agent completed but no final score"
+            )
             state["flags"] = state.get("flags", []) + [
-                f"Workflow recovered from image processing loop ({supervisor_invocations} invocations)"
+                "Workflow halted: Reasoning agent failed to produce final score"
             ]
-            # Don't halt, just fix the state and continue
-            return False
+            return True
 
-        # Don't halt by default
         return False
 
     def _create_graph(self) -> StateGraph:
@@ -307,7 +346,7 @@ async def evaluate_proposal(
 
     workflow = ProposalEvaluationWorkflow(config)
 
-    # Create initial state
+    # Create initial state with improved tracking
     initial_state = {
         "proposal_id": proposal_id,
         "proposal_data": proposal_data,
@@ -317,9 +356,9 @@ async def evaluate_proposal(
         "flags": [],
         "summaries": {},
         "token_usage": {},
-        "core_agent_invocations": 0,
-        "supervisor_invocations": 0,
         "halt": False,
+        "workflow_step": "start",
+        "completed_steps": set(),
     }
 
     # Run workflow
@@ -327,7 +366,6 @@ async def evaluate_proposal(
         logger.info(f"Starting proposal evaluation for proposal {proposal_id}")
         result = await workflow.execute(initial_state)
 
-        # Add diagnostic logging
         logger.info(
             f"[DEBUG:EXTRACT] Workflow execution complete, result keys: {list(result.keys())}"
         )
@@ -402,6 +440,8 @@ async def evaluate_proposal(
             "summaries": result.get("summaries", {}),
             "token_usage": total_token_usage,
             "model_name": model_name,
+            "workflow_step": result.get("workflow_step", "unknown"),
+            "completed_steps": list(result.get("completed_steps", set())),
         }
 
         logger.info(

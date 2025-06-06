@@ -166,6 +166,12 @@ class SupervisorMixin(BaseCapabilityMixin):
             if next_step == "end":
                 next_step = END
             state[self.routing_key] = next_step
+
+            # Track supervisor completion
+            if "completed_steps" not in state:
+                state["completed_steps"] = set()
+            state["completed_steps"].add("supervisor")
+
             return state
 
         graph.add_node(node_name, supervisor_node)

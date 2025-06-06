@@ -108,7 +108,7 @@ class BaseTask(ABC, Generic[T]):
         import time
 
         self._start_time = time.time()
-        logger.info(f"Starting task: {self.task_name}")
+        logger.debug(f"Starting task: {self.task_name}")
         logger.debug(f"{self.task_name}: Configuration - {self.config}")
 
     def _log_task_completion(self, results: List[T]) -> None:

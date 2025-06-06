@@ -1675,6 +1675,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("tx_id", filters.tx_id)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
+            if filters.evaluation_score is not None:
+                query = query.eq("evaluation_score", filters.evaluation_score)
+            if filters.flags is not None:
+                query = query.eq("flags", filters.flags)
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]

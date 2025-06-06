@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -750,6 +750,10 @@ class VoteBase(CustomBaseModel):
     cost: Optional[float] = None
     model: Optional[str] = None
     profile_id: Optional[UUID] = None
+    evaluation_score: Optional[Dict[str, Any]] = (
+        None  # Store final score from proposal evaluation
+    )
+    flags: Optional[List[str]] = None  # Store flags from proposal evaluation
 
 
 class VoteCreate(VoteBase):
@@ -772,6 +776,8 @@ class VoteFilter(CustomBaseModel):
     model: Optional[str] = None
     tx_id: Optional[str] = None
     profile_id: Optional[UUID] = None
+    evaluation_score: Optional[Dict[str, Any]] = None  # Filter by evaluation score
+    flags: Optional[List[str]] = None  # Filter by flags
 
 
 # Add this to your backend interface class to get agents by tokens

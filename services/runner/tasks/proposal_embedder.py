@@ -138,7 +138,7 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
             # Identify proposals that need embedding
             new_proposal_ids = db_proposal_ids - existing_vector_ids
             if not new_proposal_ids:
-                logger.info("No new proposals found requiring embedding.")
+                logger.debug("No new proposals found requiring embedding.")
                 return [
                     ProposalEmbedderResult(
                         success=True,
@@ -148,7 +148,7 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
                     )
                 ]
 
-            logger.info(f"Identified {len(new_proposal_ids)} new proposals to embed.")
+            logger.debug(f"Identified {len(new_proposal_ids)} new proposals to embed.")
 
             # Filter proposals to embed only the new ones
             proposals_to_embed = [
