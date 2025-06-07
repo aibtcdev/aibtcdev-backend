@@ -83,6 +83,12 @@ class JobManager:
                 JobType.TWEET.value,
             ),
             (
+                "Discord Runner Service",
+                config.scheduler.discord_runner_enabled,
+                config.scheduler.discord_runner_interval_seconds,
+                JobType.DISCORD.value,
+            ),
+            (
                 "DAO Proposal Vote Runner Service",
                 config.scheduler.dao_proposal_vote_runner_enabled,
                 config.scheduler.dao_proposal_vote_runner_interval_seconds,

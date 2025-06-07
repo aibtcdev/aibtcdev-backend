@@ -72,6 +72,7 @@ class JobType(str, Enum):
     DAO_PROPOSAL_EVALUATION = "dao_proposal_evaluation"
     DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
+    DISCORD = "discord"
     AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
     PROPOSAL_EMBEDDING = "proposal_embedding"
     CHAIN_STATE_MONITOR = "chain_state_monitor"

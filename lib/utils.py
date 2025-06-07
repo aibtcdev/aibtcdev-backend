@@ -26,6 +26,20 @@ def extract_image_urls(text):
     return image_urls
 
 
+def strip_metadata_section(text: str) -> str:
+    """Remove metadata section starting with '--- Metadata ---' to the end of the text.
+    
+    Args:
+        text: The input text that may contain a metadata section
+        
+    Returns:
+        The text with the metadata section removed
+    """
+    metadata_pattern = r"--- Metadata ---.*$"
+    # Remove from '--- Metadata ---' to the end, including the marker
+    return re.sub(metadata_pattern, "", text, flags=re.DOTALL).rstrip()
+
+
 def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
     """Decodes a hexadecimal-encoded string if valid.
 

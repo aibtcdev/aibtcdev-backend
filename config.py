@@ -48,7 +48,9 @@ class TelegramConfig:
 
 @dataclass
 class DiscordConfig:
-    webhook_url: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL", "")
+    webhook_url_passed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_PASSED", "")
+    webhook_url_failed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_FAILED", "")
+    
 
 
 @dataclass
@@ -76,6 +78,12 @@ class SchedulerConfig:
     )
     tweet_runner_interval_seconds: int = int(
         os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", "30")
+    )
+    discord_runner_enabled: bool = (
+        os.getenv("AIBTC_DISCORD_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    discord_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DISCORD_RUNNER_INTERVAL_SECONDS", "30")
     )
     dao_proposal_vote_runner_enabled: bool = (
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_ENABLED", "false").lower() == "true"

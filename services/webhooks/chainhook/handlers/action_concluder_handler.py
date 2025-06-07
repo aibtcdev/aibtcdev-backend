@@ -10,6 +10,7 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageType,
 )
+from lib.utils import strip_metadata_section
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
 
@@ -103,39 +104,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
         self.logger.info(f"Found DAO for contract {contract_identifier}: {dao.name}")
         return dao.model_dump()
 
-    def _get_message_from_events(self, events: List[Event]) -> Optional[str]:
-        """Extract the message from onchain-messaging contract events.
 
-        Args:
-            events: List of events from the transaction
-
-        Returns:
-            Optional[str]: The message if found, None otherwise
-        """
-        for event in events:
-            # Find print events from onchain-messaging contract
-            if (
-                event.type == "SmartContractEvent"
-                and hasattr(event, "data")
-                and event.data.get("topic") == "print"
-                and "onchain-messaging" in event.data.get("contract_identifier", "")
-            ):
-                value = event.data.get("value")
-
-                # Handle new structured format with payload
-                if isinstance(value, dict):
-                    payload = value.get("payload", {})
-                    if isinstance(payload, dict):
-                        message = payload.get("message")
-                        if isinstance(message, str):
-                            return message
-
-                # Handle legacy format where value is directly a string
-                if isinstance(value, str):
-                    return value
-
-        self.logger.warning("Could not find message in transaction events")
-        return None
 
     def _get_proposal_conclusion_data(self, events: List[Event]) -> Optional[Dict]:
         """Extract proposal conclusion data from action-proposal-voting contract events.
@@ -256,39 +225,109 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
         # Extract proposal conclusion data and update the proposal record
         conclusion_data = self._get_proposal_conclusion_data(events)
-        if conclusion_data:
-            updated_proposal = self._update_proposal_record(dao_data, conclusion_data)
-            if updated_proposal:
-                self.logger.info(
-                    f"Successfully updated proposal {conclusion_data.get('proposalId')} "
-                    f"for DAO {dao_data['name']}"
-                )
-            else:
-                self.logger.warning(
-                    f"Failed to update proposal {conclusion_data.get('proposalId')} "
-                    f"for DAO {dao_data['name']}"
-                )
-        else:
+        if not conclusion_data:
             self.logger.warning(
                 "No proposal conclusion data found in transaction events"
             )
+            return
 
-        # Get the message from onchain-messaging events for tweet creation
-        message = self._get_message_from_events(events)
-        if message is None:
-            self.logger.warning("Could not find message in transaction events")
+        updated_proposal = self._update_proposal_record(dao_data, conclusion_data)
+        if not updated_proposal:
+            self.logger.warning(
+                f"Failed to update proposal {conclusion_data.get('proposalId')} "
+                f"for DAO {dao_data['name']}"
+            )
             return
 
         self.logger.info(
-            f"Processing concluded proposal message from DAO {dao_data['name']}: {message[:100]}..."
+            f"Successfully updated proposal {conclusion_data.get('proposalId')} "
+            f"for DAO {dao_data['name']}"
         )
 
-        # Create a new queue message for the DAO
-        new_message = backend.create_queue_message(
-            QueueMessageCreate(
-                type=QueueMessageType.TWEET,
-                message={"message": message},
+        # Look up the full proposal record to get the content field
+        proposal_id = conclusion_data.get("proposalId")
+        proposals = backend.list_proposals(
+            filters=ProposalFilter(
                 dao_id=dao_data["id"],
+                proposal_id=proposal_id,
             )
         )
-        self.logger.info(f"Created queue message: {new_message.id}")
+
+        if not proposals:
+            self.logger.warning(
+                f"Could not find proposal {proposal_id} for content lookup"
+            )
+            return
+
+        proposal = proposals[0]
+        message = proposal.content
+        if not message:
+            self.logger.warning("No content found in the proposal")
+            return
+
+        # Clean the message content by removing metadata section
+        clean_message = strip_metadata_section(message)
+
+        self.logger.info(
+            f"Processing concluded proposal message from DAO {dao_data['name']}: {clean_message[:100]}..."
+        )
+
+        # Check if proposal passed and create appropriate queue messages
+        proposal_passed = proposal.passed or False
+        
+        if proposal_passed:
+            # Create queue messages for both Twitter and Discord if proposal passed
+            tweet_message = backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.TWEET,
+                    message={"message": clean_message},
+                    dao_id=dao_data["id"],
+                )
+            )
+            self.logger.info(f"Created tweet queue message: {tweet_message.id}")
+
+            discord_message = backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.DISCORD,
+                    message={"content": clean_message, "proposal_status": "passed"},
+                    dao_id=dao_data["id"],
+                )
+            )
+            self.logger.info(f"Created Discord queue message (proposal passed): {discord_message.id}")
+        else:
+            # Create queue message only for Discord if proposal failed with header and footer
+            # Calculate participation and approval percentages
+            votes_for = int(proposal.votes_for or 0)
+            votes_against = int(proposal.votes_against or 0)
+            total_votes = votes_for + votes_against
+            
+            participation_pct = 0.0
+            approval_pct = 0.0
+            
+            if total_votes > 0:
+                # For participation, we'd need total eligible voters - using liquid_tokens as proxy
+                liquid_tokens = int(proposal.liquid_tokens or 0)
+                if liquid_tokens > 0:
+                    participation_pct = (total_votes / liquid_tokens) * 100
+                
+                # Approval percentage is votes_for / total_votes
+                approval_pct = (votes_for / total_votes) * 100
+
+            # Format the Discord message with header and footer
+            formatted_message = f"🟥 PROPOSAL #{proposal.proposal_id}: FAILED 🟥\n\n"
+            formatted_message += "---\n\n"
+            formatted_message += f"{clean_message}\n\n"
+            formatted_message += "---\n\n"
+            formatted_message += f"Start: Block {proposal.start_block_height or 'N/A'}\n"
+            formatted_message += f"End: Block {proposal.end_block_height or 'N/A'}\n"
+            formatted_message += f"Participation: {participation_pct:.1f}%\n"
+            formatted_message += f"Approval: {approval_pct:.1f}%"
+
+            discord_message = backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.DISCORD,
+                    message={"content": formatted_message, "proposal_status": "failed"},
+                    dao_id=dao_data["id"],
+                )
+            )
+            self.logger.info(f"Created Discord queue message (proposal failed): {discord_message.id}")

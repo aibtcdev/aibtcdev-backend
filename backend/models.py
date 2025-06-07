@@ -75,6 +75,7 @@ class QueueMessageType(str, Enum):
     AGENT_ACCOUNT_DEPLOY = (
         "agent_account_deploy"  # New type for agent account deployment
     )
+    DISCORD = "discord"  # New type for Discord queue messages
 
     def __str__(self):
         return self.value

@@ -20,7 +20,6 @@ import tweepy
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from lib.utils import extract_image_urls
-from services.discord import create_discord_service
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 
 logger = configure_logger(__name__)
@@ -230,11 +229,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
-    def _strip_metadata_section(self, text: str) -> str:
-        """Remove metadata section starting with '--- Metadata ---' to the end of the text."""
-        metadata_pattern = r"--- Metadata ---.*$"
-        # Remove from '--- Metadata ---' to the end, including the marker
-        return re.sub(metadata_pattern, "", text, flags=re.DOTALL).rstrip()
+
 
     async def _process_tweet_message(
         self, message: QueueMessage
@@ -255,19 +250,16 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
 
             # Extract tweet text directly from the message format
-            original_text = message.message["message"]
-            # Strip metadata section if present
-            clean_text = self._strip_metadata_section(original_text)
+            tweet_text = message.message["message"]
             logger.info(f"Sending tweet for DAO {message.dao_id}")
-            logger.debug(f"Tweet content: {clean_text}")
+            logger.debug(f"Tweet content: {tweet_text}")
 
             # Look for image URLs in the text
-            image_urls = extract_image_urls(clean_text)
+            image_urls = extract_image_urls(tweet_text)
             image_url = image_urls[0] if image_urls else None
-            tweet_text = clean_text
 
             if image_url:
-                tweet_text = re.sub(re.escape(image_url), "", clean_text).strip()
+                tweet_text = re.sub(re.escape(image_url), "", tweet_text).strip()
                 tweet_text = re.sub(r"\s+", " ", tweet_text)
 
             # Split tweet text if necessary
@@ -299,22 +291,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.info(f"Successfully posted tweet {tweet_response.id}")
                 logger.debug(f"Tweet ID: {tweet_response.id}")
                 previous_tweet_id = tweet_response.id
-
-            # Discord Service
-            try:
-                discord_service = create_discord_service()
-
-                if discord_service:
-                    embeds = None
-                    if image_url:
-                        embeds = [{"image": {"url": image_url}}]
-                    discord_result = discord_service.send_message(
-                        tweet_text, embeds=embeds
-                    )
-                    logger.info(f"Discord message sent: {discord_result['success']}")
-
-            except Exception as e:
-                logger.warning(f"Failed to send Discord message: {str(e)}")
 
             return TweetProcessingResult(
                 success=True,
