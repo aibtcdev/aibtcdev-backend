@@ -104,8 +104,6 @@ class ActionConcluderHandler(ChainhookEventHandler):
         self.logger.info(f"Found DAO for contract {contract_identifier}: {dao.name}")
         return dao.model_dump()
 
-
-
     def _get_proposal_conclusion_data(self, events: List[Event]) -> Optional[Dict]:
         """Extract proposal conclusion data from action-proposal-voting contract events.
 
@@ -274,7 +272,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
         # Check if proposal passed and create appropriate queue messages
         proposal_passed = proposal.passed or False
-        
+
         if proposal_passed:
             # Create queue messages for both Twitter and Discord if proposal passed
             tweet_message = backend.create_queue_message(
@@ -293,23 +291,25 @@ class ActionConcluderHandler(ChainhookEventHandler):
                     dao_id=dao_data["id"],
                 )
             )
-            self.logger.info(f"Created Discord queue message (proposal passed): {discord_message.id}")
+            self.logger.info(
+                f"Created Discord queue message (proposal passed): {discord_message.id}"
+            )
         else:
             # Create queue message only for Discord if proposal failed with header and footer
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)
             total_votes = votes_for + votes_against
-            
+
             participation_pct = 0.0
             approval_pct = 0.0
-            
+
             if total_votes > 0:
                 # For participation, we'd need total eligible voters - using liquid_tokens as proxy
                 liquid_tokens = int(proposal.liquid_tokens or 0)
                 if liquid_tokens > 0:
                     participation_pct = (total_votes / liquid_tokens) * 100
-                
+
                 # Approval percentage is votes_for / total_votes
                 approval_pct = (votes_for / total_votes) * 100
 
@@ -318,8 +318,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
             formatted_message += "---\n\n"
             formatted_message += f"{clean_message}\n\n"
             formatted_message += "---\n\n"
-            formatted_message += f"Start: Block {proposal.start_block_height or 'N/A'}\n"
-            formatted_message += f"End: Block {proposal.end_block_height or 'N/A'}\n"
+            formatted_message += f"Start: Block {proposal.vote_start or 'N/A'}\n"
+            formatted_message += f"End: Block {proposal.vote_end or 'N/A'}\n"
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
             formatted_message += f"Approval: {approval_pct:.1f}%"
 
@@ -330,4 +330,6 @@ class ActionConcluderHandler(ChainhookEventHandler):
                     dao_id=dao_data["id"],
                 )
             )
-            self.logger.info(f"Created Discord queue message (proposal failed): {discord_message.id}")
+            self.logger.info(
+                f"Created Discord queue message (proposal failed): {discord_message.id}"
+            )
