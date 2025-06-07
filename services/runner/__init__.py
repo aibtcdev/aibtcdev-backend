@@ -25,6 +25,7 @@ from services.runner.tasks.dao_proposal_voter import (
 )
 from services.runner.tasks.dao_task import DAOTask, dao_task
 from services.runner.tasks.dao_tweet_task import DAOTweetTask, dao_tweet_task
+from services.runner.tasks.discord_task import DiscordTask, discord_task
 from services.runner.tasks.proposal_embedder import (
     ProposalEmbedderTask,
     proposal_embedder,
@@ -38,6 +39,7 @@ JobRegistry.register(JobType.DAO_PROPOSAL_CONCLUDE, DAOProposalConcluderTask)
 JobRegistry.register(JobType.DAO_PROPOSAL_EVALUATION, DAOProposalEvaluationTask)
 JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
+JobRegistry.register(JobType.DISCORD, DiscordTask)
 JobRegistry.register(JobType.AGENT_ACCOUNT_DEPLOY, AgentAccountDeployerTask)
 JobRegistry.register(JobType.PROPOSAL_EMBEDDING, ProposalEmbedderTask)
 JobRegistry.register(JobType.CHAIN_STATE_MONITOR, ChainStateMonitorTask)
@@ -57,6 +59,8 @@ __all__ = [
     "dao_tweet_task",
     "TweetTask",
     "tweet_task",
+    "DiscordTask",
+    "discord_task",
     "execute_runner_job",
     "DAOProposalConcluderTask",
     "dao_proposal_concluder",
