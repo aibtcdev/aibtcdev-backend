@@ -82,7 +82,12 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         return True
 
     def _convert_to_chainhook_format(
-        self, block_height: int, block_hash: str, parent_hash: str, transactions: Any
+        self,
+        block_height: int,
+        block_hash: str,
+        parent_hash: str,
+        transactions: Any,
+        burn_block_height: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Convert block transactions to chainhook format.
 
@@ -91,6 +96,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             block_hash: Hash of the block
             parent_hash: Hash of the parent block
             transactions: Block transactions from Hiro API
+            burn_block_height: Bitcoin burn block height (optional)
 
         Returns:
             Dict formatted as a chainhook webhook payload
@@ -107,6 +113,12 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         metadata = BlockMetadata(
             block_time=int(datetime.now().timestamp()), stacks_block_hash=block_hash
         )
+
+        # Add bitcoin anchor block identifier if burn block height is available
+        if burn_block_height is not None:
+            metadata.bitcoin_anchor_block_identifier = BlockIdentifier(
+                hash="", index=burn_block_height
+            )
 
         # Convert transactions to chainhook format
         chainhook_transactions = []
@@ -217,6 +229,21 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         )
 
         # Convert to dict for webhook processing
+        metadata_dict = {
+            "block_time": apply_block.metadata.block_time,
+            "stacks_block_hash": apply_block.metadata.stacks_block_hash,
+        }
+
+        # Add bitcoin anchor block identifier if present
+        if (
+            hasattr(apply_block.metadata, "bitcoin_anchor_block_identifier")
+            and apply_block.metadata.bitcoin_anchor_block_identifier
+        ):
+            metadata_dict["bitcoin_anchor_block_identifier"] = {
+                "hash": apply_block.metadata.bitcoin_anchor_block_identifier.hash,
+                "index": apply_block.metadata.bitcoin_anchor_block_identifier.index,
+            }
+
         return {
             "apply": [
                 {
@@ -224,10 +251,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         "hash": apply_block.block_identifier.hash,
                         "index": apply_block.block_identifier.index,
                     },
-                    "metadata": {
-                        "block_time": apply_block.metadata.block_time,
-                        "stacks_block_hash": apply_block.metadata.stacks_block_hash,
-                    },
+                    "metadata": metadata_dict,
                     "parent_block_identifier": {
                         "hash": apply_block.parent_block_identifier.hash,
                         "index": apply_block.parent_block_identifier.index,
@@ -360,16 +384,21 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                 f"Block {height}: Found {transactions.total} transactions"
                             )
 
-                            # Get block details
+                            # Get block details and burn block height
+                            burn_block_height = None
                             if transactions.results:
                                 # Handle transactions.results as either dict or object
                                 tx = transactions.results[0]
                                 if isinstance(tx, dict):
                                     block_hash = tx.get("block_hash")
                                     parent_hash = tx.get("parent_block_hash")
+                                    burn_block_height = tx.get("burn_block_height")
                                 else:
                                     block_hash = tx.block_hash
                                     parent_hash = tx.parent_block_hash
+                                    burn_block_height = getattr(
+                                        tx, "burn_block_height", None
+                                    )
                             else:
                                 # If no transactions, fetch the block directly
                                 try:
@@ -379,9 +408,15 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                     if isinstance(block, dict):
                                         block_hash = block.get("hash")
                                         parent_hash = block.get("parent_block_hash")
+                                        burn_block_height = block.get(
+                                            "burn_block_height"
+                                        )
                                     else:
                                         block_hash = block.hash
                                         parent_hash = block.parent_block_hash
+                                        burn_block_height = getattr(
+                                            block, "burn_block_height", None
+                                        )
 
                                     if not block_hash or not parent_hash:
                                         raise ValueError(
@@ -393,9 +428,17 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                     )
                                     raise
 
+                            logger.debug(
+                                f"Block {height}: burn_block_height={burn_block_height}"
+                            )
+
                             # Convert to chainhook format
                             chainhook_data = self._convert_to_chainhook_format(
-                                height, block_hash, parent_hash, transactions
+                                height,
+                                block_hash,
+                                parent_hash,
+                                transactions,
+                                burn_block_height,
                             )
 
                             # Process through chainhook service
