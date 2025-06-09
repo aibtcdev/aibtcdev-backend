@@ -426,7 +426,7 @@ class ChatWorkflow(
                         )
                         continue
                     web_context_chunks.append(
-                        f"Web Search Result {i+1}:\n{page_content}\nSource: {source_urls[0]}"
+                        f"Web Search Result {i + 1}:\n{page_content}\nSource: {source_urls[0]}"
                     )
                 web_context = "\n\n".join(web_context_chunks)
                 if web_context:
@@ -501,7 +501,6 @@ class ChatService:
         collection_names: Union[str, List[str]],
         embeddings: Optional[Embeddings] = None,
     ):
-
         self.collection_names = collection_names
         self.embeddings = embeddings or OpenAIEmbeddings()
         self.message_processor = MessageProcessor()

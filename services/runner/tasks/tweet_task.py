@@ -229,8 +229,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id if hasattr(message, "dao_id") else None,
             )
 
-
-
     async def _process_tweet_message(
         self, message: QueueMessage
     ) -> TweetProcessingResult:

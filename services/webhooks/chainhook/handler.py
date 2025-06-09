@@ -103,9 +103,8 @@ class ChainhookHandler(WebhookHandler):
 
                 # Process other block-level handlers
                 for handler in self.handlers:
-                    if (
-                        handler != self.block_state_handler
-                        and handler.can_handle_block(apply)
+                    if handler != self.block_state_handler and handler.can_handle_block(
+                        apply
                     ):
                         self.logger.debug(
                             f"Using handler {handler.__class__.__name__} for block-level processing"

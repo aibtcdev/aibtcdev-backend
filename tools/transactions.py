@@ -7,6 +7,7 @@ from backend.models import UUID
 
 from .bun import BunScriptRunner
 
+
 class StacksTransactionInput(BaseModel):
     """Input schema for retrieving detailed Stacks transaction information."""
 
