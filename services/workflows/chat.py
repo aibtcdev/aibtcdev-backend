@@ -130,8 +130,8 @@ class ChatWorkflow(
         # This method could be implemented to modify existing graphs with these capabilities
         pass
 
-    async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
-        """Retrieve relevant documents from multiple vector stores.
+    async def hybrid_retrieve(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve relevant documents from multiple vector stores using hybrid search.
 
         Args:
             query: The query to search for
@@ -141,51 +141,59 @@ class ChatWorkflow(
             List of retrieved documents
         """
         try:
-            all_documents = []
-            limit_per_collection = kwargs.get(
-                "limit", 4
-            )  # Get 4 results from each collection
-
-            # Query each collection and gather results
-            for collection_name in self.collection_names:
-                try:
-                    # Query vectors using the backend
-                    vector_results = await backend.query_vectors(
-                        collection_name=collection_name,
-                        query_text=query,
-                        limit=limit_per_collection,
-                        embeddings=self.embeddings,
-                    )
-
-                    # Convert to LangChain Documents and add collection source
-                    documents = [
-                        Document(
-                            page_content=doc.get("page_content", ""),
-                            metadata={
-                                **doc.get("metadata", {}),
-                                "collection_source": collection_name,
-                            },
-                        )
-                        for doc in vector_results
-                    ]
-
-                    all_documents.extend(documents)
-                    logger.info(
-                        f"Retrieved {len(documents)} documents from collection {collection_name}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to retrieve from collection {collection_name}: {str(e)}"
-                    )
-                    continue  # Continue with other collections if one fails
-
-            logger.info(
-                f"Retrieved total of {len(all_documents)} documents from all collections"
-            )
-            return all_documents
+            # Use the hybrid_retrieve method from VectorRetrievalCapability
+            return await super().hybrid_retrieve(query, **kwargs)
         except Exception as e:
-            logger.error(f"Vector store retrieval failed: {str(e)}")
-            return []
+            logger.error(
+                f"Hybrid retrieval failed, falling back to vector search: {str(e)}"
+            )
+            # Fallback to the original vector search implementation
+            try:
+                all_documents = []
+                limit_per_collection = kwargs.get(
+                    "limit", 4
+                )  # Get 4 results from each collection
+
+                # Query each collection and gather results
+                for collection_name in self.collection_names:
+                    try:
+                        # Query vectors using the backend
+                        vector_results = await backend.query_vectors(
+                            collection_name=collection_name,
+                            query_text=query,
+                            limit=limit_per_collection,
+                            embeddings=self.embeddings,
+                        )
+
+                        # Convert to LangChain Documents and add collection source
+                        documents = [
+                            Document(
+                                page_content=doc.get("page_content", ""),
+                                metadata={
+                                    **doc.get("metadata", {}),
+                                    "collection_source": collection_name,
+                                },
+                            )
+                            for doc in vector_results
+                        ]
+
+                        all_documents.extend(documents)
+                        logger.info(
+                            f"Retrieved {len(documents)} documents from collection {collection_name}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to retrieve from collection {collection_name}: {str(e)}"
+                        )
+                        continue  # Continue with other collections if one fails
+
+                logger.info(
+                    f"Retrieved total of {len(all_documents)} documents from all collections"
+                )
+                return all_documents
+            except Exception as e:
+                logger.error(f"Vector store retrieval failed: {str(e)}")
+                return []
 
     async def create_plan(
         self, query: str, context_docs: List[Document] = None, **kwargs
@@ -364,9 +372,7 @@ class ChatWorkflow(
                 return {"vector_results": [], "web_search_results": []}
 
             # Get vector results
-            vector_results = await self.retrieve_from_vector_store(
-                query=last_user_message
-            )
+            vector_results = await self.hybrid_retrieve(query=last_user_message)
             logger.info(f"Retrieved {len(vector_results)} documents from vector store")
 
             # Get web search results
@@ -557,7 +563,7 @@ class ChatService:
             logger.info(
                 f"Retrieving documents from vector store for query: {input_str[:50]}..."
             )
-            documents = await workflow.retrieve_from_vector_store(query=input_str)
+            documents = await workflow.hybrid_retrieve(query=input_str)
             logger.info(f"Retrieved {len(documents)} documents from vector store")
             try:
                 logger.info("Creating plan with vector context...")

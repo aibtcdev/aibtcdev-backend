@@ -1,9 +1,10 @@
-"""Proposal embedding task implementation."""
+"""Enhanced proposal embedding task with advanced RAG strategies."""
 
 from dataclasses import dataclass
 from typing import List, Optional
 
 import openai
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
 from backend.factory import backend
@@ -11,11 +12,20 @@ from backend.models import Proposal
 from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
+from services.workflows.chunking_strategies import (
+    AdaptiveChunkingStrategy,
+    create_chunking_strategy,
+)
+from services.workflows.enhanced_embeddings import (
+    ENHANCED_EMBEDDING_CONFIGS,
+    create_embedding_strategy,
+)
 
 logger = configure_logger(__name__)
 
 PROPOSAL_COLLECTION_NAME = "proposals"
-EMBEDDING_MODEL = "text-embedding-ada-002"
+# Use latest embedding model for better performance
+EMBEDDING_MODEL = "text-embedding-3-large"
 
 
 @dataclass
@@ -45,17 +55,45 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
         # More sophisticated check could compare DB count vs vector store count.
         return True
 
-    def _format_proposal_for_embedding(self, proposal: Proposal) -> str:
-        """Format proposal data into a string for embedding."""
-        parts = [
-            f"Title: {proposal.title or 'N/A'}",
-            f"Content: {proposal.content or 'N/A'}",
-            f"Type: {proposal.type.value if proposal.type else 'N/A'}",
-        ]
+    def _format_proposal_for_embedding(self, proposal: Proposal) -> Document:
+        """Format proposal data into a LangChain Document with rich metadata."""
+        # Create comprehensive content
+        content_parts = []
+
+        if proposal.title:
+            content_parts.append(f"Title: {proposal.title}")
+
+        if proposal.content:
+            content_parts.append(f"Content: {proposal.content}")
+
+        if proposal.type:
+            content_parts.append(f"Type: {proposal.type.value}")
+
         if proposal.action:
-            parts.append(f"Action: {proposal.action}")
-        # Add more relevant fields as needed
-        return "\n".join(parts)
+            content_parts.append(f"Action: {proposal.action}")
+
+        # Add contextual information
+        if hasattr(proposal, "dao_id") and proposal.dao_id:
+            content_parts.append(f"DAO ID: {proposal.dao_id}")
+
+        content = "\n\n".join(content_parts)
+
+        # Create rich metadata
+        metadata = {
+            "proposal_id": str(proposal.id),
+            "title": proposal.title or "",
+            "dao_id": str(proposal.dao_id) if proposal.dao_id else "",
+            "type": proposal.type.value if proposal.type else "",
+            "content_length": len(proposal.content or ""),
+            "has_action": bool(proposal.action),
+            "source": "proposal_database",
+        }
+
+        # Add timestamp information if available
+        if hasattr(proposal, "created_at") and proposal.created_at:
+            metadata["created_at"] = proposal.created_at.isoformat()
+
+        return Document(page_content=content, metadata=metadata)
 
     async def _get_embeddings(self, texts: List[str]) -> Optional[List[List[float]]]:
         """Get embeddings for a list of texts using OpenAI API."""
@@ -155,42 +193,53 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
                 p for p in all_proposals if str(p.id) in new_proposal_ids
             ]
 
-            # Prepare data for embedding only for new proposals
-            texts_to_embed = []
-            metadata_list = []
-            proposal_ids = []
-
+            # Prepare documents for advanced processing
+            documents_to_embed = []
             for proposal in proposals_to_embed:
-                proposal_text = self._format_proposal_for_embedding(proposal)
-                texts_to_embed.append(proposal_text)
-                metadata_list.append(
-                    {
-                        "proposal_id": str(proposal.id),
-                        "title": proposal.title or "",
-                        "dao_id": str(proposal.dao_id),
-                        "type": proposal.type.value if proposal.type else "",
-                    }
-                )
-                proposal_ids.append(str(proposal.id))
+                document = self._format_proposal_for_embedding(proposal)
+                documents_to_embed.append(document)
 
-            # Get embeddings using the updated method
-            logger.debug(
-                f"Requesting embeddings for {len(texts_to_embed)} new proposals."
+            # Apply advanced chunking strategy
+            chunking_strategy = create_chunking_strategy("adaptive")
+            chunked_documents = []
+
+            for document in documents_to_embed:
+                chunks = chunking_strategy.chunk_document(document)
+                chunked_documents.extend(chunks)
+
+            logger.info(
+                f"Created {len(chunked_documents)} chunks from {len(documents_to_embed)} proposals"
             )
-            embeddings_list = await self._get_embeddings(texts_to_embed)
+
+            # Use enhanced embedding strategy
+            embedding_strategy = create_embedding_strategy("adaptive")
+            texts_to_embed = [doc.page_content for doc in chunked_documents]
+            metadata_list = [doc.metadata for doc in chunked_documents]
+            chunk_ids = [
+                f"{doc.metadata.get('proposal_id', 'unknown')}_{doc.metadata.get('chunk_index', 0)}"
+                for doc in chunked_documents
+            ]
+
+            # Get embeddings using the enhanced strategy
+            logger.debug(f"Requesting embeddings for {len(texts_to_embed)} chunks.")
+            try:
+                embeddings_list = embedding_strategy.embed_documents(texts_to_embed)
+                logger.debug(
+                    f"Successfully retrieved {len(embeddings_list)} embeddings."
+                )
+            except Exception as e:
+                logger.error(f"Failed to get embeddings: {e}")
+                embeddings_list = None
 
             if embeddings_list is None:
                 errors.append("Failed to retrieve embeddings.")
             else:
-                logger.debug(
-                    f"Successfully retrieved {len(embeddings_list)} embeddings."
-                )
                 # Prepare records for upsert
                 records_to_upsert = []
-                for i, proposal_id in enumerate(proposal_ids):
+                for i, chunk_id in enumerate(chunk_ids):
                     records_to_upsert.append(
                         (
-                            proposal_id,  # Use proposal UUID as the vector ID
+                            chunk_id,  # Use chunk ID as the vector ID
                             embeddings_list[i],  # Use the retrieved embeddings
                             metadata_list[i],
                         )
@@ -199,9 +248,10 @@ class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
                 # Upsert into the vector collection
                 try:
                     collection.upsert(records=records_to_upsert)
-                    proposals_embedded = len(records_to_upsert)
+                    chunks_embedded = len(records_to_upsert)
+                    proposals_embedded = len(proposals_to_embed)
                     logger.info(
-                        f"Successfully upserted {proposals_embedded} proposal embeddings."
+                        f"Successfully upserted {chunks_embedded} chunks from {proposals_embedded} proposals."
                     )
                 except Exception as e:
                     error_msg = f"Failed to upsert proposal embeddings: {str(e)}"

@@ -7,6 +7,8 @@ from langgraph.graph import StateGraph
 from backend.factory import backend
 from lib.logger import configure_logger
 from services.workflows.base import BaseWorkflowMixin
+from services.workflows.enhanced_embeddings import create_embedding_strategy
+from services.workflows.hybrid_search import HybridSearchEngine, SearchResult
 
 logger = configure_logger(__name__)
 
@@ -22,11 +24,24 @@ class VectorRetrievalCapability(BaseWorkflowMixin):
     def _init_vector_retrieval(self) -> None:
         """Initialize vector retrieval attributes if not already initialized."""
         if not hasattr(self, "collection_names"):
-            self.collection_names = ["knowledge_collection", "dao_collection"]
+            self.collection_names = [
+                "knowledge_collection",
+                "dao_collection",
+                "proposals",
+            ]
         if not hasattr(self, "embeddings"):
-            self.embeddings = OpenAIEmbeddings()
+            # Use enhanced embedding strategy
+            self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+            self.embedding_strategy = create_embedding_strategy("adaptive")
         if not hasattr(self, "vector_results_cache"):
             self.vector_results_cache = {}
+        if not hasattr(self, "hybrid_search_engine"):
+            self.hybrid_search_engine = HybridSearchEngine(
+                collection_names=self.collection_names,
+                embeddings=self.embeddings,
+                vector_weight=0.7,
+                keyword_weight=0.3,
+            )
 
     async def retrieve_from_vector_store(self, query: str, **kwargs) -> List[Document]:
         """Retrieve relevant documents from multiple vector stores.
@@ -84,6 +99,50 @@ class VectorRetrievalCapability(BaseWorkflowMixin):
         except Exception as e:
             logger.error(f"Vector store retrieval failed: {str(e)}", exc_info=True)
             return []
+
+    async def hybrid_retrieve(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve documents using hybrid search (vector + keyword)."""
+        try:
+            self._init_vector_retrieval()
+
+            # Check cache first
+            cache_key = f"hybrid_{query}"
+            if cache_key in self.vector_results_cache:
+                logger.debug(f"Using cached hybrid results for query: {query}")
+                return self.vector_results_cache[cache_key]
+
+            limit = kwargs.pop("limit", 10)
+
+            # Perform hybrid search
+            search_results = await self.hybrid_search_engine.hybrid_search(
+                query=query, limit=limit, **kwargs
+            )
+
+            # Convert SearchResult objects back to Documents
+            documents = [result.document for result in search_results]
+
+            # Add search metadata to documents
+            for i, (doc, result) in enumerate(zip(documents, search_results)):
+                doc.metadata.update(
+                    {
+                        "search_rank": result.rank,
+                        "vector_score": result.vector_score,
+                        "keyword_score": result.keyword_score,
+                        "combined_score": result.combined_score,
+                        "search_method": "hybrid",
+                    }
+                )
+
+            # Cache results
+            self.vector_results_cache[cache_key] = documents
+
+            logger.debug(f"Hybrid search returned {len(documents)} documents")
+            return documents
+
+        except Exception as e:
+            logger.error(f"Hybrid search failed: {str(e)}", exc_info=True)
+            # Fallback to regular vector search
+            return await self.retrieve_from_vector_store(query, **kwargs)
 
     def integrate_with_graph(self, graph: StateGraph, **kwargs) -> None:
         """Integrate vector retrieval capability with a graph.

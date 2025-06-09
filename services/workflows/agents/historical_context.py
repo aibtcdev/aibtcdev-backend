@@ -36,14 +36,12 @@ class HistoricalContextAgent(
 
     def _initialize_vector_capability(self):
         """Initialize the vector retrieval capability if not already initialized."""
-        if not hasattr(self, "retrieve_from_vector_store"):
-            self.retrieve_from_vector_store = (
-                VectorRetrievalCapability.retrieve_from_vector_store.__get__(
-                    self, self.__class__
-                )
+        if not hasattr(self, "hybrid_retrieve"):
+            self.hybrid_retrieve = VectorRetrievalCapability.hybrid_retrieve.__get__(
+                self, self.__class__
             )
             self.logger.info(
-                "Initialized vector retrieval capability for HistoricalContextAgent"
+                "Initialized hybrid retrieval capability for HistoricalContextAgent"
             )
 
     async def _fetch_dao_proposals(self, dao_id: UUID) -> List[Proposal]:
@@ -137,9 +135,9 @@ class HistoricalContextAgent(
         past_proposals_vector_text = ""
         try:
             self.logger.debug(
-                f"[DEBUG:HistoricalAgent:{proposal_id}] Retrieving similar past proposals from vector store"
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Retrieving similar past proposals from vector store using hybrid search"
             )
-            similar_proposals = await self.retrieve_from_vector_store(
+            similar_proposals = await self.hybrid_retrieve(
                 query=proposal_content[
                     :1000
                 ],  # Use first 1000 chars of proposal as query

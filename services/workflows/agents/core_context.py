@@ -33,14 +33,12 @@ class CoreContextAgent(
 
     def _initialize_vector_capability(self):
         """Initialize the vector retrieval capability if not already initialized."""
-        if not hasattr(self, "retrieve_from_vector_store"):
-            self.retrieve_from_vector_store = (
-                VectorRetrievalCapability.retrieve_from_vector_store.__get__(
-                    self, self.__class__
-                )
+        if not hasattr(self, "hybrid_retrieve"):
+            self.hybrid_retrieve = VectorRetrievalCapability.hybrid_retrieve.__get__(
+                self, self.__class__
             )
             self.logger.info(
-                "Initialized vector retrieval capability for CoreContextAgent"
+                "Initialized hybrid retrieval capability for CoreContextAgent"
             )
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -68,9 +66,9 @@ class CoreContextAgent(
         if not dao_mission_text:
             try:
                 self.logger.debug(
-                    f"[DEBUG:CoreAgent:{proposal_id}] Attempting to retrieve DAO mission"
+                    f"[DEBUG:CoreAgent:{proposal_id}] Attempting to retrieve DAO mission using hybrid search"
                 )
-                dao_mission = await self.retrieve_from_vector_store(
+                dao_mission = await self.hybrid_retrieve(
                     query="DAO mission statement and values",
                     collection_name=self.config.get(
                         "mission_collection", "dao_documents"
