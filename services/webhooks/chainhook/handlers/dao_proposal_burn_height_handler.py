@@ -11,7 +11,6 @@ from backend.models import (
     QueueMessageFilter,
     QueueMessageType,
 )
-from config import config
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import ChainHookData, TransactionWithReceipt

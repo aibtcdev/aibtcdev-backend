@@ -153,7 +153,7 @@ Examples:
             vote_result = result.get("vote_result")
             message = result.get("message", "")
 
-            print(f"📊 Evaluation Results:")
+            print("📊 Evaluation Results:")
             if evaluation:
                 print(
                     f"   • Approval: {'✅ APPROVE' if evaluation.get('approve') else '❌ REJECT'}"
@@ -163,7 +163,7 @@ Examples:
 
                 scores = evaluation.get("scores", {})
                 if scores:
-                    print(f"   • Detailed Scores:")
+                    print("   • Detailed Scores:")
                     for score_type, score_value in scores.items():
                         print(f"     - {score_type.title()}: {score_value}")
 
@@ -173,13 +173,13 @@ Examples:
 
                 token_usage = evaluation.get("token_usage", {})
                 if token_usage:
-                    print(f"   • Token Usage:")
+                    print("   • Token Usage:")
                     print(f"     - Input: {token_usage.get('input_tokens', 0)}")
                     print(f"     - Output: {token_usage.get('output_tokens', 0)}")
                     print(f"     - Total: {token_usage.get('total_tokens', 0)}")
 
             if vote_result:
-                print(f"\n🗳️  Voting Results:")
+                print("\n🗳️  Voting Results:")
                 print(f"   • Status: {vote_result}")
             elif args.auto_vote and not args.evaluation_only:
                 print(f"\n🗳️  Voting: {message}")

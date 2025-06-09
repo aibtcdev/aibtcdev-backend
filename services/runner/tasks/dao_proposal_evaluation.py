@@ -9,7 +9,6 @@ from backend.factory import backend
 from backend.models import (
     QueueMessage,
     QueueMessageBase,
-    QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
     VoteCreate,

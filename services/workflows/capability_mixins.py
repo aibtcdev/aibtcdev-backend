@@ -4,13 +4,11 @@ This module provides a standardized approach to creating and integrating
 capabilities into LangGraph workflows through a mixin system.
 """
 
-import asyncio
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Dict, List, Optional, TypeVar
 
 from langchain.prompts import PromptTemplate
-from langchain_core.callbacks import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
@@ -277,7 +275,7 @@ class PromptCapability:
         """
         try:
             # Create filter based on available IDs, prioritizing specificity
-            filters = PromptFilter(is_active=True)
+            PromptFilter(is_active=True)
 
             # Try to find prompts in order of specificity:
             # 1. Agent-specific prompts

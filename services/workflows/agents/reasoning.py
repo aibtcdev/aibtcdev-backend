@@ -1,7 +1,6 @@
 import asyncio
 from typing import Any, Dict, Optional
 
-from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph

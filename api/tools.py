@@ -12,7 +12,6 @@ from backend.models import (  # Added Profile, AgentFilter, Wallet
     UUID,
     AgentFilter,
     ContractStatus,
-    DAOFilter,
     Profile,
     Proposal,
     ProposalCreate,
