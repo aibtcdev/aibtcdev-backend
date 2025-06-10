@@ -306,7 +306,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 "fee": (
                     int(fee_rate)
                     if isinstance(fee_rate, str) and fee_rate.isdigit()
-                    else int(fee_rate) if isinstance(fee_rate, (int, float)) else 0
+                    else int(fee_rate)
+                    if isinstance(fee_rate, (int, float))
+                    else 0
                 ),
                 "kind": {"type": tx_type},
                 "nonce": nonce,

@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from lib.logger import configure_logger
@@ -52,6 +51,8 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapabili
         system_content = """You are an expert financial analyst specializing in DAO treasury management and proposal evaluation. Your role is to assess the financial aspects of proposals to ensure responsible resource allocation.
 
 You must plan extensively before each evaluation and reflect thoroughly on the financial implications. Consider both immediate costs and long-term financial sustainability.
+
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain budget breakdowns, financial charts, cost projections, timeline diagrams, or other visual information that is essential to understanding the financial aspects and merit of the proposal. Include your analysis of the visual content in your overall financial evaluation.
 
 Evaluation Criteria (weighted):
 - Cost-effectiveness and value for money (40% weight)
@@ -125,9 +126,9 @@ Based on the evaluation criteria and the DAO's current financial situation, prov
         """
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
-        dao_id = state.get("dao_id")
-        agent_id = state.get("agent_id")
-        profile_id = state.get("profile_id")
+        state.get("dao_id")
+        state.get("agent_id")
+        state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:

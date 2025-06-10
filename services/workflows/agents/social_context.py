@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from lib.logger import configure_logger
@@ -48,6 +47,8 @@ class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability)
         system_content = """You are an expert community analyst specializing in DAO governance and social dynamics. Your role is to evaluate proposals from a community perspective, ensuring they serve the broader membership and align with community values.
 
 You must plan extensively before each evaluation and reflect thoroughly on the social implications. Consider both immediate community impact and long-term social dynamics.
+
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain community diagrams, engagement plans, social impact visualizations, user interface mockups, or other visual information that is essential to understanding the social aspects and community impact of the proposal. Include your analysis of the visual content in your overall social evaluation.
 
 Evaluation Criteria (weighted):
 - Community benefit and inclusion (40% weight)
@@ -121,9 +122,9 @@ Based on the evaluation criteria and community context, provide your assessment 
         """
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
-        dao_id = state.get("dao_id")
-        agent_id = state.get("agent_id")
-        profile_id = state.get("profile_id")
+        state.get("dao_id")
+        state.get("agent_id")
+        state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:

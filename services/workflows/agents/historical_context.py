@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from backend.factory import backend
@@ -194,6 +193,8 @@ class HistoricalContextAgent(
 
 You must plan extensively before each evaluation and reflect thoroughly on historical patterns. The DAO has a 1000 token payout limit per proposal, and submitters might try to game this by splitting large requests across multiple proposals.
 
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain diagrams, charts, screenshots, mockups, or other visual information that is essential to understanding the full scope and merit of the proposal. When comparing against historical proposals, also consider visual similarities and whether images reveal patterns that might indicate duplicate or sequential proposals. Include your analysis of the visual content in your overall historical evaluation.
+
 Evaluation Process:
 1. First, analyze proposals to identify sequences or relationships:
    - Look for proposals with similar titles, themes, or goals
@@ -282,8 +283,8 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
             # Escape curly braces to prevent f-string/format interpretation issues
             proposal_content = proposal_content.replace("{", "{{").replace("}", "}}")
         dao_id = state.get("dao_id")
-        agent_id = state.get("agent_id")
-        profile_id = state.get("profile_id")
+        state.get("agent_id")
+        state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:
