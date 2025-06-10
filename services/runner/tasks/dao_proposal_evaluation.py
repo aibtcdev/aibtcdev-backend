@@ -168,6 +168,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 profile_id=wallet.profile_id,
                 evaluation_score=evaluation_scores,  # Store the complete evaluation scores
                 flags=evaluation_flags,  # Store the evaluation flags
+                evaluation=evaluation,
             )
 
             # Create the vote record

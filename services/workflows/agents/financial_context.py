@@ -28,20 +28,12 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapabili
     def _create_chat_messages(
         self,
         proposal_data: str,
-        treasury_balance: str,
-        monthly_budget: str,
-        funding_priorities: str,
-        financial_constraints: str,
         proposal_images: List[Dict[str, Any]] = None,
     ) -> List:
         """Create chat messages for financial context evaluation.
 
         Args:
             proposal_data: The proposal content to evaluate
-            treasury_balance: Current treasury balance
-            monthly_budget: Monthly budget information
-            funding_priorities: DAO funding priorities
-            financial_constraints: Financial constraints to consider
             proposal_images: List of processed images
 
         Returns:
@@ -54,26 +46,30 @@ You must plan extensively before each evaluation and reflect thoroughly on the f
 
 **Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain budget breakdowns, financial charts, cost projections, timeline diagrams, or other visual information that is essential to understanding the financial aspects and merit of the proposal. Include your analysis of the visual content in your overall financial evaluation.
 
+**Default Financial Context**: 
+- If this proposal passes, it will automatically distribute 1000 tokens from the treasury to the proposer
+- Beyond this default payout, evaluate any additional financial requests, promises, or money/crypto-related aspects mentioned in the proposal
+
 Evaluation Criteria (weighted):
 - Cost-effectiveness and value for money (40% weight)
-- Budget accuracy and detail (20% weight)
-- Financial risk assessment (20% weight)
-- Alignment with DAO's financial priorities (20% weight)
+- Reasonableness of any additional funding requests (25% weight)
+- Financial feasibility of promises or commitments (20% weight)
+- Overall financial risk assessment (15% weight)
 
 Key Considerations:
-- Is the proposal requesting a reasonable amount?
-- Are costs well-justified with clear deliverables?
-- Are there hidden or underestimated costs?
-- Does it align with the DAO's financial priorities?
-- What is the potential ROI (Return on Investment)?
-- Are there financial risks or dependencies?
+- Are any additional funding requests beyond the 1000 tokens reasonable and well-justified?
+- Are there any promises or commitments in the proposal that involve money, crypto, or treasury resources?
+- What are the financial risks or implications of the proposal?
+- Are costs (if any) clearly itemized and realistic?
+- Does the proposal represent good value for the default 1000 token investment?
+- Are there any hidden financial commitments or ongoing costs?
 
 Scoring Guide:
-- 0-20: Very poor financial justification, high risk, or not aligned with priorities
-- 21-50: Significant issues or missing details, questionable value
-- 51-70: Adequate but with some concerns or minor risks
-- 71-90: Good value, well-justified, low risk, fits priorities
-- 91-100: Excellent value, clear ROI, no concerns, highly aligned
+- 0-20: Very poor financial value, unreasonable requests, or high financial risk
+- 21-50: Significant financial concerns, unclear costs, or questionable value
+- 51-70: Adequate financial merit with some minor concerns
+- 71-90: Good financial value, reasonable requests, clear justification
+- 91-100: Excellent financial merit, outstanding value, no financial concerns
 
 Output Format:
 Provide a JSON object with exactly these fields:
@@ -81,19 +77,19 @@ Provide a JSON object with exactly these fields:
 - flags: Array of any critical financial issues or red flags
 - summary: Brief summary of your financial evaluation"""
 
-        # User message with specific financial context and evaluation request
+        # User message with evaluation request
         user_content = f"""Please evaluate the financial aspects of the following proposal:
+
+**Important Context**: This proposal, if passed, will automatically receive 1000 tokens from the treasury. Your evaluation should focus on:
+1. Whether the proposal provides good value for these 1000 tokens
+2. Any additional funding requests beyond the 1000 tokens
+3. Any financial commitments, promises, or money/crypto-related aspects mentioned in the proposal
+4. Overall financial risk and feasibility
 
 Proposal to Evaluate:
 {proposal_data}
 
-DAO Financial Context:
-- Treasury Balance: {treasury_balance}
-- Monthly Budget: {monthly_budget}
-- Funding Priorities: {funding_priorities}
-- Financial Constraints: {financial_constraints}
-
-Based on the evaluation criteria and the DAO's current financial situation, provide your assessment of the proposal's financial merit, value for money, and alignment with financial priorities."""
+Based on the evaluation criteria, provide your assessment of the proposal's financial merit, focusing on the value provided for the 1000 token investment and any additional financial aspects."""
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -134,13 +130,6 @@ Based on the evaluation criteria and the DAO's current financial situation, prov
         if "token_usage" not in state:
             state["token_usage"] = {}
 
-        # Get DAO financial context from config if available
-        dao_financial_context = self.config.get("dao_financial_context", {})
-        treasury_balance = dao_financial_context.get("treasury_balance", "unknown")
-        monthly_budget = dao_financial_context.get("monthly_budget", "unknown")
-        funding_priorities = dao_financial_context.get("funding_priorities", [])
-        financial_constraints = dao_financial_context.get("financial_constraints", [])
-
         # Get proposal images
         proposal_images = state.get("proposal_images", [])
 
@@ -148,18 +137,6 @@ Based on the evaluation criteria and the DAO's current financial situation, prov
             # Create chat messages
             messages = self._create_chat_messages(
                 proposal_data=proposal_content,
-                treasury_balance=treasury_balance,
-                monthly_budget=monthly_budget,
-                funding_priorities=(
-                    ", ".join(funding_priorities)
-                    if funding_priorities
-                    else "Not specified"
-                ),
-                financial_constraints=(
-                    ", ".join(financial_constraints)
-                    if financial_constraints
-                    else "Not specified"
-                ),
                 proposal_images=proposal_images,
             )
 

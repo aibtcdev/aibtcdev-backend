@@ -17,6 +17,9 @@ class FinalOutput(BaseModel):
     score: int = Field(description="Final evaluation score")
     decision: str = Field(description="Approve or Reject")
     explanation: str = Field(description="Reasoning for decision")
+    confidence: float = Field(
+        description="Confidence in the decision (0.0-1.0)", ge=0.0, le=1.0
+    )
 
 
 class ProposalEvaluationOutput(BaseModel):

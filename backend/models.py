@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -755,6 +755,9 @@ class VoteBase(CustomBaseModel):
         None  # Store final score from proposal evaluation
     )
     flags: Optional[List[str]] = None  # Store flags from proposal evaluation
+    evaluation: Optional[Dict[str, Any]] = (
+        None  # Store evaluation from proposal evaluation
+    )
 
 
 class VoteCreate(VoteBase):
