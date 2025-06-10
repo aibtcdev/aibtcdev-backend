@@ -76,32 +76,102 @@ class HistoricalContextAgent(
         Returns:
             Formatted text of past proposals
         """
-        # Sort proposals by creation date (newest first to prioritize recent history)
-        sorted_proposals = sorted(proposals, key=lambda p: p.created_at, reverse=True)
+        if not proposals:
+            return "<no_proposals>No past proposals available.</no_proposals>"
+
+        try:
+            # Sort proposals by creation date (newest first to prioritize recent history)
+            # Use safe sorting with error handling
+            sorted_proposals = []
+            for proposal in proposals:
+                try:
+                    created_at = getattr(proposal, "created_at", None)
+                    if created_at:
+                        sorted_proposals.append((proposal, created_at))
+                    else:
+                        sorted_proposals.append((proposal, None))
+                except Exception as e:
+                    self.logger.warning(
+                        f"Error accessing created_at for proposal: {str(e)}"
+                    )
+                    sorted_proposals.append((proposal, None))
+
+            # Sort by created_at, handling None values
+            sorted_proposals.sort(
+                key=lambda x: x[1] if x[1] is not None else 0, reverse=True
+            )
+        except Exception as e:
+            self.logger.error(f"Error sorting proposals: {str(e)}")
+            sorted_proposals = [(proposal, None) for proposal in proposals]
 
         # Format individual proposals with all relevant details
-        past_proposals_text = (
-            "\n\n".join(
-                [
+        formatted_proposals = []
+        for i, (proposal, _) in enumerate(
+            sorted_proposals[:8]
+        ):  # Limit to first 8 for context
+            try:
+                # Safely get proposal attributes with proper error handling
+                title = getattr(proposal, "title", None) or "Untitled"
+                content = getattr(proposal, "content", None) or "No content"
+                status = getattr(proposal, "status", None) or "Unknown"
+                proposal_type = getattr(proposal, "type", None) or "Unknown"
+                passed = getattr(proposal, "passed", None)
+                action = getattr(proposal, "action", None) or "None"
+
+                # Safely handle created_at date formatting
+                created_at = getattr(proposal, "created_at", None)
+                created_str = "Unknown"
+                if created_at:
+                    try:
+                        created_str = created_at.strftime("%Y-%m-%d")
+                    except (AttributeError, ValueError):
+                        created_str = str(created_at)
+
+                # Safely convert content to string and limit length
+                content_str = str(content)[:500] if content else "No content"
+
+                # Ensure content is treated as plain text and safe for prompt processing
+                # Remove any control characters that might cause parsing issues
+                content_str = "".join(
+                    char for char in content_str if ord(char) >= 32 or char in "\n\r\t"
+                )
+
+                # Escape curly braces to prevent f-string/format interpretation issues
+                content_str = content_str.replace("{", "{{").replace("}", "}}")
+
+                proposal_text = (
                     f'<proposal id="{i + 1}">\n'
-                    f"  <title>{proposal.title or 'Untitled'}</title>\n"
-                    f"  <content>{proposal.content or 'No content'}</content>\n"
-                    f"  <status>{proposal.status or 'Unknown'}</status>\n"
-                    f"  <type>{proposal.type or 'Unknown'}</type>\n"
-                    f"  <created_at>{proposal.created_at.strftime('%Y-%m-%d') if proposal.created_at else 'Unknown'}</created_at>\n"
-                    f"  <passed>{proposal.passed or False}</passed>\n"
-                    f"  <action>{proposal.action or 'None'}</action>\n"
+                    f"  <title>{str(title)[:100]}</title>\n"
+                    f"  <content>{content_str}</content>\n"
+                    f"  <status>{str(status)}</status>\n"
+                    f"  <type>{str(proposal_type)}</type>\n"
+                    f"  <created_at>{created_str}</created_at>\n"
+                    f"  <passed>{str(passed) if passed is not None else 'False'}</passed>\n"
+                    f"  <action>{str(action)}</action>\n"
                     f"</proposal>"
-                    for i, proposal in enumerate(
-                        sorted_proposals[:8]
-                    )  # Limit to first 8 for context
-                ]
-            )
-            if proposals
+                )
+
+                formatted_proposals.append(proposal_text)
+            except Exception as e:
+                self.logger.error(f"Error formatting proposal {i}: {str(e)}")
+                # Add a fallback proposal entry
+                formatted_proposals.append(
+                    f'<proposal id="{i + 1}">\n'
+                    f"  <title>Error loading proposal</title>\n"
+                    f"  <content>Could not load proposal data: {str(e)}</content>\n"
+                    f"  <status>Unknown</status>\n"
+                    f"  <type>Unknown</type>\n"
+                    f"  <created_at>Unknown</created_at>\n"
+                    f"  <passed>Unknown</passed>\n"
+                    f"  <action>None</action>\n"
+                    f"</proposal>"
+                )
+
+        return (
+            "\n\n".join(formatted_proposals)
+            if formatted_proposals
             else "<no_proposals>No past proposals available.</no_proposals>"
         )
-
-        return past_proposals_text
 
     def _create_chat_messages(
         self,
@@ -200,6 +270,17 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
         self._initialize_vector_capability()
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
+
+        # Ensure proposal content is safely handled as plain text
+        if proposal_content:
+            # Convert to string and ensure it's treated as plain text
+            proposal_content = str(proposal_content)
+            # Remove any null bytes or other control characters that might cause parsing issues
+            proposal_content = "".join(
+                char for char in proposal_content if ord(char) >= 32 or char in "\n\r\t"
+            )
+            # Escape curly braces to prevent f-string/format interpretation issues
+            proposal_content = proposal_content.replace("{", "{{").replace("}", "}}")
         dao_id = state.get("dao_id")
         agent_id = state.get("agent_id")
         profile_id = state.get("profile_id")
@@ -210,13 +291,20 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
 
         # Retrieve all proposals for this DAO from Supabase
         dao_proposals = []
-        if dao_id:
-            dao_proposals = await self._fetch_dao_proposals(dao_id)
-
-        # Format database proposals for context
         past_proposals_db_text = ""
-        if dao_proposals:
-            past_proposals_db_text = self._format_proposals_for_context(dao_proposals)
+        try:
+            if dao_id:
+                dao_proposals = await self._fetch_dao_proposals(dao_id)
+                past_proposals_db_text = self._format_proposals_for_context(
+                    dao_proposals
+                )
+        except Exception as e:
+            self.logger.error(
+                f"[DEBUG:HistoricalAgent:{proposal_id}] Error fetching/formatting DAO proposals: {str(e)}"
+            )
+            past_proposals_db_text = (
+                "<no_proposals>No past proposals available due to error.</no_proposals>"
+            )
 
         # Retrieve similar past proposals from vector store if possible
         past_proposals_vector_text = ""

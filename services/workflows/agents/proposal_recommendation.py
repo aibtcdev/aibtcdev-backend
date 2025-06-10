@@ -116,6 +116,15 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
                 # Safely convert content to string and limit length
                 content_str = str(content)[:500] if content else "No content"
 
+                # Ensure content is treated as plain text and safe for prompt processing
+                # Remove any control characters that might cause parsing issues
+                content_str = "".join(
+                    char for char in content_str if ord(char) >= 32 or char in "\n\r\t"
+                )
+
+                # Escape curly braces to prevent f-string/format interpretation issues
+                content_str = content_str.replace("{", "{{").replace("}", "}}")
+
                 proposal_text = f"""<proposal id="{i + 1}">
   <title>{str(title)[:100]}</title>
   <content>{content_str}</content>
