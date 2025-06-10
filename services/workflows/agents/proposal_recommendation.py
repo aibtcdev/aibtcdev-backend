@@ -96,15 +96,48 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
 
         formatted_proposals = []
         for i, proposal in enumerate(proposals):
-            proposal_text = f"""<proposal id="{i + 1}">
-  <title>{proposal.title or "Untitled"}</title>
-  <content>{proposal.content or "No content"}</content>
-  <type>{proposal.type or "Unknown"}</type>
-  <status>{proposal.status or "Unknown"}</status>
-  <created>{proposal.created_at.strftime("%Y-%m-%d") if proposal.created_at else "Unknown"}</created>
-  <passed>{proposal.passed if proposal.passed is not None else "Unknown"}</passed>
+            try:
+                # Safely get proposal attributes with proper error handling
+                title = getattr(proposal, "title", None) or "Untitled"
+                content = getattr(proposal, "content", None) or "No content"
+                proposal_type = getattr(proposal, "type", None) or "Unknown"
+                status = getattr(proposal, "status", None) or "Unknown"
+                passed = getattr(proposal, "passed", None)
+
+                # Safely handle created_at date formatting
+                created_at = getattr(proposal, "created_at", None)
+                created_str = "Unknown"
+                if created_at:
+                    try:
+                        created_str = created_at.strftime("%Y-%m-%d")
+                    except (AttributeError, ValueError):
+                        created_str = str(created_at)
+
+                # Safely convert content to string and limit length
+                content_str = str(content)[:500] if content else "No content"
+
+                proposal_text = f"""<proposal id="{i + 1}">
+  <title>{str(title)[:100]}</title>
+  <content>{content_str}</content>
+  <type>{str(proposal_type)}</type>
+  <status>{str(status)}</status>
+  <created>{created_str}</created>
+  <passed>{str(passed) if passed is not None else "Unknown"}</passed>
 </proposal>"""
-            formatted_proposals.append(proposal_text)
+                formatted_proposals.append(proposal_text)
+            except Exception as e:
+                self.logger.error(f"Error formatting proposal {i}: {str(e)}")
+                # Add a fallback proposal entry
+                formatted_proposals.append(
+                    f"""<proposal id="{i + 1}">
+  <title>Error loading proposal</title>
+  <content>Could not load proposal data: {str(e)}</content>
+  <type>Unknown</type>
+  <status>Unknown</status>
+  <created>Unknown</created>
+  <passed>Unknown</passed>
+</proposal>"""
+                )
 
         return "\n\n".join(formatted_proposals)
 
@@ -236,8 +269,16 @@ Please analyze this information and provide a proposal recommendation that align
             }
 
         # Fetch recent proposals for context
-        recent_proposals = await self._fetch_dao_proposals(dao_id, limit=8)
-        proposals_context = self._format_proposals_for_context(recent_proposals)
+        try:
+            recent_proposals = await self._fetch_dao_proposals(dao_id, limit=8)
+            proposals_context = self._format_proposals_for_context(recent_proposals)
+        except Exception as e:
+            self.logger.error(
+                f"Error fetching/formatting proposals for DAO {dao_id}: {str(e)}"
+            )
+            proposals_context = (
+                "<no_proposals>No past proposals available due to error.</no_proposals>"
+            )
 
         # Get additional context from state if available
         focus_area = state.get("focus_area", "general improvement")
