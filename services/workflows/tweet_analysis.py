@@ -121,7 +121,7 @@ Tweet History Context:
 {filtered_content}
 
 Current DAO Symbols Already Taken:
-{', '.join(token_symbols) if token_symbols else 'None'}
+{", ".join(token_symbols) if token_symbols else "None"}
 
 Based on this information, determine if this tweet contains a valid DAO deployment request and extract the necessary parameters if applicable."""
 
