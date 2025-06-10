@@ -10,6 +10,7 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageType,
 )
+from config import config
 from lib.utils import strip_metadata_section
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
@@ -287,8 +288,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # CREATE SECOND TWEET (FOLLOW-UP POST) - ADD THIS BLOCK HERE
             proposal_number = proposal.proposal_id
             dao_name = dao_data["name"]
-            reward_amount = int(proposal.bond or 0)
-            proposal_url = f"https://app-staging.aibtc.dev/proposals/{dao_data['id']}"
+            reward_amount = 1000
+            proposal_url = f"{config.api.base_url}/proposals/{dao_data['id']}"
 
             follow_up_message = (
                 f"This message was approved by proposal #{proposal_number} of {dao_name}.\n\n"
