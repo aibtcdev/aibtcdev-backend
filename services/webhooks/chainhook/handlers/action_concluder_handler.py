@@ -10,6 +10,7 @@ from backend.models import (
     QueueMessageCreate,
     QueueMessageType,
 )
+from config import config
 from lib.utils import strip_metadata_section
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
@@ -283,6 +284,28 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 )
             )
             self.logger.info(f"Created tweet queue message: {tweet_message.id}")
+
+            # CREATE SECOND TWEET (FOLLOW-UP POST) - ADD THIS BLOCK HERE
+            proposal_number = proposal.proposal_id
+            dao_name = dao_data["name"]
+            reward_amount = 1000
+            proposal_url = f"{config.api.base_url}/proposals/{dao_data['id']}"
+
+            follow_up_message = (
+                f"This message was approved by proposal #{proposal_number} of {dao_name}.\n\n"
+                f"{reward_amount:,} DAO tokens has been rewarded to the submitter.\n\n"
+                f"View proposal details: {proposal_url}"
+            )
+
+            follow_up_tweet = backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.TWEET,
+                    message={"message": follow_up_message},
+                    dao_id=dao_data["id"],
+                )
+            )
+            self.logger.info(f"Created follow-up tweet queue message: {follow_up_tweet.id}")
+            # END OF SECOND TWEET BLOCK
 
             # Calculate participation and approval percentages for passed proposal
             votes_for = int(proposal.votes_for or 0)
