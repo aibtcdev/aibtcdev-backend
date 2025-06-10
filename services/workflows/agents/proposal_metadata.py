@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from lib.logger import configure_logger

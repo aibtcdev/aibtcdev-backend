@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from backend.factory import backend
@@ -128,8 +127,8 @@ Based on the evaluation criteria and scoring guide, provide your assessment of h
         proposal_id = state.get("proposal_id", "unknown")
         proposal_content = state.get("proposal_data", "")
         dao_id = state.get("dao_id")
-        agent_id = state.get("agent_id")
-        profile_id = state.get("profile_id")
+        state.get("agent_id")
+        state.get("profile_id")
 
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:

@@ -6,7 +6,7 @@ capabilities into LangGraph workflows through a mixin system.
 
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, Optional, TypeVar
 
 from langchain_core.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI

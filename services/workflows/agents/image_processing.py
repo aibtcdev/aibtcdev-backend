@@ -1,7 +1,5 @@
-import base64
 from typing import Any, Dict, List, Optional
 
-import httpx
 import magic
 
 from lib.logger import configure_logger
