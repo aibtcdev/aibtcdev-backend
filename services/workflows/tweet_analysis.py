@@ -1,6 +1,6 @@
 from typing import Dict, Optional, TypedDict
 
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts.chat import ChatPromptTemplate
 from langgraph.graph import END, Graph, StateGraph
 from pydantic import BaseModel, Field
 
@@ -54,86 +54,84 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
         super().__init__(**kwargs)
         self.account_name = account_name
 
-    def _create_prompt(self) -> PromptTemplate:
-        """Create the analysis prompt template."""
-        return PromptTemplate(
-            input_variables=[
-                "tweet_text",
-                "filtered_content",
-                "account_name",
-                "token_symbols",
-            ],
-            template="""
-            Your name is {account_name} on twitter.
+    def _create_chat_messages(
+        self,
+        tweet_text: str,
+        filtered_content: str,
+        account_name: str,
+        token_symbols: list,
+    ) -> list:
+        """Create chat messages for tweet analysis.
 
-            Analyze this tweet to determine:
-            1. If it's worthy of processing (contains a valid DAO deployment request)
-            2. What type of tweet it is (tool_request, thread, or invalid)
-            3. If it's a tool request, extract the following required parameters:
-               - token_symbol: The symbol for the token (e.g., 'HUMAN')
-               - token_name: The name of the token (e.g., 'Human')
-               - token_description: Description of the token (e.g., 'The Human Token')
-               - token_max_supply: Initial supply (default: 1000000000)
-               - token_decimals: Number of decimals (default: 6)
-               - origin_address: The address of the DAO creator
-               - mission: The mission statement of the DAO serves as the unifying purpose and guiding principle of an AI DAO. It defines its goals, values, and desired impact, aligning participants and AI resources to achieve a shared outcome.
-               - tweet_id: The ID of the tweet
-            
-            Tweet History:
-            {filtered_content}
-            
-            Current Tweet:
-            {tweet_text}
-            
-            If the text is determined to be a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
+        Args:
+            tweet_text: The current tweet text to analyze
+            filtered_content: Filtered content from tweet history
+            account_name: The account name analyzing tweets
+            token_symbols: List of token symbols already taken
 
-            Exclude tweets that are purely promotional and lack actionable parameters. If the tweet includes both praise and actionable details describing deploying a DAO, proceed with DAO deployment.
+        Returns:
+            List of chat messages
+        """
+        # System message with analysis guidelines
+        system_content = f"""You are {account_name}, a specialized DAO deployment analysis agent. Your role is to analyze tweets to determine if they contain valid DAO deployment requests and extract the necessary parameters.
 
-            Only craft the parameters for the tool contract_deploy_dao.
-                            
-            Requirements:
-            1. Expand upon any missing details in the request for a dao to be deployed to meet the needs of the tool parameters
-            2. If the tweet is a general conversation, unrelated to creating or deploying a DAO, or if it appears to be promotional content, set Worthiness determination to False.
-            3. Don't execute the tool contract_deploy_dao as your sole purpose is to generate the parameters for the tool.
-            4. Make sure the DAO symbol is not already taken. If it is already taken, choose a new symbol for the parameters.
-            5. Only craft the parameters for the tool contract_deploy_dao if Worthiness determination is True.
-            
-            Worthiness criteria:
-            - We welcome creativity—funny or edgy ideas are always welcome
-            - Concepts must avoid harmful or unethical themes
-            - While we're flexible on ethics, there's a clear line against promoting harm
-            - Worth depends on substance and alignment with basic principles
+Analysis Guidelines:
+1. Determine if the tweet is worthy of processing (contains a valid DAO deployment request)
+2. Classify the tweet type: tool_request, thread, or invalid
+3. For tool requests, extract required parameters for contract_deploy_dao tool:
+   - token_symbol: Symbol for the token (e.g., 'HUMAN')
+   - token_name: Name of the token (e.g., 'Human')
+   - token_description: Description of the token
+   - token_max_supply: Initial supply (default: 1000000000)
+   - token_decimals: Number of decimals (default: 6)
+   - origin_address: Address of the DAO creator
+   - mission: Mission statement serving as the unifying purpose and guiding principle
+   - tweet_id: ID of the tweet
 
-            Current DAO Symbols already taken:
-            {token_symbols}
+Worthiness Criteria:
+- Welcome creativity—funny or edgy ideas are encouraged
+- Concepts must avoid harmful or unethical themes
+- While flexible on ethics, there's a clear line against promoting harm
+- Worth depends on substance and alignment with basic principles
+- General conversations unrelated to DAO creation should be marked as not worthy
+- Purely promotional content without actionable details should be marked as not worthy
 
-            Output format:
-            {{
-                "worthy": bool,
-                "reason": str,
-                "tweet_type": "tool_request" | "thread" | "invalid",
-                "tool_request": {{
-                    "tool_name": "contract_deploy_dao",
-                    "parameters": {{
-                        "token_symbol": str,
-                        "token_name": str,
-                        "token_description": str,
-                        "token_max_supply": str,
-                        "token_decimals": str,
-                        "origin_address": str,
-                        "mission": str,
-                        "tweet_id": str,
-                    }},
-                    "priority": int
-                }} if worthy and tweet_type == "tool_request" else None,
-                "confidence_score": float
-            }}
-            """,
-        )
+Token Symbol Rules:
+- Ensure the DAO symbol is not already taken from the provided list
+- If taken, choose a new unique symbol for the parameters
+- Only craft parameters if worthiness determination is True
+
+Note: Your sole purpose is to analyze and generate parameters, not to execute the contract_deploy_dao tool.
+
+Output Format:
+Provide a JSON object with:
+- worthy: Boolean indicating if tweet is worthy of processing
+- reason: Explanation for the worthy determination
+- tweet_type: Classification as "tool_request", "thread", or "invalid"
+- tool_request: Object with tool_name "contract_deploy_dao", parameters, and priority (only if worthy and tool_request type)
+- confidence_score: Float between 0.0 and 1.0 for confidence in determination"""
+
+        # User message with the specific analysis request
+        user_content = f"""Please analyze the following tweet information:
+
+Current Tweet:
+{tweet_text}
+
+Tweet History Context:
+{filtered_content}
+
+Current DAO Symbols Already Taken:
+{', '.join(token_symbols) if token_symbols else 'None'}
+
+Based on this information, determine if this tweet contains a valid DAO deployment request and extract the necessary parameters if applicable."""
+
+        return [
+            ("system", system_content),
+            ("human", user_content),
+        ]
 
     def _create_graph(self) -> Graph:
         """Create the analysis graph."""
-        prompt = self._create_prompt()
 
         # Create analysis node
         def analyze_tweet(state: AnalysisState) -> AnalysisState:
@@ -151,23 +149,23 @@ class TweetAnalysisWorkflow(BaseWorkflow[AnalysisState]):
             # make a list of token symbols in queue and token symbols in db
             token_symbols = list(set(token_symbols_in_db + token_symbols_in_queue))
 
-            # Format prompt with state
-            formatted_prompt = prompt.format(
+            # Create chat messages
+            messages = self._create_chat_messages(
                 tweet_text=state["tweet_text"],
                 filtered_content=state["filtered_content"],
                 account_name=self.account_name,
                 token_symbols=token_symbols,
             )
 
+            # Create chat prompt template
+            prompt = ChatPromptTemplate.from_messages(messages)
+            formatted_prompt = prompt.format()
+
             structured_output = self.llm.with_structured_output(
                 TweetAnalysisOutput,
             )
             # Get analysis from LLM
             result = structured_output.invoke(formatted_prompt)
-
-            # Clean and parse the response
-            # content = self._clean_llm_response(result.content)
-            # parsed_result = TweetAnalysisOutput.model_validate_json(result)
 
             # Update state
             state["is_worthy"] = result.worthy

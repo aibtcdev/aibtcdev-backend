@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts.chat import ChatPromptTemplate
 
 from backend.factory import backend
 from backend.models import Proposal, ProposalFilter
@@ -102,6 +103,91 @@ class HistoricalContextAgent(
 
         return past_proposals_text
 
+    def _create_chat_messages(
+        self,
+        proposal_data: str,
+        past_proposals: str,
+        proposal_images: List[Dict[str, Any]] = None,
+    ) -> List:
+        """Create chat messages for historical context evaluation.
+
+        Args:
+            proposal_data: The current proposal content to evaluate
+            past_proposals: Formatted past proposals text
+            proposal_images: List of processed images
+
+        Returns:
+            List of chat messages
+        """
+        # System message with historical evaluation guidelines
+        system_content = """You are an expert DAO governance historian specializing in proposal analysis and pattern recognition. Your role is to evaluate new proposals against historical context to identify duplicates, sequences, and potential gaming attempts.
+
+You must plan extensively before each evaluation and reflect thoroughly on historical patterns. The DAO has a 1000 token payout limit per proposal, and submitters might try to game this by splitting large requests across multiple proposals.
+
+Evaluation Process:
+1. First, analyze proposals to identify sequences or relationships:
+   - Look for proposals with similar titles, themes, or goals
+   - Identify proposals that might be parts of a multi-stage initiative
+   - Detect potential attempts to circumvent the 1000 token limit by splitting requests
+   - Consider chronological relationships between proposals
+
+2. Then evaluate the current proposal based on:
+   - Is it a duplicate of past proposals? (25% weight)
+   - Has it addressed issues raised in similar past proposals? (20% weight)
+   - Shows consistency with past approved proposals? (25% weight)
+   - Is potentially part of a sequence to exceed limits? (30% weight)
+
+Key Red Flags:
+- Exact duplicates of previous proposals
+- Similar requesters, recipients, or incremental funding for the same project
+- Proposals that contradict previous decisions
+- Suspicious sequence patterns attempting to game token limits
+
+Scoring Guide:
+- 0-20: Exact duplicate, contradicts previous decisions, or appears to be gaming token limits
+- 21-50: Significant overlap without addressing past concerns or suspicious sequence pattern
+- 51-70: Similar to past proposals but with improvements and reasonable sequence relationship
+- 71-90: Builds well on past work with few concerns and transparent relationships
+- 91-100: Unique proposal or excellent improvement with clear, legitimate purpose
+
+Output Format:
+Provide a JSON object with exactly these fields:
+- score: A number from 0-100
+- flags: Array of any critical issues or red flags
+- summary: Brief summary of your evaluation
+- sequence_analysis: Identify any proposal sequences and explain relationships"""
+
+        # User message with specific historical context and evaluation request
+        user_content = f"""Please evaluate the following proposal against the DAO's historical context and past proposals:
+
+Current Proposal to Evaluate:
+{proposal_data}
+
+Past DAO Proposals:
+{past_proposals}
+
+Analyze this proposal for duplicates, sequences, and potential gaming attempts. Pay special attention to whether this might be part of a sequence of proposals designed to exceed the 1000 token payout limit. Provide your assessment based on the evaluation criteria."""
+
+        messages = [{"role": "system", "content": system_content}]
+
+        # Create user message content - start with text
+        user_message_content = [{"type": "text", "text": user_content}]
+
+        # Add images if available
+        if proposal_images:
+            for image in proposal_images:
+                if image.get("type") == "image_url":
+                    # Add detail parameter if not present
+                    image_with_detail = image.copy()
+                    if "detail" not in image_with_detail.get("image_url", {}):
+                        image_with_detail["image_url"]["detail"] = "auto"
+                    user_message_content.append(image_with_detail)
+
+        # Add the user message
+        messages.append({"role": "user", "content": user_message_content})
+
+        return messages
+
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Process the proposal against historical context.
 
@@ -168,104 +254,33 @@ class HistoricalContextAgent(
                 else past_proposals_vector_text
             )
 
-        # Default prompt template
-        default_template = """<system>
-  <reminder>
-    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-  </reminder>
-  <reminder>
-    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
-  </reminder>
-  <reminder>
-    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
-  </reminder>
-</system>
-<historical_context_evaluation>
-  <current_proposal>
-    {proposal_data}
-  </current_proposal>
-  <past_dao_proposals>
-    {past_proposals}
-  </past_dao_proposals>
-  <task>
-    <sequence_analysis>
-      First, analyze the proposals to identify any sequences or relationships between them:
-      <criteria>
-        <criterion>Look for proposals with similar titles, themes, or goals</criterion>
-        <criterion>Identify proposals that might be parts of a multi-stage initiative</criterion>
-        <criterion>Detect proposals that might be attempting to circumvent the 1000 token payout limit per proposal by splitting a large request into multiple smaller proposals</criterion>
-        <criterion>Consider chronological relationships between proposals</criterion>
-      </criteria>
-    </sequence_analysis>
-    <proposal_evaluation>
-      Then, evaluate whether this proposal:
-      <criteria>
-        <criterion weight=\"25\">Is a duplicate of past proposals</criterion>
-        <criterion weight=\"20\">Has addressed issues raised in similar past proposals</criterion>
-        <criterion weight=\"25\">Shows consistency with past approved proposals</criterion>
-        <criterion weight=\"30\">Is potentially part of a sequence of proposals to exceed limits
-          <details>
-            <detail>The DAO has a 1000 token payout limit per proposal</detail>
-            <detail>Submitters might split large requests across multiple proposals to get around this limit</detail>
-            <detail>Look for patterns like similar requesters, recipients, or incremental funding for the same project</detail>
-          </details>
-        </criterion>
-      </criteria>
-    </proposal_evaluation>
-    <scoring_guide>
-      Score this proposal from 0-100 based on the criteria above.
-      <score range=\"0-20\">Exact duplicate, contradicts previous decisions, or appears to be gaming token limits</score>
-      <score range=\"21-50\">Significant overlap without addressing past concerns or suspicious sequence pattern</score>
-      <score range=\"51-70\">Similar to past proposals but with improvements and reasonable sequence relationship (if any)</score>
-      <score range=\"71-90\">Builds well on past work with few concerns and transparent relationships to other proposals</score>
-      <score range=\"91-100\">Unique proposal or excellent improvement on past proposals with clear, legitimate purpose</score>
-    </scoring_guide>
-  </task>
-  <output_format>
-    Provide:
-    <score>A number from 0-100</score>
-    <flags>List of any critical issues or red flags</flags>
-    <summary>Brief summary of your evaluation</summary>
-    <sequence_analysis>Identify any proposal sequences and explain how this proposal might relate to others</sequence_analysis>
-    Only return a JSON object with these four fields: score, flags (array), summary, and sequence_analysis.
-  </output_format>
-</historical_context_evaluation>"""
-
-        # Create prompt with custom injection
-        prompt = self.create_prompt_with_custom_injection(
-            default_template=default_template,
-            input_variables=["proposal_data", "past_proposals"],
-            dao_id=dao_id,
-            agent_id=agent_id,
-            profile_id=profile_id,
-            prompt_type="historical_context_evaluation",
-        )
+        # Get proposal images
+        proposal_images = state.get("proposal_images", [])
 
         try:
-            formatted_prompt_text = prompt.format(
+            # Create chat messages
+            messages = self._create_chat_messages(
                 proposal_data=proposal_content,
                 past_proposals=past_proposals_text
                 or "<no_proposals>No past proposals available for comparison.</no_proposals>",
+                proposal_images=proposal_images,
             )
-            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
 
-            # Add any proposal images to the message
-            proposal_images = state.get("proposal_images", [])
-            if proposal_images:
-                message_content_list.extend(proposal_images)
-
-            llm_input_message = HumanMessage(content=message_content_list)
+            # Create chat prompt template
+            prompt = ChatPromptTemplate.from_messages(messages)
+            formatted_prompt = prompt.format()
 
             # Get structured output from the LLM
             result = await self.llm.with_structured_output(AgentOutput).ainvoke(
-                [llm_input_message]
+                formatted_prompt
             )
             result_dict = result.model_dump()
 
             # Track token usage
-            token_usage_data = self.track_token_usage(formatted_prompt_text, result)
+            token_usage_data = self.track_token_usage(str(formatted_prompt), result)
             state["token_usage"]["historical_agent"] = token_usage_data
             result_dict["token_usage"] = token_usage_data
+            result_dict["images_processed"] = len(proposal_images)
 
             # Update state with agent result
             update_state_with_agent_result(state, result_dict, "historical")
@@ -279,4 +294,5 @@ class HistoricalContextAgent(
                 "flags": [f"Error: {str(e)}"],
                 "summary": "Historical evaluation failed due to error",
                 "sequence_analysis": "Could not analyze potential proposal sequences due to error.",
+                "images_processed": len(proposal_images) if proposal_images else 0,
             }

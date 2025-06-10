@@ -9,6 +9,7 @@ dependencies = [
     "apscheduler==3.11.0",
     "cachetools==6.0.0",
     "fastapi==0.115.12",
+    "httpx>=0.25.0",
     "langchain==0.3.25",
     "langchain-community==0.3.24",
     "langchain-core>=0.3.56,<1.0.0",

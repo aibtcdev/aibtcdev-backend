@@ -402,9 +402,13 @@ Score Statistics:
 </reasoning_evaluation>"""
 
         # Create prompt with custom injection
-        prompt = self.create_prompt_with_custom_injection(
-            default_template=default_template,
-            input_variables=["agent_evaluations", "approval_threshold"],
+        # Split the template into system and user messages
+        default_system_message = default_template
+        default_user_message = "Please evaluate the agent assessments provided above and make your final decision."
+
+        prompt = self.create_chat_prompt_with_custom_injection(
+            default_system_message=default_system_message,
+            default_user_message=default_user_message,
             dao_id=dao_id,
             agent_id=agent_id,
             profile_id=profile_id,

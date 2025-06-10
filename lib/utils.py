@@ -3,26 +3,93 @@
 import binascii
 import logging
 import re
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
 
-def extract_image_urls(text):
+def extract_image_urls(text: str) -> List[str]:
     """
-    Extracts image URLs from a string.
+    Extracts image URLs from a string by making HEAD requests to verify Content-Type.
 
     Args:
-        text: The input string to search for image URLs.
+        text: The input string to search for URLs.
 
     Returns:
-        A list of image URLs found in the string.
+        A list of verified image URLs found in the string.
     """
-    image_url_pattern = re.compile(
-        r"\bhttps?://[^\s<>\"]+?\.(?:png|jpg|jpeg|gif|webp)(?:\b|(?=\s|$))",
-        re.IGNORECASE,
-    )
-    image_urls = re.findall(image_url_pattern, text)
+    # Find all https URLs in the text
+    url_pattern = re.compile(r'https://[^\s<>"\'()]+', re.IGNORECASE)
+    urls = re.findall(url_pattern, text)
+
+    if not urls:
+        return []
+
+    image_urls = []
+
+    # Common image MIME types to check for
+    image_mime_types = {
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/bmp",
+        "image/svg+xml",
+        "image/tiff",
+        "image/ico",
+        "image/x-icon",
+    }
+
+    # Use httpx for better async support and modern HTTP handling
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(5.0, connect=2.0),  # 5s total, 2s connect
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; ImageBot/1.0)"},
+        ) as client:
+            for url in urls:
+                try:
+                    # Make HEAD request to check Content-Type without downloading the file
+                    response = client.head(url)
+
+                    if response.status_code == 200:
+                        content_type = (
+                            response.headers.get("Content-Type", "")
+                            .lower()
+                            .split(";")[0]
+                            .strip()
+                        )
+
+                        # Check if it's an image type
+                        if content_type in image_mime_types:
+                            image_urls.append(url)
+                            logger.debug(
+                                f"Found image URL: {url} (Content-Type: {content_type})"
+                            )
+                        else:
+                            logger.debug(
+                                f"Skipped non-image URL: {url} (Content-Type: {content_type})"
+                            )
+                    else:
+                        logger.debug(
+                            f"Failed to access URL: {url} (Status: {response.status_code})"
+                        )
+
+                except httpx.TimeoutException:
+                    logger.debug(f"Timeout checking URL: {url}")
+                except httpx.RequestError as e:
+                    logger.debug(f"Request error checking URL {url}: {str(e)}")
+                except Exception as e:
+                    logger.debug(f"Unexpected error checking URL {url}: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize HTTP client: {str(e)}")
+        return []
+
+    logger.info(f"Found {len(image_urls)} image URLs out of {len(urls)} total URLs")
     return image_urls
 
 

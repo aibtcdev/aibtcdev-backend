@@ -38,7 +38,7 @@ def detect_image_mime_type(image_data: bytes) -> str:
 
 
 class ImageProcessingNode(BaseCapabilityMixin):
-    """Workflow node to process proposal images: extract URLs, download, and base64 encode."""
+    """Workflow node to process proposal images: extract URLs and format them for LLM."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the image processing node.
@@ -79,37 +79,20 @@ class ImageProcessingNode(BaseCapabilityMixin):
             return []
 
         processed_images = []
-        async with httpx.AsyncClient() as client:
-            for url in image_urls:
-                try:
-                    self.logger.debug(
-                        f"[ImageProcessorNode:{proposal_id}] Processing image URL: {url}"
-                    )
-                    response = await client.get(url, timeout=10.0)
-                    response.raise_for_status()
+        for url in image_urls:
+            self.logger.debug(
+                f"[ImageProcessorNode:{proposal_id}] Processing image URL: {url}"
+            )
 
-                    # Detect MIME type from actual image content using python-magic
-                    image_content = response.content
-                    mime_type = detect_image_mime_type(image_content)
-
-                    # Encode to base64
-                    image_data = base64.b64encode(image_content).decode("utf-8")
-
-                    processed_images.append(
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime_type};base64,{image_data}"
-                            },
-                        }
-                    )
-                    self.logger.debug(
-                        f"[ImageProcessorNode:{proposal_id}] Successfully processed image: {url} (detected as {mime_type})"
-                    )
-                except Exception as e:
-                    self.logger.error(
-                        f"[ImageProcessorNode:{proposal_id}] Error processing {url}: {str(e)}"
-                    )
+            processed_images.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": url},
+                }
+            )
+            self.logger.debug(
+                f"[ImageProcessorNode:{proposal_id}] Successfully processed image: {url}"
+            )
 
         self.logger.info(
             f"[ImageProcessorNode:{proposal_id}] Processed {len(processed_images)} images."

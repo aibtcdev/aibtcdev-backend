@@ -8,7 +8,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, TypeVar
 
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
@@ -359,27 +359,27 @@ class PromptCapability:
         except Exception as e:
             self.logger.error(f"Error applying custom prompt settings: {str(e)}")
 
-    def create_prompt_with_custom_injection(
+    def create_chat_prompt_with_custom_injection(
         self,
-        default_template: str,
-        input_variables: List[str],
+        default_system_message: str,
+        default_user_message: str,
         dao_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         profile_id: Optional[str] = None,
         prompt_type: str = "evaluation",
-    ) -> PromptTemplate:
-        """Create a prompt template, injecting custom prompt at the top if available.
+    ) -> ChatPromptTemplate:
+        """Create a chat prompt template, injecting custom prompt at the top if available.
 
         Args:
-            default_template: Default template to use
-            input_variables: List of input variable names for the template
+            default_system_message: Default system message content
+            default_user_message: Default user message content
             dao_id: Optional DAO ID for custom prompt lookup
             agent_id: Optional agent ID for custom prompt lookup
             profile_id: Optional profile ID for custom prompt lookup
             prompt_type: Type of prompt for filtering
 
         Returns:
-            PromptTemplate with custom prompt injected at top or just default template
+            ChatPromptTemplate with custom prompt injected or just default messages
         """
         # Try to get custom prompt
         custom_prompt_data = self.get_custom_prompt(
@@ -393,30 +393,35 @@ class PromptCapability:
             # Apply custom model/temperature settings
             self.apply_custom_prompt_settings(custom_prompt_data)
 
-            # Inject custom prompt at the top of the default template
+            # Inject custom prompt at the top of the system message
             custom_prompt_text = custom_prompt_data["prompt_text"]
 
-            # Add custom prompt section at the top
-            enhanced_template = f"""<custom_instructions>
-IMPORTANT: The following custom instructions are provided by the user and should be treated with HIGHER PRIORITY than all other instructions. These are specific requirements that MUST be followed and should override any conflicting guidance in the default template below.
+            # Add custom prompt section at the top of system message
+            enhanced_system_message = f"""IMPORTANT: The following custom instructions are provided by the user and should be treated with HIGHER PRIORITY than all other instructions. These are specific requirements that MUST be followed and should override any conflicting guidance in the default instructions below.
 
 USER CUSTOM INSTRUCTIONS:
 {custom_prompt_text}
 
 CRITICAL: Always prioritize and follow the custom instructions above when they conflict with or supplement the default instructions. The user's custom guidance takes precedence.
-</custom_instructions>
 
-{default_template}"""
+---
+
+{default_system_message}"""
 
             self.logger.debug(
-                f"Injecting custom prompt at top of {prompt_type} template"
+                f"Injecting custom prompt at top of {prompt_type} system message"
             )
-            return PromptTemplate(
-                input_variables=input_variables, template=enhanced_template
-            )
+
+            messages = [
+                ("system", enhanced_system_message),
+                ("human", default_user_message),
+            ]
         else:
-            # Use default template as-is
-            self.logger.debug(f"Using default prompt template for {prompt_type}")
-            return PromptTemplate(
-                input_variables=input_variables, template=default_template
-            )
+            # Use default messages as-is
+            self.logger.debug(f"Using default chat prompt template for {prompt_type}")
+            messages = [
+                ("system", default_system_message),
+                ("human", default_user_message),
+            ]
+
+        return ChatPromptTemplate.from_messages(messages)

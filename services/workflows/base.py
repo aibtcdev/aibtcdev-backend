@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
-from langchain.prompts import PromptTemplate
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import Graph, StateGraph
 
@@ -130,8 +130,8 @@ class BaseWorkflow(Generic[StateType]):
             callbacks=callbacks,
         )
 
-    def _create_prompt(self) -> PromptTemplate:
-        """Create the prompt template for this workflow."""
+    def _create_prompt(self) -> ChatPromptTemplate:
+        """Create the chat prompt template for this workflow."""
         raise NotImplementedError("Workflow must implement _create_prompt")
 
     def _create_graph(self) -> Union[Graph, StateGraph]:

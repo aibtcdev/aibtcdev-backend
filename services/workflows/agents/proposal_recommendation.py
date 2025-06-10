@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from langchain.prompts import PromptTemplate
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts.chat import ChatPromptTemplate
 
 from backend.factory import backend
 from backend.models import DAO, Proposal, ProposalFilter
@@ -108,6 +108,96 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
 
         return "\n\n".join(formatted_proposals)
 
+    def _create_chat_messages(
+        self,
+        dao_name: str,
+        dao_mission: str,
+        dao_description: str,
+        recent_proposals: str,
+        focus_area: str,
+        specific_needs: str,
+        proposal_images: List[Dict[str, Any]] = None,
+    ) -> List:
+        """Create chat messages for the proposal recommendation.
+
+        Args:
+            dao_name: Name of the DAO
+            dao_mission: Mission statement of the DAO
+            dao_description: Description of the DAO
+            recent_proposals: Formatted recent proposals text
+            focus_area: Focus area for the recommendation
+            specific_needs: Specific needs mentioned
+            proposal_images: List of processed images
+
+        Returns:
+            List of chat messages
+        """
+        # System message with guidelines and context
+        system_content = """You are an expert DAO governance advisor. Generate a thoughtful proposal recommendation that aligns with the DAO's mission and builds upon past proposals intelligently.
+
+Analysis Criteria:
+- Alignment with the DAO's stated mission and values
+- Gaps or opportunities not addressed by recent proposals
+- Natural progression from successful past proposals
+- Practical feasibility and clear deliverables
+- Potential positive impact on the DAO community
+- Resource requirements and sustainability
+
+Guidelines:
+- Avoid duplicating recent proposals unless building meaningfully upon them
+- Ensure the proposal is specific and actionable
+- Consider both short-term wins and long-term strategic value
+- Make sure the proposal scope is reasonable and achievable
+- Include clear success metrics where applicable
+
+Output Format:
+Provide a JSON object with:
+- title: A clear, compelling proposal title (max 100 characters)
+- content: Detailed proposal content with specific objectives, deliverables, timeline, and success metrics (max 1800 characters)
+- rationale: Explanation of why this proposal is recommended based on the DAO's context
+- priority: Priority level: high, medium, or low
+- estimated_impact: Expected positive impact on the DAO
+- suggested_action: Specific next steps or actions to implement (optional)
+
+IMPORTANT: Use only ASCII characters (characters 0-127) in all fields. Avoid any Unicode characters, emojis, special symbols, or non-ASCII punctuation. Use standard English letters, numbers, and basic punctuation only."""
+
+        # User message with the specific DAO context and request
+        user_content = f"""Based on the following DAO information and context, generate a thoughtful recommendation for a new proposal that would benefit the DAO:
+
+DAO Context:
+- Name: {dao_name}
+- Mission: {dao_mission}
+- Description: {dao_description}
+
+Recent Proposals:
+{recent_proposals}
+
+Recommendation Request:
+- Focus Area: {focus_area}
+- Specific Needs: {specific_needs or "No specific needs mentioned"}
+
+Please analyze this information and provide a proposal recommendation that aligns with the DAO's mission, addresses gaps in recent proposals, and offers clear value to the community."""
+
+        messages = [{"role": "system", "content": system_content}]
+
+        # Create user message content - start with text
+        user_message_content = [{"type": "text", "text": user_content}]
+
+        # Add images if available
+        if proposal_images:
+            for image in proposal_images:
+                if image.get("type") == "image_url":
+                    # Add detail parameter if not present
+                    image_with_detail = image.copy()
+                    if "detail" not in image_with_detail.get("image_url", {}):
+                        image_with_detail["image_url"]["detail"] = "auto"
+                    user_message_content.append(image_with_detail)
+
+        # Add the user message
+        messages.append({"role": "user", "content": user_message_content})
+
+        return messages
+
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a proposal recommendation based on DAO context.
 
@@ -152,94 +242,32 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
         # Get additional context from state if available
         focus_area = state.get("focus_area", "general improvement")
         specific_needs = state.get("specific_needs", "")
-
-        prompt = PromptTemplate(
-            input_variables=[
-                "dao_name",
-                "dao_mission",
-                "dao_description",
-                "recent_proposals",
-                "focus_area",
-                "specific_needs",
-            ],
-            template="""<system>
-  <reminder>
-    You are an expert DAO governance advisor. Generate a thoughtful proposal recommendation that aligns with the DAO's mission and builds upon past proposals intelligently.
-  </reminder>
-</system>
-<proposal_recommendation_task>
-  <dao_context>
-    <name>{dao_name}</name>
-    <mission>{dao_mission}</mission>
-    <description>{dao_description}</description>
-  </dao_context>
-  
-  <recent_proposals>
-    {recent_proposals}
-  </recent_proposals>
-  
-  <recommendation_request>
-    <focus_area>{focus_area}</focus_area>
-    <specific_needs>{specific_needs}</specific_needs>
-  </recommendation_request>
-  
-  <task>
-    Based on the DAO's mission, description, and recent proposal history, generate a thoughtful recommendation for a new proposal that would benefit the DAO. Consider:
-    
-    <analysis_criteria>
-      <criterion>Alignment with the DAO's stated mission and values</criterion>
-      <criterion>Gaps or opportunities not addressed by recent proposals</criterion>
-      <criterion>Natural progression from successful past proposals</criterion>
-      <criterion>Practical feasibility and clear deliverables</criterion>
-      <criterion>Potential positive impact on the DAO community</criterion>
-      <criterion>Resource requirements and sustainability</criterion>
-    </analysis_criteria>
-    
-    <guidelines>
-      <guideline>Avoid duplicating recent proposals unless building meaningfully upon them</guideline>
-      <guideline>Ensure the proposal is specific and actionable</guideline>
-      <guideline>Consider both short-term wins and long-term strategic value</guideline>
-      <guideline>Make sure the proposal scope is reasonable and achievable</guideline>
-      <guideline>Include clear success metrics where applicable</guideline>
-    </guidelines>
-  </task>
-  
-  <output_format>
-    Provide a JSON object with:
-    <title>A clear, compelling proposal title (max 100 characters)</title>
-    <content>Detailed proposal content with specific objectives, deliverables, timeline, and success metrics (max 1800 characters)</content>
-    <rationale>Explanation of why this proposal is recommended based on the DAO's context</rationale>
-    <priority>Priority level: high, medium, or low</priority>
-    <estimated_impact>Expected positive impact on the DAO</estimated_impact>
-    <suggested_action>Specific next steps or actions to implement (optional)</suggested_action>
-    
-    <encoding_requirement>
-      IMPORTANT: Use only ASCII characters (characters 0-127) in all fields. Avoid any Unicode characters, emojis, special symbols, or non-ASCII punctuation. Use standard English letters, numbers, and basic punctuation only.
-    </encoding_requirement>
-  </output_format>
-</proposal_recommendation_task>""",
-        )
+        proposal_images = state.get("proposal_images", [])
 
         try:
-            formatted_prompt_text = prompt.format(
+            # Create chat messages
+            messages = self._create_chat_messages(
                 dao_name=dao.name or "Unknown DAO",
                 dao_mission=dao.mission or "Mission not specified",
                 dao_description=dao.description or "Description not provided",
                 recent_proposals=proposals_context,
                 focus_area=focus_area,
-                specific_needs=specific_needs or "No specific needs mentioned",
+                specific_needs=specific_needs,
+                proposal_images=proposal_images,
             )
 
-            llm_input_message = HumanMessage(content=formatted_prompt_text)
+            # Create chat prompt template
+            prompt = ChatPromptTemplate.from_messages(messages)
+            formatted_prompt = prompt.format()
 
             # Get structured output from the LLM
             result = await self.llm.with_structured_output(
                 ProposalRecommendationOutput
-            ).ainvoke([llm_input_message])
+            ).ainvoke(formatted_prompt)
             result_dict = result.model_dump()
 
             # Track token usage
-            token_usage_data = self.track_token_usage(formatted_prompt_text, result)
+            token_usage_data = self.track_token_usage(str(formatted_prompt), result)
             state["token_usage"]["proposal_recommendation_agent"] = token_usage_data
             result_dict["token_usage"] = token_usage_data
 
@@ -247,6 +275,7 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
             result_dict["dao_id"] = str(dao_id)
             result_dict["dao_name"] = dao.name
             result_dict["proposals_analyzed"] = len(recent_proposals)
+            result_dict["images_processed"] = len(proposal_images)
 
             self.logger.info(
                 f"Generated proposal recommendation for DAO {dao_id}: {result_dict.get('title', 'Unknown')}"

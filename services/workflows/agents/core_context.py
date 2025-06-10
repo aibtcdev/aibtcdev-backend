@@ -1,7 +1,9 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts.chat import ChatPromptTemplate
 
+from backend.factory import backend
 from lib.logger import configure_logger
 from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
 from services.workflows.utils.models import AgentOutput
@@ -42,6 +44,77 @@ class CoreContextAgent(
                 "Initialized vector retrieval capability for CoreContextAgent"
             )
 
+    def _create_chat_messages(
+        self,
+        proposal_data: str,
+        dao_mission: str,
+        proposal_images: List[Dict[str, Any]] = None,
+    ) -> List:
+        """Create chat messages for core context evaluation.
+
+        Args:
+            proposal_data: The proposal content to evaluate
+            dao_mission: The DAO mission statement
+            proposal_images: List of processed images
+
+        Returns:
+            List of chat messages
+        """
+        # System message with evaluation guidelines
+        system_content = """You are an expert DAO governance evaluator specializing in core context analysis. Your role is to evaluate proposals against the DAO's mission and fundamental standards.
+
+You must plan extensively before each evaluation, and reflect thoroughly on the alignment between the proposal and DAO mission. Do not rush through this process - take time to analyze thoroughly.
+
+Evaluation Criteria (weighted):
+- Alignment with DAO mission (40% weight)
+- Clarity of proposal (20% weight) 
+- Feasibility and practicality (20% weight)
+- Community benefit (20% weight)
+
+Scoring Guide:
+- 0-20: Not aligned, unclear, impractical, or no community benefit
+- 21-50: Significant issues or missing details
+- 51-70: Adequate but with some concerns or minor risks
+- 71-90: Good alignment, clear, practical, and beneficial
+- 91-100: Excellent alignment, clarity, feasibility, and community value
+
+Output Format:
+Provide a JSON object with exactly these fields:
+- score: A number from 0-100
+- flags: Array of any critical issues or red flags
+- summary: Brief summary of your evaluation"""
+
+        # User message with specific evaluation request
+        user_content = f"""Please evaluate the following proposal against the DAO's core mission and standards:
+
+DAO Mission:
+{dao_mission}
+
+Proposal to Evaluate:
+{proposal_data}
+
+Based on the evaluation criteria and scoring guide, provide your assessment of how well this proposal aligns with the DAO's mission and meets the core standards for clarity, feasibility, and community benefit."""
+
+        messages = [{"role": "system", "content": system_content}]
+
+        # Create user message content - start with text
+        user_message_content = [{"type": "text", "text": user_content}]
+
+        # Add images if available
+        if proposal_images:
+            for image in proposal_images:
+                if image.get("type") == "image_url":
+                    # Add detail parameter if not present
+                    image_with_detail = image.copy()
+                    if "detail" not in image_with_detail.get("image_url", {}):
+                        image_with_detail["image_url"]["detail"] = "auto"
+                    user_message_content.append(image_with_detail)
+
+        # Add the user message
+        messages.append({"role": "user", "content": user_message_content})
+
+        return messages
+
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Process the proposal against core DAO context.
 
@@ -62,105 +135,60 @@ class CoreContextAgent(
         if "token_usage" not in state:
             state["token_usage"] = {}
 
-        # Retrieve or use provided DAO mission text
+        # Get DAO mission from database using dao_id
         dao_mission_text = self.config.get("dao_mission", "")
-        if not dao_mission_text:
+        if not dao_mission_text and dao_id:
             try:
                 self.logger.debug(
-                    f"[DEBUG:CoreAgent:{proposal_id}] Attempting to retrieve DAO mission"
+                    f"[DEBUG:CoreAgent:{proposal_id}] Attempting to retrieve DAO mission from database for dao_id: {dao_id}"
                 )
-                dao_mission = await self.retrieve_from_vector_store(
-                    query="DAO mission statement and values",
-                    collection_name=self.config.get(
-                        "mission_collection", "dao_documents"
-                    ),
-                    limit=3,
-                )
-                dao_mission_text = "\n".join([doc.page_content for doc in dao_mission])
+                dao = backend.get_dao(dao_id)
+                if dao and dao.mission:
+                    dao_mission_text = dao.mission
+                    self.logger.debug(
+                        f"[DEBUG:CoreAgent:{proposal_id}] Retrieved DAO mission: {dao_mission_text[:100]}..."
+                    )
+                else:
+                    self.logger.warning(
+                        f"[DEBUG:CoreAgent:{proposal_id}] No DAO found or no mission field for dao_id: {dao_id}"
+                    )
+                    dao_mission_text = "Elevate human potential through AI on Bitcoin"
             except Exception as e:
                 self.logger.error(
-                    f"[DEBUG:CoreAgent:{proposal_id}] Error retrieving DAO mission: {str(e)}"
+                    f"[DEBUG:CoreAgent:{proposal_id}] Error retrieving DAO from database: {str(e)}"
                 )
                 dao_mission_text = "Elevate human potential through AI on Bitcoin"
 
-        # Default prompt template
-        default_template = """<system>
-  <reminder>
-    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-  </reminder>
-  <reminder>
-    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
-  </reminder>
-  <reminder>
-    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
-  </reminder>
-</system>
-<core_context_evaluation>
-  <dao_mission>
-    {dao_mission}
-  </dao_mission>
-  <proposal_data>
-    {proposal_data}
-  </proposal_data>
-  <task>
-    <criteria>
-      <criterion weight=\"40\">Alignment with DAO mission</criterion>
-      <criterion weight=\"20\">Clarity of proposal</criterion>
-      <criterion weight=\"20\">Feasibility and practicality</criterion>
-      <criterion weight=\"20\">Community benefit</criterion>
-    </criteria>
-    <scoring_guide>
-      <score range=\"0-20\">Not aligned, unclear, impractical, or no community benefit</score>
-      <score range=\"21-50\">Significant issues or missing details</score>
-      <score range=\"51-70\">Adequate but with some concerns or minor risks</score>
-      <score range=\"71-90\">Good alignment, clear, practical, and beneficial</score>
-      <score range=\"91-100\">Excellent alignment, clarity, feasibility, and community value</score>
-    </scoring_guide>
-  </task>
-  <output_format>
-    Provide:
-    <score>A number from 0-100</score>
-    <flags>List of any critical issues or red flags</flags>
-    <summary>Brief summary of your evaluation</summary>
-    Only return a JSON object with these three fields: score, flags (array), and summary.
-  </output_format>
-</core_context_evaluation>"""
+        # Fallback to default mission if still empty
+        if not dao_mission_text:
+            dao_mission_text = "Elevate human potential through AI on Bitcoin"
 
-        # Create prompt with custom injection
-        prompt = self.create_prompt_with_custom_injection(
-            default_template=default_template,
-            input_variables=["proposal_data", "dao_mission"],
-            dao_id=dao_id,
-            agent_id=agent_id,
-            profile_id=profile_id,
-            prompt_type="core_context_evaluation",
-        )
+        # Get proposal images
+        proposal_images = state.get("proposal_images", [])
 
         try:
-            formatted_prompt_text = prompt.format(
+            # Create chat messages
+            messages = self._create_chat_messages(
                 proposal_data=proposal_content,
-                dao_mission=dao_mission_text
-                or "Elevate human potential through AI on Bitcoin",
+                dao_mission=dao_mission_text,
+                proposal_images=proposal_images,
             )
-            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
 
-            # Add any proposal images to the message
-            proposal_images = state.get("proposal_images", [])
-            if proposal_images:
-                message_content_list.extend(proposal_images)
-
-            llm_input_message = HumanMessage(content=message_content_list)
+            # Create chat prompt template
+            prompt = ChatPromptTemplate.from_messages(messages)
+            formatted_prompt = prompt.format()
 
             # Get structured output from the LLM
             result = await self.llm.with_structured_output(AgentOutput).ainvoke(
-                [llm_input_message]
+                formatted_prompt
             )
             result_dict = result.model_dump()
 
             # Track token usage
-            token_usage_data = self.track_token_usage(formatted_prompt_text, result)
+            token_usage_data = self.track_token_usage(str(formatted_prompt), result)
             state["token_usage"]["core_agent"] = token_usage_data
             result_dict["token_usage"] = token_usage_data
+            result_dict["images_processed"] = len(proposal_images)
 
             # Update state with agent result
             update_state_with_agent_result(state, result_dict, "core")
@@ -173,4 +201,5 @@ class CoreContextAgent(
                 "score": 50,
                 "flags": [f"Error: {str(e)}"],
                 "summary": "Evaluation failed due to error",
+                "images_processed": len(proposal_images) if proposal_images else 0,
             }

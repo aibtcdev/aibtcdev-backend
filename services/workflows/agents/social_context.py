@@ -1,6 +1,7 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts.chat import ChatPromptTemplate
 
 from lib.logger import configure_logger
 from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
@@ -24,6 +25,90 @@ class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability)
         TokenUsageMixin.__init__(self)
         PromptCapability.__init__(self)
         self.initialize()
+
+    def _create_chat_messages(
+        self,
+        proposal_data: str,
+        community_info: str,
+        search_results: str,
+        proposal_images: List[Dict[str, Any]] = None,
+    ) -> List:
+        """Create chat messages for social context evaluation.
+
+        Args:
+            proposal_data: The proposal content to evaluate
+            community_info: Information about the DAO community
+            search_results: External context from web search
+            proposal_images: List of processed images
+
+        Returns:
+            List of chat messages
+        """
+        # System message with social evaluation guidelines
+        system_content = """You are an expert community analyst specializing in DAO governance and social dynamics. Your role is to evaluate proposals from a community perspective, ensuring they serve the broader membership and align with community values.
+
+You must plan extensively before each evaluation and reflect thoroughly on the social implications. Consider both immediate community impact and long-term social dynamics.
+
+Evaluation Criteria (weighted):
+- Community benefit and inclusion (40% weight)
+- Alignment with community values and interests (30% weight)
+- Potential for community engagement (20% weight)
+- Consideration of diverse stakeholders (10% weight)
+
+Key Considerations:
+- Will this proposal benefit the broader community or just a few members?
+- Is there likely community support or opposition?
+- Does it foster inclusivity and participation?
+- Does it align with the community's values and interests?
+- Could it cause controversy or division?
+- Does it consider the needs of diverse stakeholders?
+
+Scoring Guide:
+- 0-20: No benefit, misaligned, or divisive
+- 21-50: Significant issues or missing details
+- 51-70: Adequate but with some concerns or minor risks
+- 71-90: Good benefit, aligned, and inclusive
+- 91-100: Excellent benefit, highly aligned, and unifying
+
+Output Format:
+Provide a JSON object with exactly these fields:
+- score: A number from 0-100
+- flags: Array of any critical social issues or red flags
+- summary: Brief summary of your social evaluation"""
+
+        # User message with specific social context and evaluation request
+        user_content = f"""Please evaluate the social and community aspects of the following proposal:
+
+Proposal to Evaluate:
+{proposal_data}
+
+Community Information:
+{community_info}
+
+External Context:
+{search_results}
+
+Based on the evaluation criteria and community context, provide your assessment of how this proposal will impact the community, whether it aligns with community values, and its potential for fostering engagement and inclusion."""
+
+        messages = [{"role": "system", "content": system_content}]
+
+        # Create user message content - start with text
+        user_message_content = [{"type": "text", "text": user_content}]
+
+        # Add images if available
+        if proposal_images:
+            for image in proposal_images:
+                if image.get("type") == "image_url":
+                    # Add detail parameter if not present
+                    image_with_detail = image.copy()
+                    if "detail" not in image_with_detail.get("image_url", {}):
+                        image_with_detail["image_url"]["detail"] = "auto"
+                    user_message_content.append(image_with_detail)
+
+        # Add the user message
+        messages.append({"role": "user", "content": user_message_content})
+
+        return messages
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Process the proposal's social context.
@@ -63,95 +148,33 @@ Governance Participation: {governance_participation}
 Recent Community Sentiment: {recent_sentiment}
 """
 
-        # Default prompt template
-        default_template = """<system>
-  <reminder>
-    You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-  </reminder>
-  <reminder>
-    If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
-  </reminder>
-  <reminder>
-    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
-  </reminder>
-</system>
-<social_context_evaluation>
-  <proposal_data>
-    {proposal_data}
-  </proposal_data>
-  <community_info>
-    {community_info}
-  </community_info>
-  <external_context>
-    {search_results}
-  </external_context>
-  <task>
-    <criteria>
-      <criterion weight=\"40\">Community benefit and inclusion</criterion>
-      <criterion weight=\"30\">Alignment with community values and interests</criterion>
-      <criterion weight=\"20\">Potential for community engagement</criterion>
-      <criterion weight=\"10\">Consideration of diverse stakeholders</criterion>
-    </criteria>
-    <considerations>
-      <consideration>Will this proposal benefit the broader community or just a few members?</consideration>
-      <consideration>Is there likely community support or opposition?</consideration>
-      <consideration>Does it foster inclusivity and participation?</consideration>
-      <consideration>Does it align with the community's values and interests?</consideration>
-      <consideration>Could it cause controversy or division?</consideration>
-      <consideration>Does it consider the needs of diverse stakeholders?</consideration>
-    </considerations>
-    <scoring_guide>
-      <score range=\"0-20\">No benefit, misaligned, or divisive</score>
-      <score range=\"21-50\">Significant issues or missing details</score>
-      <score range=\"51-70\">Adequate but with some concerns or minor risks</score>
-      <score range=\"71-90\">Good benefit, aligned, and inclusive</score>
-      <score range=\"91-100\">Excellent benefit, highly aligned, and unifying</score>
-    </scoring_guide>
-  </task>
-  <output_format>
-    Provide:
-    <score>A number from 0-100</score>
-    <flags>List of any critical social issues or red flags</flags>
-    <summary>Brief summary of your social evaluation</summary>
-    Only return a JSON object with these three fields: score, flags (array), and summary.
-  </output_format>
-</social_context_evaluation>"""
-
-        # Create prompt with custom injection
-        prompt = self.create_prompt_with_custom_injection(
-            default_template=default_template,
-            input_variables=["proposal_data", "search_results", "community_info"],
-            dao_id=dao_id,
-            agent_id=agent_id,
-            profile_id=profile_id,
-            prompt_type="social_context_evaluation",
-        )
+        # Get proposal images
+        proposal_images = state.get("proposal_images", [])
 
         try:
-            formatted_prompt_text = prompt.format(
+            # Create chat messages
+            messages = self._create_chat_messages(
                 proposal_data=proposal_content,
-                search_results=search_results_text,
                 community_info=community_info,
+                search_results=search_results_text,
+                proposal_images=proposal_images,
             )
-            message_content_list = [{"type": "text", "text": formatted_prompt_text}]
 
-            # Add any proposal images to the message
-            proposal_images = state.get("proposal_images", [])
-            if proposal_images:
-                message_content_list.extend(proposal_images)
-
-            llm_input_message = HumanMessage(content=message_content_list)
+            # Create chat prompt template
+            prompt = ChatPromptTemplate.from_messages(messages)
+            formatted_prompt = prompt.format()
 
             # Get structured output from the LLM
             result = await self.llm.with_structured_output(AgentOutput).ainvoke(
-                [llm_input_message]
+                formatted_prompt
             )
             result_dict = result.model_dump()
 
             # Track token usage
-            token_usage_data = self.track_token_usage(formatted_prompt_text, result)
+            token_usage_data = self.track_token_usage(str(formatted_prompt), result)
             state["token_usage"]["social_agent"] = token_usage_data
             result_dict["token_usage"] = token_usage_data
+            result_dict["images_processed"] = len(proposal_images)
 
             # Update state with agent result
             update_state_with_agent_result(state, result_dict, "social")
@@ -164,4 +187,5 @@ Recent Community Sentiment: {recent_sentiment}
                 "score": 50,
                 "flags": [f"Error: {str(e)}"],
                 "summary": "Social evaluation failed due to error",
+                "images_processed": len(proposal_images) if proposal_images else 0,
             }
