@@ -96,13 +96,13 @@ class ProposalRecommendationAgent(BaseCapabilityMixin, TokenUsageMixin):
 
         formatted_proposals = []
         for i, proposal in enumerate(proposals):
-            proposal_text = f"""<proposal id="{i+1}">
-  <title>{proposal.title or 'Untitled'}</title>
-  <content>{proposal.content or 'No content'}</content>
-  <type>{proposal.type or 'Unknown'}</type>
-  <status>{proposal.status or 'Unknown'}</status>
-  <created>{proposal.created_at.strftime('%Y-%m-%d') if proposal.created_at else 'Unknown'}</created>
-  <passed>{proposal.passed if proposal.passed is not None else 'Unknown'}</passed>
+            proposal_text = f"""<proposal id="{i + 1}">
+  <title>{proposal.title or "Untitled"}</title>
+  <content>{proposal.content or "No content"}</content>
+  <type>{proposal.type or "Unknown"}</type>
+  <status>{proposal.status or "Unknown"}</status>
+  <created>{proposal.created_at.strftime("%Y-%m-%d") if proposal.created_at else "Unknown"}</created>
+  <passed>{proposal.passed if proposal.passed is not None else "Unknown"}</passed>
 </proposal>"""
             formatted_proposals.append(proposal_text)
 

@@ -20,6 +20,7 @@ logger = configure_logger(__name__)
 @dataclass
 class DiscordProcessingResult(RunnerResult):
     """Result of Discord message processing operation."""
+
     queue_message_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
 
@@ -47,7 +48,9 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             )
             return True
         except Exception as e:
-            logger.error(f"Error validating Discord prerequisites: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error validating Discord prerequisites: {str(e)}", exc_info=True
+            )
             self._pending_messages = None
             return False
 
@@ -77,7 +80,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             tts = message.message.get("tts", False)
             proposal_status = message.message.get("proposal_status")
             webhook_url = message.message.get("webhook_url")  # Allow override
-            
+
             # Select appropriate webhook URL based on proposal status
             if not webhook_url:
                 if proposal_status == "passed":
@@ -115,7 +118,10 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     dao_id=message.dao_id,
                 )
         except Exception as e:
-            logger.error(f"Error processing Discord message {message.id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error processing Discord message {message.id}: {str(e)}",
+                exc_info=True,
+            )
             return DiscordProcessingResult(
                 success=False,
                 message=f"Error sending Discord message: {str(e)}",
@@ -142,4 +148,4 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         return results
 
 
-discord_task = DiscordTask() 
+discord_task = DiscordTask()

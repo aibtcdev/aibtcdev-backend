@@ -12,6 +12,7 @@ class DaoBaseInput(BaseModel):
 
     pass
 
+
 class ProposeActionSendMessageInput(BaseModel):
     """Input schema for proposing to send a message action."""
 
@@ -132,6 +133,7 @@ class ProposeActionSendMessageTool(BaseTool):
             memo,
             **kwargs,
         )
+
 
 class VoteOnActionProposalInput(BaseModel):
     """Input schema for voting on an action proposal."""
@@ -316,6 +318,7 @@ class ConcludeActionProposalTool(BaseTool):
             action_proposal_contract_to_execute,
             **kwargs,
         )
+
 
 class GetLiquidSupplyInput(BaseModel):
     """Input schema for getting the liquid supply."""
@@ -653,9 +656,7 @@ class VetoActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to veto an action proposal."""
-        return self._deploy(
-            dao_action_proposal_voting_contract, proposal_id, **kwargs
-        )
+        return self._deploy(dao_action_proposal_voting_contract, proposal_id, **kwargs)
 
     async def _arun(
         self,
@@ -664,9 +665,7 @@ class VetoActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
-            dao_action_proposal_voting_contract, proposal_id, **kwargs
-        )
+        return self._deploy(dao_action_proposal_voting_contract, proposal_id, **kwargs)
 
 
 class GetTotalProposalsInput(BaseModel):

@@ -1,7 +1,5 @@
-import inspect
 from typing import Any, Dict, List, Optional, Type
 
-from config import config
 from lib.logger import configure_logger
 
 from .base import BaseTask, JobType

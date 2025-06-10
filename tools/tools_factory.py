@@ -102,7 +102,6 @@ def initialize_tools(
                 logger.warning(f"Failed to get wallet for agent {agent_id}: {e}")
 
     tools = {
-
         "bitflow_execute_trade": BitflowExecuteTradeTool(wallet_id),
         "contracts_fetch_sip10_info": ContractSIP10InfoTool(wallet_id),
         "contracts_fetch_source_code": FetchContractSourceTool(wallet_id),

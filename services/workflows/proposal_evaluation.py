@@ -1,9 +1,6 @@
-import asyncio
 import operator
-import uuid
 from typing import Annotated, Any, Dict, List, Optional, TypedDict, Union
 
-from langchain.prompts import PromptTemplate
 from langgraph.graph import END, StateGraph
 
 from backend.factory import backend
@@ -235,13 +232,6 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         completed_steps = state.get("completed_steps", set())
 
         # Define the expected workflow sequence
-        expected_sequence = [
-            "image_processing",
-            "core_evaluation",
-            "specialized_evaluation",
-            "final_reasoning",
-            "complete",
-        ]
 
         # If we've been on the same step too long, something is wrong
         if hasattr(state, "_step_attempts"):
@@ -260,14 +250,6 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
             state["_step_attempts"] = {workflow_step: 1}
 
         # Check for agent completion tracking
-        required_agents = {
-            "image_processor",
-            "core_agent",
-            "historical_agent",
-            "financial_agent",
-            "social_agent",
-            "reasoning_agent",
-        }
 
         # If we have all required scores but final score is missing and reasoning agent hasn't run
         if (
@@ -626,7 +608,7 @@ async def evaluate_and_vote_on_proposal(
                     "message": f"Skipped voting due to low confidence: {confidence_score:.2f} < {confidence_threshold}",
                 }
         else:
-            logger.info(f"Auto-voting disabled, returning evaluation only")
+            logger.info("Auto-voting disabled, returning evaluation only")
             return {
                 "evaluation": evaluation_result,
                 "vote_result": None,

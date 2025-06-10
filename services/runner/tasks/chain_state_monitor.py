@@ -1,8 +1,7 @@
 """Chain state monitoring task implementation."""
 
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
@@ -19,7 +18,6 @@ from services.webhooks.chainhook.models import (
     ChainHookInfo,
     Predicate,
     TransactionIdentifier,
-    TransactionMetadata,
     TransactionWithReceipt,
 )
 
@@ -229,7 +227,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 tx_index = tx.get("tx_index", 0)
                 sender_address = tx.get("sender_address", "")
                 sponsor_address = tx.get("sponsor_address", None)
-                sponsored = tx.get("sponsored", False)
+                tx.get("sponsored", False)
                 tx_status = tx.get("tx_status", "")
                 tx_type = tx.get("tx_type", "")
                 tx_result_repr = (
@@ -258,7 +256,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 tx_index = tx.tx_index
                 sender_address = tx.sender_address
                 sponsor_address = tx.sponsor_address if tx.sponsored else None
-                sponsored = tx.sponsored
                 tx_status = tx.tx_status
                 tx_type = tx.tx_type
                 tx_result_repr = (
@@ -357,7 +354,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         )
 
         # Create full chainhook data
-        chainhook_data = ChainHookData(
+        ChainHookData(
             apply=[apply_block], chainhook=chainhook_info, events=[], rollback=[]
         )
 
