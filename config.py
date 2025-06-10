@@ -140,6 +140,7 @@ class SchedulerConfig:
 
 @dataclass
 class APIConfig:
+    base_url: str = os.getenv("AIBTC_BASEURL", "https://app-staging.aibtc.dev")
     alex_base_url: str = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
     hiro_api_url: str = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
     platform_base_url: str = os.getenv(
