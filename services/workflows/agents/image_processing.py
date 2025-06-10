@@ -2,12 +2,39 @@ import base64
 from typing import Any, Dict, List, Optional
 
 import httpx
+import magic
 
 from lib.logger import configure_logger
 from lib.utils import extract_image_urls
 from services.workflows.capability_mixins import BaseCapabilityMixin
 
 logger = configure_logger(__name__)
+
+
+def detect_image_mime_type(image_data: bytes) -> str:
+    """Detect MIME type from image content using python-magic library.
+
+    Args:
+        image_data: Raw image bytes
+
+    Returns:
+        MIME type string, defaults to 'image/jpeg' if unknown or not an image
+    """
+    try:
+        mime_type = magic.from_buffer(image_data, mime=True)
+
+        # Ensure it's actually an image MIME type
+        if mime_type and mime_type.startswith("image/"):
+            return mime_type
+        else:
+            logger.warning(
+                f"Detected non-image MIME type: {mime_type}, defaulting to image/jpeg"
+            )
+            return "image/jpeg"
+
+    except Exception as e:
+        logger.warning(f"Error detecting MIME type: {e}, defaulting to image/jpeg")
+        return "image/jpeg"
 
 
 class ImageProcessingNode(BaseCapabilityMixin):
@@ -60,18 +87,13 @@ class ImageProcessingNode(BaseCapabilityMixin):
                     )
                     response = await client.get(url, timeout=10.0)
                     response.raise_for_status()
-                    image_data = base64.b64encode(response.content).decode("utf-8")
 
-                    # Determine MIME type from URL extension
-                    mime_type = "image/jpeg"  # Default
-                    if url.lower().endswith((".jpg", ".jpeg")):
-                        mime_type = "image/jpeg"
-                    elif url.lower().endswith(".png"):
-                        mime_type = "image/png"
-                    elif url.lower().endswith(".gif"):
-                        mime_type = "image/gif"
-                    elif url.lower().endswith(".webp"):
-                        mime_type = "image/webp"
+                    # Detect MIME type from actual image content using python-magic
+                    image_content = response.content
+                    mime_type = detect_image_mime_type(image_content)
+
+                    # Encode to base64
+                    image_data = base64.b64encode(image_content).decode("utf-8")
 
                     processed_images.append(
                         {
@@ -82,7 +104,7 @@ class ImageProcessingNode(BaseCapabilityMixin):
                         }
                     )
                     self.logger.debug(
-                        f"[ImageProcessorNode:{proposal_id}] Successfully processed image: {url}"
+                        f"[ImageProcessorNode:{proposal_id}] Successfully processed image: {url} (detected as {mime_type})"
                     )
                 except Exception as e:
                     self.logger.error(

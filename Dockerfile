@@ -31,6 +31,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Second stage: final image without uv
 FROM public.ecr.aws/docker/library/python:3.13
 
+# Install libmagic1 for mime type detection
+RUN apt-get update && apt-get install -y libmagic1
+
 # Copy the application from the builder
 COPY --from=builder /usr/src/app /usr/src/app
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
