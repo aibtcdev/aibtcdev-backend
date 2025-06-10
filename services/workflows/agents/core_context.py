@@ -64,6 +64,8 @@ class CoreContextAgent(
 
 You must plan extensively before each evaluation, and reflect thoroughly on the alignment between the proposal and DAO mission. Do not rush through this process - take time to analyze thoroughly.
 
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain diagrams, charts, screenshots, mockups, or other visual information that is essential to understanding the full scope and merit of the proposal. Include your analysis of the visual content in your overall evaluation.
+
 Evaluation Criteria (weighted):
 - Alignment with DAO mission (40% weight)
 - Clarity of proposal (20% weight) 

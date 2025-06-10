@@ -44,6 +44,8 @@ class ProposalMetadataAgent(BaseCapabilityMixin, TokenUsageMixin):
         # System message with guidelines
         system_content = """You are an expert at analyzing DAO proposals and generating comprehensive metadata including titles, summaries, and tags. Create content that accurately represents and categorizes the proposal to help with organization and discoverability.
 
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or enhance the written proposal. Images may contain diagrams, charts, screenshots, mockups, wireframes, or other visual information that provides crucial context for understanding the proposal's scope, objectives, and implementation details. Include insights from the visual content when generating the title, summary, and tags.
+
 Title Guidelines:
 - Keep the title under 100 characters
 - Make it descriptive and action-oriented

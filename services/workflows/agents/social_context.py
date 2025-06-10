@@ -48,6 +48,8 @@ class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability)
 
 You must plan extensively before each evaluation and reflect thoroughly on the social implications. Consider both immediate community impact and long-term social dynamics.
 
+**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images, considering how they support, clarify, or relate to the written proposal. Images may contain community diagrams, engagement plans, social impact visualizations, user interface mockups, or other visual information that is essential to understanding the social aspects and community impact of the proposal. Include your analysis of the visual content in your overall social evaluation.
+
 Evaluation Criteria (weighted):
 - Community benefit and inclusion (40% weight)
 - Alignment with community values and interests (30% weight)
