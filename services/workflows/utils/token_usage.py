@@ -45,7 +45,7 @@ class TokenUsageMixin:
         llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
         token_count = len(prompt_text) // 4  # Simple estimation
         token_usage_dict = {"input_tokens": token_count}
-        cost_result = calculate_token_cost(token_usage_dict, llm_model_name)
+        calculate_token_cost(token_usage_dict, llm_model_name)
         token_usage_data = {
             "input_tokens": token_count,
             "output_tokens": (

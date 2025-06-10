@@ -1,7 +1,6 @@
 """Job management utilities for the runner service."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Any, Callable, List, Optional, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

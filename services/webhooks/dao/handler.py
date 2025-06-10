@@ -10,7 +10,6 @@ from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import (
     DAOWebhookPayload,
     DAOWebhookResponse,
-    DeployedContract,
 )
 
 

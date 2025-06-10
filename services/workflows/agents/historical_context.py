@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 
 from backend.factory import backend
@@ -83,7 +82,7 @@ class HistoricalContextAgent(
         past_proposals_text = (
             "\n\n".join(
                 [
-                    f'<proposal id="{i+1}">\n'
+                    f'<proposal id="{i + 1}">\n'
                     f"  <title>{proposal.title or 'Untitled'}</title>\n"
                     f"  <content>{proposal.content or 'No content'}</content>\n"
                     f"  <status>{proposal.status or 'Unknown'}</status>\n"
@@ -150,7 +149,7 @@ class HistoricalContextAgent(
             )
             past_proposals_vector_text = "\n\n".join(
                 [
-                    f'<similar_proposal id="{i+1}">\n{doc.page_content}\n</similar_proposal>'
+                    f'<similar_proposal id="{i + 1}">\n{doc.page_content}\n</similar_proposal>'
                     for i, doc in enumerate(similar_proposals)
                 ]
             )

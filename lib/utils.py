@@ -28,10 +28,10 @@ def extract_image_urls(text):
 
 def strip_metadata_section(text: str) -> str:
     """Remove metadata section starting with '--- Metadata ---' to the end of the text.
-    
+
     Args:
         text: The input text that may contain a metadata section
-        
+
     Returns:
         The text with the metadata section removed
     """

@@ -1,6 +1,5 @@
 """Handler for tracking the latest block state from chainhooks."""
 
-from datetime import datetime
 from typing import Optional
 
 from backend.factory import backend

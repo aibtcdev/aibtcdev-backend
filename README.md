@@ -1,23 +1,39 @@
 # aibtcdev-backend
 
-## Overview
+[![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-aibtcdev-backend is a sophisticated FastAPI-based backend service that powers AI-driven interactions with Bitcoin and Stacks blockchain technologies. The service provides:
+> A sophisticated FastAPI-based backend service that powers AI-driven interactions with Bitcoin and Stacks blockchain technologies.
 
-1. Real-time chat functionality with AI agents via WebSocket
-2. Automated DAO management and monitoring
-3. Social media integration (Twitter, Telegram, Discord)
-4. Blockchain interaction capabilities (Stacks, Bitcoin)
-5. Market data analysis and reporting
-6. Document processing and vector search capabilities
+aibtcdev-backend provides real-time chat functionality with AI agents, automated DAO management, social media integration, blockchain interaction capabilities, market data analysis, and document processing with vector search.
 
-The system is designed to be modular, scalable, and easily configurable through environment variables.
+**⚠️ Disclaimer**: aibtc.dev is not liable for any lost, locked, or mistakenly sent funds. This is alpha software—use at your own risk. Any STX sent to you is owned by you, the trader, and may be redeemed, including profits or losses, at the end of the aibtc.dev Champions Sprint (~5 days). By participating, you accept that aibtc.dev is not responsible for any product use, costs, taxes incurred from trading STX or any other digital asset, or any other liability.
 
-## Disclaimer
+## Table of Contents
 
-aibtc.dev is not liable for any lost, locked, or mistakenly sent funds. This is alpha software—use at your own risk. Any STX sent to you is owned by you, the trader, and may be redeemed, including profits or losses, at the end of the aibtc.dev Champions Sprint (~5 days). By participating, you accept that aibtc.dev is not responsible for any product use, costs, taxes incurred from trading STX or any other digital asset, or any other liability.
+- [Background](#background)
+- [Install](#install)
+- [Usage](#usage)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Prerequisites
+## Background
+
+aibtcdev-backend was created to bridge AI capabilities with blockchain technologies, specifically Bitcoin and Stacks. The system is designed to be modular, scalable, and easily configurable through environment variables.
+
+### Key Features
+
+- **AI Chat System**: Real-time WebSocket-based chat with AI agent integration, context-aware conversations, and vector search capabilities
+- **DAO Management**: Automated DAO deployment monitoring, proposal creation and tracking, vote processing, and automated conclusion handling
+- **Social Media Integration**: Twitter automation with automatic threading for tweets longer than 280 characters, Telegram bot integration, and Discord notifications
+- **Blockchain Integration**: Stacks blockchain interaction, Bitcoin network monitoring, and multiple API integrations (Hiro, Alex, Velar, Platform API)
+- **Market Analysis**: LunarCrush integration, CoinMarketCap data processing, and automated reporting
+- **Background Processing**: Scheduled task management, event-driven processing, and multi-threaded task execution
+
+
+## Install
+
+### Prerequisites
 
 - Python 3.13
 - [Bun](https://bun.sh/) (for TypeScript tools)
@@ -25,117 +41,28 @@ aibtc.dev is not liable for any lost, locked, or mistakenly sent funds. This is 
 - Conda (recommended for development) or Docker
 - Node.js and npm (for agent tools)
 
-## Project Structure
-
-```
-aibtcdev-backend/
-├── api/                    # FastAPI endpoint definitions
-│   ├── chat.py            # WebSocket chat endpoints
-│   ├── tools.py           # Tool endpoints
-│   ├── webhooks.py        # Webhook handlers
-│   └── dependencies.py    # API dependencies
-├── services/              # Core business logic
-│   ├── workflows/         # Workflow implementations
-│   ├── runner/           # Background task runners
-│   ├── webhooks/         # Webhook processors
-│   ├── discord/          # Discord integration
-│   ├── chat.py           # Chat service
-│   ├── daos.py           # DAO operations
-│   ├── schedule.py       # Task scheduling
-│   ├── startup.py        # App lifecycle management
-│   ├── twitter.py        # Twitter integration
-│   ├── bot.py            # Telegram bot
-│   └── websocket.py      # WebSocket management
-├── backend/              # Database and storage
-├── tools/                # AI agent tools
-├── lib/                  # Shared utilities
-├── tests/                # Test suite
-├── docs/                 # Documentation
-├── examples/             # Usage examples
-└── agent-tools-ts/       # TypeScript-based agent tools
-```
-
-## Key Features
-
-### 1. AI Chat System
-- Real-time WebSocket-based chat
-- AI agent integration with OpenAI
-- Context-aware conversations
-- Document-based knowledge integration
-- Vector search capabilities
-
-### 2. DAO Management
-- Automated DAO deployment monitoring
-- Proposal creation and tracking
-- Vote processing
-- Automated conclusion handling
-- Tweet generation for DAO events
-
-### 3. Social Media Integration
-- Twitter automation and monitoring
-- Tweets longer than 280 characters are automatically threaded
-- Telegram bot integration
-- Discord notifications
-- Automated content generation
-- Social engagement tracking
-
-### 4. Blockchain Integration
-- Stacks blockchain interaction
-- Bitcoin network monitoring
-- Multiple API integrations:
-  - Hiro
-  - Alex
-  - Velar
-  - Platform API
-
-### 5. Market Analysis
-- LunarCrush integration
-- CoinMarketCap data processing
-- Market trend analysis
-- Automated reporting
-
-### 6. Background Processing
-- Scheduled task management
-- Event-driven processing
-- Multi-threaded task execution
-- Failure recovery and retry logic
-
-## Installation
-
-### 1. Clone the Repository
+### Development Setup
 
 ```bash
+# Clone the repository
 git clone [repository-url]
 cd aibtcdev-backend
 git submodule init
 git submodule update --remote
-```
 
-### 2. Environment Setup
-
-1. Copy the example environment file:
-```bash
+# Copy environment file
 cp .env.example .env
-```
+# Configure your environment variables by following the Configuration Guide
 
-2. Configure your environment variables by following the [Configuration Guide](CONFIG.md)
+# Install UV (modern Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Or on macOS: brew install uv
 
-### 3. Development Setup (Conda Recommended)
+# Create virtual environment and install dependencies
+uv sync
 
-```bash
-# Install Miniconda
-brew install miniconda
-
-# Initialize conda
-conda init "$(basename "${SHELL}")"
-# Restart your terminal
-
-# Create and activate environment
-conda create --name aibackend python=3.12
-conda activate aibackend
-
-# Install dependencies
-pip install -r requirements.txt
+# Activate the virtual environment
+source .venv/bin/activate
 
 # Set up TypeScript tools
 cd agent-tools-ts/
@@ -143,38 +70,14 @@ bun install
 cd ..
 ```
 
-### 4. Docker Setup
+### Docker Setup
 
 ```bash
 docker build -t aibtcdev-backend .
 docker run -p 8000:8000 --env-file .env aibtcdev-backend
 ```
 
-## API Documentation
-
-### WebSocket Endpoints (`/chat`)
-- `/chat/ws`: Real-time chat communication
-  - Supports message history
-  - AI agent integration
-  - Context management
-  - Document processing
-
-### Tool Endpoints (`/tools`)
-- `/tools/available`: Available tool listing
-- `/tools/execute`: Tool execution endpoint
-- Custom tool integration support
-
-### Webhook Endpoints (`/webhooks`)
-- `/webhooks/chainhook`: Blockchain event processing
-- `/webhooks/github`: GitHub integration
-- `/webhooks/discord`: Discord notifications
-
-### Bot Endpoints (`/bot`)
-- `/bot/telegram`: Telegram bot integration
-- User verification and management
-- Command processing
-
-## Development
+## Usage
 
 ### Running the Development Server
 
@@ -182,9 +85,7 @@ docker run -p 8000:8000 --env-file .env aibtcdev-backend
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Code Style
-
-The project uses ruff for code formatting and linting. Configuration is in `ruff.toml`.
+The server will be available at `http://localhost:8000` with API documentation at `/docs`.
 
 ### Testing
 
@@ -192,11 +93,45 @@ The project uses ruff for code formatting and linting. Configuration is in `ruff
 pytest tests/
 ```
 
-### Documentation
+### Code Style
 
-API documentation is available at `/docs` when running the server.
+The project uses ruff for code formatting and linting. Configuration is in `ruff.toml`.
+
+```bash
+ruff check .
+ruff format .
+```
+
+### Troubleshooting
+
+**OpenAI Rate Limits**
+- Check limits at https://platform.openai.com/settings/organization/limits
+- TPM (Tokens Per Minute) limits: Tier 1: 200,000 TPM, Tier 2: 2,000,000 TPM
+
+**WebSocket Connection Issues**
+- Check network connectivity and authentication tokens
+- Verify server logs for details
+
+**Database Connection Issues**
+- Verify Supabase credentials and network access
+- Check connection string format
+
+## Maintainers
+
+[@aibtcdev](https://github.com/aibtcdev)
 
 ## Contributing
+
+PRs accepted.
+
+### Guidelines
+
+- Follow the Python code style guide
+- Add tests for new features
+- Update documentation as needed
+- Keep pull requests focused and atomic
+
+### Development Process
 
 1. Fork the repository
 2. Create a feature branch
@@ -204,43 +139,6 @@ API documentation is available at `/docs` when running the server.
 4. Run tests
 5. Submit a pull request
 
-Guidelines:
-- Follow the Python code style guide
-- Add tests for new features
-- Update documentation as needed
-- Keep pull requests focused and atomic
-
-## Troubleshooting
-
-### Common Issues
-
-1. OpenAI Rate Limits
-   - Check limits at https://platform.openai.com/settings/organization/limits
-   - TPM (Tokens Per Minute) limits:
-     - Tier 1: 200,000 TPM
-     - Tier 2: 2,000,000 TPM
-
-2. WebSocket Connection Issues
-   - Check network connectivity
-   - Verify authentication tokens
-   - Check server logs for details
-
-3. Database Connection Issues
-   - Verify Supabase credentials
-   - Check network access to database
-   - Verify connection string format
-
-## Support
-
-For support:
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue with:
-   - Clear description
-   - Steps to reproduce
-   - Expected vs actual behavior
-   - Environment details
-
 ## License
 
-[License Information]
+[MIT](LICENSE) aibtcdev
