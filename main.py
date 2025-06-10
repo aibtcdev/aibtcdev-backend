@@ -3,7 +3,6 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import api
 from api import chat, tools, webhooks
 from config import config
 from lib.logger import configure_logger
@@ -12,6 +11,8 @@ from services.websocket import websocket_manager
 
 # Configure module logger
 logger = configure_logger(__name__)
+
+_ = config
 
 # Define app
 app = FastAPI(
@@ -23,16 +24,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://sprint.aibtc.dev",
-        "https://sprint-faster.aibtc.dev",
-        "https://*.aibtcdev-frontend.pages.dev",  # Cloudflare preview deployments
-        "http://localhost:3000",  # Local development
-        "https://staging.aibtc.chat",
-        "https://app.aibtc.dev",
-        "https://aibtc.dev",
-        "https://app-staging.aibtc.dev",
-    ],
+    allow_origin_regex=r"^(https://((sprint|sprint-faster|app|app-staging)\.aibtc\.dev|aibtc\.dev|staging\.aibtc\.chat|[^.]+\.aibtcdev-frontend(-staging)?\.pages\.dev)|http://localhost:3000)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,9 +39,9 @@ async def health_check():
 
 
 # Load API routes
-app.include_router(api.tools.router)
-app.include_router(api.chat.router)
-app.include_router(api.webhooks.router)
+app.include_router(tools.router)
+app.include_router(chat.router)
+app.include_router(webhooks.router)
 
 
 @app.on_event("startup")

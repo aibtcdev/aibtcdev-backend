@@ -3,7 +3,7 @@
 from typing import Dict, List, Optional
 
 from backend.factory import backend
-from backend.models import ProposalFilter, VoteBase, VoteCreate, VoteFilter
+from backend.models import VoteBase, VoteCreate, VoteFilter
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import Event, TransactionWithReceipt
@@ -76,9 +76,13 @@ class BaseVoteHandler(ChainhookEventHandler):
             )
             return False
 
-        # Check if the method name contains "vote-on-proposal"
+        # Check if the method name contains "vote" and "proposal"
         tx_method = tx_data_content.get("method", "")
-        is_vote_method = tx_method == "vote-on-proposal"
+        is_vote_method = (
+            tx_method == "vote-on-proposal"
+            or "vote-on-action-proposal" in tx_method
+            or "vote-on-core-proposal" in tx_method
+        )
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
@@ -130,6 +134,10 @@ class BaseVoteHandler(ChainhookEventHandler):
                     self.logger.info(
                         f"Extracted vote value from transaction args: {vote_value}"
                     )
+        else:
+            self.logger.info(
+                f"Vote value found directly in event payload: {vote_value}"
+            )
 
         if not proposal_identifier or not voter_address:
             self.logger.warning(
@@ -186,7 +194,13 @@ class BaseVoteHandler(ChainhookEventHandler):
             update_data = VoteBase(tx_id=tx_id)
             if amount and not vote.amount:
                 update_data.amount = amount
+                self.logger.info(f"[DEBUG] Setting amount in update_data: {amount}")
+            else:
+                self.logger.info(
+                    f"[DEBUG] Not setting amount - amount: {amount}, existing vote.amount: {vote.amount}"
+                )
 
+            self.logger.info(f"[DEBUG] Update data: {update_data.model_dump()}")
             backend.update_vote(vote.id, update_data)
             self.logger.info(f"Updated vote {vote.id}")
         else:
@@ -209,8 +223,19 @@ class BaseVoteHandler(ChainhookEventHandler):
                 amount=amount,
             )
 
+            self.logger.info(
+                f"[DEBUG] Creating vote with data: {new_vote.model_dump()}"
+            )
+
             try:
                 vote = backend.create_vote(new_vote)
                 self.logger.info(f"Created new vote record with ID: {vote.id}")
+                self.logger.info(f"[DEBUG] Created vote details: {vote.model_dump()}")
             except Exception as e:
                 self.logger.error(f"Failed to create vote record: {str(e)}")
+                self.logger.error(
+                    f"[DEBUG] Vote data that failed: {new_vote.model_dump()}"
+                )
+                import traceback
+
+                self.logger.error(f"[DEBUG] Full traceback: {traceback.format_exc()}")

@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from backend.factory import backend
 from backend.models import (
+    UUID,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
@@ -38,54 +39,24 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
     QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_VOTE
 
-    async def _validate_task_specific(self, context: JobContext) -> bool:
-        """Validate task-specific conditions."""
-        try:
-            # Get pending messages from the queue
-            pending_messages = await self.get_pending_messages()
-            message_count = len(pending_messages)
-            logger.debug(f"Found {message_count} pending proposal voting messages")
+    async def get_pending_messages(self) -> List[QueueMessage]:
+        """Get all unprocessed DAO proposal vote messages from the queue."""
+        filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
+        return backend.list_queue_messages(filters=filters)
 
-            if message_count == 0:
-                logger.info("No pending proposal voting messages found")
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate that we have pending messages to process."""
+        try:
+            pending_messages = await self.get_pending_messages()
+
+            if not pending_messages:
+                logger.info("No pending DAO proposal vote messages to process")
                 return False
 
-            # Validate that at least one message has a valid proposal ID
-            for message in pending_messages:
-                message_data = message.message or {}
-                proposal_id = message_data.get("proposal_id")
-
-                if not proposal_id:
-                    logger.warning(f"Message {message.id} missing proposal_id")
-                    continue
-
-                # Check if the proposal exists in the database
-                proposal = backend.get_proposal(proposal_id)
-                if proposal:
-                    # Check if there are any unvoted votes for this proposal
-                    unvoted_votes = backend.list_votes(
-                        VoteFilter(
-                            proposal_id=proposal_id,
-                            voted=False,
-                        )
-                    )
-
-                    if unvoted_votes:
-                        logger.info(
-                            f"Found valid proposal {proposal_id} with {len(unvoted_votes)} unvoted votes to process"
-                        )
-                        return True
-                    else:
-                        logger.warning(
-                            f"No unvoted votes found for proposal {proposal_id}"
-                        )
-                else:
-                    logger.warning(f"Proposal {proposal_id} not found in database")
-
-            logger.warning(
-                "No valid proposals with unvoted votes found in pending messages"
+            logger.info(
+                f"Found {len(pending_messages)} pending DAO proposal vote messages"
             )
-            return False
+            return True
 
         except Exception as e:
             logger.error(
@@ -98,41 +69,73 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
-        dao_id = message.dao_id
 
         logger.debug(
             f"Processing proposal voting message {message_id} for wallet {wallet_id}"
         )
 
-        # Get the proposal ID from the message
+        # Get the proposal ID from the message (this should be the database UUID)
         proposal_id = message_data.get("proposal_id")
-
         if not proposal_id:
             error_msg = f"Missing proposal_id in message {message_id}"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
         try:
-            # Get the proposal details from the database
-            proposal = backend.get_proposal(proposal_id)
+            # Convert string UUID to UUID object
+            try:
+                proposal_uuid = UUID(proposal_id)
+            except ValueError:
+                error_msg = (
+                    f"Invalid proposal_id format {proposal_id} in message {message_id}"
+                )
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+
+            # Get the proposal by its database ID
+            proposal = backend.get_proposal(proposal_uuid)
             if not proposal:
                 error_msg = f"Proposal {proposal_id} not found in database"
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Get unvoted votes for this proposal and wallet
-            unvoted_votes = backend.list_votes(
-                VoteFilter(
-                    proposal_id=proposal_id,
-                    wallet_id=wallet_id,
-                    voted=False,
-                )
+            # Get the wallet
+            wallet = backend.get_wallet(wallet_id)
+            if not wallet:
+                error_msg = f"Wallet {wallet_id} not found"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+
+            # Get unvoted votes for this specific proposal and wallet
+            votes = backend.list_votes(
+                VoteFilter(proposal_id=proposal_uuid, wallet_id=wallet_id)
             )
+            if not votes:
+                error_msg = (
+                    f"No votes found for proposal {proposal_id} and wallet {wallet_id}"
+                )
+                logger.warning(error_msg)
+                return {
+                    "success": True,
+                    "message": "No votes to process",
+                    "votes_processed": 0,
+                }
+
+            # Filter out already voted votes
+            unvoted_votes = [vote for vote in votes if not vote.voted]
 
             if not unvoted_votes:
                 error_msg = f"No unvoted votes found for proposal {proposal_id} and wallet {wallet_id}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
+                logger.warning(error_msg)
+                return {
+                    "success": True,
+                    "message": "No votes to process",
+                    "votes_processed": 0,
+                }
+
+            logger.info(
+                f"Found {len(unvoted_votes)} unvoted votes for proposal {proposal_id} and wallet {wallet_id}"
+            )
 
             # Initialize the voting tool
             voting_tool = VoteOnActionProposalTool(wallet_id=wallet_id)
@@ -142,9 +145,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             for vote in unvoted_votes:
                 # Submit the vote
                 vote_result = await voting_tool._arun(
-                    action_proposals_voting_extension=proposal.contract_principal,
+                    dao_action_proposal_voting_contract=proposal.contract_principal,
                     proposal_id=proposal.proposal_id,
-                    vote=vote.answer,
+                    vote_for=vote.answer,
                 )
 
                 if not vote_result.get("success", False):
@@ -189,40 +192,43 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                # Log the txid for debugging
-                ## Get the correct address based on network configuration
-                wallet = backend.get_wallet(wallet_id)
+                # Get the correct address based on network configuration
                 address = (
                     wallet.mainnet_address
                     if config.network.network == "mainnet"
                     else wallet.testnet_address
                 )
-                logger.debug(f"Found txid in response: {tx_id}")
+
                 vote_data = VoteBase(
                     tx_id=tx_id,
                     voted=True,
                     address=address,
                     profile_id=wallet.profile_id,
                 )
-                logger.debug(
-                    f"Attempting to update vote {vote.id} with data: {vote_data.model_dump()}"
-                )
-                try:
-                    # Log the current vote state before update
-                    current_vote = backend.get_vote(vote.id)
-                    logger.debug(
-                        f"Current vote state before update: {current_vote.model_dump() if current_vote else None}"
-                    )
 
+                try:
                     updated_vote = backend.update_vote(vote.id, vote_data)
                     if updated_vote:
                         logger.info(
-                            f"Successfully updated vote {vote.id} with transaction ID {tx_id} and marked as voted"
+                            f"Successfully updated vote {vote.id} with transaction ID {tx_id}"
                         )
-                        logger.debug(f"Updated vote state: {updated_vote.model_dump()}")
+                        results.append(
+                            {
+                                "success": True,
+                                "vote_id": vote.id,
+                                "tx_id": tx_id,
+                            }
+                        )
                     else:
                         logger.error(
                             f"Failed to update vote {vote.id} - update_vote returned None"
+                        )
+                        results.append(
+                            {
+                                "success": False,
+                                "error": "Failed to update vote in database",
+                                "vote_id": vote.id,
+                            }
                         )
                 except Exception as e:
                     logger.error(
@@ -233,53 +239,42 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                             "success": False,
                             "error": f"Failed to update vote: {str(e)}",
                             "vote_id": vote.id,
-                            "vote_result": vote_result,
                         }
                     )
-                    continue
-                results.append(
-                    {
-                        "success": True,
-                        "vote_id": vote.id,
-                        "tx_id": tx_id,
-                        "vote_result": vote_result,
-                    }
-                )
 
-            # Mark the message as processed if all votes were handled
-            if all(result["success"] for result in results):
+            # Mark the message as processed ONLY if ALL votes were handled successfully
+            successful_votes = len([r for r in results if r["success"]])
+            if successful_votes == len(results) and successful_votes > 0:
                 update_data = QueueMessageBase(is_processed=True)
                 backend.update_queue_message(message_id, update_data)
                 logger.info(
-                    f"Successfully processed all votes for message {message_id}"
+                    f"Successfully processed all {successful_votes} votes for message {message_id} - marking as processed"
                 )
-                return {
-                    "success": True,
-                    "results": results,
-                }
+            elif successful_votes > 0:
+                logger.warning(
+                    f"Only {successful_votes}/{len(results)} votes succeeded for message {message_id} - leaving unprocessed for retry"
+                )
             else:
-                # Some votes failed
-                return {
-                    "success": False,
-                    "error": "Some votes failed to process",
-                    "results": results,
-                }
+                logger.error(
+                    f"No votes succeeded for message {message_id} - leaving unprocessed for retry"
+                )
+
+            return {
+                "success": True,
+                "votes_processed": successful_votes,
+                "votes_failed": len(results) - successful_votes,
+                "results": results,
+            }
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {"success": False, "error": error_msg}
 
-    async def get_pending_messages(self) -> List[QueueMessage]:
-        """Get all unprocessed messages from the queue."""
-        filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
-        return backend.list_queue_messages(filters=filters)
-
     async def _execute_impl(self, context: JobContext) -> List[DAOProposalVoteResult]:
-        """Run the DAO proposal voter task."""
+        """Run the DAO proposal voter task by processing each message directly."""
+        # Get pending messages
         pending_messages = await self.get_pending_messages()
-        message_count = len(pending_messages)
-        logger.debug(f"Found {message_count} pending proposal voting messages")
 
         if not pending_messages:
             return [
@@ -291,38 +286,46 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 )
             ]
 
+        message_count = len(pending_messages)
+        logger.info(f"Processing {message_count} pending proposal voting messages")
+
         # Process each message
         processed_count = 0
-        voted_count = 0
+        total_votes_processed = 0
         errors = []
 
         for message in pending_messages:
-            result = await self.process_message(message)
-            processed_count += 1
+            try:
+                result = await self.process_message(message)
+                processed_count += 1
 
-            if result.get("success"):
-                # Count successful votes from the results
-                voted_count += len(
-                    [r for r in result.get("results", []) if r.get("success")]
-                )
-            else:
-                errors.append(result.get("error", "Unknown error"))
-                # Also add any individual vote errors
-                for vote_result in result.get("results", []):
-                    if not vote_result.get("success"):
-                        errors.append(vote_result.get("error", "Unknown vote error"))
+                if result.get("success"):
+                    votes_processed = result.get("votes_processed", 0)
+                    total_votes_processed += votes_processed
+                    logger.debug(
+                        f"Message {message.id}: processed {votes_processed} votes"
+                    )
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    errors.append(f"Message {message.id}: {error_msg}")
+                    logger.error(f"Failed to process message {message.id}: {error_msg}")
 
-        logger.debug(
-            f"Task metrics - Processed: {processed_count}, "
-            f"Voted: {voted_count}, Errors: {len(errors)}"
+            except Exception as e:
+                error_msg = f"Exception processing message {message.id}: {str(e)}"
+                errors.append(error_msg)
+                logger.error(error_msg, exc_info=True)
+
+        logger.info(
+            f"Task completed - Processed: {processed_count}/{message_count} messages, "
+            f"Votes: {total_votes_processed}, Errors: {len(errors)}"
         )
 
         return [
             DAOProposalVoteResult(
                 success=True,
-                message=f"Processed {processed_count} proposal(s), voted on {voted_count} proposal(s)",
+                message=f"Processed {processed_count} message(s), voted on {total_votes_processed} vote(s)",
                 proposals_processed=processed_count,
-                proposals_voted=voted_count,
+                proposals_voted=total_votes_processed,
                 errors=errors,
             )
         ]

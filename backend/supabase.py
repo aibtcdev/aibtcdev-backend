@@ -53,6 +53,7 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    ProposalFilterN,
     QueueMessage,
     QueueMessageBase,
     QueueMessageCreate,
@@ -88,6 +89,7 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletFilterN,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -234,6 +236,34 @@ class SupabaseBackend(AbstractBackend):
         except Exception as e:
             logger.error(
                 f"Failed to add vectors to collection {collection_name}: {str(e)}"
+            )
+            raise
+
+    async def fetch_vectors(self, collection_name: str, ids: List[str]) -> List[Any]:
+        """Fetch specific vectors by their IDs using the vecs client.
+
+        Args:
+            collection_name: Name of the collection to query
+            ids: List of vector IDs to fetch
+
+        Returns:
+            List of fetched records (typically tuples of id, vector, metadata).
+        """
+        collection = self.get_vector_collection(collection_name)
+        if not ids:
+            logger.debug("fetch_vectors called with empty ID list.")
+            return []
+
+        try:
+            # Assuming the vecs library provides a `fetch` method
+            fetched_records = collection.fetch(ids=ids)
+            logger.debug(
+                f"Fetched {len(fetched_records)} vectors from collection {collection_name} for {len(ids)} requested IDs."
+            )
+            return fetched_records
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch vectors by ID from collection {collection_name}: {str(e)}"
             )
             raise
 
@@ -737,6 +767,65 @@ class SupabaseBackend(AbstractBackend):
         response = query.execute()
         data = response.data or []
         return [Wallet(**row) for row in data]
+
+    def list_wallets_n(
+        self, filters: Optional["WalletFilterN"] = None
+    ) -> List["Wallet"]:
+        """Enhanced wallets listing with support for batch operations and advanced filtering."""
+        query = self.client.table("wallets").select("*")
+
+        if filters:
+            # Standard equality filters
+            if filters.agent_id is not None:
+                query = query.eq("agent_id", str(filters.agent_id))
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+            if filters.mainnet_address is not None:
+                query = query.eq("mainnet_address", filters.mainnet_address)
+            if filters.testnet_address is not None:
+                query = query.eq("testnet_address", filters.testnet_address)
+
+            # Batch filters using 'in_' operations
+            if filters.ids is not None and len(filters.ids) > 0:
+                id_strings = [str(wallet_id) for wallet_id in filters.ids]
+                query = query.in_("id", id_strings)
+            if filters.agent_ids is not None and len(filters.agent_ids) > 0:
+                agent_id_strings = [str(agent_id) for agent_id in filters.agent_ids]
+                query = query.in_("agent_id", agent_id_strings)
+            if filters.profile_ids is not None and len(filters.profile_ids) > 0:
+                profile_id_strings = [
+                    str(profile_id) for profile_id in filters.profile_ids
+                ]
+                query = query.in_("profile_id", profile_id_strings)
+            if (
+                filters.mainnet_addresses is not None
+                and len(filters.mainnet_addresses) > 0
+            ):
+                query = query.in_("mainnet_address", filters.mainnet_addresses)
+            if (
+                filters.testnet_addresses is not None
+                and len(filters.testnet_addresses) > 0
+            ):
+                query = query.in_("testnet_address", filters.testnet_addresses)
+
+        try:
+            response = query.execute()
+            data = response.data or []
+            return [Wallet(**row) for row in data]
+        except Exception as e:
+            logger.error(f"Error in list_wallets_n: {str(e)}")
+            # Fallback to original list_wallets if enhanced filtering fails
+            if filters:
+                # Convert enhanced filter to basic filter for fallback
+                basic_filter = WalletFilter(
+                    agent_id=filters.agent_id,
+                    profile_id=filters.profile_id,
+                    mainnet_address=filters.mainnet_address,
+                    testnet_address=filters.testnet_address,
+                )
+                return self.list_wallets(basic_filter)
+            else:
+                return self.list_wallets()
 
     def update_wallet(
         self, wallet_id: UUID, update_data: "WalletBase"
@@ -1277,8 +1366,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("met_threshold", filters.met_threshold)
             if filters.type is not None:
                 query = query.eq("type", filters.type)
-            if filters.proposal_contract is not None:
-                query = query.eq("proposal_contract", filters.proposal_contract)
+            if filters.tx_id is not None:
+                query = query.eq("tx_id", filters.tx_id)
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]
@@ -1586,6 +1675,10 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("tx_id", filters.tx_id)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
+            if filters.evaluation_score is not None:
+                query = query.eq("evaluation_score", filters.evaluation_score)
+            if filters.flags is not None:
+                query = query.eq("flags", filters.flags)
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]
@@ -1907,3 +2000,87 @@ class SupabaseBackend(AbstractBackend):
         )
         deleted = response.data or []
         return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 18. PROPOSALS_N
+    # ----------------------------------------------------------------
+    def list_proposals_n(
+        self, filters: Optional["ProposalFilterN"] = None
+    ) -> List["Proposal"]:
+        """Enhanced proposals listing with support for batch operations and advanced filtering."""
+        query = self.client.table("proposals").select("*")
+
+        if filters:
+            # Standard equality filters
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.status is not None:
+                query = query.eq("status", str(filters.status))
+            if filters.contract_principal is not None:
+                query = query.eq("contract_principal", filters.contract_principal)
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", filters.proposal_id)
+            if filters.executed is not None:
+                query = query.eq("executed", filters.executed)
+            if filters.passed is not None:
+                query = query.eq("passed", filters.passed)
+            if filters.met_quorum is not None:
+                query = query.eq("met_quorum", filters.met_quorum)
+            if filters.met_threshold is not None:
+                query = query.eq("met_threshold", filters.met_threshold)
+            if filters.type is not None:
+                query = query.eq("type", filters.type)
+
+            # Batch filters using 'in_' operations
+            if filters.dao_ids is not None and len(filters.dao_ids) > 0:
+                dao_id_strings = [str(dao_id) for dao_id in filters.dao_ids]
+                query = query.in_("dao_id", dao_id_strings)
+            if filters.proposal_ids is not None and len(filters.proposal_ids) > 0:
+                query = query.in_("proposal_id", filters.proposal_ids)
+            if filters.statuses is not None and len(filters.statuses) > 0:
+                status_strings = [str(status) for status in filters.statuses]
+                query = query.in_("status", status_strings)
+            if (
+                filters.contract_principals is not None
+                and len(filters.contract_principals) > 0
+            ):
+                query = query.in_("contract_principal", filters.contract_principals)
+            if filters.types is not None and len(filters.types) > 0:
+                type_strings = [str(ptype) for ptype in filters.types]
+                query = query.in_("type", type_strings)
+
+            # Range filters for numeric fields
+            if filters.proposal_id_gte is not None:
+                query = query.gte("proposal_id", filters.proposal_id_gte)
+            if filters.proposal_id_lte is not None:
+                query = query.lte("proposal_id", filters.proposal_id_lte)
+
+            # Text search filters (using ilike for case-insensitive partial matching)
+            if filters.title_contains is not None:
+                query = query.ilike("title", f"%{filters.title_contains}%")
+            if filters.content_contains is not None:
+                query = query.ilike("content", f"%{filters.content_contains}%")
+
+        try:
+            response = query.execute()
+            data = response.data or []
+            return [Proposal(**row) for row in data]
+        except Exception as e:
+            logger.error(f"Error in list_proposals_n: {str(e)}")
+            # Fallback to original list_proposals if enhanced filtering fails
+            if filters:
+                # Convert enhanced filter to basic filter for fallback
+                basic_filter = ProposalFilter(
+                    dao_id=filters.dao_id,
+                    status=filters.status,
+                    contract_principal=filters.contract_principal,
+                    proposal_id=filters.proposal_id,
+                    executed=filters.executed,
+                    passed=filters.passed,
+                    met_quorum=filters.met_quorum,
+                    met_threshold=filters.met_threshold,
+                    type=filters.type,
+                )
+                return self.list_proposals(basic_filter)
+            else:
+                return self.list_proposals()

@@ -5,7 +5,6 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
 
-from backend.models import QueueMessageType
 from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -73,7 +72,10 @@ class JobType(str, Enum):
     DAO_PROPOSAL_EVALUATION = "dao_proposal_evaluation"
     DAO_TWEET = "dao_tweet"
     TWEET = "tweet"
+    DISCORD = "discord"
     AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
+    PROPOSAL_EMBEDDING = "proposal_embedding"
+    CHAIN_STATE_MONITOR = "chain_state_monitor"
 
     def __str__(self):
         return self.value
@@ -107,7 +109,7 @@ class BaseTask(ABC, Generic[T]):
         import time
 
         self._start_time = time.time()
-        logger.info(f"Starting task: {self.task_name}")
+        logger.debug(f"Starting task: {self.task_name}")
         logger.debug(f"{self.task_name}: Configuration - {self.config}")
 
     def _log_task_completion(self, results: List[T]) -> None:

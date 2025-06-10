@@ -15,10 +15,10 @@ def create_discord_service(webhook_url=None):
     Returns:
         DiscordService or None: Initialized Discord service or None if configuration is missing.
     """
-    # If webhook_url is not provided, get it from config
+    # If webhook_url is not provided, get it from config (default to passed webhook)
     if webhook_url is None:
         discord_config = DiscordConfig()
-        webhook_url = discord_config.webhook_url
+        webhook_url = discord_config.webhook_url_passed
 
     if not webhook_url:
         logger.warning("Discord webhook URL is not configured")

@@ -268,9 +268,7 @@ class TwitterService:
                 raise Exception(f"Failed to get user info for {target_username}")
 
             # Follow the user
-            response = self.client.follow_user(
-                user_id=me.id, target_user_id=target_user.id
-            )
+            self.client.follow_user(user_id=me.id, target_user_id=target_user.id)
             logger.info(f"Successfully followed user: {target_username}")
             return True
         except Exception as e:
@@ -302,9 +300,7 @@ class TwitterService:
                 raise Exception(f"Failed to get user info for {target_username}")
 
             # Unfollow the user
-            response = self.client.unfollow_user(
-                user_id=me.id, target_user_id=target_user.id
-            )
+            self.client.unfollow_user(user_id=me.id, target_user_id=target_user.id)
             logger.info(f"Successfully unfollowed user: {target_username}")
             return True
         except Exception as e:

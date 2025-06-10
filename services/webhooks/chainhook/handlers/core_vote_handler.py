@@ -30,7 +30,6 @@ class CoreVoteHandler(BaseVoteHandler):
         proposals = backend.list_proposals(
             filters=ProposalFilter(
                 contract_principal=contract_identifier,
-                proposal_contract=proposal_identifier,
                 type=ProposalType.CORE,
             )
         )
@@ -62,21 +61,51 @@ class CoreVoteHandler(BaseVoteHandler):
                 event_data = event.data
                 value = event_data.get("value", {})
 
-                if value.get("notification") == "vote-on-proposal":
+                # Check for both old and new notification formats
+                notification = value.get("notification", "")
+                if (
+                    notification == "vote-on-proposal"
+                    or "vote-on-core-proposal" in notification
+                ):
                     payload = value.get("payload", {})
                     if not payload:
                         self.logger.warning("Empty payload in vote event")
                         return None
 
+                    # Handle both old and new payload structures
+                    proposal_id = payload.get("proposal") or payload.get("proposalId")
+                    caller = payload.get("caller") or payload.get("contractCaller")
+
                     return {
-                        "proposal_identifier": payload.get(
-                            "proposal"
-                        ),  # Contract principal for core proposals
+                        "proposal_identifier": proposal_id,  # Contract principal for core proposals
                         "voter": payload.get("voter"),
-                        "caller": payload.get("caller"),
-                        "amount": str(payload.get("amount")),
-                        "vote_value": None,  # Will be extracted from transaction args
+                        "caller": caller,
+                        "tx_sender": payload.get("txSender"),  # New field
+                        "amount": self._extract_amount(payload.get("amount")),
+                        "vote_value": payload.get(
+                            "vote"
+                        ),  # Vote value may be directly in payload now
+                        "voter_user_id": payload.get("voterUserId"),  # New field
                     }
 
         self.logger.warning("Could not find vote information in transaction events")
         return None
+
+    def _extract_amount(self, amount) -> str:
+        """Extract and convert the amount from Clarity format to a string.
+
+        Args:
+            amount: The amount value which could be a string with 'u' prefix, integer, or None
+
+        Returns:
+            str: The amount as a string, or "0" if None
+        """
+        if amount is None:
+            return "0"
+
+        amount_str = str(amount)
+        if amount_str.startswith("u"):
+            # Remove the 'u' prefix and return as string
+            return amount_str[1:]
+        else:
+            return amount_str

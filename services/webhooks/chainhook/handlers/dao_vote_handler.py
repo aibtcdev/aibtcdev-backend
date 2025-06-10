@@ -2,8 +2,6 @@
 
 from typing import Dict, List, Optional
 
-from backend.factory import backend
-from backend.models import ProposalFilter, VoteBase, VoteCreate, VoteFilter
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.action_vote_handler import ActionVoteHandler
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
@@ -73,24 +71,28 @@ class DAOVoteHandler(ChainhookEventHandler):
                         proposal_id = payload.get("proposal_id")
 
                     # Get voter address
-                    voter = None
-                    if "voter" in payload:
-                        voter = payload.get("voter")
+                    voter = payload.get("voter")
 
                     # Get vote value (true/false)
-                    vote_value = None
-                    if "vote" in payload:
-                        vote_value = payload.get("vote")
+                    vote_value = payload.get("vote")
 
-                    # Get token amount
+                    # Get token amount - ensure it's converted to string
                     amount = None
                     if "amount" in payload:
                         amount = str(payload.get("amount"))
                     elif "liquidTokens" in payload:
                         amount = str(payload.get("liquidTokens"))
 
-                    # Try to determine the vote value from the transaction args
-                    # This is needed because some contracts don't include the vote value in the event
+                    # Get contract caller
+                    contract_caller = payload.get("contractCaller")
+
+                    # Get tx sender
+                    tx_sender = payload.get("txSender")
+
+                    # Get voter user ID
+                    voter_user_id = payload.get("voterUserId")
+
+                    # Try to determine the vote value from the transaction args if not found
                     if vote_value is None:
                         # Check if we can extract it from the method args
                         args = event_data.get("args", [])
@@ -99,10 +101,16 @@ class DAOVoteHandler(ChainhookEventHandler):
                             if vote_str in ["true", "false"]:
                                 vote_value = vote_str == "true"
 
+                    self.logger.info(
+                        f"Extracted vote info: proposal_id={proposal_id}, voter={voter}, vote_value={vote_value}, amount={amount}, contract_caller={contract_caller}, tx_sender={tx_sender}, voter_user_id={voter_user_id}"
+                    )
+
                     return {
                         "proposal_id": proposal_id,
                         "voter": voter,
-                        "caller": payload.get("caller"),
+                        "contract_caller": contract_caller,
+                        "tx_sender": tx_sender,
+                        "voter_user_id": voter_user_id,
                         "amount": amount,
                         "vote_value": vote_value,
                     }
@@ -126,9 +134,9 @@ class DAOVoteHandler(ChainhookEventHandler):
         contract_identifier = tx_data_content.get("contract_identifier", "")
 
         # Check if this is a core or action proposal vote based on the contract name
-        if "core-proposals" in contract_identifier:
+        if "core-proposal" in contract_identifier:
             await self.core_handler.handle_transaction(transaction)
-        elif "action-proposals" in contract_identifier:
+        elif "action-proposal" in contract_identifier:
             await self.action_handler.handle_transaction(transaction)
         else:
             self.logger.warning(

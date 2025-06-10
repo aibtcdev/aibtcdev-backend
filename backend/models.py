@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -29,6 +29,7 @@ class ChainStateBase(CustomBaseModel):
     block_height: Optional[int] = None
     block_hash: Optional[str] = None
     network: Optional[str] = "mainnet"  # mainnet or testnet
+    bitcoin_block_height: Optional[int] = None
 
 
 class ChainStateCreate(ChainStateBase):
@@ -74,6 +75,7 @@ class QueueMessageType(str, Enum):
     AGENT_ACCOUNT_DEPLOY = (
         "agent_account_deploy"  # New type for agent account deployment
     )
+    DISCORD = "discord"  # New type for Discord queue messages
 
     def __str__(self):
         return self.value
@@ -198,6 +200,7 @@ class Agent(AgentBase):
 class ExtensionBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
+    subtype: Optional[str] = None
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     status: Optional[ContractStatus] = ContractStatus.DRAFT
@@ -320,23 +323,16 @@ class Profile(ProfileBase):
 class ProposalBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     title: Optional[str] = None
-    description: Optional[str] = None
+    content: Optional[str] = None  # Replaces both description and parameters
     status: Optional[ContractStatus] = ContractStatus.DRAFT
     contract_principal: Optional[str] = None
     tx_id: Optional[str] = None
     proposal_id: Optional[int] = None  # On-chain proposal ID if its an action proposal
-    proposal_contract: Optional[str] = (
-        None  # Contract address of the proposal if its a core contract proposal
-    )
     type: Optional[ProposalType] = ProposalType.ACTION
     action: Optional[str] = None
     caller: Optional[str] = None
     creator: Optional[str] = None
-    created_at_block: Optional[int] = None
-    end_block: Optional[int] = None
-    start_block: Optional[int] = None
     liquid_tokens: Optional[str] = None  # Using string to handle large numbers
-    parameters: Optional[str] = None  # Hex encoded parameters
     # Additional fields from blockchain data
     concluded_by: Optional[str] = None
     executed: Optional[bool] = None
@@ -346,6 +342,24 @@ class ProposalBase(CustomBaseModel):
     votes_against: Optional[str] = None  # String to handle large numbers
     votes_for: Optional[str] = None  # String to handle large numbers
     bond: Optional[str] = None  # String to handle large numbers
+    # Fields from updated chainhook payload
+    contract_caller: Optional[str] = None
+    created_btc: Optional[int] = None
+    created_stx: Optional[int] = None
+    creator_user_id: Optional[int] = None
+    exec_end: Optional[int] = None
+    exec_start: Optional[int] = None
+    memo: Optional[str] = None
+    tx_sender: Optional[str] = None
+    vote_end: Optional[int] = None
+    vote_start: Optional[int] = None
+    voting_delay: Optional[int] = None
+    voting_period: Optional[int] = None
+    voting_quorum: Optional[int] = None
+    voting_reward: Optional[str] = None  # String to handle large numbers
+    voting_threshold: Optional[int] = None
+    summary: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 class ProposalCreate(ProposalBase):
@@ -523,6 +537,23 @@ class WalletFilter(CustomBaseModel):
     testnet_address: Optional[str] = None
 
 
+class WalletFilterN(CustomBaseModel):
+    """Enhanced wallet filter with support for batch operations using 'in_' queries."""
+
+    # Standard equality filters (same as WalletFilter)
+    agent_id: Optional[UUID] = None
+    profile_id: Optional[UUID] = None
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
+
+    # Batch filters using 'in_' operations
+    ids: Optional[List[UUID]] = None
+    agent_ids: Optional[List[UUID]] = None
+    profile_ids: Optional[List[UUID]] = None
+    mainnet_addresses: Optional[List[str]] = None
+    testnet_addresses: Optional[List[str]] = None
+
+
 class QueueMessageFilter(CustomBaseModel):
     type: Optional[QueueMessageType] = None
     is_processed: Optional[bool] = None
@@ -542,6 +573,7 @@ class AgentFilter(CustomBaseModel):
 class ExtensionFilter(CustomBaseModel):
     dao_id: Optional[UUID] = None
     type: Optional[str] = None
+    subtype: Optional[str] = None
     status: Optional[ContractStatus] = None
     contract_principal: Optional[str] = None
 
@@ -579,7 +611,37 @@ class ProposalFilter(CustomBaseModel):
     met_quorum: Optional[bool] = None
     met_threshold: Optional[bool] = None
     type: Optional[ProposalType] = None
-    proposal_contract: Optional[str] = None
+    tx_id: Optional[str] = None
+
+
+class ProposalFilterN(CustomBaseModel):
+    """Enhanced proposal filter with support for batch operations using 'in_' queries."""
+
+    # Standard equality filters (same as ProposalFilter)
+    dao_id: Optional[UUID] = None
+    status: Optional[ContractStatus] = None
+    contract_principal: Optional[str] = None
+    proposal_id: Optional[int] = None
+    executed: Optional[bool] = None
+    passed: Optional[bool] = None
+    met_quorum: Optional[bool] = None
+    met_threshold: Optional[bool] = None
+    type: Optional[ProposalType] = None
+
+    # Batch filters using 'in_' operations
+    dao_ids: Optional[List[UUID]] = None
+    proposal_ids: Optional[List[int]] = None
+    statuses: Optional[List[ContractStatus]] = None
+    contract_principals: Optional[List[str]] = None
+    types: Optional[List[ProposalType]] = None
+
+    # Range filters for numeric fields
+    proposal_id_gte: Optional[int] = None  # greater than or equal
+    proposal_id_lte: Optional[int] = None  # less than or equal
+
+    # Text search (if supported by backend)
+    title_contains: Optional[str] = None
+    content_contains: Optional[str] = None
 
 
 class StepFilter(CustomBaseModel):
@@ -689,6 +751,13 @@ class VoteBase(CustomBaseModel):
     cost: Optional[float] = None
     model: Optional[str] = None
     profile_id: Optional[UUID] = None
+    evaluation_score: Optional[Dict[str, Any]] = (
+        None  # Store final score from proposal evaluation
+    )
+    flags: Optional[List[str]] = None  # Store flags from proposal evaluation
+    evaluation: Optional[Dict[str, Any]] = (
+        None  # Store evaluation from proposal evaluation
+    )
 
 
 class VoteCreate(VoteBase):
@@ -711,6 +780,8 @@ class VoteFilter(CustomBaseModel):
     model: Optional[str] = None
     tx_id: Optional[str] = None
     profile_id: Optional[UUID] = None
+    evaluation_score: Optional[Dict[str, Any]] = None  # Filter by evaluation score
+    flags: Optional[List[str]] = None  # Filter by flags
 
 
 # Add this to your backend interface class to get agents by tokens

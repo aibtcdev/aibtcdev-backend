@@ -132,7 +132,8 @@ class DAOProposalConclusionHandler(ChainhookEventHandler):
                     base_data["type"] = ProposalType.ACTION
                 elif "proposal" in payload:
                     # Core proposal
-                    base_data["proposal_contract"] = payload.get("proposal")
+                    # Note: proposal_contract field was removed from the model
+                    # The proposal contract info is stored in contract_principal
                     base_data["type"] = ProposalType.CORE
                 else:
                     self.logger.warning(

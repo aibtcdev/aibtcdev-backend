@@ -1,5 +1,6 @@
 """Agent account deployment task implementation."""
 
+import json
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -13,7 +14,7 @@ from backend.models import (
 from config import config
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
-from tools.smartwallet import SmartWalletDeploySmartWalletTool
+from tools.agent_account import AgentAccountDeployTool
 
 logger = configure_logger(__name__)
 
@@ -46,14 +47,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
 
             if message_count == 0:
-                logger.info("No pending agent account deployment messages found")
+                logger.debug("No pending agent account deployment messages found")
                 return False
 
             # Validate that at least one message has valid deployment data
             for message in pending_messages:
-                message_data = message.message or {}
+                message_data = self._parse_message_data(message.message)
                 if self._validate_message_data(message_data):
-                    logger.info("Found valid agent account deployment message")
+                    logger.debug("Found valid agent account deployment message")
                     return True
 
             logger.warning("No valid deployment data found in pending messages")
@@ -65,6 +66,21 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 exc_info=True,
             )
             return False
+
+    def _parse_message_data(self, message: Any) -> Dict[str, Any]:
+        """Parse message data from either string or dictionary format."""
+        if message is None:
+            return {}
+
+        if isinstance(message, dict):
+            return message
+
+        try:
+            # Try to parse as JSON string
+            return json.loads(message)
+        except (json.JSONDecodeError, TypeError):
+            logger.error(f"Failed to parse message data: {message}")
+            return {}
 
     def _validate_message_data(self, message_data: Dict[str, Any]) -> bool:
         """Validate the message data contains required fields."""
@@ -78,7 +94,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
         message_id = message.id
-        message_data = message.message or {}
+        message_data = self._parse_message_data(message.message)
 
         logger.debug(f"Processing agent account deployment message {message_id}")
 
@@ -89,16 +105,29 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Initialize the SmartWalletDeploySmartWalletTool
+            # Initialize the AgentAccountDeployTool
             logger.debug("Preparing to deploy agent account")
-            deploy_tool = SmartWalletDeploySmartWalletTool(
+            deploy_tool = AgentAccountDeployTool(
                 wallet_id=config.scheduler.agent_account_deploy_runner_wallet_id
             )
+
+            # get address from wallet id
+            wallet = backend.get_wallet(
+                config.scheduler.agent_account_deploy_runner_wallet_id
+            )
+            # depending on the network, use the correct address
+            profile = backend.get_profile(wallet.profile_id)
+
+            if config.network == "mainnet":
+                owner_address = profile.email.strip("@stacks.id").upper()
+            else:
+                owner_address = "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
 
             # Execute the deployment
             logger.debug("Executing deployment...")
             deployment_result = await deploy_tool._arun(
-                owner_address=message_data["owner_address"],
+                owner_address=owner_address,
+                agent_address=message_data["owner_address"],
                 dao_token_contract=message_data["dao_token_contract"],
                 dao_token_dex_contract=message_data["dao_token_dex_contract"],
             )
@@ -118,7 +147,13 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed messages from the queue."""
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
-        return backend.list_queue_messages(filters=filters)
+        messages = backend.list_queue_messages(filters=filters)
+
+        # Messages are already parsed by the backend, but we log them for debugging
+        for message in messages:
+            logger.debug(f"Queue message raw data: {message.message!r}")
+
+        return messages
 
     async def _execute_impl(
         self, context: JobContext

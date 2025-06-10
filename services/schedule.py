@@ -10,7 +10,7 @@ from backend.factory import backend
 from backend.models import JobBase, JobCreate, StepCreate, Task, TaskFilter
 from lib.logger import configure_logger
 from lib.persona import generate_persona
-from services.workflows import execute_langgraph_stream
+from services.workflows import execute_workflow_stream
 from tools.tools_factory import exclude_tools_by_names, initialize_tools
 
 logger = configure_logger(__name__)
@@ -142,7 +142,7 @@ class SchedulerService:
                 ["db_update_scheduled_task", "db_add_scheduled_task"], tools_map
             )
 
-            stream_generator = execute_langgraph_stream(
+            stream_generator = execute_workflow_stream(
                 history=history,
                 input_str=task.prompt,
                 persona=persona,

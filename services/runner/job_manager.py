@@ -82,6 +82,12 @@ class JobManager:
                 JobType.TWEET.value,
             ),
             (
+                "Discord Runner Service",
+                config.scheduler.discord_runner_enabled,
+                config.scheduler.discord_runner_interval_seconds,
+                JobType.DISCORD.value,
+            ),
+            (
                 "DAO Proposal Vote Runner Service",
                 config.scheduler.dao_proposal_vote_runner_enabled,
                 config.scheduler.dao_proposal_vote_runner_interval_seconds,
@@ -104,6 +110,18 @@ class JobManager:
                 config.scheduler.agent_account_deploy_runner_enabled,
                 config.scheduler.agent_account_deploy_runner_interval_seconds,
                 JobType.AGENT_ACCOUNT_DEPLOY.value,
+            ),
+            (
+                "Proposal Embedder Runner Service",
+                config.scheduler.proposal_embedder_enabled,
+                config.scheduler.proposal_embedder_interval_seconds,
+                JobType.PROPOSAL_EMBEDDING.value,
+            ),
+            (
+                "Chain State Monitor Service",
+                config.scheduler.chain_state_monitor_enabled,
+                config.scheduler.chain_state_monitor_interval_seconds,
+                JobType.CHAIN_STATE_MONITOR.value,
             ),
         ]
 
@@ -166,11 +184,22 @@ class JobManager:
 
                 # Add the job with a specific ID for easier management
                 job_id = job.job_id or f"{job.name.lower().replace(' ', '_')}"
+
+                # Add max_instances=1 for all jobs to prevent concurrent execution
+                # and set misfire_grace_time to prevent missed execution warnings
+                # Set next_run_time to one minute from now
                 scheduler.add_job(
-                    job_func, "interval", seconds=job.seconds, id=job_id, **job_args
+                    job_func,
+                    "interval",
+                    seconds=job.seconds,
+                    id=job_id,
+                    max_instances=1,
+                    misfire_grace_time=60,
+                    **job_args,
                 )
+
                 logger.info(
-                    f"{job.name} started with interval of {job.seconds} seconds"
+                    f"{job.name} started with interval of {job.seconds} seconds (will execute in one minute)"
                 )
             else:
                 logger.info(f"{job.name} is disabled")

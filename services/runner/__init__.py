@@ -7,6 +7,10 @@ from services.runner.tasks.agent_account_deployer import (
     AgentAccountDeployerTask,
     agent_account_deployer,
 )
+from services.runner.tasks.chain_state_monitor import (
+    ChainStateMonitorTask,
+    chain_state_monitor,
+)
 from services.runner.tasks.dao_proposal_concluder import (
     DAOProposalConcluderTask,
     dao_proposal_concluder,
@@ -21,6 +25,11 @@ from services.runner.tasks.dao_proposal_voter import (
 )
 from services.runner.tasks.dao_task import DAOTask, dao_task
 from services.runner.tasks.dao_tweet_task import DAOTweetTask, dao_tweet_task
+from services.runner.tasks.discord_task import DiscordTask, discord_task
+from services.runner.tasks.proposal_embedder import (
+    ProposalEmbedderTask,
+    proposal_embedder,
+)
 from services.runner.tasks.tweet_task import TweetTask, tweet_task
 
 # Register tasks with the registry
@@ -30,7 +39,10 @@ JobRegistry.register(JobType.DAO_PROPOSAL_CONCLUDE, DAOProposalConcluderTask)
 JobRegistry.register(JobType.DAO_PROPOSAL_EVALUATION, DAOProposalEvaluationTask)
 JobRegistry.register(JobType.DAO_TWEET, DAOTweetTask)
 JobRegistry.register(JobType.TWEET, TweetTask)
+JobRegistry.register(JobType.DISCORD, DiscordTask)
 JobRegistry.register(JobType.AGENT_ACCOUNT_DEPLOY, AgentAccountDeployerTask)
+JobRegistry.register(JobType.PROPOSAL_EMBEDDING, ProposalEmbedderTask)
+JobRegistry.register(JobType.CHAIN_STATE_MONITOR, ChainStateMonitorTask)
 
 __all__ = [
     "BaseTask",
@@ -47,6 +59,8 @@ __all__ = [
     "dao_tweet_task",
     "TweetTask",
     "tweet_task",
+    "DiscordTask",
+    "discord_task",
     "execute_runner_job",
     "DAOProposalConcluderTask",
     "dao_proposal_concluder",
@@ -54,4 +68,8 @@ __all__ = [
     "dao_proposal_evaluation",
     "AgentAccountDeployerTask",
     "agent_account_deployer",
+    "ProposalEmbedderTask",
+    "proposal_embedder",
+    "ChainStateMonitorTask",
+    "chain_state_monitor",
 ]

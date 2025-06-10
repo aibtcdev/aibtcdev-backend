@@ -8,7 +8,6 @@ from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
-# Load environment variables first
 load_dotenv()
 
 
@@ -49,7 +48,8 @@ class TelegramConfig:
 
 @dataclass
 class DiscordConfig:
-    webhook_url: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL", "")
+    webhook_url_passed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_PASSED", "")
+    webhook_url_failed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_FAILED", "")
 
 
 @dataclass
@@ -77,6 +77,12 @@ class SchedulerConfig:
     )
     tweet_runner_interval_seconds: int = int(
         os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", "30")
+    )
+    discord_runner_enabled: bool = (
+        os.getenv("AIBTC_DISCORD_RUNNER_ENABLED", "false").lower() == "true"
+    )
+    discord_runner_interval_seconds: int = int(
+        os.getenv("AIBTC_DISCORD_RUNNER_INTERVAL_SECONDS", "30")
     )
     dao_proposal_vote_runner_enabled: bool = (
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_ENABLED", "false").lower() == "true"
@@ -114,10 +120,27 @@ class SchedulerConfig:
     dao_proposal_vote_delay_blocks: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "2")
     )
+    proposal_embedder_enabled: bool = (
+        os.getenv("AIBTC_PROPOSAL_EMBEDDER_ENABLED", "false").lower() == "true"
+    )
+    proposal_embedder_interval_seconds: int = int(
+        os.getenv(
+            "AIBTC_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300"
+        )  # Default to 5 mins
+    )
+    chain_state_monitor_enabled: bool = (
+        os.getenv("AIBTC_CHAIN_STATE_MONITOR_ENABLED", "true").lower() == "true"
+    )
+    chain_state_monitor_interval_seconds: int = int(
+        os.getenv(
+            "AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300"
+        )  # Default to 5 mins
+    )
 
 
 @dataclass
 class APIConfig:
+    base_url: str = os.getenv("AIBTC_BASEURL", "https://app-staging.aibtc.dev")
     alex_base_url: str = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
     hiro_api_url: str = os.getenv("AIBTC_HIRO_API_URL", "https://api.hiro.so")
     platform_base_url: str = os.getenv(

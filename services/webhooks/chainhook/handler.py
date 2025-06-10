@@ -4,11 +4,11 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
+from services.webhooks.chainhook.handlers.action_concluder_handler import (
+    ActionConcluderHandler,
+)
 from services.webhooks.chainhook.handlers.block_state_handler import BlockStateHandler
 from services.webhooks.chainhook.handlers.buy_event_handler import BuyEventHandler
-from services.webhooks.chainhook.handlers.contract_message_handler import (
-    ContractMessageHandler,
-)
 from services.webhooks.chainhook.handlers.dao_proposal_burn_height_handler import (
     DAOProposalBurnHeightHandler,
 )
@@ -40,7 +40,7 @@ class ChainhookHandler(WebhookHandler):
         # Initialize BlockStateHandler first as it needs to validate block heights
         self.block_state_handler = BlockStateHandler()
         self.handlers = [
-            ContractMessageHandler(),
+            ActionConcluderHandler(),
             BuyEventHandler(),
             SellEventHandler(),
             DAOProposalHandler(),
@@ -103,9 +103,8 @@ class ChainhookHandler(WebhookHandler):
 
                 # Process other block-level handlers
                 for handler in self.handlers:
-                    if (
-                        handler != self.block_state_handler
-                        and handler.can_handle_block(apply)
+                    if handler != self.block_state_handler and handler.can_handle_block(
+                        apply
                     ):
                         self.logger.debug(
                             f"Using handler {handler.__class__.__name__} for block-level processing"
@@ -130,7 +129,7 @@ class ChainhookHandler(WebhookHandler):
             for handler in self.handlers:
                 await handler.post_block_processing()
 
-            self.logger.info(
+            self.logger.debug(
                 "Finished processing all blocks and transactions in webhook"
             )
             return {

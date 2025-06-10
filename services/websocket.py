@@ -1,8 +1,7 @@
 import asyncio
 import datetime
 import time
-from typing import Any, Dict, Optional, Set, Tuple
-from uuid import UUID
+from typing import Any, Dict, Optional
 
 from fastapi import WebSocket
 

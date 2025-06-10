@@ -5,10 +5,8 @@ from typing import Optional
 from backend.factory import backend
 from backend.models import ChainState, ChainStateBase, ChainStateCreate
 from config import config
-from lib.logger import configure_logger
 from services.webhooks.chainhook.models import (
     Apply,
-    ChainHookData,
     TransactionWithReceipt,
 )
 
@@ -70,6 +68,7 @@ class BlockStateHandler(ChainhookEventHandler):
             block: The block to handle
         """
         try:
+            self.logger.debug(f"Received block metadata: {block.metadata}")
             # Get current chain state
             current_state = backend.get_latest_chain_state(
                 network=config.network.network
@@ -79,8 +78,20 @@ class BlockStateHandler(ChainhookEventHandler):
             # Extract block info
             block_height = block.block_identifier.index
             block_hash = block.block_identifier.hash
+
+            # Safely extract bitcoin block height
+            bitcoin_block_height = None
+            if block.metadata and block.metadata.bitcoin_anchor_block_identifier:
+                bitcoin_block_height = (
+                    block.metadata.bitcoin_anchor_block_identifier.index
+                )
+            self.logger.debug(
+                f"Extracted bitcoin_block_height: {bitcoin_block_height} for block_hash {block.block_identifier.hash}"
+            )
+
             self.logger.info(
-                f"Processing block: height={block_height}, hash={block_hash}"
+                f"Processing block: height={block_height}, hash={block_hash}, "
+                f"bitcoin_height={bitcoin_block_height}"
             )
 
             if current_state:
@@ -97,9 +108,21 @@ class BlockStateHandler(ChainhookEventHandler):
                     f"Updating chain state from height {current_state.block_height} "
                     f"to {block_height}"
                 )
+                # Prepare update data, omitting bitcoin_block_height if None
+                update_data = {
+                    "block_height": block_height,
+                    "block_hash": block_hash,
+                    "network": current_state.network,
+                }
+                if bitcoin_block_height is not None:
+                    update_data["bitcoin_block_height"] = bitcoin_block_height
+
+                self.logger.debug(
+                    f"Updating chain_state {current_state.id} with update_data: {update_data}"
+                )
                 updated = backend.update_chain_state(
                     current_state.id,
-                    ChainStateBase(block_height=block_height, block_hash=block_hash),
+                    ChainStateBase(**update_data),
                 )
                 if not updated:
                     self.logger.error(
@@ -118,13 +141,16 @@ class BlockStateHandler(ChainhookEventHandler):
                     f"No existing chain state found. Creating first record for "
                     f"block {block_height}"
                 )
-                created = backend.create_chain_state(
-                    ChainStateCreate(
-                        block_height=block_height,
-                        block_hash=block_hash,
-                        network=config.network.network,
-                    )
+                chain_state_create_payload = ChainStateCreate(
+                    block_height=block_height,
+                    block_hash=block_hash,
+                    network=config.network.network,
+                    bitcoin_block_height=bitcoin_block_height,
                 )
+                self.logger.debug(
+                    f"Creating new chain_state with payload: {chain_state_create_payload.model_dump_json()}"
+                )
+                created = backend.create_chain_state(chain_state_create_payload)
                 if not created:
                     self.logger.error(
                         f"Failed to create chain state for block {block_height}"

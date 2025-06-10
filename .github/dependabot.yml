@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: "pip" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "staging"
     groups:
       dev-dependencies:
@@ -17,3 +17,5 @@ updates:
     ignore:
       - dependency-name: "pgvector"
         versions: [">=0.3.1"]
+      - dependency-name: "starlette"
+        versions: [">=0.46.0" , "<=0.47.0"]

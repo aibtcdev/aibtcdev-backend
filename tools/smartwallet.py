@@ -491,7 +491,7 @@ class SmartWalletGetBalanceStxInput(BaseModel):
 class SmartWalletGetBalanceStxTool(BaseTool):
     name: str = "smartwallet_get_balance_stx"
     description: str = (
-        "Get the STX balance from a smart wallet. " "Returns the balance in microSTX."
+        "Get the STX balance from a smart wallet. Returns the balance in microSTX."
     )
     args_schema: Type[BaseModel] = SmartWalletGetBalanceStxInput
     return_direct: bool = False
@@ -2507,9 +2507,7 @@ class SmartWalletGetBalanceSTXInput(BaseModel):
 
 class SmartWalletGetBalanceSTXTool(BaseTool):
     name: str = "smartwallet_get_balance_stx"
-    description: str = (
-        "Get the STX balance from a smart wallet. Returns the current STX balance as a number."
-    )
+    description: str = "Get the STX balance from a smart wallet. Returns the current STX balance as a number."
     args_schema: Type[BaseModel] = SmartWalletGetBalanceSTXInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None

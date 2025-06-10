@@ -8,7 +8,6 @@ from backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
-    AgentWithWalletTokenDTO,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
@@ -44,6 +43,7 @@ from backend.models import (
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
+    ProposalFilterN,
     QueueMessage,
     QueueMessageBase,
     QueueMessageCreate,
@@ -78,6 +78,7 @@ from backend.models import (
     WalletBase,
     WalletCreate,
     WalletFilter,
+    WalletFilterN,
     XCreds,
     XCredsBase,
     XCredsCreate,
@@ -132,6 +133,19 @@ class AbstractBackend(ABC):
 
         Returns:
             List of IDs for the added vectors
+        """
+        pass
+
+    @abstractmethod
+    async def fetch_vectors(self, collection_name: str, ids: List[str]) -> List[Any]:
+        """Fetch specific vectors by their IDs from a collection.
+
+        Args:
+            collection_name: The name of the vector collection
+            ids: A list of vector IDs to fetch
+
+        Returns:
+            A list of the fetched records (structure depends on the backend).
         """
         pass
 
@@ -274,6 +288,11 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def list_wallets(self, filters: Optional[WalletFilter] = None) -> List[Wallet]:
+        pass
+
+    @abstractmethod
+    def list_wallets_n(self, filters: Optional[WalletFilterN] = None) -> List[Wallet]:
+        """Enhanced wallets listing with support for batch operations and advanced filtering."""
         pass
 
     @abstractmethod
@@ -454,6 +473,13 @@ class AbstractBackend(ABC):
     def list_proposals(
         self, filters: Optional[ProposalFilter] = None
     ) -> List[Proposal]:
+        pass
+
+    @abstractmethod
+    def list_proposals_n(
+        self, filters: Optional[ProposalFilterN] = None
+    ) -> List[Proposal]:
+        """Enhanced proposals listing with support for batch operations and advanced filtering."""
         pass
 
     @abstractmethod

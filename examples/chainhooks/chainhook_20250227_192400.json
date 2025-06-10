@@ -1,1 +1,86 @@
-{"apply": [{"block_identifier": {"hash": "0x95c1dbf6caddcc085b8e480f616a9151df956945217eaf4a3c7735fb9baae701", "index": 222006}, "metadata": {"bitcoin_anchor_block_identifier": {"hash": "0x36203cf8f01b0ef09aff54bc8446a5fc36d141d50ad3398e648c07e5998e286a", "index": 19755}, "block_time": 1740712383, "confirm_microblock_identifier": null, "cycle_number": null, "pox_cycle_index": 982, "pox_cycle_length": 20, "pox_cycle_position": 14, "reward_set": null, "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f", "signer_public_keys": ["0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504", "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"], "signer_signature": ["00a74c2d94b3593ac649084b35839abe6a75eca7cbd68567188ca7cea7a34de5af4b201f929fe1f5fdef7cd96feab27d51b2a6e189bb84e84bda18fcbbb5f58736", "011af1f2a6b2c9a65dac361f9c0971190771de0b409cd19804a09d47392e36ff4e5fe1ab10b62486a20cfb308173a2a5b41ea2bac9ef80eb65f48b88780bd35e7d"], "stacks_block_hash": "0x35064e4fd5736b13defe8b9d2041b595db30dca15538d2934ee64ed16447b50f", "tenure_height": 16951}, "parent_block_identifier": {"hash": "0x17eb967ff3cffacc6a2128b0c99a1d02280bb1adf7ec42e4259f28048b811094", "index": 222005}, "timestamp": 1740712308, "transactions": [{"metadata": {"description": "invoked: STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR.cat-presale-t13::set-stx-price-in-usdt(u796667)", "execution_cost": {"read_count": 5, "read_length": 4180, "runtime": 7035, "write_count": 1, "write_length": 18}, "fee": 196, "kind": {"data": {"args": ["u796667"], "contract_identifier": "STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR.cat-presale-t13", "method": "set-stx-price-in-usdt"}, "type": "ContractCall"}, "nonce": 274, "position": {"index": 0}, "raw_tx": "0x8080000000040029540d38a1e0a81d3e494e4d6bf474e339e0d8af000000000000011200000000000000c40000cd8e05a34f169d452fa7c9b2f49fa9c8338b53f53252f7465a3eef1e0928b7320bb6897bcd5dec6a3f4e2b4fb1895be294655bcc81c90577e6497455a71fb685030100000000021a29540d38a1e0a81d3e494e4d6bf474e339e0d8af0f6361742d70726573616c652d743133157365742d7374782d70726963652d696e2d757364740000000101000000000000000000000000000c27fb", "receipt": {"contract_calls_stack": [], "events": [], "mutated_assets_radius": [], "mutated_contracts_radius": []}, "result": "(ok true)", "sender": "STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR", "sponsor": null, "success": true}, "operations": [], "transaction_identifier": {"hash": "0x2328eb66a8c1d0e19ba9065c9dcf69651e09b7503cb7f7652c7b8e421df1bd53"}}]}], "chainhook": {"is_streaming_blocks": false, "predicate": {"higher_than": 221993, "scope": "block_height"}, "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"}, "events": [], "rollback": []}
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0x95c1dbf6caddcc085b8e480f616a9151df956945217eaf4a3c7735fb9baae701",
+        "index": 222006
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x36203cf8f01b0ef09aff54bc8446a5fc36d141d50ad3398e648c07e5998e286a",
+          "index": 19755
+        },
+        "block_time": 1740712383,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 982,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 14,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "00a74c2d94b3593ac649084b35839abe6a75eca7cbd68567188ca7cea7a34de5af4b201f929fe1f5fdef7cd96feab27d51b2a6e189bb84e84bda18fcbbb5f58736",
+          "011af1f2a6b2c9a65dac361f9c0971190771de0b409cd19804a09d47392e36ff4e5fe1ab10b62486a20cfb308173a2a5b41ea2bac9ef80eb65f48b88780bd35e7d"
+        ],
+        "stacks_block_hash": "0x35064e4fd5736b13defe8b9d2041b595db30dca15538d2934ee64ed16447b50f",
+        "tenure_height": 16951
+      },
+      "parent_block_identifier": {
+        "hash": "0x17eb967ff3cffacc6a2128b0c99a1d02280bb1adf7ec42e4259f28048b811094",
+        "index": 222005
+      },
+      "timestamp": 1740712308,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "invoked: STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR.cat-presale-t13::set-stx-price-in-usdt(u796667)",
+            "execution_cost": {
+              "read_count": 5,
+              "read_length": 4180,
+              "runtime": 7035,
+              "write_count": 1,
+              "write_length": 18
+            },
+            "fee": 196,
+            "kind": {
+              "data": {
+                "args": ["u796667"],
+                "contract_identifier": "STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR.cat-presale-t13",
+                "method": "set-stx-price-in-usdt"
+              },
+              "type": "ContractCall"
+            },
+            "nonce": 274,
+            "position": { "index": 0 },
+            "raw_tx": "0x8080000000040029540d38a1e0a81d3e494e4d6bf474e339e0d8af000000000000011200000000000000c40000cd8e05a34f169d452fa7c9b2f49fa9c8338b53f53252f7465a3eef1e0928b7320bb6897bcd5dec6a3f4e2b4fb1895be294655bcc81c90577e6497455a71fb685030100000000021a29540d38a1e0a81d3e494e4d6bf474e339e0d8af0f6361742d70726573616c652d743133157365742d7374782d70726963652d696e2d757364740000000101000000000000000000000000000c27fb",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": []
+            },
+            "result": "(ok true)",
+            "sender": "STMN839RM7GAG79Y9574TTZMEKHKKR6RNZC71CDR",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [],
+          "transaction_identifier": {
+            "hash": "0x2328eb66a8c1d0e19ba9065c9dcf69651e09b7503cb7f7652c7b8e421df1bd53"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": { "higher_than": 221993, "scope": "block_height" },
+    "uuid": "598a3345-cd57-4228-925f-d7c93450c94e"
+  },
+  "events": [],
+  "rollback": []
+}

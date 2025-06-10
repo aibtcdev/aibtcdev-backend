@@ -60,26 +60,37 @@ async def execute_runner_job(
         )
 
         # Create runner instance
-        runner = runner_class(context.config)
+        runner = runner_class()
 
         # Validate and execute
-        logger.info(f"Starting {job_type} runner")
+        logger.debug(f"Starting {job_type} runner")
         if await runner.validate(context):
             results = await runner.execute(context)
-            logger.info(f"Completed {job_type} runner")
+            logger.debug(f"Completed {job_type} runner")
             return results
         else:
             logger.warning(f"Validation failed for {job_type} runner")
+            result_class = runner_class.get_result_class()
             return [
-                runner_class.get_result_class()(
+                result_class(
                     success=False, message=f"Validation failed for {job_type} runner"
                 )
             ]
 
     except Exception as e:
         logger.error(f"Error in runner job: {str(e)}", exc_info=True)
-        return [
-            runner_class.get_result_class()(
-                success=False, message=f"Error in runner job: {str(e)}", error=e
+        try:
+            result_class = runner_class.get_result_class()
+            return [
+                result_class(
+                    success=False, message=f"Error in runner job: {str(e)}", error=e
+                )
+            ]
+        except Exception as inner_e:
+            logger.critical(
+                f"Could not create result object: {str(inner_e)}", exc_info=True
             )
-        ]
+            # Fallback to basic RunnerResult if all else fails
+            from .base import RunnerResult
+
+            return [RunnerResult(success=False, message=f"Critical error: {str(e)}")]
