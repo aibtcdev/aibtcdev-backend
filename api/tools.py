@@ -137,7 +137,7 @@ async def _create_proposal_from_tool_result(
             content=enhanced_message,
             summary=summary,
             tags=tags,
-            status=ContractStatus.DEPLOYED,  # Since transaction was successful
+            status=ContractStatus.DRAFT,  # Since transaction was successful
             contract_principal=voting_contract,
             tx_id=tx_id,
             type=ProposalType.ACTION,
