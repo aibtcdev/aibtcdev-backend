@@ -904,7 +904,7 @@ class SupabaseBackend(AbstractBackend):
             result.append(
                 AgentWithWalletTokenDTO(
                     agent_id=agent.id,
-                    agent_name=agent.name,
+                    agent_name=agent.name or "Unnamed Agent",
                     wallet_id=wallet.id,
                     wallet_address=wallet_address,
                     token_id=token.id,
