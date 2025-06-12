@@ -89,15 +89,8 @@ async def _create_proposal_from_tool_result(
 
         tx_id = tx_id_match.group(1)
 
-        # Extract voting contract (this will be our contract_principal)
-        voting_contract_match = re.search(
-            r"DAO Action Proposal Voting Contract: ([^\n]+)", output
-        )
-        if not voting_contract_match:
-            logger.warning("Could not extract voting contract from tool output")
-            return None
-
-        voting_contract = voting_contract_match.group(1).strip()
+        # Use the voting contract from the original payload since it's no longer in the output
+        voting_contract = payload.action_proposals_voting_extension
 
         # Find the DAO based on the voting contract or token contract
         # First try to find by the voting contract in extensions
