@@ -36,7 +36,7 @@ class RunnerConfig:
 
     twitter_profile_id: UUID
     twitter_agent_id: UUID
-    twitter_wallet_id: UUID
+    twitter_wallet_id: Optional[UUID]
 
     @classmethod
     def from_env(cls) -> "RunnerConfig":
@@ -50,16 +50,19 @@ class RunnerConfig:
         twitter_wallet = backend.list_wallets(
             filters=WalletFilter(profile_id=twitter_profile_id)
         )
+
+        twitter_wallet_id = None
         if not twitter_wallet:
-            logger.critical(
-                "No Twitter wallet found - critical system component missing"
+            logger.warning(
+                "No Twitter wallet found - some functionality may be limited"
             )
-            raise RuntimeError("Twitter wallet not found")
+        else:
+            twitter_wallet_id = twitter_wallet[0].id
 
         return cls(
             twitter_profile_id=twitter_profile_id,
             twitter_agent_id=twitter_agent_id,
-            twitter_wallet_id=twitter_wallet[0].id,
+            twitter_wallet_id=twitter_wallet_id,
         )
 
 
