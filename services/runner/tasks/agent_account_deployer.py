@@ -11,7 +11,7 @@ from backend.models import (
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 from services.runner.decorators import JobPriority, job
-from tools.agent_account_deployer import AgentAccountDeployerTool
+from tools.agent_account import AgentAccountDeployTool
 
 logger = configure_logger(__name__)
 
@@ -66,7 +66,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeploymentResult]):
             backend.get_api_status()
 
             # Test wallet generator tool initialization
-            tool = AgentAccountDeployerTool()
+            tool = AgentAccountDeployTool()
             if not tool:
                 logger.error("Cannot initialize WalletGeneratorTool")
                 return False
@@ -113,7 +113,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeploymentResult]):
             logger.info(f"Creating wallet for agent: {agent.name} ({agent.id})")
 
             # Initialize wallet generator tool
-            wallet_tool = AgentAccountDeployerTool()
+            wallet_tool = AgentAccountDeployTool()
 
             # Generate wallet
             wallet_result = await wallet_tool._arun()
