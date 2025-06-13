@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional
 from uuid import UUID
+from config import config
 
 from backend.factory import backend
 from backend.models import (
@@ -147,6 +148,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
         Processes burn height events, finds proposals that should start at or after
         the current burn height, and creates queue messages for token holders to vote.
+        Also handles veto window notifications.
 
         Args:
             transaction: The transaction to handle
@@ -186,15 +188,109 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             and p.content is not None  # Ensure content exists
         ]
 
-        if not vote_proposals and not end_proposals:
+        # Add veto window proposals
+        veto_start_proposals = [
+            p
+            for p in proposals
+            if p.vote_end is not None
+            and p.vote_end == burn_height
+            and p.content is not None
+        ]
+
+        veto_end_proposals = [
+            p
+            for p in proposals
+            if p.exec_start is not None
+            and p.exec_start == burn_height
+            and p.content is not None
+        ]
+
+        if not (vote_proposals or end_proposals or veto_start_proposals or veto_end_proposals):
             self.logger.info(
                 f"No eligible proposals found for burn height {burn_height}"
             )
             return
 
         self.logger.info(
-            f"Found {len(vote_proposals)} proposals to vote, {len(end_proposals)} proposals to conclude, "
+            f"Found {len(vote_proposals)} proposals to vote, "
+            f"{len(end_proposals)} proposals to conclude, "
+            f"{len(veto_start_proposals)} proposals entering veto window, "
+            f"{len(veto_end_proposals)} proposals ending veto window"
         )
+
+        # Process veto window start notifications
+        for proposal in veto_start_proposals:
+            dao = backend.get_dao(proposal.dao_id)
+            if not dao:
+                self.logger.warning(f"No DAO found for proposal {proposal.id}")
+                continue
+
+            # Check if a veto notification message already exists
+            if self._queue_message_exists(
+                QueueMessageType.TWEET,
+                proposal.id,
+                dao.id
+            ):
+                self.logger.debug(
+                    f"Veto notification tweet already exists for proposal {proposal.id}, skipping"
+                )
+                continue
+
+            # Create veto window start tweet
+            message = (
+                f"⚠️ VETO WINDOW OPEN: Proposal #{proposal.proposal_id} of {dao.name}\n\n"
+                f"Proposal: {proposal.content[:100]}...\n\n"
+                f"The veto window is now open until block {proposal.exec_start}.\n"
+                f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
+            )
+
+            backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.TWEET,
+                    message={"message": message},
+                    dao_id=dao.id,
+                )
+            )
+            self.logger.info(
+                f"Created veto window start tweet for proposal {proposal.id}"
+            )
+
+        # Process veto window end notifications
+        for proposal in veto_end_proposals:
+            dao = backend.get_dao(proposal.dao_id)
+            if not dao:
+                self.logger.warning(f"No DAO found for proposal {proposal.id}")
+                continue
+
+            # Check if a veto end notification message already exists
+            if self._queue_message_exists(
+                QueueMessageType.TWEET,
+                proposal.id,
+                dao.id
+            ):
+                self.logger.debug(
+                    f"Veto end notification tweet already exists for proposal {proposal.id}, skipping"
+                )
+                continue
+
+            # Create veto window end tweet
+            message = (
+                f"🔒 VETO WINDOW CLOSED: Proposal #{proposal.proposal_id} of {dao.name}\n\n"
+                f"Proposal: {proposal.content[:100]}...\n\n"
+                f"The veto window has now closed. The proposal will be executed if it passed voting.\n"
+                f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
+            )
+
+            backend.create_queue_message(
+                QueueMessageCreate(
+                    type=QueueMessageType.TWEET,
+                    message={"message": message},
+                    dao_id=dao.id,
+                )
+            )
+            self.logger.info(
+                f"Created veto window end tweet for proposal {proposal.id}"
+            )
 
         # Process proposals that are ending
         for proposal in end_proposals:
