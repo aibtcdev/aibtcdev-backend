@@ -45,14 +45,17 @@ class HistoricalContextAgent(
                 "Initialized vector retrieval capability for HistoricalContextAgent"
             )
 
-    async def _fetch_dao_proposals(self, dao_id: UUID) -> List[Proposal]:
-        """Fetch all proposals for a specific DAO from Supabase.
+    async def _fetch_dao_proposals(
+        self, dao_id: UUID, exclude_proposal_id: Optional[str] = None
+    ) -> List[Proposal]:
+        """Fetch all proposals for a specific DAO from Supabase, excluding the current proposal.
 
         Args:
             dao_id: The UUID of the DAO
+            exclude_proposal_id: Optional proposal ID to exclude from results
 
         Returns:
-            List of Proposal objects
+            List of Proposal objects (excluding the current proposal if specified)
         """
         try:
             # Create filter to get all proposals for this DAO
@@ -60,7 +63,17 @@ class HistoricalContextAgent(
 
             # Fetch proposals
             proposals = backend.list_proposals(filters)
-            self.logger.debug(f"Retrieved {len(proposals)} proposals for DAO {dao_id}")
+
+            # Filter out the current proposal if specified
+            if exclude_proposal_id:
+                proposals = [p for p in proposals if str(p.id) != exclude_proposal_id]
+                self.logger.debug(
+                    f"Excluded current proposal {exclude_proposal_id} from historical context"
+                )
+
+            self.logger.debug(
+                f"Retrieved {len(proposals)} proposals for DAO {dao_id} (excluding current)"
+            )
             return proposals
         except Exception as e:
             self.logger.error(f"Error fetching proposals for DAO {dao_id}: {str(e)}")
@@ -111,11 +124,22 @@ class HistoricalContextAgent(
             try:
                 # Safely get proposal attributes with proper error handling
                 title = getattr(proposal, "title", None) or "Untitled"
-                content = getattr(proposal, "content", None) or "No content"
+                summary = (
+                    getattr(proposal, "summary", None)
+                    or getattr(proposal, "content", None)
+                    or "No summary"
+                )
                 status = getattr(proposal, "status", None) or "Unknown"
                 proposal_type = getattr(proposal, "type", None) or "Unknown"
                 passed = getattr(proposal, "passed", None)
                 action = getattr(proposal, "action", None) or "None"
+                creator = getattr(proposal, "creator", None) or "Unknown"
+                tags = getattr(proposal, "tags", None) or []
+                executed = getattr(proposal, "executed", None)
+                votes_for = getattr(proposal, "votes_for", None) or 0
+                votes_against = getattr(proposal, "votes_against", None) or 0
+                met_quorum = getattr(proposal, "met_quorum", None)
+                met_threshold = getattr(proposal, "met_threshold", None)
 
                 # Safely handle created_at date formatting
                 created_at = getattr(proposal, "created_at", None)
@@ -126,26 +150,42 @@ class HistoricalContextAgent(
                     except (AttributeError, ValueError):
                         created_str = str(created_at)
 
-                # Safely convert content to string and limit length
-                content_str = str(content)[:500] if content else "No content"
+                # Safely convert summary to string and limit length
+                summary_str = str(summary)[:500] if summary else "No summary"
 
-                # Ensure content is treated as plain text and safe for prompt processing
+                # Ensure summary is treated as plain text and safe for prompt processing
                 # Remove any control characters that might cause parsing issues
-                content_str = "".join(
-                    char for char in content_str if ord(char) >= 32 or char in "\n\r\t"
+                summary_str = "".join(
+                    char for char in summary_str if ord(char) >= 32 or char in "\n\r\t"
                 )
 
                 # Escape curly braces to prevent f-string/format interpretation issues
-                content_str = content_str.replace("{", "{{").replace("}", "}}")
+                summary_str = summary_str.replace("{", "{{").replace("}", "}}")
+
+                # Format tags as a comma-separated string
+                tags_str = (
+                    ", ".join(
+                        str(tag) for tag in (tags if isinstance(tags, list) else [])
+                    )
+                    if tags
+                    else "None"
+                )
 
                 proposal_text = (
                     f'<proposal id="{i + 1}">\n'
                     f"  <title>{str(title)[:100]}</title>\n"
-                    f"  <content>{content_str}</content>\n"
+                    f"  <summary>{summary_str}</summary>\n"
+                    f"  <creator>{str(creator)}</creator>\n"
                     f"  <status>{str(status)}</status>\n"
                     f"  <type>{str(proposal_type)}</type>\n"
                     f"  <created_at>{created_str}</created_at>\n"
                     f"  <passed>{str(passed) if passed is not None else 'False'}</passed>\n"
+                    f"  <executed>{str(executed) if executed is not None else 'False'}</executed>\n"
+                    f"  <votes_for>{str(votes_for)}</votes_for>\n"
+                    f"  <votes_against>{str(votes_against)}</votes_against>\n"
+                    f"  <met_quorum>{str(met_quorum) if met_quorum is not None else 'Unknown'}</met_quorum>\n"
+                    f"  <met_threshold>{str(met_threshold) if met_threshold is not None else 'Unknown'}</met_threshold>\n"
+                    f"  <tags>{tags_str}</tags>\n"
                     f"  <action>{str(action)}</action>\n"
                     f"</proposal>"
                 )
@@ -157,11 +197,18 @@ class HistoricalContextAgent(
                 formatted_proposals.append(
                     f'<proposal id="{i + 1}">\n'
                     f"  <title>Error loading proposal</title>\n"
-                    f"  <content>Could not load proposal data: {str(e)}</content>\n"
+                    f"  <summary>Could not load proposal data: {str(e)}</summary>\n"
+                    f"  <creator>Unknown</creator>\n"
                     f"  <status>Unknown</status>\n"
                     f"  <type>Unknown</type>\n"
                     f"  <created_at>Unknown</created_at>\n"
                     f"  <passed>Unknown</passed>\n"
+                    f"  <executed>Unknown</executed>\n"
+                    f"  <votes_for>0</votes_for>\n"
+                    f"  <votes_against>0</votes_against>\n"
+                    f"  <met_quorum>Unknown</met_quorum>\n"
+                    f"  <met_threshold>Unknown</met_threshold>\n"
+                    f"  <tags>None</tags>\n"
                     f"  <action>None</action>\n"
                     f"</proposal>"
                 )
@@ -290,12 +337,14 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
         if "token_usage" not in state:
             state["token_usage"] = {}
 
-        # Retrieve all proposals for this DAO from Supabase
+        # Retrieve all proposals for this DAO from Supabase (excluding current proposal)
         dao_proposals = []
         past_proposals_db_text = ""
         try:
             if dao_id:
-                dao_proposals = await self._fetch_dao_proposals(dao_id)
+                dao_proposals = await self._fetch_dao_proposals(
+                    dao_id, exclude_proposal_id=proposal_id
+                )
                 past_proposals_db_text = self._format_proposals_for_context(
                     dao_proposals
                 )
