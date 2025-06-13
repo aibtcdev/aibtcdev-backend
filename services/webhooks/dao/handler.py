@@ -4,7 +4,8 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCreate
+from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCreate, XCredsCreate
+from config import config
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
 from services.webhooks.dao.models import (
@@ -52,6 +53,21 @@ class DAOHandler(WebhookHandler):
 
             dao = self.db.create_dao(dao_create)
             self.logger.info(f"Created DAO with ID: {dao.id}")
+
+            # Create X credentials for the DAO
+            new_cred = XCredsCreate(
+                dao_id=dao.id,
+                consumer_key=config.twitter.default_consumer_key,
+                consumer_secret=config.twitter.default_consumer_secret,
+                client_id=config.twitter.default_client_id,
+                client_secret=config.twitter.default_client_secret,
+                access_token=config.twitter.default_access_token,
+                access_secret=config.twitter.default_access_secret,
+                username=config.twitter.default_username
+            )
+
+            x_creds = self.db.create_x_creds(new_cred)
+            self.logger.info(f"Created X credentials with ID: {x_creds.id}")
 
             # Find the main DAO token contract
             dao_token_contract = None
@@ -101,6 +117,7 @@ class DAOHandler(WebhookHandler):
                 self.logger.info(
                     f"Created extension with ID: {extension.id} for type: {contract.type.value} and subtype: {contract.subtype}"
                 )
+
             # Prepare response
             response = DAOWebhookResponse(
                 dao_id=dao.id,

@@ -8,7 +8,6 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
-    XCredsFilter,
 )
 import re
 from io import BytesIO
@@ -17,6 +16,7 @@ from urllib.parse import urlparse
 import requests
 import tweepy
 
+from config import config
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from lib.utils import extract_image_urls
@@ -106,22 +106,33 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         return None
 
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
-        """Initialize Twitter service with credentials for the given DAO."""
+        """Initialize Twitter service with credentials from config."""
         try:
-            # Get Twitter credentials for the DAO
-            creds = backend.list_x_creds(filters=XCredsFilter(dao_id=dao_id))
-            if not creds:
-                logger.error(f"No Twitter credentials found for DAO {dao_id}")
+            # Check if Twitter is enabled in config
+            if not config.twitter.enabled:
+                logger.error("Twitter service is disabled in configuration")
                 return False
 
-            # Initialize Twitter service with the credentials
+            # Validate that required Twitter credentials are configured
+            if not all([
+                config.twitter.consumer_key,
+                config.twitter.consumer_secret,
+                config.twitter.client_id,
+                config.twitter.client_secret,
+                config.twitter.access_token,
+                config.twitter.access_secret,
+            ]):
+                logger.error("Missing required Twitter credentials in configuration")
+                return False
+
+            # Initialize Twitter service with credentials from config
             self.twitter_service = TwitterService(
-                consumer_key=creds[0].consumer_key,
-                consumer_secret=creds[0].consumer_secret,
-                client_id=creds[0].client_id,
-                client_secret=creds[0].client_secret,
-                access_token=creds[0].access_token,
-                access_secret=creds[0].access_secret,
+                consumer_key=config.twitter.consumer_key,
+                consumer_secret=config.twitter.consumer_secret,
+                client_id=config.twitter.client_id,
+                client_secret=config.twitter.client_secret,
+                access_token=config.twitter.access_token,
+                access_secret=config.twitter.access_secret,
             )
             await self.twitter_service._ainitialize()
             logger.debug(f"Initialized Twitter service for DAO {dao_id}")
@@ -134,7 +145,22 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
-            # No specific config validation needed as credentials are per-DAO
+            # Validate Twitter configuration
+            if not config.twitter.enabled:
+                logger.debug("Twitter service is disabled")
+                return False
+
+            if not all([
+                config.twitter.consumer_key,
+                config.twitter.consumer_secret,
+                config.twitter.client_id,
+                config.twitter.client_secret,
+                config.twitter.access_token,
+                config.twitter.access_secret,
+            ]):
+                logger.error("Missing required Twitter credentials in configuration")
+                return False
+
             return True
         except Exception as e:
             logger.error(f"Error validating tweet task config: {str(e)}", exc_info=True)
