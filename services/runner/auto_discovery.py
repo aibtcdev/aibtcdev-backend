@@ -20,6 +20,7 @@ def discover_and_register_tasks() -> None:
 
         # Import all Python modules in the tasks directory
         tasks_package = "services.runner.tasks"
+        discovered_modules = []
 
         # Get all .py files in the tasks directory
         for file_path in tasks_dir.glob("*.py"):
@@ -32,6 +33,7 @@ def discover_and_register_tasks() -> None:
             try:
                 logger.debug(f"Importing task module: {full_module_name}")
                 importlib.import_module(full_module_name)
+                discovered_modules.append(module_name)
                 logger.debug(f"Successfully imported: {full_module_name}")
             except ImportError as e:
                 logger.warning(
@@ -47,11 +49,11 @@ def discover_and_register_tasks() -> None:
         registered_tasks = JobRegistry.list_jobs()
         if registered_tasks:
             logger.info(
-                f"Auto-discovered and registered {len(registered_tasks)} job tasks:"
+                f"Auto-discovered and registered {len(registered_tasks)} job tasks from {len(discovered_modules)} modules:"
             )
             for job_type, metadata in registered_tasks.items():
                 logger.info(
-                    f"  - {job_type}: {metadata.name} (enabled: {metadata.enabled})"
+                    f"  - {job_type}: {metadata.name} (enabled: {metadata.enabled}, interval: {metadata.interval_seconds}s)"
                 )
         else:
             logger.warning("No job tasks were discovered and registered")
@@ -62,6 +64,17 @@ def discover_and_register_tasks() -> None:
             logger.warning("Dependency validation issues found:")
             for issue in dependency_issues:
                 logger.warning(f"  - {issue}")
+        else:
+            logger.debug("All job dependencies validated successfully")
+
+        # Log dynamic job types that were created
+        from .base import JobType
+
+        all_job_types = JobType.get_all_job_types()
+        if all_job_types:
+            logger.info(
+                f"Dynamic job types registered: {', '.join(all_job_types.keys())}"
+            )
 
     except Exception as e:
         logger.error(f"Error during task discovery: {str(e)}", exc_info=True)
@@ -73,6 +86,11 @@ def reload_tasks() -> None:
 
     # Clear existing registry
     JobRegistry.clear_registry()
+
+    # Clear dynamic job types
+    from .base import JobType
+
+    JobType._job_types = {}
 
     # Re-discover tasks
     discover_and_register_tasks()
@@ -92,6 +110,7 @@ def get_task_summary() -> dict:
         "tasks_by_priority": {},
         "tasks_by_type": {},
         "dependency_issues": JobRegistry.validate_dependencies(),
+        "dynamic_job_types": list(registered_tasks.keys()),
     }
 
     # Group by priority

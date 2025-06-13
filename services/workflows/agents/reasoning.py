@@ -6,9 +6,12 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
 from services.workflows.chat import StreamingCallbackHandler
-from services.workflows.planning_mixin import PlanningCapability
+from services.workflows.mixins.capability_mixins import (
+    BaseCapabilityMixin,
+    PromptCapability,
+)
+from services.workflows.mixins.planning_mixin import PlanningCapability
 from services.workflows.utils.models import FinalOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin

@@ -79,96 +79,38 @@ class JobManager:
         if not metadata.enabled:
             return False
 
-        # Check for config overrides (maintaining backward compatibility)
+        # Check for config overrides using dynamic approach
         job_type_str = str(job_type).lower()
 
-        # Map job types to config attributes
-        config_map = {
-            "dao": getattr(config.scheduler, "dao_runner_enabled", True),
-            "tweet": getattr(config.scheduler, "tweet_runner_enabled", True),
-            "discord": getattr(config.scheduler, "discord_runner_enabled", True),
-            "dao_tweet": getattr(config.scheduler, "dao_tweet_runner_enabled", True),
-            "dao_proposal_vote": getattr(
-                config.scheduler, "dao_proposal_vote_runner_enabled", True
-            ),
-            "dao_proposal_conclude": getattr(
-                config.scheduler, "dao_proposal_conclude_runner_enabled", True
-            ),
-            "dao_proposal_evaluation": getattr(
-                config.scheduler, "dao_proposal_evaluation_runner_enabled", True
-            ),
-            "agent_account_deploy": getattr(
-                config.scheduler, "agent_account_deploy_runner_enabled", True
-            ),
-            "proposal_embedding": getattr(
-                config.scheduler, "proposal_embedder_enabled", True
-            ),
-            "chain_state_monitor": getattr(
-                config.scheduler, "chain_state_monitor_enabled", True
-            ),
-        }
+        # Try config override with standard naming pattern
+        config_attr = f"{job_type_str}_enabled"
+        if hasattr(config.scheduler, config_attr):
+            return getattr(config.scheduler, config_attr, metadata.enabled)
 
-        return config_map.get(job_type_str, metadata.enabled)
+        # Try alternative naming pattern for backwards compatibility
+        alt_config_attr = f"{job_type_str}_runner_enabled"
+        if hasattr(config.scheduler, alt_config_attr):
+            return getattr(config.scheduler, alt_config_attr, metadata.enabled)
+
+        # Use metadata default if no config override found
+        return metadata.enabled
 
     def _get_job_interval(self, job_type, metadata: JobMetadata) -> int:
         """Get job interval, checking config overrides."""
-        # Check for config overrides
         job_type_str = str(job_type).lower()
 
-        config_map = {
-            "dao": getattr(
-                config.scheduler,
-                "dao_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "tweet": getattr(
-                config.scheduler,
-                "tweet_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "discord": getattr(
-                config.scheduler,
-                "discord_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "dao_tweet": getattr(
-                config.scheduler,
-                "dao_tweet_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "dao_proposal_vote": getattr(
-                config.scheduler,
-                "dao_proposal_vote_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "dao_proposal_conclude": getattr(
-                config.scheduler,
-                "dao_proposal_conclude_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "dao_proposal_evaluation": getattr(
-                config.scheduler,
-                "dao_proposal_evaluation_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "agent_account_deploy": getattr(
-                config.scheduler,
-                "agent_account_deploy_runner_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "proposal_embedding": getattr(
-                config.scheduler,
-                "proposal_embedder_interval_seconds",
-                metadata.interval_seconds,
-            ),
-            "chain_state_monitor": getattr(
-                config.scheduler,
-                "chain_state_monitor_interval_seconds",
-                metadata.interval_seconds,
-            ),
-        }
+        # Try config override with standard naming pattern
+        config_attr = f"{job_type_str}_interval_seconds"
+        if hasattr(config.scheduler, config_attr):
+            return getattr(config.scheduler, config_attr, metadata.interval_seconds)
 
-        return config_map.get(job_type_str, metadata.interval_seconds)
+        # Try alternative naming pattern for backwards compatibility
+        alt_config_attr = f"{job_type_str}_runner_interval_seconds"
+        if hasattr(config.scheduler, alt_config_attr):
+            return getattr(config.scheduler, alt_config_attr, metadata.interval_seconds)
+
+        # Use metadata default if no config override found
+        return metadata.interval_seconds
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
         """Execute a job through the enhanced executor system."""

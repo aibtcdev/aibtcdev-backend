@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 from langchain_core.prompts.chat import ChatPromptTemplate
 
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.mixins.capability_mixins import BaseCapabilityMixin
 from services.workflows.utils.models import ProposalMetadataOutput
 from services.workflows.utils.token_usage import TokenUsageMixin
 

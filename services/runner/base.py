@@ -1,7 +1,6 @@
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
 
@@ -66,22 +65,69 @@ class RunnerConfig:
         )
 
 
-class JobType(str, Enum):
-    """Types of jobs that can be run."""
+class JobType:
+    """Dynamic job types that are registered at runtime via auto-discovery.
 
-    DAO = "dao"
-    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
-    DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
-    DAO_PROPOSAL_EVALUATION = "dao_proposal_evaluation"
-    DAO_TWEET = "dao_tweet"
-    TWEET = "tweet"
-    DISCORD = "discord"
-    AGENT_ACCOUNT_DEPLOY = "agent_account_deploy"
-    PROPOSAL_EMBEDDING = "proposal_embedding"
-    CHAIN_STATE_MONITOR = "chain_state_monitor"
+    No hardcoded job types - all jobs are discovered and registered dynamically
+    using the @job decorator in task files.
+    """
 
-    def __str__(self):
-        return self.value
+    _job_types: Dict[str, "JobType"] = {}
+
+    def __init__(self, value: str):
+        self._value = value.lower()
+        self._name = value.upper()
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __repr__(self) -> str:
+        return f"JobType.{self._name}"
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, JobType):
+            return self._value == other._value
+        if isinstance(other, str):
+            return self._value == other.lower()
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+    @classmethod
+    def get_or_create(cls, job_type: str) -> "JobType":
+        """Get existing job type or create new one."""
+        normalized = job_type.lower()
+        if normalized not in cls._job_types:
+            cls._job_types[normalized] = cls(normalized)
+        return cls._job_types[normalized]
+
+    @classmethod
+    def register(cls, job_type: str) -> "JobType":
+        """Register a new job type and return the enum member."""
+        return cls.get_or_create(job_type)
+
+    @classmethod
+    def get_all_job_types(cls) -> Dict[str, str]:
+        """Get all registered job types."""
+        return {jt._value: jt._value for jt in cls._job_types.values()}
+
+    @classmethod
+    def list_all(cls) -> List["JobType"]:
+        """Get all registered job type instances."""
+        return list(cls._job_types.values())
+
+    def __call__(self, value: str) -> "JobType":
+        """Allow calling like an enum constructor."""
+        return self.get_or_create(value)
 
 
 @dataclass

@@ -18,8 +18,9 @@ class JobPriority(Enum):
 
     LOW = 1
     NORMAL = 2
-    HIGH = 3
-    CRITICAL = 4
+    MEDIUM = 3
+    HIGH = 4
+    CRITICAL = 5
 
     def __str__(self):
         return self.name.lower()
@@ -51,6 +52,8 @@ class JobMetadata:
     requires_wallet: bool = False
     requires_twitter: bool = False
     requires_discord: bool = False
+    requires_blockchain: bool = False
+    requires_ai: bool = False
     dependencies: List[str] = field(default_factory=list)
 
     # Advanced settings
@@ -88,24 +91,21 @@ class JobRegistry:
 
         Example:
             @JobRegistry.register(
-                JobType.DAO,
-                name="DAO Deployment",
-                description="Deploys DAO contracts",
+                "new_job_type",  # Can use string - will auto-create JobType
+                name="New Job",
+                description="Does new job things",
                 interval_seconds=120,
                 max_concurrent=2
             )
-            class DAOTask(BaseTask[DAOResult]):
+            class NewJobTask(BaseTask[NewJobResult]):
                 pass
         """
 
         def decorator(task_class: Type[T]) -> Type[T]:
-            # Convert string to JobType if needed
+            # Convert string to JobType or create new one
             if isinstance(job_type, str):
-                try:
-                    job_enum = JobType(job_type.lower())
-                except ValueError:
-                    logger.error(f"Invalid job type string: {job_type}")
-                    raise ValueError(f"Invalid job type: {job_type}")
+                job_enum = JobType.get_or_create(job_type)
+                logger.info(f"Auto-registered job type: {job_type} -> {job_enum}")
             else:
                 job_enum = job_type
 
@@ -200,15 +200,20 @@ class JobRegistry:
         for job_type, metadata in cls._metadata.items():
             for dep in metadata.dependencies:
                 try:
-                    dep_type = JobType(dep.lower())
+                    dep_type = JobType.get_or_create(dep)
                     if dep_type not in all_job_types:
                         issues.append(
                             f"Job {job_type} depends on unregistered job: {dep}"
                         )
-                except ValueError:
+                except Exception:
                     issues.append(f"Job {job_type} has invalid dependency: {dep}")
 
         return issues
+
+    @classmethod
+    def get_all_job_types(cls) -> List[str]:
+        """Get all registered job type strings."""
+        return [str(job_type) for job_type in cls._jobs.keys()]
 
 
 # Convenience function for job registration
@@ -221,14 +226,14 @@ def job(
     """Convenience decorator for job registration.
 
     Args:
-        job_type: The job type
+        job_type: The job type (can be string - will auto-create JobType)
         name: Human-readable job name
         description: Job description
         **kwargs: Additional metadata fields
 
     Example:
-        @job(JobType.TWEET, name="Tweet Processor", interval_seconds=30)
-        class TweetTask(BaseTask[TweetResult]):
+        @job("my_new_job", name="My New Job", interval_seconds=30)
+        class MyNewJobTask(BaseTask[MyJobResult]):
             pass
     """
     return JobRegistry.register(
@@ -249,14 +254,14 @@ def scheduled_job(
     """Decorator for scheduled jobs with interval configuration.
 
     Args:
-        job_type: The job type
+        job_type: The job type (can be string - will auto-create JobType)
         interval_seconds: How often to run the job
         name: Human-readable job name
         **kwargs: Additional metadata fields
 
     Example:
-        @scheduled_job(JobType.DAO, 120, name="DAO Processor")
-        class DAOTask(BaseTask[DAOResult]):
+        @scheduled_job("my_scheduled_job", 120, name="My Scheduled Job")
+        class MyScheduledJobTask(BaseTask[MyJobResult]):
             pass
     """
     return JobRegistry.register(

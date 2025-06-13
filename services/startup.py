@@ -11,14 +11,14 @@ from config import config
 from lib.logger import configure_logger
 from services.bot import start_application
 from services.runner.auto_discovery import discover_and_register_jobs
-from services.runner.enhanced_job_manager import EnhancedJobManager
+from services.runner.job_manager import JobManager
 from services.runner.monitoring import JobMetrics, SystemMetrics
 from services.websocket import websocket_manager
 
 logger = configure_logger(__name__)
 
 # Global enhanced job manager instance
-job_manager: Optional[EnhancedJobManager] = None
+job_manager: Optional[JobManager] = None
 shutdown_event = asyncio.Event()
 metrics_collector = JobMetrics()
 system_metrics = SystemMetrics()
@@ -37,13 +37,13 @@ class EnhancedStartupService:
         self.scheduler = scheduler or AsyncIOScheduler()
         self.cleanup_task: Optional[asyncio.Task] = None
         self.bot_application: Optional[Any] = None
-        self.job_manager: Optional[EnhancedJobManager] = None
+        self.job_manager: Optional[JobManager] = None
 
     async def initialize_job_system(self):
         """Initialize the enhanced job system with auto-discovery."""
         try:
             # Initialize enhanced job manager
-            self.job_manager = EnhancedJobManager(
+            self.job_manager = JobManager(
                 metrics_collector=metrics_collector, system_metrics=system_metrics
             )
 

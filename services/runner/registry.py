@@ -25,6 +25,17 @@ class JobRegistry:
         """Get runner for a job type."""
         return cls._runners.get(job_type)
 
+    @classmethod
+    def get_all_jobs(cls) -> Dict[str, Type[BaseTask]]:
+        """Get all registered jobs."""
+        return {str(job_type): runner for job_type, runner in cls._runners.items()}
+
+    @classmethod
+    def clear_registry(cls) -> None:
+        """Clear all registered jobs (useful for testing)."""
+        cls._runners.clear()
+        logger.debug("Cleared job registry")
+
 
 async def execute_runner_job(
     job_type: str, parameters: Optional[Dict[str, str]] = None
