@@ -278,7 +278,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Create queue messages for both Twitter and Discord if proposal passed
             tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
+                    type=QueueMessageType.get_or_create("tweet"),
                     message={"message": clean_message},
                     dao_id=dao_data["id"],
                 )
@@ -299,33 +299,37 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             follow_up_tweet = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
+                    type=QueueMessageType.get_or_create("tweet"),
                     message={"message": follow_up_message},
                     dao_id=dao_data["id"],
                 )
             )
-            self.logger.info(f"Created follow-up tweet queue message: {follow_up_tweet.id}")
+            self.logger.info(
+                f"Created follow-up tweet queue message: {follow_up_tweet.id}"
+            )
             # END OF SECOND TWEET BLOCK
 
             # Calculate participation and approval percentages for passed proposal
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)
             total_votes = votes_for + votes_against
-            
+
             participation_pct = 0.0
             approval_pct = 0.0
-            
+
             if total_votes > 0:
                 # For participation, we'd need total eligible voters - using liquid_tokens as proxy
                 liquid_tokens = int(proposal.liquid_tokens or 0)
                 if liquid_tokens > 0:
                     participation_pct = (total_votes / liquid_tokens) * 100
-                
+
                 # Approval percentage is votes_for / total_votes
                 approval_pct = (votes_for / total_votes) * 100
 
             # Format the Discord message with header and footer for passed proposal
-            formatted_message = f"🟩 {dao_data['name']} PROPOSAL #{proposal.proposal_id}: PASSED 🟩\n\n"
+            formatted_message = (
+                f"🟩 {dao_data['name']} PROPOSAL #{proposal.proposal_id}: PASSED 🟩\n\n"
+            )
             formatted_message += "---\n\n"
             formatted_message += f"{clean_message}\n\n"
             formatted_message += "---\n\n"
@@ -336,7 +340,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={"content": formatted_message, "proposal_status": "passed"},
                     dao_id=dao_data["id"],
                 )
@@ -364,7 +368,9 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 approval_pct = (votes_for / total_votes) * 100
 
             # Format the Discord message with header and footer
-            formatted_message = f"🟥 {dao_data['name']} PROPOSAL #{proposal.proposal_id}: FAILED 🟥\n\n"
+            formatted_message = (
+                f"🟥 {dao_data['name']} PROPOSAL #{proposal.proposal_id}: FAILED 🟥\n\n"
+            )
             formatted_message += "---\n\n"
             formatted_message += f"{clean_message}\n\n"
             formatted_message += "---\n\n"
@@ -375,7 +381,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={"content": formatted_message, "proposal_status": "failed"},
                     dao_id=dao_data["id"],
                 )

@@ -50,7 +50,7 @@ class DAOProposalConcludeResult(RunnerResult):
 class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     """Task runner for processing and concluding DAO proposals with enhanced capabilities."""
 
-    QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_CONCLUDE
+    QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_conclude")
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""

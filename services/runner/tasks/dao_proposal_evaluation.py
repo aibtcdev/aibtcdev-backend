@@ -52,7 +52,7 @@ class DAOProposalEvaluationResult(RunnerResult):
 class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     """Task runner for evaluating DAO proposals using AI analysis with enhanced capabilities."""
 
-    QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_EVALUATION
+    QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_evaluation")
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed DAO proposal evaluation messages from the queue."""

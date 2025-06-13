@@ -61,7 +61,11 @@ class PriorityQueue:
         self, message: QueueMessage, priority: JobPriority = JobPriority.NORMAL
     ) -> UUID:
         """Add a job to the priority queue."""
-        job_type = JobType(message.type.value)
+        # Convert message type to JobType, handling both DynamicQueueMessageType and string
+        type_value = (
+            message.type.value if hasattr(message.type, "value") else str(message.type)
+        )
+        job_type = JobType.get_or_create(type_value)
         execution = JobExecution(
             id=message.id, job_type=job_type, metadata={"message": message}
         )

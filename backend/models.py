@@ -63,44 +63,69 @@ class ProposalType(str, Enum):
         return self.value
 
 
-class QueueMessageType(str, Enum):
-    TWEET = "tweet"
-    DAO = "dao"
-    DAO_TWEET = "dao_tweet"
-    DAO_PROPOSAL_VOTE = "dao_proposal_vote"
-    DAO_PROPOSAL_CONCLUDE = "dao_proposal_conclude"
-    DAO_PROPOSAL_EVALUATION = (
-        "dao_proposal_evaluation"  # New type for proposal evaluation
-    )
-    AGENT_ACCOUNT_DEPLOY = (
-        "agent_account_deploy"  # New type for agent account deployment
-    )
-    DISCORD = "discord"  # New type for Discord queue messages
+class QueueMessageType:
+    """Dynamic queue message types that are registered at runtime.
 
-    def __str__(self):
-        return self.value
+    This system is compatible with the runner's dynamic JobType system.
+    Queue message types are registered dynamically as job tasks are discovered.
+    """
+
+    _message_types: Dict[str, "QueueMessageType"] = {}
+
+    def __init__(self, value: str):
+        self._value = value.lower()
+        self._name = value.upper()
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __repr__(self) -> str:
+        return f"QueueMessageType({self._value})"
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, QueueMessageType):
+            return self._value == other._value
+        if isinstance(other, str):
+            return self._value == other.lower()
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+    @classmethod
+    def get_or_create(cls, message_type: str) -> "QueueMessageType":
+        """Get existing message type or create new one."""
+        normalized = message_type.lower()
+        if normalized not in cls._message_types:
+            cls._message_types[normalized] = cls(normalized)
+        return cls._message_types[normalized]
+
+    @classmethod
+    def register(cls, message_type: str) -> "QueueMessageType":
+        """Register a new message type and return the instance."""
+        return cls.get_or_create(message_type)
+
+    @classmethod
+    def get_all_message_types(cls) -> Dict[str, str]:
+        """Get all registered message types."""
+        return {mt._value: mt._value for mt in cls._message_types.values()}
+
+    @classmethod
+    def list_all(cls) -> List["QueueMessageType"]:
+        """Get all registered message type instances."""
+        return list(cls._message_types.values())
 
 
-#
-#  SECRETS
-#
-class SecretBase(CustomBaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    secret: Optional[str] = None
-    decrypted_secret: Optional[str] = None
-    key_id: Optional[str] = None
-    nonce: Optional[str] = None
-
-
-class SecretCreate(SecretBase):
-    pass
-
-
-class Secret(SecretBase):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
+# Types are registered dynamically by the runner system
+# No need to pre-register common types
 
 
 #
@@ -123,6 +148,28 @@ class QueueMessageCreate(QueueMessageBase):
 class QueueMessage(QueueMessageBase):
     id: UUID
     created_at: datetime
+
+
+#
+#  SECRETS
+#
+class SecretBase(CustomBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    secret: Optional[str] = None
+    decrypted_secret: Optional[str] = None
+    key_id: Optional[str] = None
+    nonce: Optional[str] = None
+
+
+class SecretCreate(SecretBase):
+    pass
+
+
+class Secret(SecretBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
 
 
 #

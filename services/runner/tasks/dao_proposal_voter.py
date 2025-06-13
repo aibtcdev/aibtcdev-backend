@@ -53,7 +53,7 @@ class DAOProposalVoteResult(RunnerResult):
 class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     """Task runner for processing and voting on DAO proposals with enhanced capabilities."""
 
-    QUEUE_TYPE = QueueMessageType.DAO_PROPOSAL_VOTE
+    QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_vote")
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed DAO proposal vote messages from the queue."""
