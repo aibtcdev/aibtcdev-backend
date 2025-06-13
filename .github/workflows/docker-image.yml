@@ -1,20 +1,19 @@
-name: Docker Image CI
+name: Docker Image Build Test
 
 on:
   push:
-    branches: [ "main", "staging" ]
+    branches: ["main", "staging"]
   pull_request:
-    branches: [ "main", "staging" ]
+    branches: ["main", "staging"]
 
 jobs:
-
-  build:
-
+  docker-image:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
