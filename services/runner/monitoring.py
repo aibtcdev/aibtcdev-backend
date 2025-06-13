@@ -327,6 +327,45 @@ class MetricsCollector:
         logger.info(f"Reset metrics for {job_type or 'all job types'}")
 
 
+class SystemMetrics:
+    """System-wide metrics collector for monitoring system resources."""
+
+    def __init__(self):
+        self.monitoring_active = False
+
+    async def start_monitoring(self) -> None:
+        """Start system monitoring."""
+        self.monitoring_active = True
+        logger.info("System metrics monitoring started")
+
+    async def stop_monitoring(self) -> None:
+        """Stop system monitoring."""
+        self.monitoring_active = False
+        logger.info("System metrics monitoring stopped")
+
+    def get_current_metrics(self) -> Dict[str, Any]:
+        """Get current system metrics."""
+        try:
+            import psutil
+
+            return {
+                "cpu_usage": psutil.cpu_percent(interval=1),
+                "memory_usage": psutil.virtual_memory().percent,
+                "disk_usage": psutil.disk_usage("/").percent,
+                "timestamp": datetime.now().isoformat(),
+                "monitoring_active": self.monitoring_active,
+            }
+        except ImportError:
+            logger.warning("psutil not available, returning basic metrics")
+            return {
+                "cpu_usage": 0,
+                "memory_usage": 0,
+                "disk_usage": 0,
+                "timestamp": datetime.now().isoformat(),
+                "monitoring_active": self.monitoring_active,
+            }
+
+
 class PerformanceMonitor:
     """Monitors job execution performance and provides alerts."""
 

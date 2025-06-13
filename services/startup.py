@@ -10,9 +10,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import config
 from lib.logger import configure_logger
 from services.bot import start_application
-from services.runner.auto_discovery import discover_and_register_jobs
+from services.runner.auto_discovery import discover_and_register_tasks
 from services.runner.job_manager import JobManager
-from services.runner.monitoring import JobMetrics, SystemMetrics
+from services.runner.monitoring import MetricsCollector, SystemMetrics
 from services.websocket import websocket_manager
 
 logger = configure_logger(__name__)
@@ -20,7 +20,7 @@ logger = configure_logger(__name__)
 # Global enhanced job manager instance
 job_manager: Optional[JobManager] = None
 shutdown_event = asyncio.Event()
-metrics_collector = JobMetrics()
+metrics_collector = MetricsCollector()
 system_metrics = SystemMetrics()
 
 
@@ -43,26 +43,18 @@ class EnhancedStartupService:
         """Initialize the enhanced job system with auto-discovery."""
         try:
             # Initialize enhanced job manager
-            self.job_manager = JobManager(
-                metrics_collector=metrics_collector, system_metrics=system_metrics
-            )
+            self.job_manager = JobManager()
 
-            # Auto-discover and register all jobs
-            discovered_jobs = await discover_and_register_jobs()
+            # Auto-discover and register all jobs (this populates JobRegistry)
+            discover_and_register_tasks()
 
-            for job_type, job_class in discovered_jobs.items():
-                try:
-                    # Create job instance
-                    job_instance = job_class()
-                    self.job_manager.register_task(job_instance)
-                    logger.info(f"Registered job: {job_type} ({job_class.__name__})")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to register job {job_type}: {e}", exc_info=True
-                    )
+            # Get registered jobs from JobRegistry
+            from services.runner.decorators import JobRegistry
+
+            registered_jobs = JobRegistry.list_jobs()
 
             logger.info(
-                f"Enhanced job system initialized with {len(discovered_jobs)} jobs"
+                f"Enhanced job system initialized with {len(registered_jobs)} jobs discovered"
             )
             return True
 
@@ -101,10 +93,9 @@ class EnhancedStartupService:
             logger.error("Failed to initialize enhanced job system")
             raise RuntimeError("Job system initialization failed")
 
-        # Start the enhanced job manager with monitoring
-        await self.job_manager.start()
-        logger.info("Enhanced job manager started successfully")
-        logger.info(f"Registered {len(self.job_manager.task_registry)} tasks")
+        # Start the job executor
+        await self.job_manager.start_executor()
+        logger.info("Enhanced job manager executor started successfully")
 
         # Start system metrics collection
         await system_metrics.start_monitoring()
@@ -144,12 +135,8 @@ class EnhancedStartupService:
             # Gracefully shutdown enhanced job manager
             if self.job_manager:
                 logger.info("Stopping enhanced job manager...")
-                await self.job_manager.stop()
+                await self.job_manager.stop_executor()
                 logger.info("Enhanced job manager stopped successfully")
-
-                # Log final metrics
-                final_metrics = self.job_manager.get_comprehensive_metrics()
-                logger.info(f"Final job metrics: {final_metrics}")
 
             # Stop websocket cleanup
             if self.cleanup_task:
@@ -183,26 +170,26 @@ class EnhancedStartupService:
             }
 
         # Get comprehensive health data
-        health_data = self.job_manager.get_health_status()
+        health_data = self.job_manager.get_system_health()
         system_health = system_metrics.get_current_metrics()
 
         return {
             "status": health_data["status"],
-            "message": health_data["message"],
+            "message": "Enhanced job system running",
             "jobs": {
-                "running": health_data["running_jobs"],
-                "registered": health_data["registered_tasks"],
-                "failed": health_data.get("failed_jobs", 0),
-                "completed": health_data.get("completed_jobs", 0),
-                "total_executions": health_data.get("total_executions", 0),
+                "running": health_data["executor"]["running"],
+                "registered": health_data["tasks"]["total_registered"],
+                "enabled": health_data["tasks"]["enabled"],
+                "disabled": health_data["tasks"]["disabled"],
+                "total_executions": health_data["metrics"]["total_executions"],
             },
             "system": {
                 "cpu_usage": system_health.get("cpu_usage", 0),
                 "memory_usage": system_health.get("memory_usage", 0),
                 "disk_usage": system_health.get("disk_usage", 0),
             },
-            "uptime": health_data.get("uptime", 0),
-            "last_updated": health_data.get("last_updated"),
+            "uptime": health_data.get("uptime_seconds", 0),
+            "last_updated": system_health.get("timestamp"),
             "version": "2.0-enhanced",
             "services": {
                 "websocket_cleanup": self.cleanup_task is not None

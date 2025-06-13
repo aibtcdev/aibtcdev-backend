@@ -8,7 +8,8 @@ from pydantic import BaseModel, ConfigDict
 
 class CustomBaseModel(BaseModel):
     model_config = ConfigDict(
-        json_encoders={UUID: str, datetime: lambda v: v.isoformat()}
+        json_encoders={UUID: str, datetime: lambda v: v.isoformat()},
+        arbitrary_types_allowed=True,
     )
 
 

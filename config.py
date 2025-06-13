@@ -42,6 +42,13 @@ class TwitterConfig:
 
 
 @dataclass
+class BackendWallet:
+    private_key: str = os.getenv("AIBTC_BACKEND_WALLET_PRIVATE_KEY", "")
+    public_key: str = os.getenv("AIBTC_BACKEND_WALLET_PUBLIC_KEY", "")
+    address: str = os.getenv("AIBTC_BACKEND_WALLET_ADDRESS", "")
+
+
+@dataclass
 class TelegramConfig:
     token: str = os.getenv("AIBTC_TELEGRAM_BOT_TOKEN", "")
     enabled: bool = os.getenv("AIBTC_TELEGRAM_BOT_ENABLED", "false").lower() == "true"

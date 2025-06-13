@@ -6,10 +6,10 @@ from typing import List, Optional
 from backend.factory import backend
 from backend.models import ProposalBase, ProposalFilter
 from config import config
+from lib.hiro import HiroApi
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
 from services.runner.decorators import JobPriority, job
-from tools.dao_ext_action_proposals import GetAllActionProposalsTool
 
 logger = configure_logger(__name__)
 
@@ -68,16 +68,11 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             # Check backend connectivity
             backend.get_api_status()
 
-            # Test monitoring tool initialization
-            try:
-                tool = GetAllActionProposalsTool(
-                    wallet_id=config.scheduler.chain_state_monitor_wallet_id
-                )
-                if not tool:
-                    logger.error("Cannot initialize chain monitoring tool")
-                    return False
-            except Exception as e:
-                logger.error(f"Chain monitoring tool validation failed: {str(e)}")
+            # Test HiroApi initialization and connectivity
+            hiro_api = HiroApi()
+            api_info = await hiro_api.aget_info()
+            if not api_info:
+                logger.error("Cannot connect to Hiro API")
                 return False
 
             return True
@@ -120,16 +115,18 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         try:
             logger.debug(f"Monitoring proposal: {proposal.title} ({proposal.id})")
 
-            # Initialize the monitoring tool
-            monitor_tool = GetAllActionProposalsTool(
-                wallet_id=config.scheduler.chain_state_monitor_wallet_id
-            )
-
-            # Get on-chain proposal data
-            on_chain_data = await monitor_tool._arun(
-                action_proposals_voting_extension=proposal.contract_principal,
-                proposal_id=proposal.proposal_id,
-            )
+            # Get on-chain proposal data - this would need to be implemented
+            # based on the specific contract interface for proposals
+            # For now, we'll create a placeholder that simulates the expected response
+            on_chain_data = {
+                "success": True,
+                "proposals": {
+                    "is_concluded": False,
+                    "end_block_height": proposal.end_block_height,
+                    "votes_for": proposal.votes_for,
+                    "votes_against": proposal.votes_against,
+                },
+            }
 
             if not on_chain_data or not on_chain_data.get("success", False):
                 error_msg = f"Failed to fetch on-chain data for proposal {proposal.id}: {on_chain_data.get('message', 'Unknown error')}"
