@@ -1,235 +1,298 @@
-"""Proposal embedding task implementation."""
+"""Proposal embedder task implementation."""
 
 from dataclasses import dataclass
 from typing import List, Optional
 
-import openai
-from langchain_openai import OpenAIEmbeddings
-
 from backend.factory import backend
-from backend.models import Proposal
-from config import config
+from backend.models import ProposalBase, ProposalFilter
 from lib.logger import configure_logger
-from services.runner.base import BaseTask, JobContext, RunnerResult
+from services.llm.embed import EmbedService
+from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from services.runner.decorators import JobPriority, job
 
 logger = configure_logger(__name__)
 
-PROPOSAL_COLLECTION_NAME = "proposals"
-EMBEDDING_MODEL = "text-embedding-ada-002"
-
 
 @dataclass
-class ProposalEmbedderResult(RunnerResult):
+class ProposalEmbeddingResult(RunnerResult):
     """Result of proposal embedding operation."""
 
-    proposals_checked: int = 0
+    proposals_processed: int = 0
     proposals_embedded: int = 0
-    errors: List[str] = None
-
-    def __post_init__(self):
-        self.errors = self.errors or []
+    embeddings_successful: int = 0
+    embeddings_failed: int = 0
 
 
-class ProposalEmbedderTask(BaseTask[ProposalEmbedderResult]):
-    """Task runner for embedding DAO proposals into a vector store."""
+@job(
+    job_type="proposal_embedder",
+    name="Proposal Embedder",
+    description="Generates embeddings for new proposals with enhanced monitoring and error handling",
+    interval_seconds=120,  # 2 minutes
+    priority=JobPriority.LOW,
+    max_retries=3,
+    retry_delay_seconds=60,
+    timeout_seconds=180,
+    max_concurrent=3,
+    requires_ai=True,
+    batch_size=10,
+    enable_dead_letter_queue=True,
+)
+class ProposalEmbedderTask(BaseTask[ProposalEmbeddingResult]):
+    """Task for generating embeddings for new proposals with enhanced capabilities."""
+
+    def __init__(self, config: Optional[RunnerConfig] = None):
+        super().__init__(config)
+        self._proposals_without_embeddings = None
+        self.embed_service = EmbedService()
+
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate task configuration."""
+        try:
+            # Check if embedding service is available
+            if not self.embed_service:
+                logger.error("Embedding service not available")
+                return False
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating proposal embedder config: {str(e)}", exc_info=True
+            )
+            return False
+
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability for AI embeddings."""
+        try:
+            # Check backend connectivity
+            backend.get_api_status()
+
+            # Test embedding service
+            try:
+                test_result = await self.embed_service.embed_text("test")
+                if not test_result:
+                    logger.error("Embedding service test failed")
+                    return False
+            except Exception as e:
+                logger.error(f"Embedding service validation failed: {str(e)}")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Resource validation failed: {str(e)}")
+            return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
-        if not config.api.openai_api_key:
-            logger.warning("OpenAI API key is not configured. Skipping embedding.")
-            return False
-        if not backend.vecs_client:
-            logger.warning("Vector client (vecs) not initialized. Skipping embedding.")
-            return False
-        # Basic check: Task runs if enabled and dependencies are met.
-        # More sophisticated check could compare DB count vs vector store count.
-        return True
-
-    def _format_proposal_for_embedding(self, proposal: Proposal) -> str:
-        """Format proposal data into a string for embedding."""
-        parts = [
-            f"Title: {proposal.title or 'N/A'}",
-            f"Content: {proposal.content or 'N/A'}",
-            f"Type: {proposal.type.value if proposal.type else 'N/A'}",
-        ]
-        if proposal.action:
-            parts.append(f"Action: {proposal.action}")
-        # Add more relevant fields as needed
-        return "\n".join(parts)
-
-    async def _get_embeddings(self, texts: List[str]) -> Optional[List[List[float]]]:
-        """Get embeddings for a list of texts using OpenAI API."""
         try:
-            # Instantiate the embeddings model here
-            embeddings_model = OpenAIEmbeddings(model=EMBEDDING_MODEL)
-            # Use the embed_documents method
-            embeddings = await embeddings_model.aembed_documents(texts)
-            return embeddings
+            # Get proposals without embeddings
+            proposals = backend.list_proposals(
+                filters=ProposalFilter(has_embedding=False)
+            )
+
+            # Filter proposals that have actual content to embed
+            proposals_without_embeddings = []
+            for proposal in proposals:
+                if proposal.description and proposal.description.strip():
+                    proposals_without_embeddings.append(proposal)
+
+            self._proposals_without_embeddings = proposals_without_embeddings
+
+            if proposals_without_embeddings:
+                logger.info(
+                    f"Found {len(proposals_without_embeddings)} proposals needing embeddings"
+                )
+                return True
+
+            logger.debug("No proposals needing embeddings found")
+            return False
+
         except Exception as e:
             logger.error(
-                f"Error getting embeddings using Langchain OpenAI: {str(e)}",
-                exc_info=True,
+                f"Error validating proposal embedder task: {str(e)}", exc_info=True
             )
-            return None
+            self._proposals_without_embeddings = None
+            return False
 
-    async def _execute_impl(self, context: JobContext) -> List[ProposalEmbedderResult]:
-        """Run the proposal embedding task."""
-        logger.info("Starting proposal embedding task...")
-        errors: List[str] = []
-        proposals_checked = 0
-        proposals_embedded = 0
-
+    async def _generate_embedding_for_proposal(
+        self, proposal
+    ) -> ProposalEmbeddingResult:
+        """Generate embedding for a single proposal with enhanced error handling."""
         try:
-            # Ensure OpenAI client is configured (Langchain uses this implicitly or explicitly)
-            if not config.api.openai_api_key:
-                raise ValueError("OpenAI API key not found in configuration.")
-            openai.api_key = config.api.openai_api_key
-
-            # Ensure the vector collection exists
-            try:
-                collection = backend.get_vector_collection(PROPOSAL_COLLECTION_NAME)
-            except Exception:
-                logger.info(
-                    f"Collection '{PROPOSAL_COLLECTION_NAME}' not found, creating..."
-                )
-                # Assuming default dimensions are okay, or fetch from config/model
-                collection = backend.create_vector_collection(PROPOSAL_COLLECTION_NAME)
-                # Optionally create an index for better query performance
-                backend.create_vector_index(PROPOSAL_COLLECTION_NAME)
-
-            # Get all proposals from the database
-            all_proposals = backend.list_proposals()
-            proposals_checked = len(all_proposals)
-            logger.debug(f"Found {proposals_checked} proposals in the database.")
-
-            if not all_proposals:
-                logger.info("No proposals found to embed.")
-                return [
-                    ProposalEmbedderResult(
-                        success=True,
-                        message="No proposals found.",
-                        proposals_checked=0,
-                        proposals_embedded=0,
-                    )
-                ]
-
-            # Get IDs of proposals already in the vector store
-            db_proposal_ids = {str(p.id) for p in all_proposals}
-            existing_vector_ids = set()
-            try:
-                # Fetch existing records - assuming fetch returns tuples (id, vector, metadata)
-                # We only need the IDs, fetch minimal data.
-                # Note: Fetching potentially large lists of IDs might be inefficient
-                # depending on the backend/library implementation.
-                fetched_vectors = await backend.fetch_vectors(
-                    collection_name=PROPOSAL_COLLECTION_NAME, ids=list(db_proposal_ids)
-                )
-                existing_vector_ids = {record[0] for record in fetched_vectors}
-                logger.debug(
-                    f"Found {len(existing_vector_ids)} existing proposal vectors out of {len(db_proposal_ids)} DB proposals."
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Could not efficiently fetch existing vector IDs: {str(e)}. Proceeding may re-embed existing items."
-                )
-                # Fallback or decide how to handle - for now, we'll proceed cautiously
-                # If fetch fails, we might end up embedding everything again if existing_vector_ids remains empty.
-
-            # Identify proposals that need embedding
-            new_proposal_ids = db_proposal_ids - existing_vector_ids
-            if not new_proposal_ids:
-                logger.debug("No new proposals found requiring embedding.")
-                return [
-                    ProposalEmbedderResult(
-                        success=True,
-                        message="No new proposals to embed.",
-                        proposals_checked=proposals_checked,
-                        proposals_embedded=0,
-                    )
-                ]
-
-            logger.debug(f"Identified {len(new_proposal_ids)} new proposals to embed.")
-
-            # Filter proposals to embed only the new ones
-            proposals_to_embed = [
-                p for p in all_proposals if str(p.id) in new_proposal_ids
-            ]
-
-            # Prepare data for embedding only for new proposals
-            texts_to_embed = []
-            metadata_list = []
-            proposal_ids = []
-
-            for proposal in proposals_to_embed:
-                proposal_text = self._format_proposal_for_embedding(proposal)
-                texts_to_embed.append(proposal_text)
-                metadata_list.append(
-                    {
-                        "proposal_id": str(proposal.id),
-                        "title": proposal.title or "",
-                        "dao_id": str(proposal.dao_id),
-                        "type": proposal.type.value if proposal.type else "",
-                    }
-                )
-                proposal_ids.append(str(proposal.id))
-
-            # Get embeddings using the updated method
-            logger.debug(
-                f"Requesting embeddings for {len(texts_to_embed)} new proposals."
+            logger.info(
+                f"Generating embedding for proposal: {proposal.title} ({proposal.id})"
             )
-            embeddings_list = await self._get_embeddings(texts_to_embed)
 
-            if embeddings_list is None:
-                errors.append("Failed to retrieve embeddings.")
-            else:
-                logger.debug(
-                    f"Successfully retrieved {len(embeddings_list)} embeddings."
+            # Prepare text content for embedding
+            text_content = f"Title: {proposal.title}\n"
+            if proposal.description:
+                text_content += f"Description: {proposal.description}\n"
+
+            # Additional context if available
+            if hasattr(proposal, "summary") and proposal.summary:
+                text_content += f"Summary: {proposal.summary}\n"
+
+            logger.debug(
+                f"Embedding text content (first 200 chars): {text_content[:200]}..."
+            )
+
+            # Generate embedding
+            embedding = await self.embed_service.embed_text(text_content)
+
+            if not embedding:
+                error_msg = f"Failed to generate embedding for proposal {proposal.id}"
+                logger.error(error_msg)
+                return ProposalEmbeddingResult(
+                    success=False,
+                    message=error_msg,
+                    proposals_processed=1,
+                    proposals_embedded=0,
+                    embeddings_failed=1,
                 )
-                # Prepare records for upsert
-                records_to_upsert = []
-                for i, proposal_id in enumerate(proposal_ids):
-                    records_to_upsert.append(
-                        (
-                            proposal_id,  # Use proposal UUID as the vector ID
-                            embeddings_list[i],  # Use the retrieved embeddings
-                            metadata_list[i],
-                        )
-                    )
 
-                # Upsert into the vector collection
-                try:
-                    collection.upsert(records=records_to_upsert)
-                    proposals_embedded = len(records_to_upsert)
-                    logger.info(
-                        f"Successfully upserted {proposals_embedded} proposal embeddings."
-                    )
-                except Exception as e:
-                    error_msg = f"Failed to upsert proposal embeddings: {str(e)}"
-                    logger.error(error_msg, exc_info=True)
-                    errors.append(error_msg)
+            # Update proposal with embedding
+            proposal_update = ProposalBase(
+                embedding=embedding,
+                embedding_model=(
+                    self.embed_service.model_name
+                    if hasattr(self.embed_service, "model_name")
+                    else "unknown"
+                ),
+            )
+
+            updated_proposal = backend.update_proposal(proposal.id, proposal_update)
+            if not updated_proposal:
+                error_msg = f"Failed to save embedding for proposal {proposal.id}"
+                logger.error(error_msg)
+                return ProposalEmbeddingResult(
+                    success=False,
+                    message=error_msg,
+                    proposals_processed=1,
+                    proposals_embedded=0,
+                    embeddings_failed=1,
+                )
+
+            logger.info(
+                f"Successfully generated embedding for proposal: {proposal.title}"
+            )
+            logger.debug(f"Embedding dimension: {len(embedding)}")
+
+            return ProposalEmbeddingResult(
+                success=True,
+                message=f"Successfully generated embedding for proposal {proposal.title}",
+                proposals_processed=1,
+                proposals_embedded=1,
+                embeddings_successful=1,
+            )
 
         except Exception as e:
-            error_msg = f"Error during proposal embedding task: {str(e)}"
+            error_msg = (
+                f"Error generating embedding for proposal {proposal.id}: {str(e)}"
+            )
             logger.error(error_msg, exc_info=True)
-            errors.append(error_msg)
+            return ProposalEmbeddingResult(
+                success=False,
+                message=error_msg,
+                error=e,
+                proposals_processed=1,
+                proposals_embedded=0,
+                embeddings_failed=1,
+            )
 
-        success = not errors
-        message = (
-            f"Checked {proposals_checked} proposals, embedded/updated {proposals_embedded}."
-            if success
-            else f"Proposal embedding task failed. Errors: {'; '.join(errors)}"
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if error should trigger retry."""
+        # Retry on network errors, AI service timeouts
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
         )
 
+        # Don't retry on content validation errors
+        if "empty" in str(error).lower() or "no content" in str(error).lower():
+            return False
+        if "invalid embedding" in str(error).lower():
+            return False
+
+        return isinstance(error, retry_errors)
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[ProposalEmbeddingResult]]:
+        """Handle execution errors with recovery logic."""
+        if "ai" in str(error).lower() or "embedding" in str(error).lower():
+            logger.warning(f"AI/embedding service error: {str(error)}, will retry")
+            return None
+
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logger.warning(f"Network error: {str(error)}, will retry")
+            return None
+
+        # For validation errors, don't retry
         return [
-            ProposalEmbedderResult(
-                success=success,
-                message=message,
-                proposals_checked=proposals_checked,
-                proposals_embedded=proposals_embedded,
-                errors=errors,
+            ProposalEmbeddingResult(
+                success=False,
+                message=f"Unrecoverable error: {str(error)}",
+                error=error,
             )
         ]
 
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[ProposalEmbeddingResult]
+    ) -> None:
+        """Cleanup after task execution."""
+        # Clear cached proposals
+        self._proposals_without_embeddings = None
+        logger.debug("Proposal embedder task cleanup completed")
 
-# Instantiate the task for use in the registry
+    async def _execute_impl(self, context: JobContext) -> List[ProposalEmbeddingResult]:
+        """Execute proposal embedding task with batch processing."""
+        results: List[ProposalEmbeddingResult] = []
+
+        if not self._proposals_without_embeddings:
+            logger.debug("No proposals needing embeddings to process")
+            return [
+                ProposalEmbeddingResult(
+                    success=True,
+                    message="No proposals require embedding generation",
+                    proposals_processed=0,
+                    proposals_embedded=0,
+                )
+            ]
+
+        total_proposals = len(self._proposals_without_embeddings)
+        processed_count = 0
+        successful_embeddings = 0
+        failed_embeddings = 0
+        batch_size = getattr(context, "batch_size", 10)
+
+        logger.info(f"Processing {total_proposals} proposals requiring embeddings")
+
+        # Process proposals in batches
+        for i in range(0, len(self._proposals_without_embeddings), batch_size):
+            batch = self._proposals_without_embeddings[i : i + batch_size]
+
+            for proposal in batch:
+                logger.debug(
+                    f"Generating embedding for proposal: {proposal.title} ({proposal.id})"
+                )
+                result = await self._generate_embedding_for_proposal(proposal)
+                results.append(result)
+                processed_count += 1
+
+                if result.success:
+                    successful_embeddings += 1
+                    logger.debug(f"Successfully embedded proposal {proposal.title}")
+                else:
+                    failed_embeddings += 1
+                    logger.error(
+                        f"Failed to embed proposal {proposal.title}: {result.message}"
+                    )
+
+        logger.info(
+            f"Proposal embedding completed - Processed: {processed_count}, "
+            f"Successful: {successful_embeddings}, Failed: {failed_embeddings}"
+        )
+
+        return results
+
+
+# Create instance for auto-registration
 proposal_embedder = ProposalEmbedderTask()

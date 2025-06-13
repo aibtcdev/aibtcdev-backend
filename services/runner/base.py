@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from uuid import UUID
@@ -94,6 +94,13 @@ class JobContext:
     retry_count: int = 0
     max_retries: int = 3
 
+    # Enhanced context fields
+    execution_id: Optional[str] = None
+    worker_name: Optional[str] = None
+    timeout_seconds: Optional[int] = None
+    priority: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 class BaseTask(ABC, Generic[T]):
     """Base class for all tasks."""
@@ -147,7 +154,8 @@ class BaseTask(ABC, Generic[T]):
         This method provides a validation pipeline:
         1. Configuration validation
         2. Prerequisites validation
-        3. Task-specific validation
+        3. Resource availability validation
+        4. Task-specific validation
         """
         try:
             logger.debug(f"Starting validation for {self.task_name}")
@@ -162,7 +170,12 @@ class BaseTask(ABC, Generic[T]):
                 logger.debug(f"{self.task_name}: Prerequisites validation failed")
                 return False
 
-            # Step 3: Task-specific validation
+            # Step 3: Resource availability validation
+            if not await self._validate_resources(context):
+                logger.debug(f"{self.task_name}: Resource validation failed")
+                return False
+
+            # Step 4: Task-specific validation
             if not await self._validate_task_specific(context):
                 logger.debug(f"{self.task_name}: Task-specific validation failed")
                 return False
@@ -183,6 +196,10 @@ class BaseTask(ABC, Generic[T]):
         """Validate task prerequisites."""
         return True
 
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability (network, APIs, etc.)."""
+        return True
+
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
         return True
@@ -190,21 +207,89 @@ class BaseTask(ABC, Generic[T]):
     async def execute(self, context: JobContext) -> List[T]:
         """Execute the task with given context."""
         self._log_task_start()
+        results = []
+
         try:
-            results = await self._execute_impl(context)
+            # Prepare context
+            prepared_context = await self._prepare_context(context)
+
+            # Execute the task implementation
+            results = await self._execute_impl(prepared_context)
             self._log_task_completion(results)
-            return results
+
         except Exception as e:
             logger.error(f"Error executing {self.task_name}: {str(e)}", exc_info=True)
-            result_class = self.get_result_class()
-            return [
-                result_class(
-                    success=False, message=f"Error executing task: {str(e)}", error=e
+
+            # Try custom error handling
+            recovery_results = await self._handle_execution_error(e, context)
+            if recovery_results is not None:
+                results = recovery_results
+                logger.info(f"Task {self.task_name} recovered from error: {str(e)}")
+            else:
+                # Default error handling
+                result_class = self.get_result_class()
+                results = [
+                    result_class(
+                        success=False,
+                        message=f"Error executing task: {str(e)}",
+                        error=e,
+                    )
+                ]
+
+        finally:
+            # Always perform cleanup
+            try:
+                await self._post_execution_cleanup(context, results)
+            except Exception as cleanup_error:
+                logger.warning(
+                    f"Cleanup error in {self.task_name}: {str(cleanup_error)}"
                 )
-            ]
+
+        return results
 
     @abstractmethod
     async def _execute_impl(self, context: JobContext) -> List[T]:
         """Implementation of task execution logic.
         This method should be implemented by subclasses."""
         pass
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[T]]:
+        """Handle execution errors with recovery logic.
+
+        Override this method to implement custom error recovery.
+        Return None to use default error handling, or return results
+        to continue as if execution succeeded.
+        """
+        return None
+
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[T]
+    ) -> None:
+        """Perform cleanup after task execution.
+
+        This is called after both successful and failed executions.
+        Override this method to implement custom cleanup logic.
+        """
+        pass
+
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if a specific error should trigger a retry.
+
+        Override this method to implement custom retry logic based on error type.
+        """
+        # Default: retry on network errors, API timeouts, temporary failures
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
+            # Add more error types as needed
+        )
+        return isinstance(error, retry_errors)
+
+    async def _prepare_context(self, context: JobContext) -> JobContext:
+        """Prepare and enrich the job context before execution.
+
+        Override this method to add task-specific context data.
+        """
+        return context

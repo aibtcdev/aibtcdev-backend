@@ -1,208 +1,297 @@
 """Agent account deployment task implementation."""
 
-import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import List, Optional
 
 from backend.factory import backend
 from backend.models import (
-    QueueMessage,
-    QueueMessageBase,
-    QueueMessageFilter,
-    QueueMessageType,
+    WalletCreate,
+    WalletFilter,
 )
-from config import config
 from lib.logger import configure_logger
-from services.runner.base import BaseTask, JobContext, RunnerResult
-from tools.agent_account import AgentAccountDeployTool
+from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from services.runner.decorators import JobPriority, job
+from tools.wallet_generator import WalletGeneratorTool
 
 logger = configure_logger(__name__)
 
 
 @dataclass
-class AgentAccountDeployResult(RunnerResult):
+class AgentAccountDeploymentResult(RunnerResult):
     """Result of agent account deployment operation."""
 
-    accounts_processed: int = 0
-    accounts_deployed: int = 0
-    errors: List[str] = None
-
-    def __post_init__(self):
-        self.errors = self.errors or []
+    agents_processed: int = 0
+    wallets_created: int = 0
+    wallets_successful: int = 0
+    wallets_failed: int = 0
 
 
-class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
-    """Task runner for deploying agent accounts."""
+@job(
+    job_type="agent_account_deployer",
+    name="Agent Account Deployer",
+    description="Deploys wallet accounts for new agents with enhanced monitoring and error handling",
+    interval_seconds=300,  # 5 minutes
+    priority=JobPriority.MEDIUM,
+    max_retries=2,
+    retry_delay_seconds=180,
+    timeout_seconds=120,
+    max_concurrent=1,
+    requires_blockchain=True,
+    batch_size=5,
+    enable_dead_letter_queue=True,
+)
+class AgentAccountDeployerTask(BaseTask[AgentAccountDeploymentResult]):
+    """Task for deploying wallet accounts for new agents with enhanced capabilities."""
 
-    QUEUE_TYPE = QueueMessageType.AGENT_ACCOUNT_DEPLOY
+    def __init__(self, config: Optional[RunnerConfig] = None):
+        super().__init__(config)
+        self._agents_without_wallets = None
 
-    async def _validate_task_specific(self, context: JobContext) -> bool:
-        """Validate task-specific conditions."""
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate task configuration."""
         try:
-            # Get pending messages from the queue
-            pending_messages = await self.get_pending_messages()
-            message_count = len(pending_messages)
-            logger.debug(
-                f"Found {message_count} pending agent account deployment messages"
-            )
-
-            if message_count == 0:
-                logger.debug("No pending agent account deployment messages found")
-                return False
-
-            # Validate that at least one message has valid deployment data
-            for message in pending_messages:
-                message_data = self._parse_message_data(message.message)
-                if self._validate_message_data(message_data):
-                    logger.debug("Found valid agent account deployment message")
-                    return True
-
-            logger.warning("No valid deployment data found in pending messages")
-            return False
-
+            # Check if wallet generation tool is available
+            return True
         except Exception as e:
             logger.error(
-                f"Error validating agent account deployment task: {str(e)}",
+                f"Error validating agent account deployer config: {str(e)}",
                 exc_info=True,
             )
             return False
 
-    def _parse_message_data(self, message: Any) -> Dict[str, Any]:
-        """Parse message data from either string or dictionary format."""
-        if message is None:
-            return {}
-
-        if isinstance(message, dict):
-            return message
-
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability."""
         try:
-            # Try to parse as JSON string
-            return json.loads(message)
-        except (json.JSONDecodeError, TypeError):
-            logger.error(f"Failed to parse message data: {message}")
-            return {}
+            # Check backend connectivity
+            backend.get_api_status()
 
-    def _validate_message_data(self, message_data: Dict[str, Any]) -> bool:
-        """Validate the message data contains required fields."""
-        required_fields = [
-            "owner_address",
-            "dao_token_contract",
-            "dao_token_dex_contract",
-        ]
-        return all(field in message_data for field in required_fields)
+            # Test wallet generator tool initialization
+            tool = WalletGeneratorTool()
+            if not tool:
+                logger.error("Cannot initialize WalletGeneratorTool")
+                return False
 
-    async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single agent account deployment message."""
-        message_id = message.id
-        message_data = self._parse_message_data(message.message)
+            return True
+        except Exception as e:
+            logger.error(f"Resource validation failed: {str(e)}")
+            return False
 
-        logger.debug(f"Processing agent account deployment message {message_id}")
-
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        """Validate task-specific conditions."""
         try:
-            # Validate message data
-            if not self._validate_message_data(message_data):
-                error_msg = f"Invalid message data in message {message_id}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
+            # Get agents without wallets
+            agents = backend.list_agents()
+            agents_without_wallets = []
 
-            # Initialize the AgentAccountDeployTool
-            logger.debug("Preparing to deploy agent account")
-            deploy_tool = AgentAccountDeployTool(
-                wallet_id=config.scheduler.agent_account_deploy_runner_wallet_id
-            )
+            for agent in agents:
+                # Check if agent already has a wallet
+                wallets = backend.list_wallets(filters=WalletFilter(agent_id=agent.id))
+                if not wallets:
+                    agents_without_wallets.append(agent)
 
-            # get address from wallet id
-            wallet = backend.get_wallet(
-                config.scheduler.agent_account_deploy_runner_wallet_id
-            )
-            # depending on the network, use the correct address
-            profile = backend.get_profile(wallet.profile_id)
+            self._agents_without_wallets = agents_without_wallets
 
-            if config.network == "mainnet":
-                owner_address = profile.email.strip("@stacks.id").upper()
-            else:
-                owner_address = "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
+            if agents_without_wallets:
+                logger.info(
+                    f"Found {len(agents_without_wallets)} agents without wallets"
+                )
+                return True
 
-            # Execute the deployment
-            logger.debug("Executing deployment...")
-            deployment_result = await deploy_tool._arun(
-                owner_address=owner_address,
-                agent_address=message_data["owner_address"],
-                dao_token_contract=message_data["dao_token_contract"],
-                dao_token_dex_contract=message_data["dao_token_dex_contract"],
-            )
-            logger.debug(f"Deployment result: {deployment_result}")
-
-            # Mark the message as processed
-            update_data = QueueMessageBase(is_processed=True)
-            backend.update_queue_message(message_id, update_data)
-
-            return {"success": True, "deployed": True, "result": deployment_result}
+            logger.debug("No agents without wallets found")
+            return False
 
         except Exception as e:
-            error_msg = f"Error processing message {message_id}: {str(e)}"
+            logger.error(
+                f"Error validating agent deployer task: {str(e)}", exc_info=True
+            )
+            self._agents_without_wallets = None
+            return False
+
+    async def _create_wallet_for_agent(self, agent) -> AgentAccountDeploymentResult:
+        """Create a wallet for a single agent with enhanced error handling."""
+        try:
+            logger.info(f"Creating wallet for agent: {agent.name} ({agent.id})")
+
+            # Initialize wallet generator tool
+            wallet_tool = WalletGeneratorTool()
+
+            # Generate wallet
+            wallet_result = await wallet_tool._arun()
+
+            if not wallet_result.get("success", False):
+                error_msg = f"Failed to generate wallet for agent {agent.id}: {wallet_result.get('message', 'Unknown error')}"
+                logger.error(error_msg)
+                return AgentAccountDeploymentResult(
+                    success=False,
+                    message=error_msg,
+                    agents_processed=1,
+                    wallets_created=0,
+                    wallets_failed=1,
+                )
+
+            # Extract wallet data from result
+            wallet_data = wallet_result.get("wallet")
+            if not wallet_data:
+                error_msg = f"No wallet data returned for agent {agent.id}"
+                logger.error(error_msg)
+                return AgentAccountDeploymentResult(
+                    success=False,
+                    message=error_msg,
+                    agents_processed=1,
+                    wallets_created=0,
+                    wallets_failed=1,
+                )
+
+            # Create wallet record in database
+            wallet_create = WalletCreate(
+                agent_id=agent.id,
+                profile_id=agent.profile_id,
+                name=f"{agent.name}_wallet",
+                mainnet_address=wallet_data.get("mainnet_address"),
+                testnet_address=wallet_data.get("testnet_address"),
+                mnemonic=wallet_data.get("mnemonic"),
+                private_key=wallet_data.get("private_key"),
+                public_key=wallet_data.get("public_key"),
+                stacks_address=wallet_data.get("stacks_address"),
+                btc_address=wallet_data.get("btc_address"),
+            )
+
+            created_wallet = backend.create_wallet(wallet_create)
+            if not created_wallet:
+                error_msg = f"Failed to save wallet to database for agent {agent.id}"
+                logger.error(error_msg)
+                return AgentAccountDeploymentResult(
+                    success=False,
+                    message=error_msg,
+                    agents_processed=1,
+                    wallets_created=0,
+                    wallets_failed=1,
+                )
+
+            logger.info(
+                f"Successfully created wallet {created_wallet.id} for agent {agent.name}"
+            )
+            logger.debug(
+                f"Wallet addresses - Mainnet: {wallet_data.get('mainnet_address')}, "
+                f"Testnet: {wallet_data.get('testnet_address')}"
+            )
+
+            return AgentAccountDeploymentResult(
+                success=True,
+                message=f"Successfully created wallet for agent {agent.name}",
+                agents_processed=1,
+                wallets_created=1,
+                wallets_successful=1,
+            )
+
+        except Exception as e:
+            error_msg = f"Error creating wallet for agent {agent.id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
+            return AgentAccountDeploymentResult(
+                success=False,
+                message=error_msg,
+                error=e,
+                agents_processed=1,
+                wallets_created=0,
+                wallets_failed=1,
+            )
 
-    async def get_pending_messages(self) -> List[QueueMessage]:
-        """Get all unprocessed messages from the queue."""
-        filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
-        messages = backend.list_queue_messages(filters=filters)
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if error should trigger retry."""
+        # Retry on network errors, temporary blockchain issues
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
+        )
 
-        # Messages are already parsed by the backend, but we log them for debugging
-        for message in messages:
-            logger.debug(f"Queue message raw data: {message.message!r}")
+        # Don't retry on wallet generation errors or database issues
+        if "database" in str(error).lower():
+            return False
+        if "mnemonic" in str(error).lower():
+            return False
 
-        return messages
+        return isinstance(error, retry_errors)
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[AgentAccountDeploymentResult]]:
+        """Handle execution errors with recovery logic."""
+        if "blockchain" in str(error).lower() or "wallet" in str(error).lower():
+            logger.warning(f"Blockchain/wallet error: {str(error)}, will retry")
+            return None
+
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logger.warning(f"Network error: {str(error)}, will retry")
+            return None
+
+        # For database/validation errors, don't retry
+        return [
+            AgentAccountDeploymentResult(
+                success=False,
+                message=f"Unrecoverable error: {str(error)}",
+                error=error,
+            )
+        ]
+
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[AgentAccountDeploymentResult]
+    ) -> None:
+        """Cleanup after task execution."""
+        # Clear cached agents
+        self._agents_without_wallets = None
+        logger.debug("Agent account deployer task cleanup completed")
 
     async def _execute_impl(
         self, context: JobContext
-    ) -> List[AgentAccountDeployResult]:
-        """Run the agent account deployment task."""
-        pending_messages = await self.get_pending_messages()
-        message_count = len(pending_messages)
-        logger.debug(f"Found {message_count} pending agent account deployment messages")
+    ) -> List[AgentAccountDeploymentResult]:
+        """Execute agent account deployment task with batch processing."""
+        results: List[AgentAccountDeploymentResult] = []
 
-        if not pending_messages:
+        if not self._agents_without_wallets:
+            logger.debug("No agents without wallets to process")
             return [
-                AgentAccountDeployResult(
+                AgentAccountDeploymentResult(
                     success=True,
-                    message="No pending messages found",
-                    accounts_processed=0,
-                    accounts_deployed=0,
+                    message="No agents require wallet deployment",
+                    agents_processed=0,
+                    wallets_created=0,
                 )
             ]
 
-        # Process each message
+        total_agents = len(self._agents_without_wallets)
         processed_count = 0
-        deployed_count = 0
-        errors = []
+        successful_deployments = 0
+        failed_deployments = 0
+        batch_size = getattr(context, "batch_size", 5)
 
-        for message in pending_messages:
-            result = await self.process_message(message)
-            processed_count += 1
+        logger.info(f"Processing {total_agents} agents requiring wallet deployment")
 
-            if result.get("success"):
-                if result.get("deployed", False):
-                    deployed_count += 1
-            else:
-                errors.append(result.get("error", "Unknown error"))
+        # Process agents in batches
+        for i in range(0, len(self._agents_without_wallets), batch_size):
+            batch = self._agents_without_wallets[i : i + batch_size]
 
-        logger.debug(
-            f"Task metrics - Processed: {processed_count}, "
-            f"Deployed: {deployed_count}, Errors: {len(errors)}"
+            for agent in batch:
+                logger.debug(f"Creating wallet for agent: {agent.name} ({agent.id})")
+                result = await self._create_wallet_for_agent(agent)
+                results.append(result)
+                processed_count += 1
+
+                if result.success:
+                    successful_deployments += 1
+                    logger.debug(f"Successfully deployed wallet for agent {agent.name}")
+                else:
+                    failed_deployments += 1
+                    logger.error(
+                        f"Failed to deploy wallet for agent {agent.name}: {result.message}"
+                    )
+
+        logger.info(
+            f"Agent account deployment completed - Processed: {processed_count}, "
+            f"Successful: {successful_deployments}, Failed: {failed_deployments}"
         )
 
-        return [
-            AgentAccountDeployResult(
-                success=True,
-                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s)",
-                accounts_processed=processed_count,
-                accounts_deployed=deployed_count,
-                errors=errors,
-            )
-        ]
+        return results
 
 
-# Instantiate the task for use in the registry
+# Create instance for auto-registration
 agent_account_deployer = AgentAccountDeployerTask()
