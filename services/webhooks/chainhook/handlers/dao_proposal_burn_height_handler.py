@@ -227,32 +227,34 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.TWEET,
+                QueueMessageType.DISCORD,
                 proposal.id,
                 dao.id
             ):
                 self.logger.debug(
-                    f"Veto notification tweet already exists for proposal {proposal.id}, skipping"
+                    f"Veto notification Discord message already exists for proposal {proposal.id}, skipping"
                 )
                 continue
 
-            # Create veto window start tweet
+            # Create veto window start Discord message
             message = (
-                f"⚠️ VETO WINDOW OPEN: Proposal #{proposal.proposal_id} of {dao.name}\n\n"
-                f"Proposal: {proposal.content[:100]}...\n\n"
-                f"The veto window is now open until block {proposal.exec_start}.\n"
+                f"⚠️ **VETO WINDOW OPEN: Proposal #{proposal.proposal_id} of {dao.name}**\n\n"
+                f"**Proposal:**\n{proposal.content[:100]}...\n\n"
+                f"**Veto Window Details:**\n"
+                f"• Opens at: Block {proposal.vote_end}\n"
+                f"• Closes at: Block {proposal.exec_start}\n\n"
                 f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
             )
 
             backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
-                    message={"message": message},
+                    type=QueueMessageType.DISCORD,
+                    message={"content": message, "proposal_status": "veto_window_open"},
                     dao_id=dao.id,
                 )
             )
             self.logger.info(
-                f"Created veto window start tweet for proposal {proposal.id}"
+                f"Created veto window start Discord message for proposal {proposal.id}"
             )
 
         # Process veto window end notifications
@@ -264,32 +266,34 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto end notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.TWEET,
+                QueueMessageType.DISCORD,
                 proposal.id,
                 dao.id
             ):
                 self.logger.debug(
-                    f"Veto end notification tweet already exists for proposal {proposal.id}, skipping"
+                    f"Veto end notification Discord message already exists for proposal {proposal.id}, skipping"
                 )
                 continue
 
-            # Create veto window end tweet
+            # Create veto window end Discord message
             message = (
-                f"🔒 VETO WINDOW CLOSED: Proposal #{proposal.proposal_id} of {dao.name}\n\n"
-                f"Proposal: {proposal.content[:100]}...\n\n"
-                f"The veto window has now closed. The proposal will be executed if it passed voting.\n"
+                f"🔒 **VETO WINDOW CLOSED: Proposal #{proposal.proposal_id} of {dao.name}**\n\n"
+                f"**Proposal:**\n{proposal.content[:100]}...\n\n"
+                f"**Status:**\n"
+                f"• Veto window has now closed\n"
+                f"• Proposal will be executed if it passed voting\n\n"
                 f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
             )
 
             backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
-                    message={"message": message},
+                    type=QueueMessageType.DISCORD,
+                    message={"content": message, "proposal_status": "veto_window_closed"},
                     dao_id=dao.id,
                 )
             )
             self.logger.info(
-                f"Created veto window end tweet for proposal {proposal.id}"
+                f"Created veto window end Discord message for proposal {proposal.id}"
             )
 
         # Process proposals that are ending
