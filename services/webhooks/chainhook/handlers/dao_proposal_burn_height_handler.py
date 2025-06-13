@@ -205,7 +205,12 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             and p.content is not None
         ]
 
-        if not (vote_proposals or end_proposals or veto_start_proposals or veto_end_proposals):
+        if not (
+            vote_proposals
+            or end_proposals
+            or veto_start_proposals
+            or veto_end_proposals
+        ):
             self.logger.info(
                 f"No eligible proposals found for burn height {burn_height}"
             )
@@ -227,9 +232,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.DISCORD,
-                proposal.id,
-                dao.id
+                QueueMessageType.DISCORD, proposal.id, dao.id
             ):
                 self.logger.debug(
                     f"Veto notification Discord message already exists for proposal {proposal.id}, skipping"
@@ -266,9 +269,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto end notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.DISCORD,
-                proposal.id,
-                dao.id
+                QueueMessageType.DISCORD, proposal.id, dao.id
             ):
                 self.logger.debug(
                     f"Veto end notification Discord message already exists for proposal {proposal.id}, skipping"
@@ -288,7 +289,10 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             backend.create_queue_message(
                 QueueMessageCreate(
                     type=QueueMessageType.DISCORD,
-                    message={"content": message, "proposal_status": "veto_window_closed"},
+                    message={
+                        "content": message,
+                        "proposal_status": "veto_window_closed",
+                    },
                     dao_id=dao.id,
                 )
             )
