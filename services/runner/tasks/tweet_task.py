@@ -16,6 +16,7 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
+    XCredsFilter,
 )
 from config import config
 from lib.logger import configure_logger
@@ -210,12 +211,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             logger.debug(f"Initialized Twitter service for DAO {dao_id}")
             return True
 
-        except requests.exceptions.Timeout:
-            logger.warning(f"Timeout downloading image: {image_url}")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Error downloading image {image_url}: {str(e)}")
-            return None
         except Exception as e:
             logger.error(f"Failed to post tweet with media: {str(e)}")
             return None
