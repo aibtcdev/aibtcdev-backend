@@ -16,8 +16,8 @@ from backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
-    XCredsFilter,
 )
+from config import config
 from lib.logger import configure_logger
 from lib.twitter import TwitterService
 from lib.utils import extract_image_urls
@@ -169,10 +169,46 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 media_ids=[media.media_id_string],
                 in_reply_to_tweet_id=reply_id,
             )
-
             if result and result.data:
-                return type("TweetResponse", (), {"id": result.data["id"]})()
-            return None
+                return type("Obj", (), {"id": result.data["id"]})()
+        except Exception as e:
+            logger.error(f"Failed to post tweet with media: {str(e)}")
+        return None
+
+    async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
+        """Initialize Twitter service with credentials from config."""
+        try:
+            # Check if Twitter is enabled in config
+            if not config.twitter.enabled:
+                logger.error("Twitter service is disabled in configuration")
+                return False
+
+            # Validate that required Twitter credentials are configured
+            if not all(
+                [
+                    config.twitter.consumer_key,
+                    config.twitter.consumer_secret,
+                    config.twitter.client_id,
+                    config.twitter.client_secret,
+                    config.twitter.access_token,
+                    config.twitter.access_secret,
+                ]
+            ):
+                logger.error("Missing required Twitter credentials in configuration")
+                return False
+
+            # Initialize Twitter service with credentials from config
+            self.twitter_service = TwitterService(
+                consumer_key=config.twitter.consumer_key,
+                consumer_secret=config.twitter.consumer_secret,
+                client_id=config.twitter.client_id,
+                client_secret=config.twitter.client_secret,
+                access_token=config.twitter.access_token,
+                access_secret=config.twitter.access_secret,
+            )
+            await self.twitter_service._ainitialize()
+            logger.debug(f"Initialized Twitter service for DAO {dao_id}")
+            return True
 
         except requests.exceptions.Timeout:
             logger.warning(f"Timeout downloading image: {image_url}")
@@ -195,8 +231,24 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability."""
         try:
-            # Check if we can access the backend
-            backend.get_api_status()
+            # Validate Twitter configuration
+            if not config.twitter.enabled:
+                logger.debug("Twitter service is disabled")
+                return False
+
+            if not all(
+                [
+                    config.twitter.consumer_key,
+                    config.twitter.consumer_secret,
+                    config.twitter.client_id,
+                    config.twitter.client_secret,
+                    config.twitter.access_token,
+                    config.twitter.access_secret,
+                ]
+            ):
+                logger.error("Missing required Twitter credentials in configuration")
+                return False
+
             return True
         except Exception as e:
             logger.error(f"Backend not available: {str(e)}")

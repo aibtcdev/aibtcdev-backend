@@ -32,4 +32,4 @@ jobs:
         run: uvx ruff format --check .
 
       - name: Run ruff lint check
-        run: uvx run ruff check .
+        run: uvx ruff check .

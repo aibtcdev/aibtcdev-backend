@@ -34,6 +34,7 @@ class TwitterConfig:
     client_secret: str = os.getenv("AIBTC_TWITTER_CLIENT_SECRET", "")
     access_token: str = os.getenv("AIBTC_TWITTER_ACCESS_TOKEN", "")
     access_secret: str = os.getenv("AIBTC_TWITTER_ACCESS_SECRET", "")
+    username: str = os.getenv("AIBTC_TWITTER_USERNAME", "")
     automated_user_id: str = os.getenv("AIBTC_TWITTER_AUTOMATED_USER_ID", "")
     whitelisted_authors: List[str] = field(
         default_factory=lambda: os.getenv("AIBTC_TWITTER_WHITELISTED", "").split(",")
