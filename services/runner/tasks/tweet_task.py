@@ -114,14 +114,16 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return False
 
             # Validate that required Twitter credentials are configured
-            if not all([
-                config.twitter.consumer_key,
-                config.twitter.consumer_secret,
-                config.twitter.client_id,
-                config.twitter.client_secret,
-                config.twitter.access_token,
-                config.twitter.access_secret,
-            ]):
+            if not all(
+                [
+                    config.twitter.consumer_key,
+                    config.twitter.consumer_secret,
+                    config.twitter.client_id,
+                    config.twitter.client_secret,
+                    config.twitter.access_token,
+                    config.twitter.access_secret,
+                ]
+            ):
                 logger.error("Missing required Twitter credentials in configuration")
                 return False
 
@@ -150,14 +152,16 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.debug("Twitter service is disabled")
                 return False
 
-            if not all([
-                config.twitter.consumer_key,
-                config.twitter.consumer_secret,
-                config.twitter.client_id,
-                config.twitter.client_secret,
-                config.twitter.access_token,
-                config.twitter.access_secret,
-            ]):
+            if not all(
+                [
+                    config.twitter.consumer_key,
+                    config.twitter.consumer_secret,
+                    config.twitter.client_id,
+                    config.twitter.client_secret,
+                    config.twitter.access_token,
+                    config.twitter.access_secret,
+                ]
+            ):
                 logger.error("Missing required Twitter credentials in configuration")
                 return False
 

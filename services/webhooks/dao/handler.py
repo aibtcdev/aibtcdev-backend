@@ -4,7 +4,13 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from backend.factory import backend
-from backend.models import ContractStatus, DAOCreate, ExtensionCreate, TokenCreate, XCredsCreate
+from backend.models import (
+    ContractStatus,
+    DAOCreate,
+    ExtensionCreate,
+    TokenCreate,
+    XCredsCreate,
+)
 from config import config
 from lib.logger import configure_logger
 from services.webhooks.base import WebhookHandler
@@ -63,7 +69,7 @@ class DAOHandler(WebhookHandler):
                 client_secret=config.twitter.default_client_secret,
                 access_token=config.twitter.default_access_token,
                 access_secret=config.twitter.default_access_secret,
-                username=config.twitter.default_username
+                username=config.twitter.default_username,
             )
 
             x_creds = self.db.create_x_creds(new_cred)
