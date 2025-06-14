@@ -91,7 +91,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             # Filter DAO proposals that have actual content to embed
             dao_proposals_without_embeddings = []
             for proposal in dao_proposals:
-                if proposal.description and proposal.description.strip():
+                if proposal.content and proposal.content.strip():
                     dao_proposals_without_embeddings.append(proposal)
 
             self._dao_proposals_without_embeddings = dao_proposals_without_embeddings
@@ -123,10 +123,8 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
 
             # Prepare text content for DAO proposal embedding
             text_content = f"DAO Proposal Title: {dao_proposal.title}\n"
-            if dao_proposal.description:
-                text_content += (
-                    f"DAO Proposal Description: {dao_proposal.description}\n"
-                )
+            if dao_proposal.content:
+                text_content += f"DAO Proposal Content: {dao_proposal.content}\n"
 
             # Additional context if available for DAO proposal
             if hasattr(dao_proposal, "summary") and dao_proposal.summary:
