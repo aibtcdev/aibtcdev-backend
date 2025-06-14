@@ -1367,6 +1367,13 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("type", filters.type)
             if filters.tx_id is not None:
                 query = query.eq("tx_id", filters.tx_id)
+            if filters.has_embedding is not None:
+                if filters.has_embedding:
+                    # Filter for proposals that have embeddings (embedding field is not null)
+                    query = query.not_.is_("embedding", "null")
+                else:
+                    # Filter for proposals that don't have embeddings (embedding field is null)
+                    query = query.is_("embedding", "null")
         response = query.execute()
         data = response.data or []
         return [Proposal(**row) for row in data]

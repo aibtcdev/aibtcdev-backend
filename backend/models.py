@@ -432,6 +432,9 @@ class ProposalBase(CustomBaseModel):
     voting_threshold: Optional[int] = None
     summary: Optional[str] = None
     tags: Optional[List[str]] = None
+    has_embedding: Optional[bool] = (
+        False  # Flag to track if proposal has been embedded in vector store
+    )
 
 
 class ProposalCreate(ProposalBase):
@@ -684,6 +687,7 @@ class ProposalFilter(CustomBaseModel):
     met_threshold: Optional[bool] = None
     type: Optional[ProposalType] = None
     tx_id: Optional[str] = None
+    has_embedding: Optional[bool] = None  # Filter by embedding presence
 
 
 class ProposalFilterN(CustomBaseModel):
