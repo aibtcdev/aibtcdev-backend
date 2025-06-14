@@ -142,7 +142,7 @@ class SchedulerConfig:
     )
 
     # tweet job
-    tweet_enabled: bool = os.getenv("AIBTC_TWEET_ENABLED", "false").lower() == "true"
+    tweet_enabled: bool = os.getenv("AIBTC_TWEET_ENABLED", "true").lower() == "true"
     tweet_interval_seconds: int = int(os.getenv("AIBTC_TWEET_INTERVAL_SECONDS", "30"))
 
 

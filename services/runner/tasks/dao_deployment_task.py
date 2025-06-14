@@ -112,7 +112,8 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             # Cache pending messages for later use
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
-                    type=QueueMessageType.DAO, is_processed=False
+                    type=QueueMessageType.get_or_create("dao_deployment"),
+                    is_processed=False,
                 )
             )
             return True

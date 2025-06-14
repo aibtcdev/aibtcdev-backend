@@ -78,7 +78,8 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             # Cache pending deployment tweet messages for later use
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
-                    type=QueueMessageType.DAO_TWEET, is_processed=False
+                    type=QueueMessageType.get_or_create("dao_deployment_tweet"),
+                    is_processed=False,
                 )
             )
             return True

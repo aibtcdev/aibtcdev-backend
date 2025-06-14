@@ -86,7 +86,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         try:
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
-                    type=QueueMessageType.DISCORD, is_processed=False
+                    type=QueueMessageType.get_or_create("discord"), is_processed=False
                 )
             )
             return True

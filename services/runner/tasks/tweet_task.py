@@ -255,7 +255,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             # Cache pending messages for later use
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
-                    type=QueueMessageType.TWEET, is_processed=False
+                    type=QueueMessageType.get_or_create("tweet"), is_processed=False
                 )
             )
             return True
