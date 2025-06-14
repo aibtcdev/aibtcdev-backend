@@ -160,8 +160,8 @@ class BaseTask(ABC, Generic[T]):
 
         This method provides a validation pipeline:
         1. Configuration validation
-        2. Prerequisites validation
-        3. Resource availability validation
+        2. Resource availability validation
+        3. Prerequisites validation
         4. Task-specific validation
         """
         try:
@@ -172,14 +172,14 @@ class BaseTask(ABC, Generic[T]):
                 logger.warning(f"{self.task_name}: Configuration validation failed")
                 return False
 
-            # Step 2: Prerequisites validation
-            if not await self._validate_prerequisites(context):
-                logger.debug(f"{self.task_name}: Prerequisites validation failed")
-                return False
-
-            # Step 3: Resource availability validation
+            # Step 2: Resource availability validation
             if not await self._validate_resources(context):
                 logger.debug(f"{self.task_name}: Resource validation failed")
+                return False
+
+            # Step 3: Prerequisites validation
+            if not await self._validate_prerequisites(context):
+                logger.debug(f"{self.task_name}: Prerequisites validation failed")
                 return False
 
             # Step 4: Task-specific validation
@@ -217,6 +217,14 @@ class BaseTask(ABC, Generic[T]):
         results = []
 
         try:
+            # Validate before execution
+            if not await self.validate(context):
+                logger.warning(
+                    f"{self.task_name}: Validation failed, skipping execution"
+                )
+                result_class = self.get_result_class()
+                return [result_class(success=False, message="Validation failed")]
+
             # Prepare context
             prepared_context = await self._prepare_context(context)
 

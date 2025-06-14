@@ -122,14 +122,43 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         """Check if a Discord message is valid for processing."""
         try:
             if not message.message or not isinstance(message.message, dict):
+                logger.debug(
+                    f"Message {message.id} invalid: message field is not a dict"
+                )
                 return False
 
             content = message.message.get("content")
-            if not content or not content.strip():
+            if not content or not str(content).strip():
+                logger.debug(f"Message {message.id} invalid: content field is empty")
+                return False
+
+            # Check for required Discord message structure
+            # Content should be a string
+            if not isinstance(content, str):
+                logger.debug(f"Message {message.id} invalid: content is not a string")
+                return False
+
+            # Optional fields should have correct types if present
+            embeds = message.message.get("embeds")
+            if embeds is not None and not isinstance(embeds, list):
+                logger.debug(f"Message {message.id} invalid: embeds is not a list")
+                return False
+
+            tts = message.message.get("tts")
+            if tts is not None and not isinstance(tts, bool):
+                logger.debug(f"Message {message.id} invalid: tts is not a boolean")
+                return False
+
+            proposal_status = message.message.get("proposal_status")
+            if proposal_status is not None and not isinstance(proposal_status, str):
+                logger.debug(
+                    f"Message {message.id} invalid: proposal_status is not a string"
+                )
                 return False
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Message {message.id} validation error: {str(e)}")
             return False
 
     def _get_webhook_url(self, message: QueueMessage) -> str:
@@ -145,6 +174,9 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             return config.discord.webhook_url_passed
         elif proposal_status == "failed":
             return config.discord.webhook_url_failed
+        elif proposal_status in ["veto_window_open", "veto_window_closed"]:
+            # Veto window notifications go to passed webhook (info/updates channel)
+            return config.discord.webhook_url_passed
         else:
             # Default to passed webhook for backwards compatibility
             return config.discord.webhook_url_passed
@@ -167,6 +199,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         try:
             # Extract content and optional parameters from message.message
             if not message.message:
+                logger.warning(f"Discord message {message.id} has empty message field")
                 return DiscordProcessingResult(
                     success=False,
                     message="Discord message is empty",
@@ -174,9 +207,30 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
+            if not isinstance(message.message, dict):
+                logger.warning(
+                    f"Discord message {message.id} message field is not a dict: {type(message.message)}"
+                )
+                return DiscordProcessingResult(
+                    success=False,
+                    message=f"Discord message format invalid: expected dict, got {type(message.message)}",
+                    queue_message_id=message.id,
+                    dao_id=message.dao_id,
+                )
+
             content = message.message.get("content")
             embeds = message.message.get("embeds")
             tts = message.message.get("tts", False)
+
+            # Validate content exists and is not empty
+            if not content or not str(content).strip():
+                logger.warning(f"Discord message {message.id} has empty content field")
+                return DiscordProcessingResult(
+                    success=False,
+                    message="Discord message content is empty",
+                    queue_message_id=message.id,
+                    dao_id=message.dao_id,
+                )
 
             # Get appropriate webhook URL
             webhook_url = self._get_webhook_url(message)
@@ -200,6 +254,10 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
 
             logger.info(f"Sending Discord message for queue {message.id}")
             logger.debug(f"Content: {content[:100]}..." if content else "No content")
+            logger.debug(
+                f"Proposal status: {message.message.get('proposal_status', 'none')}"
+            )
+            logger.debug(f"Webhook URL used: {webhook_url}")
 
             # Send the message
             result = discord_service.send_message(content, embeds=embeds, tts=tts)

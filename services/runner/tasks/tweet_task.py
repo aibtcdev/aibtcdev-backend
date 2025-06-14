@@ -258,6 +258,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     type=QueueMessageType.get_or_create("tweet"), is_processed=False
                 )
             )
+            logger.debug(
+                f"Found {len(self._pending_messages)} unprocessed tweet messages"
+            )
+
+            # Log some details about the messages for debugging
+            if self._pending_messages:
+                for idx, msg in enumerate(self._pending_messages[:3]):  # Log first 3
+                    logger.debug(
+                        f"Tweet message {idx + 1}: ID={msg.id}, DAO={msg.dao_id}, "
+                        f"Message type={type(msg.message)}, Content preview: {str(msg.message)[:100]}"
+                    )
+
             return True
         except Exception as e:
             logger.error(f"Error loading pending tweets: {str(e)}", exc_info=True)
@@ -272,37 +284,79 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         # Validate each message before processing
         valid_messages = []
+        invalid_count = 0
+
         for message in self._pending_messages:
             if await self._is_message_valid(message):
                 valid_messages.append(message)
+            else:
+                invalid_count += 1
 
         self._pending_messages = valid_messages
+
+        logger.info(
+            f"Tweet validation complete: {len(valid_messages)} valid, {invalid_count} invalid messages"
+        )
 
         if valid_messages:
             logger.debug(f"Found {len(valid_messages)} valid tweet messages")
             return True
 
-        logger.debug("No valid tweet messages to process")
+        logger.warning(
+            f"No valid tweet messages to process (found {invalid_count} invalid messages)"
+        )
         return False
 
     async def _is_message_valid(self, message: QueueMessage) -> bool:
         """Check if a message is valid for processing."""
         try:
-            if not message.message or not message.dao_id:
+            if not message.message:
+                logger.debug(
+                    f"Tweet message {message.id} invalid: message field is empty"
+                )
                 return False
 
-            if (
-                not isinstance(message.message, dict)
-                or "message" not in message.message
-            ):
+            if not message.dao_id:
+                logger.debug(f"Tweet message {message.id} invalid: dao_id is missing")
+                return False
+
+            if not isinstance(message.message, dict):
+                logger.debug(
+                    f"Tweet message {message.id} invalid: message field is not a dict, got {type(message.message)}"
+                )
+                return False
+
+            if "message" not in message.message:
+                logger.debug(
+                    f"Tweet message {message.id} invalid: 'message' key not found in message dict. Keys: {list(message.message.keys())}"
+                )
                 return False
 
             tweet_text = message.message["message"]
-            if not tweet_text or not tweet_text.strip():
+            if not tweet_text:
+                logger.debug(
+                    f"Tweet message {message.id} invalid: tweet text is None or empty"
+                )
                 return False
 
+            if not isinstance(tweet_text, str):
+                logger.debug(
+                    f"Tweet message {message.id} invalid: tweet text is not a string, got {type(tweet_text)}"
+                )
+                return False
+
+            if not tweet_text.strip():
+                logger.debug(
+                    f"Tweet message {message.id} invalid: tweet text is only whitespace"
+                )
+                return False
+
+            logger.debug(
+                f"Tweet message {message.id} is valid with content: {tweet_text[:50]}..."
+            )
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Tweet message {message.id} validation error: {str(e)}")
             return False
 
     async def _process_tweet_message(
@@ -310,6 +364,25 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     ) -> TweetProcessingResult:
         """Process a single tweet message with enhanced error handling."""
         try:
+            # Validate message structure first
+            if not message.message or not isinstance(message.message, dict):
+                logger.warning(
+                    f"Tweet message {message.id} has invalid message structure"
+                )
+                return TweetProcessingResult(
+                    success=False,
+                    message="Tweet message structure is invalid",
+                    dao_id=message.dao_id,
+                )
+
+            if "message" not in message.message:
+                logger.warning(f"Tweet message {message.id} missing 'message' key")
+                return TweetProcessingResult(
+                    success=False,
+                    message="Tweet message missing 'message' key",
+                    dao_id=message.dao_id,
+                )
+
             # Get Twitter service for this DAO
             twitter_service = await self._get_twitter_service(message.dao_id)
             if not twitter_service:
@@ -321,8 +394,19 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             # Extract tweet text
             tweet_text = message.message["message"]
+            if not isinstance(tweet_text, str):
+                logger.warning(
+                    f"Tweet message {message.id} content is not a string: {type(tweet_text)}"
+                )
+                return TweetProcessingResult(
+                    success=False,
+                    message=f"Tweet content is not a string: {type(tweet_text)}",
+                    dao_id=message.dao_id,
+                )
+
             logger.info(f"Sending tweet for DAO {message.dao_id}")
             logger.debug(f"Tweet content: {tweet_text[:100]}...")
+            logger.debug(f"Message structure: {message.message}")
 
             # Look for image URLs in the text
             image_urls = extract_image_urls(tweet_text)
