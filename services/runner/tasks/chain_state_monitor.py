@@ -54,7 +54,7 @@ class ChainStateMonitorResult(RunnerResult):
     max_retries=3,
     retry_delay_seconds=120,
     timeout_seconds=300,
-    max_concurrent=2,
+    max_concurrent=1,
     requires_blockchain=True,
     batch_size=20,
     enable_dead_letter_queue=True,

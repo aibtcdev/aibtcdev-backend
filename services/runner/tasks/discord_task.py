@@ -37,7 +37,7 @@ class DiscordProcessingResult(RunnerResult):
     max_retries=3,
     retry_delay_seconds=30,
     timeout_seconds=120,
-    max_concurrent=3,
+    max_concurrent=1,
     requires_discord=True,
     batch_size=10,
     enable_dead_letter_queue=True,

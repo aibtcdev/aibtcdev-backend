@@ -45,7 +45,7 @@ class DAOProposalVoteResult(RunnerResult):
     max_retries=2,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=2,
+    max_concurrent=1,
     requires_blockchain=True,
     batch_size=3,
     enable_dead_letter_queue=True,

@@ -93,6 +93,15 @@ class EnhancedStartupService:
             logger.error("Failed to initialize enhanced job system")
             raise RuntimeError("Job system initialization failed")
 
+        # Schedule jobs with the scheduler
+        any_jobs_scheduled = self.job_manager.schedule_jobs(self.scheduler)
+        if any_jobs_scheduled:
+            # Start the scheduler
+            self.scheduler.start()
+            logger.info("Job scheduler started successfully")
+        else:
+            logger.warning("No jobs were scheduled")
+
         # Start the job executor
         await self.job_manager.start_executor()
         logger.info("Enhanced job manager executor started successfully")
@@ -131,6 +140,11 @@ class EnhancedStartupService:
             if system_metrics:
                 await system_metrics.stop_monitoring()
                 logger.info("System metrics collection stopped")
+
+            # Stop the scheduler
+            if self.scheduler and self.scheduler.running:
+                self.scheduler.shutdown()
+                logger.info("Job scheduler stopped")
 
             # Gracefully shutdown enhanced job manager
             if self.job_manager:

@@ -1,6 +1,8 @@
 """Enhanced Job Manager using the new job queue system."""
 
+import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -51,6 +53,12 @@ class JobManager:
         self._executor = get_executor()
         self._metrics = get_metrics_collector()
         self._performance_monitor = get_performance_monitor()
+        self._is_running = False
+
+    @property
+    def is_running(self) -> bool:
+        """Check if the job manager is running."""
+        return self._is_running
 
     def get_all_jobs(self) -> List[JobScheduleConfig]:
         """Get configurations for all registered jobs."""
@@ -113,15 +121,53 @@ class JobManager:
         return metadata.interval_seconds
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
-        """Execute a job through the enhanced executor system."""
+        """Execute a job through the enhanced executor system with proper concurrency control."""
         try:
-            # Load pending jobs into the executor
-            await self._executor.enqueue_pending_jobs()
+            from backend.models import QueueMessage, QueueMessageType
 
-            logger.debug(f"Triggered job execution check for {job_type}")
+            from .base import JobType
+            from .decorators import JobRegistry
+
+            # Convert job_type string to JobType enum
+            job_type_enum = JobType.get_or_create(job_type)
+
+            # Get job metadata to check if it should run
+            metadata = JobRegistry.get_metadata(job_type_enum)
+            if not metadata:
+                logger.error(f"No metadata found for job type: {job_type}")
+                return
+
+            # Create a synthetic queue message for scheduled execution
+            # This allows the job to go through the proper executor pipeline with concurrency control
+            synthetic_message = QueueMessage(
+                id=uuid.uuid4(),
+                type=QueueMessageType.get_or_create(job_type),
+                message={
+                    "scheduled_execution": True,
+                    "triggered_at": str(datetime.now()),
+                },
+                dao_id=None,
+                tweet_id=None,
+                conversation_id=None,
+                is_processed=False,
+                result=None,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+            )
+
+            # Enqueue the synthetic message with the job's priority
+            job_id = await self._executor.priority_queue.enqueue(
+                synthetic_message, metadata.priority
+            )
+
+            logger.debug(
+                f"Enqueued scheduled job {job_type} with ID {job_id} (priority: {metadata.priority})"
+            )
 
         except Exception as e:
-            logger.error(f"Error executing job {job_type}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error enqueuing scheduled job {job_type}: {str(e)}", exc_info=True
+            )
 
     def schedule_jobs(self, scheduler: AsyncIOScheduler) -> bool:
         """Schedule all enabled jobs using the new system."""
@@ -173,11 +219,13 @@ class JobManager:
     async def start_executor(self, num_workers: int = 5) -> None:
         """Start the job executor."""
         await self._executor.start(num_workers)
+        self._is_running = True
         logger.info(f"Job executor started with {num_workers} workers")
 
     async def stop_executor(self) -> None:
         """Stop the job executor."""
         await self._executor.stop()
+        self._is_running = False
         logger.info("Job executor stopped")
 
     def get_executor_stats(self) -> Dict[str, Any]:

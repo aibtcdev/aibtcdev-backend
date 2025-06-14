@@ -47,7 +47,7 @@ class TweetProcessingResult(RunnerResult):
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=2,
+    max_concurrent=1,
     requires_twitter=True,
     batch_size=5,
     enable_dead_letter_queue=True,

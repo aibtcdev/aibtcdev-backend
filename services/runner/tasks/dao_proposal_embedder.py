@@ -32,7 +32,7 @@ class DAOProposalEmbeddingResult(RunnerResult):
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=180,
-    max_concurrent=3,
+    max_concurrent=1,
     requires_ai=True,
     batch_size=10,
     enable_dead_letter_queue=True,
