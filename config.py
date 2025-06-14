@@ -26,7 +26,7 @@ class DatabaseConfig:
 
 @dataclass
 class TwitterConfig:
-    enabled: bool = os.getenv("AIBTC_TWITTER_ENABLED", "false").lower() == "true"
+    enabled: bool = os.getenv("AIBTC_TWITTER_ENABLED", "true").lower() == "true"
     interval_seconds: int = int(os.getenv("AIBTC_TWITTER_INTERVAL_SECONDS", "120"))
     consumer_key: str = os.getenv("AIBTC_TWITTER_CONSUMER_KEY", "")
     consumer_secret: str = os.getenv("AIBTC_TWITTER_CONSUMER_SECRET", "")
