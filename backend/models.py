@@ -110,9 +110,6 @@ class QueueMessageType:
         """Custom Pydantic schema for serialization/deserialization."""
         from pydantic_core import core_schema
 
-        def serialize_queue_message_type(instance):
-            return instance.value if instance is not None else None
-
         def validate_queue_message_type(value):
             if value is None:
                 return None
@@ -122,16 +119,9 @@ class QueueMessageType:
                 return cls.get_or_create(value)
             raise ValueError(f"Invalid QueueMessageType value: {value}")
 
-        return core_schema.with_info_before_validator_function(
+        return core_schema.no_info_plain_validator_function(
             validate_queue_message_type,
-            core_schema.no_info_plain_validator_function(
-                lambda x: x,
-                serialization=core_schema.plain_serializer_function(
-                    serialize_queue_message_type,
-                    return_schema=core_schema.str_schema(),
-                    when_used="json",
-                ),
-            ),
+            serialization=core_schema.to_string_ser_schema(),
         )
 
     @classmethod
