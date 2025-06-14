@@ -313,7 +313,7 @@ class JobExecutor:
 
             context = JobContext(
                 job_type=job_type,
-                config=RunnerConfig.from_env(),
+                config=RunnerConfig(),
                 retry_count=execution.attempt - 1,
                 max_retries=metadata.max_retries,
             )

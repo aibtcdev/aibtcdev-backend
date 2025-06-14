@@ -1,12 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from backend.factory import backend
 from backend.models import (
     DAOFilter,
-    Profile,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
@@ -52,10 +50,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
         self._pending_messages = None
-        self.tools_map_all = initialize_tools(
-            Profile(id=self.config.twitter_profile_id, created_at=datetime.now()),
-            agent_id=self.config.twitter_agent_id,
-        )
+        self.tools_map_all = initialize_tools(None, None)
         self.tools_map = filter_tools_by_names(
             ["contract_deploy_dao"], self.tools_map_all
         )
@@ -72,10 +67,8 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 logger.error("Tools not properly initialized")
                 return False
 
-            # Validate that the twitter profile and agent are available
-            if not self.config.twitter_profile_id or not self.config.twitter_agent_id:
-                logger.error("Twitter profile or agent ID not configured")
-                return False
+            # Configuration validation passed
+            logger.debug("DAO deployment task configuration validation passed")
 
             return True
         except Exception as e:
@@ -108,7 +101,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 filters=DAOFilter(
                     is_deployed=False,
                     is_broadcasted=True,
-                    wallet_id=self.config.twitter_wallet_id,
                 )
             )
             if pending_daos:

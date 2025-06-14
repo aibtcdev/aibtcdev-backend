@@ -1,8 +1,6 @@
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
-from uuid import UUID
 
 from lib.logger import configure_logger
 
@@ -21,48 +19,11 @@ class RunnerResult:
 T = TypeVar("T", bound=RunnerResult)
 
 
-def get_required_env_var(name: str) -> UUID:
-    """Get a required environment variable and convert it to UUID."""
-    value = os.getenv(name)
-    if not value:
-        raise ValueError(f"{name} environment variable is not set")
-    return UUID(value)
-
-
 @dataclass
 class RunnerConfig:
     """Configuration class for runners."""
 
-    twitter_profile_id: UUID
-    twitter_agent_id: UUID
-    twitter_wallet_id: Optional[UUID]
-
-    @classmethod
-    def from_env(cls) -> "RunnerConfig":
-        """Create configuration from environment variables."""
-        from backend.factory import backend
-        from backend.models import WalletFilter
-
-        twitter_profile_id = get_required_env_var("AIBTC_TWITTER_PROFILE_ID")
-        twitter_agent_id = get_required_env_var("AIBTC_TWITTER_AGENT_ID")
-
-        twitter_wallet = backend.list_wallets(
-            filters=WalletFilter(profile_id=twitter_profile_id)
-        )
-
-        twitter_wallet_id = None
-        if not twitter_wallet:
-            logger.warning(
-                "No Twitter wallet found - some functionality may be limited"
-            )
-        else:
-            twitter_wallet_id = twitter_wallet[0].id
-
-        return cls(
-            twitter_profile_id=twitter_profile_id,
-            twitter_agent_id=twitter_agent_id,
-            twitter_wallet_id=twitter_wallet_id,
-        )
+    pass
 
 
 class JobType:
@@ -152,7 +113,7 @@ class BaseTask(ABC, Generic[T]):
     """Base class for all tasks."""
 
     def __init__(self, config: Optional[RunnerConfig] = None):
-        self.config = config or RunnerConfig.from_env()
+        self.config = config or RunnerConfig()
         self._start_time: Optional[float] = None
 
     @property
