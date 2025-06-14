@@ -45,10 +45,17 @@ class AgentAccountDeployTool(BaseTool):
     args_schema: Type[BaseModel] = AgentAccountDeployInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None
+    seed_phrase: Optional[str] = None
 
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+    def __init__(
+        self,
+        wallet_id: Optional[UUID] = None,
+        seed_phrase: Optional[str] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
+        self.seed_phrase = seed_phrase
 
     def _deploy(
         self,
@@ -60,8 +67,12 @@ class AgentAccountDeployTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to deploy agent account."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
+        if self.seed_phrase is None and self.wallet_id is None:
+            return {
+                "success": False,
+                "message": "Either seed phrase or wallet ID is required",
+                "data": None,
+            }
 
         args = [
             owner_address,
@@ -71,12 +82,21 @@ class AgentAccountDeployTool(BaseTool):
             str(save_to_file).lower(),
         ]
 
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-cohort-0/contract-tools",
-            "deploy-agent-account.ts",
-            *args,
-        )
+        # Use seed phrase if available, otherwise fall back to wallet_id
+        if self.seed_phrase:
+            return BunScriptRunner.bun_run_with_seed_phrase(
+                self.seed_phrase,
+                "aibtc-cohort-0/contract-tools",
+                "deploy-agent-account.ts",
+                *args,
+            )
+        else:
+            return BunScriptRunner.bun_run(
+                self.wallet_id,
+                "aibtc-cohort-0/contract-tools",
+                "deploy-agent-account.ts",
+                *args,
+            )
 
     def _run(
         self,

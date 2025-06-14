@@ -42,6 +42,13 @@ class TwitterConfig:
 
 
 @dataclass
+class BackendWalletConfig:
+    """Configuration for backend wallet operations."""
+
+    seed_phrase: str = os.getenv("AIBTC_BACKEND_WALLET_SEED_PHRASE", "")
+
+
+@dataclass
 class TelegramConfig:
     token: str = os.getenv("AIBTC_TELEGRAM_BOT_TOKEN", "")
     enabled: bool = os.getenv("AIBTC_TELEGRAM_BOT_ENABLED", "false").lower() == "true"
@@ -61,82 +68,84 @@ class SchedulerConfig:
     sync_interval_seconds: int = int(
         os.getenv("AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS", "60")
     )
-    dao_runner_enabled: bool = (
-        os.getenv("AIBTC_DAO_RUNNER_ENABLED", "false").lower() == "true"
+
+    # Job-specific configurations matching job_type names exactly
+
+    # agent_account_deployer job
+    agent_account_deployer_enabled: bool = (
+        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOYER_ENABLED", "false").lower() == "true"
     )
-    dao_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DAO_RUNNER_INTERVAL_SECONDS", "30")
+    agent_account_deployer_interval_seconds: int = int(
+        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOYER_INTERVAL_SECONDS", "60")
     )
-    dao_tweet_runner_enabled: bool = (
-        os.getenv("AIBTC_DAO_TWEET_RUNNER_ENABLED", "false").lower() == "true"
-    )
-    dao_tweet_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DAO_TWEET_RUNNER_INTERVAL_SECONDS", "30")
-    )
-    tweet_runner_enabled: bool = (
-        os.getenv("AIBTC_TWEET_RUNNER_ENABLED", "false").lower() == "true"
-    )
-    tweet_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_TWEET_RUNNER_INTERVAL_SECONDS", "30")
-    )
-    discord_runner_enabled: bool = (
-        os.getenv("AIBTC_DISCORD_RUNNER_ENABLED", "false").lower() == "true"
-    )
-    discord_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DISCORD_RUNNER_INTERVAL_SECONDS", "30")
-    )
-    dao_proposal_vote_runner_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_ENABLED", "false").lower() == "true"
-    )
-    dao_proposal_vote_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_RUNNER_INTERVAL_SECONDS", "60")
-    )
-    dao_proposal_conclude_runner_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_ENABLED", "false").lower()
-        == "true"
-    )
-    dao_proposal_conclude_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_INTERVAL_SECONDS", "60")
-    )
-    dao_proposal_conclude_runner_wallet_id: str = os.getenv(
-        "AIBTC_DAO_PROPOSAL_CONCLUDE_RUNNER_WALLET_ID", ""
-    )
-    dao_proposal_evaluation_runner_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_RUNNER_ENABLED", "false").lower()
-        == "true"
-    )
-    dao_proposal_evaluation_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_RUNNER_INTERVAL_SECONDS", "60")
-    )
-    agent_account_deploy_runner_enabled: bool = (
-        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_ENABLED", "false").lower()
-        == "true"
-    )
-    agent_account_deploy_runner_interval_seconds: int = int(
-        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_INTERVAL_SECONDS", "60")
-    )
-    agent_account_deploy_runner_wallet_id: str = os.getenv(
-        "AIBTC_AGENT_ACCOUNT_DEPLOY_RUNNER_WALLET_ID", ""
-    )
-    dao_proposal_vote_delay_blocks: int = int(
-        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_DELAY_BLOCKS", "2")
-    )
-    proposal_embedder_enabled: bool = (
-        os.getenv("AIBTC_PROPOSAL_EMBEDDER_ENABLED", "false").lower() == "true"
-    )
-    proposal_embedder_interval_seconds: int = int(
-        os.getenv(
-            "AIBTC_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300"
-        )  # Default to 5 mins
-    )
+
+    # chain_state_monitor job
     chain_state_monitor_enabled: bool = (
         os.getenv("AIBTC_CHAIN_STATE_MONITOR_ENABLED", "true").lower() == "true"
     )
     chain_state_monitor_interval_seconds: int = int(
-        os.getenv(
-            "AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300"
-        )  # Default to 5 mins
+        os.getenv("AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300")
     )
+
+    # dao_deployment job
+    dao_deployment_enabled: bool = (
+        os.getenv("AIBTC_DAO_DEPLOYMENT_ENABLED", "false").lower() == "true"
+    )
+    dao_deployment_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_DEPLOYMENT_INTERVAL_SECONDS", "60")
+    )
+
+    # dao_deployment_tweet job
+    dao_deployment_tweet_enabled: bool = (
+        os.getenv("AIBTC_DAO_DEPLOYMENT_TWEET_ENABLED", "false").lower() == "true"
+    )
+    dao_deployment_tweet_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_DEPLOYMENT_TWEET_INTERVAL_SECONDS", "60")
+    )
+
+    # dao_proposal_conclude job
+    dao_proposal_conclude_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_conclude_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_INTERVAL_SECONDS", "60")
+    )
+
+    # dao_proposal_embedder job
+    dao_proposal_embedder_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_EMBEDDER_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_embedder_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300")
+    )
+
+    # dao_proposal_evaluation job
+    dao_proposal_evaluation_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_evaluation_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_INTERVAL_SECONDS", "60")
+    )
+
+    # dao_proposal_vote job
+    dao_proposal_vote_enabled: bool = (
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_ENABLED", "false").lower() == "true"
+    )
+    dao_proposal_vote_interval_seconds: int = int(
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_INTERVAL_SECONDS", "60")
+    )
+
+    # discord job
+    discord_enabled: bool = (
+        os.getenv("AIBTC_DISCORD_ENABLED", "false").lower() == "true"
+    )
+    discord_interval_seconds: int = int(
+        os.getenv("AIBTC_DISCORD_INTERVAL_SECONDS", "30")
+    )
+
+    # tweet job
+    tweet_enabled: bool = os.getenv("AIBTC_TWEET_ENABLED", "false").lower() == "true"
+    tweet_interval_seconds: int = int(os.getenv("AIBTC_TWEET_INTERVAL_SECONDS", "30"))
 
 
 @dataclass
@@ -175,6 +184,7 @@ class Config:
     api: APIConfig = field(default_factory=APIConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
     discord: DiscordConfig = field(default_factory=DiscordConfig)
+    backend_wallet: BackendWalletConfig = field(default_factory=BackendWalletConfig)
 
     @classmethod
     def load(cls) -> "Config":

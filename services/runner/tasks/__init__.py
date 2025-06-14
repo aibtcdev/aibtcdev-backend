@@ -1,29 +1,29 @@
-"""Task runners for scheduled and on-demand jobs."""
+"""Task runners for scheduled and on-demand jobs.
 
-from .chain_state_monitor import ChainStateMonitorTask, chain_state_monitor
-from .dao_proposal_concluder import DAOProposalConcluderTask, dao_proposal_concluder
-from .dao_proposal_evaluation import DAOProposalEvaluationTask, dao_proposal_evaluation
-from .dao_proposal_voter import DAOProposalVoterTask, dao_proposal_voter
-from .dao_task import DAOTask, dao_task
-from .dao_tweet_task import DAOTweetTask, dao_tweet_task
-from .discord_task import DiscordTask, discord_task
-from .tweet_task import TweetTask, tweet_task
+Tasks are automatically discovered and registered using the @job decorator.
+To create a new task:
 
-__all__ = [
-    "DAOTask",
-    "dao_task",
-    "DAOProposalVoterTask",
-    "dao_proposal_voter",
-    "DAOTweetTask",
-    "dao_tweet_task",
-    "DiscordTask",
-    "discord_task",
-    "TweetTask",
-    "tweet_task",
-    "DAOProposalConcluderTask",
-    "dao_proposal_concluder",
-    "DAOProposalEvaluationTask",
-    "dao_proposal_evaluation",
-    "ChainStateMonitorTask",
-    "chain_state_monitor",
-]
+1. Create a new .py file in this directory
+2. Import the @job decorator: from ..decorators import job
+3. Decorate your task class with @job("your_job_type", ...)
+4. That's it! The task will be automatically discovered and registered.
+
+Example:
+    @job(
+        "my_new_job",
+        name="My New Job",
+        description="Does something useful",
+        interval_seconds=120,
+        priority=JobPriority.NORMAL,
+        max_concurrent=1,
+    )
+    class MyNewJobTask(BaseTask[MyJobResult]):
+        async def _execute_impl(self, context: JobContext) -> List[MyJobResult]:
+            # Implementation here
+            pass
+"""
+
+# Auto-discovery handles all task imports and registrations
+# No manual imports needed here anymore!
+
+__all__ = []  # Auto-discovery populates the registry

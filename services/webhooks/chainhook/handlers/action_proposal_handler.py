@@ -433,7 +433,9 @@ class ActionProposalHandler(BaseProposalHandler):
 
                         backend.create_queue_message(
                             QueueMessageCreate(
-                                type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
+                                type=QueueMessageType.get_or_create(
+                                    "dao_proposal_evaluation"
+                                ),
                                 message=message_data,
                                 dao_id=dao_data["id"],
                                 wallet_id=agent["wallet_id"],
@@ -528,7 +530,9 @@ class ActionProposalHandler(BaseProposalHandler):
 
                         backend.create_queue_message(
                             QueueMessageCreate(
-                                type=QueueMessageType.DAO_PROPOSAL_EVALUATION,
+                                type=QueueMessageType.get_or_create(
+                                    "dao_proposal_evaluation"
+                                ),
                                 message=message_data,
                                 dao_id=dao_data["id"],
                                 wallet_id=agent["wallet_id"],

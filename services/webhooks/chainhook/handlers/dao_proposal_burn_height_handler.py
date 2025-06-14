@@ -2,7 +2,6 @@
 
 from typing import Dict, List, Optional
 from uuid import UUID
-from config import config
 
 from backend.factory import backend
 from backend.models import (
@@ -12,6 +11,7 @@ from backend.models import (
     QueueMessageFilter,
     QueueMessageType,
 )
+from config import config
 from lib.logger import configure_logger
 from services.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.webhooks.chainhook.models import ChainHookData, TransactionWithReceipt
@@ -232,7 +232,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.DISCORD, proposal.id, dao.id
+                QueueMessageType.get_or_create("discord"), proposal.id, dao.id
             ):
                 self.logger.debug(
                     f"Veto notification Discord message already exists for proposal {proposal.id}, skipping"
@@ -251,7 +251,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={"content": message, "proposal_status": "veto_window_open"},
                     dao_id=dao.id,
                 )
@@ -269,7 +269,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto end notification message already exists
             if self._queue_message_exists(
-                QueueMessageType.DISCORD, proposal.id, dao.id
+                QueueMessageType.get_or_create("discord"), proposal.id, dao.id
             ):
                 self.logger.debug(
                     f"Veto end notification Discord message already exists for proposal {proposal.id}, skipping"
@@ -288,7 +288,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={
                         "content": message,
                         "proposal_status": "veto_window_closed",
@@ -309,7 +309,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a conclude message already exists for this proposal
             if self._queue_message_exists(
-                QueueMessageType.DAO_PROPOSAL_CONCLUDE, proposal.id, dao.id
+                QueueMessageType.get_or_create("dao_proposal_conclude"),
+                proposal.id,
+                dao.id,
             ):
                 self.logger.debug(
                     f"Conclude queue message already exists for proposal {proposal.id}, skipping"
@@ -323,7 +325,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DAO_PROPOSAL_CONCLUDE,
+                    type=QueueMessageType.get_or_create("dao_proposal_conclude"),
                     message=message_data,
                     dao_id=dao.id,
                     wallet_id=None,  # No specific wallet needed for conclusion
@@ -352,7 +354,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             for agent in agents:
                 # Check if a queue message already exists for this proposal+wallet combination
                 if self._queue_message_exists(
-                    QueueMessageType.DAO_PROPOSAL_VOTE,
+                    QueueMessageType.get_or_create("dao_proposal_vote"),
                     proposal.id,
                     dao.id,
                     agent["wallet_id"],
@@ -369,7 +371,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
                 backend.create_queue_message(
                     QueueMessageCreate(
-                        type=QueueMessageType.DAO_PROPOSAL_VOTE,
+                        type=QueueMessageType.get_or_create("dao_proposal_vote"),
                         message=message_data,
                         dao_id=dao.id,
                         wallet_id=agent["wallet_id"],

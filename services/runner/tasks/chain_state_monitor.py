@@ -1,6 +1,7 @@
 """Chain state monitoring task implementation."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -8,7 +9,8 @@ from backend.factory import backend
 from config import config
 from lib.hiro import HiroApi
 from lib.logger import configure_logger
-from services.runner.base import BaseTask, JobContext, RunnerResult
+from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from services.runner.decorators import JobPriority, job
 from services.webhooks.chainhook import ChainhookService
 from services.webhooks.chainhook.models import (
     Apply,
@@ -24,60 +26,88 @@ from services.webhooks.chainhook.models import (
 logger = configure_logger(__name__)
 
 
+@dataclass
 class ChainStateMonitorResult(RunnerResult):
     """Result of chain state monitoring operation."""
 
-    def __init__(
-        self,
-        success: bool,
-        message: str,
-        error: Optional[Exception] = None,
-        network: str = None,
-        is_stale: bool = False,
-        last_updated: Optional[datetime] = None,
-        elapsed_minutes: float = 0,
-        blocks_behind: int = 0,
-        blocks_processed: Optional[List[int]] = None,
-    ):
-        """Initialize with required and optional parameters.
+    network: str = None
+    is_stale: bool = False
+    last_updated: Optional[datetime] = None
+    elapsed_minutes: float = 0
+    blocks_behind: int = 0
+    blocks_processed: Optional[List[int]] = None
 
-        Args:
-            success: Whether the operation was successful
-            message: Message describing the operation result
-            error: Optional exception that occurred
-            network: The network being monitored (optional, defaults to None)
-            is_stale: Whether the chain state is stale (optional, defaults to False)
-            last_updated: When the chain state was last updated
-            elapsed_minutes: Minutes since last update
-            blocks_behind: Number of blocks behind
-            blocks_processed: List of blocks processed
-        """
-        super().__init__(success=success, message=message, error=error)
-        self.network = (
-            network or config.network.network
-        )  # Use config network as default
-        self.is_stale = is_stale
-        self.last_updated = last_updated
-        self.elapsed_minutes = elapsed_minutes
-        self.blocks_behind = blocks_behind
-        self.blocks_processed = blocks_processed if blocks_processed is not None else []
+    def __post_init__(self):
+        """Initialize default values after dataclass creation."""
+        if self.network is None:
+            self.network = config.network.network
+        if self.blocks_processed is None:
+            self.blocks_processed = []
 
 
+@job(
+    job_type="chain_state_monitor",
+    name="Chain State Monitor",
+    description="Monitors blockchain state for synchronization with enhanced monitoring and error handling",
+    interval_seconds=90,  # 1.5 minutes
+    priority=JobPriority.MEDIUM,
+    max_retries=3,
+    retry_delay_seconds=120,
+    timeout_seconds=300,
+    max_concurrent=2,
+    requires_blockchain=True,
+    batch_size=20,
+    enable_dead_letter_queue=True,
+)
 class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
-    """Task runner for monitoring chain state freshness."""
+    """Task for monitoring blockchain state and syncing with database with enhanced capabilities."""
 
-    def __init__(self):
-        """Initialize the task without requiring config parameter."""
-        # No config parameter needed - we get it from the import
-        super().__init__()
+    def __init__(self, config: Optional[RunnerConfig] = None):
+        super().__init__(config)
         self.hiro_api = HiroApi()
         self.chainhook_service = ChainhookService()
 
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate task configuration."""
+        try:
+            # Chain state monitor doesn't require wallet configuration
+            # It only reads from the blockchain, no transactions needed
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating chain state monitor config: {str(e)}", exc_info=True
+            )
+            return False
+
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability for blockchain monitoring."""
+        try:
+            # Check backend connectivity
+            backend.get_api_status()
+
+            # Test HiroApi initialization and connectivity
+            hiro_api = HiroApi()
+            api_info = await hiro_api.aget_info()
+            if not api_info:
+                logger.error("Cannot connect to Hiro API")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Resource validation failed: {str(e)}")
+            return False
+
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
-        # Always valid to run - we want to check chain state freshness
-        # even when there's no new data
-        return True
+        try:
+            # Always valid to run - we want to check chain state freshness
+            # even when there's no new data
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating chain state monitor task: {str(e)}", exc_info=True
+            )
+            return False
 
     def _convert_to_chainhook_format(
         self,
@@ -554,8 +584,51 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
         return operations
 
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if error should trigger retry."""
+        # Retry on network errors, blockchain RPC issues
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
+        )
+
+        # Don't retry on configuration errors
+        if "not configured" in str(error).lower():
+            return False
+        if "invalid contract" in str(error).lower():
+            return False
+
+        return isinstance(error, retry_errors)
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[ChainStateMonitorResult]]:
+        """Handle execution errors with recovery logic."""
+        if "blockchain" in str(error).lower() or "rpc" in str(error).lower():
+            logger.warning(f"Blockchain/RPC error: {str(error)}, will retry")
+            return None
+
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logger.warning(f"Network error: {str(error)}, will retry")
+            return None
+
+        # For configuration errors, don't retry
+        return [
+            ChainStateMonitorResult(
+                success=False,
+                message=f"Unrecoverable error: {str(error)}",
+                error=error,
+            )
+        ]
+
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[ChainStateMonitorResult]
+    ) -> None:
+        """Cleanup after task execution."""
+        logger.debug("Chain state monitor task cleanup completed")
+
     async def _execute_impl(self, context: JobContext) -> List[ChainStateMonitorResult]:
-        """Run the chain state monitoring task."""
+        """Execute chain state monitoring task with blockchain synchronization."""
         # Use the configured network
         network = config.network.network
 
@@ -800,5 +873,5 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             ]
 
 
-# Instantiate the task for use in the registry
+# Create instance for auto-registration
 chain_state_monitor = ChainStateMonitorTask()

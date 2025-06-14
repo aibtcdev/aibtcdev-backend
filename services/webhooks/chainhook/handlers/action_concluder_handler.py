@@ -278,7 +278,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Create queue messages for both Twitter and Discord if proposal passed
             tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
+                    type=QueueMessageType.get_or_create("tweet"),
                     message={"message": clean_message},
                     dao_id=dao_data["id"],
                 )
@@ -299,7 +299,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             follow_up_tweet = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.TWEET,
+                    type=QueueMessageType.get_or_create("tweet"),
                     message={"message": follow_up_message},
                     dao_id=dao_data["id"],
                 )
@@ -340,7 +340,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={"content": formatted_message, "proposal_status": "passed"},
                     dao_id=dao_data["id"],
                 )
@@ -381,7 +381,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type=QueueMessageType.DISCORD,
+                    type=QueueMessageType.get_or_create("discord"),
                     message={"content": formatted_message, "proposal_status": "failed"},
                     dao_id=dao_data["id"],
                 )

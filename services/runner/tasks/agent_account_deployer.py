@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
 from backend.models import (
@@ -13,7 +13,8 @@ from backend.models import (
 )
 from config import config
 from lib.logger import configure_logger
-from services.runner.base import BaseTask, JobContext, RunnerResult
+from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
+from services.runner.decorators import JobPriority, job
 from tools.agent_account import AgentAccountDeployTool
 
 logger = configure_logger(__name__)
@@ -31,10 +32,61 @@ class AgentAccountDeployResult(RunnerResult):
         self.errors = self.errors or []
 
 
+@job(
+    job_type="agent_account_deployer",
+    name="Agent Account Deployer",
+    description="Deploys agent account contracts with enhanced monitoring and error handling",
+    interval_seconds=300,  # 5 minutes
+    priority=JobPriority.MEDIUM,
+    max_retries=2,
+    retry_delay_seconds=180,
+    timeout_seconds=120,
+    max_concurrent=1,
+    requires_blockchain=True,
+    batch_size=5,
+    enable_dead_letter_queue=True,
+)
 class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
-    """Task runner for deploying agent accounts."""
+    """Task runner for deploying agent account contracts with enhanced capabilities."""
 
-    QUEUE_TYPE = QueueMessageType.AGENT_ACCOUNT_DEPLOY
+    QUEUE_TYPE = QueueMessageType.get_or_create("agent_account_deploy")
+
+    def __init__(self, config: Optional[RunnerConfig] = None):
+        super().__init__(config)
+
+    async def _validate_config(self, context: JobContext) -> bool:
+        """Validate task configuration."""
+        try:
+            # Check if backend wallet configuration is available
+            if not config.backend_wallet or not config.backend_wallet.seed_phrase:
+                logger.error(
+                    "Backend wallet seed phrase not configured for agent account deployment"
+                )
+                return False
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error validating agent account deployer config: {str(e)}",
+                exc_info=True,
+            )
+            return False
+
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability."""
+        try:
+            # Check backend connectivity
+            backend.get_api_status()
+
+            # Test agent account deploy tool initialization
+            tool = AgentAccountDeployTool(seed_phrase=config.backend_wallet.seed_phrase)
+            if not tool:
+                logger.error("Cannot initialize AgentAccountDeployTool")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Resource validation failed: {str(e)}")
+            return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
@@ -103,25 +155,33 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             if not self._validate_message_data(message_data):
                 error_msg = f"Invalid message data in message {message_id}"
                 logger.error(error_msg)
-                return {"success": False, "error": error_msg}
+                result = {"success": False, "error": error_msg}
 
-            # Initialize the AgentAccountDeployTool
+                # Store result and mark as processed
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+
+                return result
+
+            # Initialize the AgentAccountDeployTool with seed phrase
             logger.debug("Preparing to deploy agent account")
             deploy_tool = AgentAccountDeployTool(
-                wallet_id=config.scheduler.agent_account_deploy_runner_wallet_id
+                seed_phrase=config.backend_wallet.seed_phrase
             )
 
-            # get address from wallet id
-            wallet = backend.get_wallet(
-                config.scheduler.agent_account_deploy_runner_wallet_id
-            )
-            # depending on the network, use the correct address
-            profile = backend.get_profile(wallet.profile_id)
-
-            if config.network == "mainnet":
-                owner_address = profile.email.strip("@stacks.id").upper()
+            # Determine owner address based on network and wallet configuration
+            if config.network.network == "mainnet":
+                # For mainnet, try to derive from backend wallet or use configured address
+                owner_address = (
+                    config.backend_wallet.address
+                    or "SP1HTBVD3JG9C05J7HDJKDYR99M9Q4JKJECEWC9S"
+                )
             else:
-                owner_address = "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
+                # For testnet/other networks
+                owner_address = (
+                    config.backend_wallet.address
+                    or "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
+                )
 
             # Execute the deployment
             logger.debug("Executing deployment...")
@@ -133,16 +193,26 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
             logger.debug(f"Deployment result: {deployment_result}")
 
-            # Mark the message as processed
-            update_data = QueueMessageBase(is_processed=True)
+            result = {"success": True, "deployed": True, "result": deployment_result}
+
+            # Store result and mark as processed
+            update_data = QueueMessageBase(is_processed=True, result=result)
             backend.update_queue_message(message_id, update_data)
 
-            return {"success": True, "deployed": True, "result": deployment_result}
+            logger.info(f"Successfully deployed agent account for message {message_id}")
+
+            return result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
+            result = {"success": False, "error": error_msg}
+
+            # Store result even for failed processing
+            update_data = QueueMessageBase(result=result)
+            backend.update_queue_message(message_id, update_data)
+
+            return result
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed messages from the queue."""
@@ -155,10 +225,53 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
         return messages
 
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if error should trigger retry."""
+        # Retry on network errors, blockchain timeouts
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
+        )
+
+        # Don't retry on validation errors
+        if "invalid message data" in str(error).lower():
+            return False
+        if "missing" in str(error).lower() and "required" in str(error).lower():
+            return False
+
+        return isinstance(error, retry_errors)
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[AgentAccountDeployResult]]:
+        """Handle execution errors with recovery logic."""
+        if "blockchain" in str(error).lower() or "contract" in str(error).lower():
+            logger.warning(f"Blockchain/contract error: {str(error)}, will retry")
+            return None
+
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logger.warning(f"Network error: {str(error)}, will retry")
+            return None
+
+        # For validation errors, don't retry
+        return [
+            AgentAccountDeployResult(
+                success=False,
+                message=f"Unrecoverable error: {str(error)}",
+                error=error,
+            )
+        ]
+
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[AgentAccountDeployResult]
+    ) -> None:
+        """Cleanup after task execution."""
+        logger.debug("Agent account deployer task cleanup completed")
+
     async def _execute_impl(
         self, context: JobContext
     ) -> List[AgentAccountDeployResult]:
-        """Run the agent account deployment task."""
+        """Run the agent account deployment task with batch processing."""
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
         logger.debug(f"Found {message_count} pending agent account deployment messages")
@@ -173,23 +286,36 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 )
             ]
 
-        # Process each message
+        # Process each message in batches
         processed_count = 0
         deployed_count = 0
         errors = []
+        batch_size = getattr(context, "batch_size", 5)
 
-        for message in pending_messages:
-            result = await self.process_message(message)
-            processed_count += 1
+        logger.info(f"Processing {message_count} agent account deployment messages")
 
-            if result.get("success"):
-                if result.get("deployed", False):
-                    deployed_count += 1
-            else:
-                errors.append(result.get("error", "Unknown error"))
+        # Process messages in batches
+        for i in range(0, len(pending_messages), batch_size):
+            batch = pending_messages[i : i + batch_size]
 
-        logger.debug(
-            f"Task metrics - Processed: {processed_count}, "
+            for message in batch:
+                try:
+                    result = await self.process_message(message)
+                    processed_count += 1
+
+                    if result.get("success"):
+                        if result.get("deployed", False):
+                            deployed_count += 1
+                    else:
+                        errors.append(result.get("error", "Unknown error"))
+
+                except Exception as e:
+                    error_msg = f"Exception processing message {message.id}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg, exc_info=True)
+
+        logger.info(
+            f"Agent account deployment completed - Processed: {processed_count}, "
             f"Deployed: {deployed_count}, Errors: {len(errors)}"
         )
 
@@ -204,5 +330,5 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         ]
 
 
-# Instantiate the task for use in the registry
+# Create instance for auto-registration
 agent_account_deployer = AgentAccountDeployerTask()

@@ -6,7 +6,7 @@ from langchain_core.prompts.chat import ChatPromptTemplate
 from backend.factory import backend
 from backend.models import DAO, Proposal, ProposalFilter
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.mixins.capability_mixins import BaseCapabilityMixin
 from services.workflows.utils.models import ProposalRecommendationOutput
 from services.workflows.utils.token_usage import TokenUsageMixin
 

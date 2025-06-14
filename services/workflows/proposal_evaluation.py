@@ -618,30 +618,3 @@ async def evaluate_and_vote_on_proposal(
     except Exception as e:
         logger.error(f"Error in evaluate_and_vote_on_proposal: {str(e)}")
         return {"error": f"Failed to evaluate proposal: {str(e)}"}
-
-
-async def evaluate_proposal_only(
-    proposal_id: UUID,
-    wallet_id: Optional[UUID] = None,
-    agent_id: Optional[UUID] = None,
-    dao_id: Optional[UUID] = None,
-) -> Dict:
-    """Evaluate a proposal without voting.
-
-    Args:
-        proposal_id: Proposal ID
-        wallet_id: Optional wallet ID
-        agent_id: Optional agent ID
-        dao_id: Optional DAO ID
-
-    Returns:
-        Evaluation results
-    """
-    # Delegate to evaluate_and_vote_on_proposal with auto_vote=False
-    return await evaluate_and_vote_on_proposal(
-        proposal_id=proposal_id,
-        wallet_id=wallet_id,
-        agent_id=agent_id,
-        auto_vote=False,
-        dao_id=dao_id,
-    )

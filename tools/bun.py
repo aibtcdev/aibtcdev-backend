@@ -40,6 +40,49 @@ class BunScriptRunner:
         secret = backend.get_secret(wallet.secret_id)
         mnemonic = secret.decrypted_secret
 
+        return BunScriptRunner._execute_script(
+            mnemonic, script_path, script_name, *args
+        )
+
+    @staticmethod
+    def bun_run_with_seed_phrase(
+        seed_phrase: str, script_path: str, script_name: str, *args: str
+    ) -> Dict[str, Union[str, bool, None]]:
+        """
+        Run a TypeScript script using Bun with specified parameters using seed phrase directly.
+
+        Args:
+            seed_phrase: The mnemonic seed phrase to use for script execution
+            script_path: Path of the directory containing the script
+            script_name: Name of the TypeScript script to run
+            *args: Additional arguments to pass to the script
+
+        Returns:
+            Dict containing:
+                - output: Script execution stdout if successful
+                - error: Error message if execution failed, None otherwise
+                - success: Boolean indicating if execution was successful
+        """
+        return BunScriptRunner._execute_script(
+            seed_phrase, script_path, script_name, *args
+        )
+
+    @staticmethod
+    def _execute_script(
+        mnemonic: str, script_path: str, script_name: str, *args: str
+    ) -> Dict[str, Union[str, bool, None]]:
+        """
+        Internal method to execute the script with the given mnemonic.
+
+        Args:
+            mnemonic: The mnemonic phrase to use
+            script_path: Path of the directory containing the script
+            script_name: Name of the TypeScript script to run
+            *args: Additional arguments to pass to the script
+
+        Returns:
+            Dict containing script execution results
+        """
         env = os.environ.copy()
         env["ACCOUNT_INDEX"] = "0"
         env["MNEMONIC"] = mnemonic
@@ -60,7 +103,7 @@ class BunScriptRunner:
         )
 
         try:
-            logger.info(f"Running script: {script_name} for wallet: {wallet_id}")
+            logger.info(f"Running script: {script_name}")
             result = subprocess.run(
                 command,
                 check=True,

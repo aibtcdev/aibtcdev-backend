@@ -26,11 +26,11 @@ from services.workflows.base import (
     MessageProcessor,
     StreamingCallbackHandler,
 )
-from services.workflows.planning_mixin import PlanningCapability
-from services.workflows.vector_mixin import (
+from services.workflows.mixins.planning_mixin import PlanningCapability
+from services.workflows.mixins.vector_mixin import (
     VectorRetrievalCapability,
 )
-from services.workflows.web_search_mixin import WebSearchCapability
+from services.workflows.mixins.web_search_mixin import WebSearchCapability
 
 logger = configure_logger(__name__)
 

@@ -19,7 +19,7 @@ from langgraph.channels.last_value import LastValue
 from langgraph.graph import END, StateGraph
 
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import (
+from services.workflows.mixins.capability_mixins import (
     BaseCapabilityMixin,
     ComposableWorkflowMixin,
     StateType,

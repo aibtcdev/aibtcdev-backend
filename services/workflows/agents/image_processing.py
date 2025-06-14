@@ -4,7 +4,7 @@ import magic
 
 from lib.logger import configure_logger
 from lib.utils import extract_image_urls
-from services.workflows.capability_mixins import BaseCapabilityMixin
+from services.workflows.mixins.capability_mixins import BaseCapabilityMixin
 
 logger = configure_logger(__name__)
 

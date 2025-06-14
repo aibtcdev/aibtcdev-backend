@@ -9,10 +9,11 @@ from backend.models import (
     QueueMessageFilter,
     QueueMessageType,
 )
+from config import config
 from lib.logger import configure_logger
 from services.discord.discord_factory import create_discord_service
 from services.runner.base import BaseTask, JobContext, RunnerConfig, RunnerResult
-from config import config
+from services.runner.decorators import JobPriority, job
 
 logger = configure_logger(__name__)
 
@@ -23,20 +24,62 @@ class DiscordProcessingResult(RunnerResult):
 
     queue_message_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
+    messages_sent: int = 0
+    webhook_url_used: Optional[str] = None
 
 
+@job(
+    job_type="discord",
+    name="Discord Message Sender",
+    description="Sends Discord messages from queue with webhook support and enhanced error handling",
+    interval_seconds=20,
+    priority=JobPriority.MEDIUM,
+    max_retries=3,
+    retry_delay_seconds=30,
+    timeout_seconds=120,
+    max_concurrent=3,
+    requires_discord=True,
+    batch_size=10,
+    enable_dead_letter_queue=True,
+)
 class DiscordTask(BaseTask[DiscordProcessingResult]):
-    """Task for sending Discord messages from the queue."""
+    """Task for sending Discord messages from the queue with enhanced capabilities."""
 
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
         self._pending_messages: Optional[List[QueueMessage]] = None
-        self.discord_service = None
+        self._discord_services: dict[str, object] = {}
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
-        # No special config needed for Discord
-        return True
+        try:
+            # Check if at least one webhook URL is configured
+            if (
+                not config.discord.webhook_url_passed
+                and not config.discord.webhook_url_failed
+            ):
+                logger.error("No Discord webhook URLs configured")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error validating Discord config: {str(e)}", exc_info=True)
+            return False
+
+    async def _validate_resources(self, context: JobContext) -> bool:
+        """Validate resource availability."""
+        try:
+            # Test Discord service creation
+            test_webhook = (
+                config.discord.webhook_url_passed or config.discord.webhook_url_failed
+            )
+            discord_service = create_discord_service(webhook_url=test_webhook)
+            if not discord_service:
+                logger.error("Cannot create Discord service")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Discord resource validation failed: {str(e)}")
+            return False
 
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate task prerequisites."""
@@ -59,15 +102,70 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         if not self._pending_messages:
             logger.debug("No pending Discord messages found")
             return False
-        logger.debug(f"Found {len(self._pending_messages)} pending Discord messages")
-        return True
+
+        # Validate each message has required content
+        valid_messages = []
+        for message in self._pending_messages:
+            if await self._is_message_valid(message):
+                valid_messages.append(message)
+
+        self._pending_messages = valid_messages
+
+        if valid_messages:
+            logger.debug(f"Found {len(valid_messages)} valid Discord messages")
+            return True
+
+        logger.debug("No valid Discord messages to process")
+        return False
+
+    async def _is_message_valid(self, message: QueueMessage) -> bool:
+        """Check if a Discord message is valid for processing."""
+        try:
+            if not message.message or not isinstance(message.message, dict):
+                return False
+
+            content = message.message.get("content")
+            if not content or not content.strip():
+                return False
+
+            return True
+        except Exception:
+            return False
+
+    def _get_webhook_url(self, message: QueueMessage) -> str:
+        """Get the appropriate webhook URL for the message."""
+        # Allow message-level webhook override
+        webhook_url = message.message.get("webhook_url")
+        if webhook_url:
+            return webhook_url
+
+        # Select based on proposal status
+        proposal_status = message.message.get("proposal_status")
+        if proposal_status == "passed":
+            return config.discord.webhook_url_passed
+        elif proposal_status == "failed":
+            return config.discord.webhook_url_failed
+        else:
+            # Default to passed webhook for backwards compatibility
+            return config.discord.webhook_url_passed
+
+    def _get_discord_service(self, webhook_url: str):
+        """Get or create Discord service with caching."""
+        if webhook_url in self._discord_services:
+            return self._discord_services[webhook_url]
+
+        discord_service = create_discord_service(webhook_url=webhook_url)
+        if discord_service:
+            self._discord_services[webhook_url] = discord_service
+
+        return discord_service
 
     async def _process_discord_message(
         self, message: QueueMessage
     ) -> DiscordProcessingResult:
-        """Process a single Discord queue message."""
+        """Process a single Discord queue message with enhanced error handling."""
         try:
-            # Extract content and optional embeds from message.message
+            # Extract content and optional parameters from message.message
             if not message.message:
                 return DiscordProcessingResult(
                     success=False,
@@ -75,23 +173,23 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     queue_message_id=message.id,
                     dao_id=message.dao_id,
                 )
+
             content = message.message.get("content")
             embeds = message.message.get("embeds")
             tts = message.message.get("tts", False)
-            proposal_status = message.message.get("proposal_status")
-            webhook_url = message.message.get("webhook_url")  # Allow override
 
-            # Select appropriate webhook URL based on proposal status
+            # Get appropriate webhook URL
+            webhook_url = self._get_webhook_url(message)
             if not webhook_url:
-                if proposal_status == "passed":
-                    webhook_url = config.discord.webhook_url_passed
-                elif proposal_status == "failed":
-                    webhook_url = config.discord.webhook_url_failed
-                else:
-                    # Default to passed webhook for backwards compatibility
-                    webhook_url = config.discord.webhook_url_passed
+                return DiscordProcessingResult(
+                    success=False,
+                    message="No webhook URL available for Discord message",
+                    queue_message_id=message.id,
+                    dao_id=message.dao_id,
+                )
 
-            discord_service = create_discord_service(webhook_url=webhook_url)
+            # Get Discord service
+            discord_service = self._get_discord_service(webhook_url)
             if not discord_service:
                 return DiscordProcessingResult(
                     success=False,
@@ -100,7 +198,12 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
+            logger.info(f"Sending Discord message for queue {message.id}")
+            logger.debug(f"Content: {content[:100]}..." if content else "No content")
+
+            # Send the message
             result = discord_service.send_message(content, embeds=embeds, tts=tts)
+
             if result.get("success"):
                 logger.info(f"Successfully sent Discord message for queue {message.id}")
                 return DiscordProcessingResult(
@@ -108,6 +211,8 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     message="Successfully sent Discord message",
                     queue_message_id=message.id,
                     dao_id=message.dao_id,
+                    messages_sent=1,
+                    webhook_url_used=webhook_url,
                 )
             else:
                 logger.error(f"Failed to send Discord message: {result}")
@@ -117,6 +222,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     queue_message_id=message.id,
                     dao_id=message.dao_id,
                 )
+
         except Exception as e:
             logger.error(
                 f"Error processing Discord message {message.id}: {str(e)}",
@@ -130,22 +236,130 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                 dao_id=message.dao_id,
             )
 
+    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+        """Determine if error should trigger retry."""
+        # Retry on network errors, API timeouts, webhook issues
+        retry_errors = (
+            ConnectionError,
+            TimeoutError,
+        )
+
+        # Don't retry on configuration errors
+        if "webhook" in str(error).lower() and "not configured" in str(error).lower():
+            return False
+
+        return isinstance(error, retry_errors)
+
+    async def _handle_execution_error(
+        self, error: Exception, context: JobContext
+    ) -> Optional[List[DiscordProcessingResult]]:
+        """Handle execution errors with recovery logic."""
+        if "webhook" in str(error).lower() or "discord" in str(error).lower():
+            logger.warning(f"Discord service error: {str(error)}, will retry")
+            return None
+
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logger.warning(f"Network error: {str(error)}, will retry")
+            return None
+
+        # For configuration errors, don't retry
+        return [
+            DiscordProcessingResult(
+                success=False,
+                message=f"Unrecoverable error: {str(error)}",
+                error=error,
+            )
+        ]
+
+    async def _post_execution_cleanup(
+        self, context: JobContext, results: List[DiscordProcessingResult]
+    ) -> None:
+        """Cleanup after task execution."""
+        # Clear cached pending messages
+        self._pending_messages = None
+
+        # Keep Discord services cached for reuse
+        logger.debug(
+            f"Discord task cleanup completed. Cached services: {len(self._discord_services)}"
+        )
+
     async def _execute_impl(self, context: JobContext) -> List[DiscordProcessingResult]:
-        """Execute Discord message sending task."""
+        """Execute Discord message sending task with batch processing."""
         results: List[DiscordProcessingResult] = []
+
         if not self._pending_messages:
+            logger.debug("No pending Discord messages to process")
             return results
-        for message in self._pending_messages:
-            logger.debug(f"Processing Discord message: {message.id}")
-            result = await self._process_discord_message(message)
-            results.append(result)
-            if result.success:
-                backend.update_queue_message(
-                    queue_message_id=message.id,
-                    update_data=QueueMessageBase(is_processed=True),
-                )
-                logger.debug(f"Marked Discord message {message.id} as processed")
+
+        processed_count = 0
+        success_count = 0
+        batch_size = getattr(context, "batch_size", 10)
+
+        # Process messages in batches
+        for i in range(0, len(self._pending_messages), batch_size):
+            batch = self._pending_messages[i : i + batch_size]
+
+            for message in batch:
+                logger.debug(f"Processing Discord message: {message.id}")
+                result = await self._process_discord_message(message)
+                results.append(result)
+                processed_count += 1
+
+                if result.success:
+                    success_count += 1
+                    # Mark message as processed with result
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "queue_message_id": (
+                            str(result.queue_message_id)
+                            if result.queue_message_id
+                            else None
+                        ),
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "messages_sent": result.messages_sent,
+                        "webhook_url_used": result.webhook_url_used,
+                        "error": str(result.error) if result.error else None,
+                    }
+                    backend.update_queue_message(
+                        queue_message_id=message.id,
+                        update_data=QueueMessageBase(
+                            is_processed=True, result=result_dict
+                        ),
+                    )
+                    logger.debug(
+                        f"Marked Discord message {message.id} as processed with result"
+                    )
+                else:
+                    # Store result for failed processing
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "queue_message_id": (
+                            str(result.queue_message_id)
+                            if result.queue_message_id
+                            else None
+                        ),
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "messages_sent": result.messages_sent,
+                        "webhook_url_used": result.webhook_url_used,
+                        "error": str(result.error) if result.error else None,
+                    }
+                    backend.update_queue_message(
+                        queue_message_id=message.id,
+                        update_data=QueueMessageBase(result=result_dict),
+                    )
+                    logger.debug(
+                        f"Stored result for failed Discord message {message.id}"
+                    )
+
+        logger.info(
+            f"Discord task completed - Processed: {processed_count}, "
+            f"Successful: {success_count}, Failed: {processed_count - success_count}"
+        )
+
         return results
 
 
+# Create instance for auto-registration
 discord_task = DiscordTask()

@@ -4,11 +4,14 @@ from langchain_core.prompts.chat import ChatPromptTemplate
 
 from backend.factory import backend
 from lib.logger import configure_logger
-from services.workflows.capability_mixins import BaseCapabilityMixin, PromptCapability
+from services.workflows.mixins.capability_mixins import (
+    BaseCapabilityMixin,
+    PromptCapability,
+)
+from services.workflows.mixins.vector_mixin import VectorRetrievalCapability
 from services.workflows.utils.models import AgentOutput
 from services.workflows.utils.state_reducers import update_state_with_agent_result
 from services.workflows.utils.token_usage import TokenUsageMixin
-from services.workflows.vector_mixin import VectorRetrievalCapability
 
 logger = configure_logger(__name__)
 
