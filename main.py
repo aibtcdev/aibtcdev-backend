@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import chat, tools, webhooks
 from config import config
 from lib.logger import configure_logger
-from services import startup
 from services.websocket import websocket_manager
 
 # Configure module logger
@@ -46,18 +45,18 @@ app.include_router(webhooks.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Run startup tasks."""
-    # Start the WebSocket manager's cleanup task
-    # Note: This is now redundant as startup.run() will also start the WebSocket manager
-    # but we'll keep it for clarity and to ensure it's started early
+    """Run web server startup tasks."""
+    logger.info("Starting FastAPI web server...")
+    # Only start WebSocket manager for web server connections
+    # Background services (job runners, bot, etc.) are handled by worker.py
     asyncio.create_task(websocket_manager.start_cleanup_task())
-
-    # Run other startup tasks
-    await startup.run()
+    logger.info("Web server startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Run shutdown tasks."""
-    logger.info("Shutting down FastAPI application")
-    await startup.shutdown()
+    """Run web server shutdown tasks."""
+    logger.info("Shutting down FastAPI web server...")
+    # Only handle web server specific cleanup
+    # Background services shutdown is handled by worker.py
+    logger.info("Web server shutdown complete")

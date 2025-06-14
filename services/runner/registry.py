@@ -67,7 +67,7 @@ async def execute_runner_job(
 
         # Create context
         context = JobContext(
-            job_type=job_enum, config=RunnerConfig.from_env(), parameters=parameters
+            job_type=job_enum, config=RunnerConfig(), parameters=parameters
         )
 
         # Create runner instance
