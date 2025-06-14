@@ -307,12 +307,51 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
 
                 if result.success:
                     success_count += 1
-                    # Mark message as processed
+                    # Mark message as processed with result
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "queue_message_id": (
+                            str(result.queue_message_id)
+                            if result.queue_message_id
+                            else None
+                        ),
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "messages_sent": result.messages_sent,
+                        "webhook_url_used": result.webhook_url_used,
+                        "error": str(result.error) if result.error else None,
+                    }
                     backend.update_queue_message(
                         queue_message_id=message.id,
-                        update_data=QueueMessageBase(is_processed=True),
+                        update_data=QueueMessageBase(
+                            is_processed=True, result=result_dict
+                        ),
                     )
-                    logger.debug(f"Marked Discord message {message.id} as processed")
+                    logger.debug(
+                        f"Marked Discord message {message.id} as processed with result"
+                    )
+                else:
+                    # Store result for failed processing
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "queue_message_id": (
+                            str(result.queue_message_id)
+                            if result.queue_message_id
+                            else None
+                        ),
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "messages_sent": result.messages_sent,
+                        "webhook_url_used": result.webhook_url_used,
+                        "error": str(result.error) if result.error else None,
+                    }
+                    backend.update_queue_message(
+                        queue_message_id=message.id,
+                        update_data=QueueMessageBase(result=result_dict),
+                    )
+                    logger.debug(
+                        f"Stored result for failed Discord message {message.id}"
+                    )
 
         logger.info(
             f"Discord task completed - Processed: {processed_count}, "

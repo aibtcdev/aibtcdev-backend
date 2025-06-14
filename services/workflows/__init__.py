@@ -27,7 +27,6 @@ from services.workflows.mixins.web_search_mixin import WebSearchCapability
 from services.workflows.proposal_evaluation import (
     ProposalEvaluationWorkflow,
     evaluate_and_vote_on_proposal,
-    evaluate_proposal_only,
 )
 from services.workflows.tweet_analysis import (
     TweetAnalysisWorkflow,
@@ -72,7 +71,6 @@ __all__ = [
     "TweetGeneratorWorkflow",
     "analyze_tweet",
     "evaluate_and_vote_on_proposal",
-    "evaluate_proposal_only",
     "generate_dao_tweet",
     "ChatService",
     "ChatWorkflow",

@@ -16,7 +16,7 @@ from backend.models import (
 from lib.logger import configure_logger
 from services.runner.base import BaseTask, JobContext, RunnerResult
 from services.runner.decorators import JobPriority, job
-from services.workflows import process_dao_proposal
+from services.workflows import evaluate_and_vote_on_proposal
 
 logger = configure_logger(__name__)
 
@@ -189,8 +189,10 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(f"Evaluating proposal {proposal.proposal_id} for DAO {dao_id}")
 
             # Process the proposal using the AI workflow
-            evaluation_result = await process_dao_proposal(
-                dao_id=dao_id, proposal_id=proposal_id
+            evaluation_result = await evaluate_and_vote_on_proposal(
+                dao_id=dao_id,
+                proposal_id=proposal_id,
+                auto_vote=False,
             )
 
             if not evaluation_result or not evaluation_result.get("success"):
@@ -330,11 +332,15 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                             successful_evaluations += 1
                             total_votes_created += result.get("votes_created", 0)
 
-                        # Mark message as processed if indicated
+                        # Mark message as processed if indicated and store result
                         if result.get("should_mark_processed", False):
-                            update_data = QueueMessageBase(is_processed=True)
+                            update_data = QueueMessageBase(
+                                is_processed=True, result=result
+                            )
                             backend.update_queue_message(message.id, update_data)
-                            logger.debug(f"Marked message {message.id} as processed")
+                            logger.debug(
+                                f"Marked message {message.id} as processed with result"
+                            )
 
                     else:
                         error_msg = result.get("error", "Unknown error")
@@ -343,10 +349,21 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                             f"Failed to process message {message.id}: {error_msg}"
                         )
 
+                        # Store result for failed processing
+                        update_data = QueueMessageBase(result=result)
+                        backend.update_queue_message(message.id, update_data)
+                        logger.debug(f"Stored result for failed message {message.id}")
+
                 except Exception as e:
                     error_msg = f"Exception processing message {message.id}: {str(e)}"
                     errors.append(error_msg)
                     logger.error(error_msg, exc_info=True)
+
+                    # Store result for exception cases
+                    error_result = {"success": False, "error": error_msg}
+                    update_data = QueueMessageBase(result=error_result)
+                    backend.update_queue_message(message.id, update_data)
+                    logger.debug(f"Stored error result for message {message.id}")
 
         logger.info(
             f"DAO proposal evaluation task completed - Processed: {processed_count}/{message_count}, "

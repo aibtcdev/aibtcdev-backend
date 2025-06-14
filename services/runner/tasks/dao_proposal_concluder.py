@@ -55,11 +55,9 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
-            # Check if conclude tool configuration is available
-            if not config.scheduler or not hasattr(
-                config.scheduler, "dao_proposal_conclude_runner_wallet_id"
-            ):
-                logger.error("DAO proposal conclude wallet ID not configured")
+            # Check if backend wallet configuration is available
+            if not config.backend_wallet or not config.backend_wallet.seed_phrase:
+                logger.error("Backend wallet seed phrase not configured")
                 return False
             return True
         except Exception as e:
@@ -176,7 +174,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
 
             # Initialize the ConcludeActionProposalTool
             conclude_tool = ConcludeActionProposalTool(
-                wallet_id=config.scheduler.dao_proposal_conclude_runner_wallet_id
+                seed_phrase=config.backend_wallet.seed_phrase
             )
 
             # Execute the conclusion
@@ -189,18 +187,26 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             )
             logger.debug(f"Conclusion result: {conclusion_result}")
 
-            # Mark the message as processed
-            update_data = QueueMessageBase(is_processed=True)
+            result = {"success": True, "concluded": True, "result": conclusion_result}
+
+            # Store result and mark the message as processed
+            update_data = QueueMessageBase(is_processed=True, result=result)
             backend.update_queue_message(message_id, update_data)
 
             logger.info(f"Successfully concluded proposal {proposal.proposal_id}")
 
-            return {"success": True, "concluded": True, "result": conclusion_result}
+            return result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
+            result = {"success": False, "error": error_msg}
+
+            # Store result even for failed processing
+            update_data = QueueMessageBase(result=result)
+            backend.update_queue_message(message_id, update_data)
+
+            return result
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed messages from the queue."""

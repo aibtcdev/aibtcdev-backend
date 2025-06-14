@@ -20,10 +20,7 @@ from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from services.workflows.proposal_evaluation import (
-    evaluate_and_vote_on_proposal,
-    evaluate_proposal_only,
-)
+from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
 
 
 def parse_uuid(value: str) -> Optional[UUID]:
@@ -124,11 +121,12 @@ Examples:
     try:
         if args.evaluation_only:
             print("🔍 Running evaluation only...")
-            result = await evaluate_proposal_only(
+            result = await evaluate_and_vote_on_proposal(
                 proposal_id=args.proposal_id,
                 wallet_id=args.wallet_id,
                 agent_id=args.agent_id,
                 dao_id=args.dao_id,
+                auto_vote=False,
             )
         else:
             print("🔍 Running evaluation with voting option...")

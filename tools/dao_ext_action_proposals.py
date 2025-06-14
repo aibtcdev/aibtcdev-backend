@@ -254,10 +254,17 @@ class ConcludeActionProposalTool(BaseTool):
     args_schema: Type[BaseModel] = ConcludeActionProposalInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None
+    seed_phrase: Optional[str] = None
 
-    def __init__(self, wallet_id: Optional[UUID] = None, **kwargs):
+    def __init__(
+        self,
+        wallet_id: Optional[UUID] = None,
+        seed_phrase: Optional[str] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
+        self.seed_phrase = seed_phrase
 
     def _deploy(
         self,
@@ -268,8 +275,12 @@ class ConcludeActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to conclude an action proposal."""
-        if self.wallet_id is None:
-            return {"success": False, "message": "Wallet ID is required", "data": None}
+        if self.seed_phrase is None and self.wallet_id is None:
+            return {
+                "success": False,
+                "message": "Either seed phrase or wallet ID is required",
+                "data": None,
+            }
 
         args = [
             action_proposals_voting_extension,
@@ -278,12 +289,21 @@ class ConcludeActionProposalTool(BaseTool):
             dao_token_contract_address,
         ]
 
-        return BunScriptRunner.bun_run(
-            self.wallet_id,
-            "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
-            "conclude-action-proposal.ts",
-            *args,
-        )
+        # Use seed phrase if available, otherwise fall back to wallet_id
+        if self.seed_phrase:
+            return BunScriptRunner.bun_run_with_seed_phrase(
+                self.seed_phrase,
+                "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+                "conclude-action-proposal.ts",
+                *args,
+            )
+        else:
+            return BunScriptRunner.bun_run(
+                self.wallet_id,
+                "aibtc-cohort-0/dao-tools/extensions/action-proposal-voting/public",
+                "conclude-action-proposal.ts",
+                *args,
+            )
 
     def _run(
         self,

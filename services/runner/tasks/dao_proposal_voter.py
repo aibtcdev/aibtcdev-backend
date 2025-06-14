@@ -318,16 +318,40 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             # Mark the message as processed ONLY if ALL votes were handled successfully
             successful_votes = len([r for r in results if r["success"]])
             if successful_votes == len(results) and successful_votes > 0:
-                update_data = QueueMessageBase(is_processed=True)
+                result = {
+                    "success": True,
+                    "votes_processed": successful_votes,
+                    "votes_failed": len(results) - successful_votes,
+                    "results": results,
+                }
+                update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)
                 logger.info(
                     f"Successfully processed all {successful_votes} votes for message {message_id} - marking as processed"
                 )
             elif successful_votes > 0:
+                result = {
+                    "success": False,
+                    "votes_processed": successful_votes,
+                    "votes_failed": len(results) - successful_votes,
+                    "results": results,
+                    "message": "Partial success - some votes failed",
+                }
+                update_data = QueueMessageBase(result=result)
+                backend.update_queue_message(message_id, update_data)
                 logger.warning(
                     f"Only {successful_votes}/{len(results)} votes succeeded for message {message_id} - leaving unprocessed for retry"
                 )
             else:
+                result = {
+                    "success": False,
+                    "votes_processed": 0,
+                    "votes_failed": len(results),
+                    "results": results,
+                    "message": "All votes failed",
+                }
+                update_data = QueueMessageBase(result=result)
+                backend.update_queue_message(message_id, update_data)
                 logger.error(
                     f"No votes succeeded for message {message_id} - leaving unprocessed for retry"
                 )
@@ -342,7 +366,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
+            result = {"success": False, "error": error_msg}
+
+            # Store result even for failed processing
+            update_data = QueueMessageBase(result=result)
+            backend.update_queue_message(message_id, update_data)
+
+            return result
 
     def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
         """Determine if error should trigger retry."""

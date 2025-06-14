@@ -140,6 +140,7 @@ class QueueMessageBase(CustomBaseModel):
     conversation_id: Optional[str] = None
     dao_id: Optional[UUID] = None
     wallet_id: Optional[UUID] = None
+    result: Optional[dict] = None
 
 
 class QueueMessageCreate(QueueMessageBase):

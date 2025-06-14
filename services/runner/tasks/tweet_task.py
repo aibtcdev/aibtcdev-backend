@@ -467,12 +467,41 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
                 if result.success:
                     success_count += 1
-                    # Mark message as processed
+                    # Mark message as processed with result
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "tweet_id": result.tweet_id,
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "tweets_sent": result.tweets_sent,
+                        "chunks_processed": result.chunks_processed,
+                        "error": str(result.error) if result.error else None,
+                    }
                     backend.update_queue_message(
                         queue_message_id=message.id,
-                        update_data=QueueMessageBase(is_processed=True),
+                        update_data=QueueMessageBase(
+                            is_processed=True, result=result_dict
+                        ),
                     )
-                    logger.debug(f"Marked message {message.id} as processed")
+                    logger.debug(
+                        f"Marked message {message.id} as processed with result"
+                    )
+                else:
+                    # Store result for failed processing
+                    result_dict = {
+                        "success": result.success,
+                        "message": result.message,
+                        "tweet_id": result.tweet_id,
+                        "dao_id": str(result.dao_id) if result.dao_id else None,
+                        "tweets_sent": result.tweets_sent,
+                        "chunks_processed": result.chunks_processed,
+                        "error": str(result.error) if result.error else None,
+                    }
+                    backend.update_queue_message(
+                        queue_message_id=message.id,
+                        update_data=QueueMessageBase(result=result_dict),
+                    )
+                    logger.debug(f"Stored result for failed message {message.id}")
 
         logger.info(
             f"Tweet task completed - Processed: {processed_count}, "
