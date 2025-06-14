@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from supabase import Client
+from config import config
 
 from backend.abstract import AbstractBackend
 from backend.models import (
@@ -1047,12 +1048,35 @@ class SupabaseBackend(AbstractBackend):
     # 3. DAOS
     # ----------------------------------------------------------------
     def create_dao(self, new_dao: "DAOCreate") -> "DAO":
+        # First create the DAO
         payload = new_dao.model_dump(exclude_unset=True, mode="json")
         response = self.client.table("daos").insert(payload).execute()
         data = response.data or []
         if not data:
             raise ValueError("No data returned for dao insert.")
-        return DAO(**data[0])
+        dao = DAO(**data[0])
+        
+        # After DAO creation, create X credentials using config values
+        try:
+            # Create new X credentials using default values from config
+            new_cred = XCredsCreate(
+                dao_id=dao.id,
+                consumer_key=config.twitter.default_consumer_key,
+                consumer_secret=config.twitter.default_consumer_secret,
+                client_id=config.twitter.default_client_id,
+                client_secret=config.twitter.default_client_secret,
+                access_token=config.twitter.default_access_token,
+                access_secret=config.twitter.default_access_secret,
+                username=config.twitter.default_username
+            )
+            self.create_x_creds(new_cred)
+                
+        except Exception as e:
+            logger.error(f"Error creating X credentials for new DAO: {str(e)}")
+            # We don't raise the error here since the DAO was created successfully
+            # The X credentials can be added later if needed
+        
+        return dao
 
     def get_dao(self, dao_id: UUID) -> Optional["DAO"]:
         response = (

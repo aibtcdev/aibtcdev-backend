@@ -22,12 +22,20 @@ class DatabaseConfig:
     url: str = os.getenv("AIBTC_SUPABASE_URL", "")
     service_key: str = os.getenv("AIBTC_SUPABASE_SERVICE_KEY", "")
     bucket_name: str = os.getenv("AIBTC_SUPABASE_BUCKET_NAME", "")
+    default_dao_id: str = os.getenv("AIBTC_DEFAULT_DAO_ID", "00000000-0000-0000-0000-000000000000")
 
 
 @dataclass
 class TwitterConfig:
     enabled: bool = os.getenv("AIBTC_TWITTER_ENABLED", "false").lower() == "true"
     interval_seconds: int = int(os.getenv("AIBTC_TWITTER_INTERVAL_SECONDS", "120"))
+    default_consumer_key: str = os.getenv("AIBTC_TWITTER_DEFAULT_CONSUMER_KEY", "")
+    default_consumer_secret: str = os.getenv("AIBTC_TWITTER_DEFAULT_CONSUMER_SECRET", "")
+    default_client_id: str = os.getenv("AIBTC_TWITTER_DEFAULT_CLIENT_ID", "")
+    default_client_secret: str = os.getenv("AIBTC_TWITTER_DEFAULT_CLIENT_SECRET", "")
+    default_access_token: str = os.getenv("AIBTC_TWITTER_DEFAULT_ACCESS_TOKEN", "")
+    default_access_secret: str = os.getenv("AIBTC_TWITTER_DEFAULT_ACCESS_SECRET", "")
+    default_username: str = os.getenv("AIBTC_TWITTER_DEFAULT_USERNAME", "")
     consumer_key: str = os.getenv("AIBTC_TWITTER_CONSUMER_KEY", "")
     consumer_secret: str = os.getenv("AIBTC_TWITTER_CONSUMER_SECRET", "")
     client_id: str = os.getenv("AIBTC_TWITTER_CLIENT_ID", "")
