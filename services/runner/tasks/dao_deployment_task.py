@@ -80,9 +80,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for DAO deployment."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
-
             # Check if we have required tools initialized
             if not self.tools_map:
                 logger.error("DAO deployment tools not available")

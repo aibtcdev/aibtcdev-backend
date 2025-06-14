@@ -63,9 +63,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for DAO proposal AI embeddings."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
-
             # Test embedding service for DAO proposals
             try:
                 test_result = await self.embed_service.embed_text("test dao proposal")

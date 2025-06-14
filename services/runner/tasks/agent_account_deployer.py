@@ -74,9 +74,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
-
             # Test agent account deploy tool initialization
             tool = AgentAccountDeployTool(seed_phrase=config.backend_wallet.seed_phrase)
             if not tool:

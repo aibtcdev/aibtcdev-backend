@@ -65,8 +65,6 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for DAO deployment tweet generation."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
             return True
         except Exception as e:
             logger.error(f"Backend not available for DAO deployment tweets: {str(e)}")

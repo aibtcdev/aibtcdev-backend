@@ -82,9 +82,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for blockchain monitoring."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
-
             # Test HiroApi initialization and connectivity
             hiro_api = HiroApi()
             api_info = await hiro_api.aget_info()

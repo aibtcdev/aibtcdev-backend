@@ -69,8 +69,6 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability."""
         try:
-            # Check backend connectivity
-            backend.get_api_status()
             return True
         except Exception as e:
             logger.error(f"Backend not available: {str(e)}")
