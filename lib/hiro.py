@@ -811,19 +811,159 @@ class HiroApi(BaseHiroApi):
         super().__init__(config.api.hiro_api_url)
 
     @cached(lambda self: self._cache)
-    def get_token_holders(self, token: str) -> Dict[str, Any]:
-        """Retrieve a list of token holders with caching."""
-        logger.debug("Retrieving token holders for %s", token)
+    def get_token_holders(
+        self, token: str, limit: int = 20, offset: int = 0
+    ) -> Dict[str, Any]:
+        """Retrieve a list of token holders with caching and pagination support.
+
+        Args:
+            token: Token identifier (contract principal or symbol)
+            limit: Maximum number of holders to return (default: 20)
+            offset: Pagination offset (default: 0)
+
+        Returns:
+            Dict containing the response with holders data
+        """
+        logger.debug(
+            "Retrieving token holders for %s with limit %d offset %d",
+            token,
+            limit,
+            offset,
+        )
         return self._make_request(
-            "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
+            "GET",
+            f"{self.ENDPOINTS['tokens']}/ft/{token}/holders",
+            params={"limit": limit, "offset": offset},
         )
 
-    async def aget_token_holders(self, token: str) -> Dict[str, Any]:
-        """Async version of get_token_holders."""
-        logger.debug("Async retrieving token holders for %s", token)
-        return await self._amake_request(
-            "GET", f"{self.ENDPOINTS['tokens']}/ft/{token}/holders"
+    def get_all_token_holders(self, token: str, page_size: int = 20) -> Dict[str, Any]:
+        """Get all token holders by paginating through results.
+
+        Args:
+            token: Token identifier (contract principal or symbol)
+            page_size: Number of holders per page request (default: 20)
+
+        Returns:
+            Combined response with all holders
+        """
+        logger.debug("Getting all token holders for %s", token)
+
+        # Get first page to determine total
+        first_page = self.get_token_holders(token, limit=page_size)
+
+        # If we got all holders in the first request, return it
+        total_holders = first_page.get("total", 0)
+        if total_holders <= page_size:
+            return first_page
+
+        # Initialize with first page results
+        all_holders = first_page.get("results", []).copy()
+
+        # Paginate through the rest
+        remaining = total_holders - page_size
+        offset = page_size
+
+        while remaining > 0:
+            current_limit = min(page_size, remaining)
+            logger.debug(
+                "Fetching %d more token holders with offset %d", current_limit, offset
+            )
+
+            page = self.get_token_holders(token, limit=current_limit, offset=offset)
+            page_results = page.get("results", [])
+            all_holders.extend(page_results)
+
+            offset += current_limit
+            remaining -= current_limit
+
+        # Create combined response
+        return {
+            "total_supply": first_page.get("total_supply"),
+            "limit": total_holders,
+            "offset": 0,
+            "total": total_holders,
+            "results": all_holders,
+        }
+
+    async def aget_token_holders(
+        self, token: str, limit: int = 20, offset: int = 0
+    ) -> Dict[str, Any]:
+        """Async version of get_token_holders with pagination support.
+
+        Args:
+            token: Token identifier (contract principal or symbol)
+            limit: Maximum number of holders to return (default: 20)
+            offset: Pagination offset (default: 0)
+
+        Returns:
+            Dict containing the response with holders data
+        """
+        logger.debug(
+            "Async retrieving token holders for %s with limit %d offset %d",
+            token,
+            limit,
+            offset,
         )
+        return await self._amake_request(
+            "GET",
+            f"{self.ENDPOINTS['tokens']}/ft/{token}/holders",
+            params={"limit": limit, "offset": offset},
+        )
+
+    async def aget_all_token_holders(
+        self, token: str, page_size: int = 20
+    ) -> Dict[str, Any]:
+        """Async version to get all token holders by paginating through results.
+
+        Args:
+            token: Token identifier (contract principal or symbol)
+            page_size: Number of holders per page request (default: 20)
+
+        Returns:
+            Combined response with all holders
+        """
+        logger.debug("Async getting all token holders for %s", token)
+
+        # Get first page to determine total
+        first_page = await self.aget_token_holders(token, limit=page_size)
+
+        # If we got all holders in the first request, return it
+        total_holders = first_page.get("total", 0)
+        if total_holders <= page_size:
+            return first_page
+
+        # Initialize with first page results
+        all_holders = first_page.get("results", []).copy()
+
+        # Paginate through the rest
+        remaining = total_holders - page_size
+        offset = page_size
+
+        while remaining > 0:
+            current_limit = min(page_size, remaining)
+            logger.debug(
+                "Async fetching %d more token holders with offset %d",
+                current_limit,
+                offset,
+            )
+
+            page = await self.aget_token_holders(
+                token, limit=current_limit, offset=offset
+            )
+            page_results = page.get("results", [])
+            all_holders.extend(page_results)
+
+            offset += current_limit
+            remaining -= current_limit
+
+        # Create combined response
+        return {
+            "total_supply": first_page.get("total_supply"),
+            "limit": total_holders,
+            "offset": 0,
+            "total": total_holders,
+            "results": all_holders,
+        }
 
     def get_address_balance(self, addr: str) -> Dict[str, Any]:
         """Retrieve wallet balance for an address."""
