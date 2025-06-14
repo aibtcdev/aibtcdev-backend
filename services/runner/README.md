@@ -9,8 +9,106 @@ The system automatically:
 2. 📝 **Registers** jobs decorated with `@job`
 3. 🏗️ **Creates** JobType enums dynamically
 4. ⚙️ **Configures** scheduling and execution
+5. 🔄 **Schedules** jobs with APScheduler
+6. 🏃 **Executes** jobs through multi-worker executor
 
 **No hardcoded job types!** Everything is discovered at runtime through the `@job` decorator.
+
+## Job Execution Architecture
+
+### 🎯 **Multi-Level Concurrency Control**
+
+The system implements **three levels** of concurrency control to ensure efficient and safe job execution:
+
+#### 1. **APScheduler Level** (Prevents Overlapping Triggers)
+```python
+scheduler.add_job(
+    max_instances=1,  # Prevent same job triggering multiple times
+    misfire_grace_time=60,  # Skip missed executions if system is busy
+)
+```
+
+#### 2. **Job Type Level** (Respects max_concurrent Settings)
+```python
+@job(max_concurrent=2)  # Max 2 instances of this job type running
+```
+
+#### 3. **Worker Pool Level** (5 Workers Handle All Jobs)
+- Multiple workers can run **different job types** simultaneously
+- Same job type limited by `max_concurrent` semaphores
+- Priority-based job scheduling
+
+### 🔄 **Job Execution Flow**
+
+```mermaid
+graph TD
+    A[APScheduler Interval] --> B[_execute_job_via_executor]
+    B --> C[Create Synthetic Queue Message]
+    C --> D[Add to Priority Queue]
+    D --> E[Worker Picks Up Job]
+    E --> F{Acquire Concurrency Slot?}
+    F -->|Yes| G[Execute Job Task]
+    F -->|No| H[Wait in Queue]
+    G --> I[Validate Job]
+    I --> J{Validation Passes?}
+    J -->|Yes| K[Run Job Logic]
+    J -->|No| L[Skip Execution]
+    K --> M[Release Slot]
+    L --> M
+    H --> E
+```
+
+### 📋 **Two Job Execution Patterns**
+
+#### **Pattern 1: Self-Contained Scheduled Jobs**
+Jobs that run independently without needing database queue messages:
+
+```python
+@job("chain_state_monitor", interval_seconds=90, max_concurrent=2)
+class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        return True  # Always valid - checks blockchain state
+    
+    async def _execute_impl(self, context: JobContext) -> List[ChainStateMonitorResult]:
+        # Fetch blockchain data and process
+        return results
+```
+
+**Examples:** `chain_state_monitor`, `dao_proposal_embedder`, `dao_proposal_conclude`
+
+#### **Pattern 2: Queue-Processing Jobs**
+Jobs that process messages from the database queue:
+
+```python
+@job("tweet", interval_seconds=30, max_concurrent=2)
+class TweetTask(BaseTask[TweetProcessingResult]):
+    async def _validate_task_specific(self, context: JobContext) -> bool:
+        pending_messages = backend.list_queue_messages(
+            filters=QueueMessageFilter(type=QueueMessageType.TWEET, is_processed=False)
+        )
+        return len(pending_messages) > 0  # Only run if messages exist
+    
+    async def _execute_impl(self, context: JobContext) -> List[TweetProcessingResult]:
+        # Process pending tweet messages
+        return results
+```
+
+**Examples:** `tweet`, `discord`, `dao_deployment`, `agent_account_deployer`
+
+### ⚡ **Concurrency Examples**
+
+With 5 workers and these job settings:
+- `tweet`: `max_concurrent=2` 
+- `discord`: `max_concurrent=3`
+- `chain_state_monitor`: `max_concurrent=2`
+
+**Possible Simultaneous Execution:**
+- ✅ Worker-1: `tweet` job #1
+- ✅ Worker-2: `tweet` job #2  
+- ❌ Worker-3: `tweet` job #3 (waits - max_concurrent exceeded)
+- ✅ Worker-3: `discord` job #1 (different type)
+- ✅ Worker-4: `discord` job #2
+- ✅ Worker-5: `chain_state_monitor` job #1
 
 ## Adding a New Job (Super Easy!)
 
@@ -52,8 +150,9 @@ class MyAwesomeJobTask(BaseTask[MyJobResult]):
 Your job is automatically:
 - ✅ Discovered and registered
 - ✅ JobType enum created dynamically
-- ✅ Available in the job manager
-- ✅ Schedulable and executable
+- ✅ Scheduled with APScheduler
+- ✅ Added to executor pipeline
+- ✅ Respects concurrency limits
 - ✅ Configurable via environment/config
 
 ## Dynamic Job Types
@@ -117,6 +216,28 @@ The `@job` decorator supports many options:
 )
 ```
 
+## System Startup and Lifecycle
+
+### 🚀 **Initialization Sequence**
+1. **Auto-Discovery** - Scan `tasks/` directory and register jobs
+2. **Job Scheduling** - Schedule enabled jobs with APScheduler  
+3. **Scheduler Start** - Start APScheduler to begin triggering jobs
+4. **Executor Start** - Start 5-worker executor pool
+5. **Concurrency Setup** - Initialize semaphores for each job type
+
+### 📊 **Runtime Monitoring**
+The system provides comprehensive monitoring:
+- **Job Metrics** - Execution counts, success rates, timing
+- **Health Status** - System health and performance alerts
+- **Concurrency Stats** - Active jobs per type, slot usage
+- **Performance Monitoring** - Execution times, failure rates
+
+### 🛑 **Graceful Shutdown**
+1. **Stop Scheduler** - No new job triggers
+2. **Stop Executor** - Complete running jobs, reject new ones
+3. **Cancel Workers** - Gracefully terminate worker tasks
+4. **Cleanup Resources** - Release connections and memory
+
 ## Migration from Old System
 
 ### Before (Manual Registration Required)
@@ -138,14 +259,19 @@ The `@job` decorator supports many options:
 - 🌟 **Consistent**: Same pattern for all jobs
 - 🎯 **Dynamic**: Job types created automatically
 - 🔄 **No hardcoded types**: Everything discovered at runtime
+- ⚡ **Efficient**: Multi-level concurrency control
+- 📊 **Observable**: Built-in monitoring and metrics
+- 🔒 **Safe**: Prevents resource exhaustion and overlapping executions
 
 ## Examples
 
 Check out existing task files for patterns:
-- `dao_task.py` - Complex workflow-based task
-- `tweet_task.py` - Media handling and chunking
-- `discord_task.py` - Webhook integration
-- `proposal_embedder.py` - AI service integration
+- `chain_state_monitor.py` - Self-contained scheduled monitoring
+- `tweet_task.py` - Queue-based message processing with media
+- `discord_task.py` - Webhook integration with error handling
+- `dao_proposal_embedder.py` - AI service integration
+- `dao_deployment_task.py` - Complex workflow with validation
+- `agent_account_deployer.py` - Blockchain deployment with retry logic
 
 ## Troubleshooting
 
@@ -154,14 +280,84 @@ Check out existing task files for patterns:
 2. Check `@job` decorator is present
 3. Check no syntax errors in task file
 4. Check logs for import errors
+5. Verify job is enabled in configuration
+
+### Jobs Not Running?
+1. Check if scheduler is started: `scheduler.running`
+2. Check if executor is running: `job_manager.is_running`
+3. Check job validation: jobs may be skipping execution
+4. Check concurrency limits: jobs may be waiting for slots
+5. Check for errors in job logs
 
 ### Configuration Not Working?
 1. Use naming pattern: `{job_type}_enabled` or `{job_type}_interval_seconds`
 2. Check environment variables
 3. Check config file settings
+4. Verify job metadata is being overridden
+
+### Performance Issues?
+1. Check `max_concurrent` settings - too high can overwhelm resources
+2. Monitor job execution times - increase timeout if needed  
+3. Check for resource contention between jobs
+4. Review job validation logic - expensive validation can slow scheduling
+5. Use performance monitoring to identify bottlenecks
 
 ### Need Help?
 - Look at existing task examples
 - Check the auto-discovery logs
 - Use `JobRegistry.list_jobs()` to see registered jobs
-- Check dynamic job types with `JobType.__class__.get_all_job_types()` 
+- Check dynamic job types with `JobType.get_all_job_types()`
+- Monitor system health with `job_manager.get_system_health()`
+- Review job metrics with `job_manager.get_job_metrics()`
+
+## Advanced Topics
+
+### Custom Job Validation
+Override validation methods for complex job requirements:
+
+```python
+async def _validate_config(self, context: JobContext) -> bool:
+    # Check configuration requirements
+    return True
+
+async def _validate_resources(self, context: JobContext) -> bool:
+    # Check external resources (APIs, databases, etc.)
+    return True
+
+async def _validate_prerequisites(self, context: JobContext) -> bool:
+    # Check dependencies and prerequisites  
+    return True
+
+async def _validate_task_specific(self, context: JobContext) -> bool:
+    # Task-specific validation logic
+    return True
+```
+
+### Error Handling and Retries
+Implement custom error handling:
+
+```python
+def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+    # Custom retry logic based on error type
+    return isinstance(error, (ConnectionError, TimeoutError))
+
+async def _handle_execution_error(
+    self, error: Exception, context: JobContext
+) -> Optional[List[MyJobResult]]:
+    # Custom error recovery
+    if "temporary" in str(error).lower():
+        return None  # Let retry system handle it
+    return [MyJobResult(success=False, message=f"Unrecoverable: {error}")]
+```
+
+### Priority and Dependencies
+Use priority and dependencies for complex workflows:
+
+```python
+@job(
+    "high_priority_job",
+    priority=JobPriority.CRITICAL,  # Runs before NORMAL priority jobs
+    dependencies=["prerequisite_job"],  # Wait for other jobs
+    preserve_order=True,  # Execute in specific order
+)
+``` 

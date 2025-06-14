@@ -101,6 +101,39 @@ class QueueMessageType:
     def __hash__(self) -> int:
         return hash(self._value)
 
+    def __json__(self) -> str:
+        """Custom JSON serialization for Pydantic."""
+        return self._value
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type, handler):
+        """Custom Pydantic schema for serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def serialize_queue_message_type(instance):
+            return instance.value if instance is not None else None
+
+        def validate_queue_message_type(value):
+            if value is None:
+                return None
+            if isinstance(value, cls):
+                return value
+            if isinstance(value, str):
+                return cls.get_or_create(value)
+            raise ValueError(f"Invalid QueueMessageType value: {value}")
+
+        return core_schema.with_info_before_validator_function(
+            validate_queue_message_type,
+            core_schema.no_info_plain_validator_function(
+                lambda x: x,
+                serialization=core_schema.plain_serializer_function(
+                    serialize_queue_message_type,
+                    return_schema=core_schema.str_schema(),
+                    when_used="json",
+                ),
+            ),
+        )
+
     @classmethod
     def get_or_create(cls, message_type: str) -> "QueueMessageType":
         """Get existing message type or create new one."""
