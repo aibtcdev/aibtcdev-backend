@@ -73,7 +73,7 @@ class SchedulerConfig:
 
     # agent_account_deployer job
     agent_account_deployer_enabled: bool = (
-        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOYER_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOYER_ENABLED", "true").lower() == "true"
     )
     agent_account_deployer_interval_seconds: int = int(
         os.getenv("AIBTC_AGENT_ACCOUNT_DEPLOYER_INTERVAL_SECONDS", "60")
@@ -89,7 +89,7 @@ class SchedulerConfig:
 
     # dao_deployment job
     dao_deployment_enabled: bool = (
-        os.getenv("AIBTC_DAO_DEPLOYMENT_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_DEPLOYMENT_ENABLED", "true").lower() == "true"
     )
     dao_deployment_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_DEPLOYMENT_INTERVAL_SECONDS", "60")
@@ -97,7 +97,7 @@ class SchedulerConfig:
 
     # dao_deployment_tweet job
     dao_deployment_tweet_enabled: bool = (
-        os.getenv("AIBTC_DAO_DEPLOYMENT_TWEET_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_DEPLOYMENT_TWEET_ENABLED", "true").lower() == "true"
     )
     dao_deployment_tweet_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_DEPLOYMENT_TWEET_INTERVAL_SECONDS", "60")
@@ -105,7 +105,7 @@ class SchedulerConfig:
 
     # dao_proposal_conclude job
     dao_proposal_conclude_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_ENABLED", "true").lower() == "true"
     )
     dao_proposal_conclude_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_CONCLUDE_INTERVAL_SECONDS", "60")
@@ -113,7 +113,7 @@ class SchedulerConfig:
 
     # dao_proposal_embedder job
     dao_proposal_embedder_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_EMBEDDER_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_PROPOSAL_EMBEDDER_ENABLED", "true").lower() == "true"
     )
     dao_proposal_embedder_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_EMBEDDER_INTERVAL_SECONDS", "300")
@@ -121,7 +121,7 @@ class SchedulerConfig:
 
     # dao_proposal_evaluation job
     dao_proposal_evaluation_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_ENABLED", "true").lower() == "true"
     )
     dao_proposal_evaluation_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_EVALUATION_INTERVAL_SECONDS", "60")
@@ -129,16 +129,14 @@ class SchedulerConfig:
 
     # dao_proposal_vote job
     dao_proposal_vote_enabled: bool = (
-        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_ENABLED", "false").lower() == "true"
+        os.getenv("AIBTC_DAO_PROPOSAL_VOTE_ENABLED", "true").lower() == "true"
     )
     dao_proposal_vote_interval_seconds: int = int(
         os.getenv("AIBTC_DAO_PROPOSAL_VOTE_INTERVAL_SECONDS", "60")
     )
 
     # discord job
-    discord_enabled: bool = (
-        os.getenv("AIBTC_DISCORD_ENABLED", "false").lower() == "true"
-    )
+    discord_enabled: bool = os.getenv("AIBTC_DISCORD_ENABLED", "true").lower() == "true"
     discord_interval_seconds: int = int(
         os.getenv("AIBTC_DISCORD_INTERVAL_SECONDS", "30")
     )
