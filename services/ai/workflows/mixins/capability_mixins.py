@@ -85,7 +85,7 @@ class BaseCapabilityMixin(CapabilityMixin):
         # Create the LLM instance
         self.llm = ChatOpenAI(
             model=self.config.get("model_name", "gpt-4.1"),
-            temperature=self.config.get("temperature", 0.1),
+            temperature=self.config.get("temperature", 0.9),
             streaming=self.config.get("streaming", True),
             callbacks=self.config.get("callbacks", []),
         )
@@ -327,7 +327,7 @@ class PromptCapability:
                 return {
                     "prompt_text": best_prompt.prompt_text,
                     "model": best_prompt.model or "gpt-4o",
-                    "temperature": best_prompt.temperature or 0.1,
+                    "temperature": best_prompt.temperature or 0.9,
                 }
 
         except Exception as e:
@@ -345,7 +345,7 @@ class PromptCapability:
             if hasattr(self, "llm") and custom_prompt_data:
                 # Update LLM with custom settings
                 model = custom_prompt_data.get("model", "gpt-4.1")
-                temperature = custom_prompt_data.get("temperature", 0.1)
+                temperature = custom_prompt_data.get("temperature", 0.9)
 
                 if model != self.llm.model_name or temperature != self.llm.temperature:
                     self.llm = ChatOpenAI(

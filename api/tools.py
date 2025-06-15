@@ -708,7 +708,7 @@ async def generate_proposal_recommendation(
         # Create the proposal recommendation agent with model configuration
         config = {
             "model_name": "gpt-4.1",  # Use model from request or default
-            "temperature": 0.1,  # Use temperature from request or default
+            "temperature": 0.9,  # Use temperature from request or default
             "streaming": True,  # Enable streaming responses
             "callbacks": [],  # Optional callback handlers
         }

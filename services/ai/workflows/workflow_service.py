@@ -422,7 +422,7 @@ class WorkflowBuilder:
         self.callback_handler = None
         self.tools = []
         self.model_name = kwargs.get("model_name", "gpt-4.1")
-        self.temperature = kwargs.get("temperature", 0.1)
+        self.temperature = kwargs.get("temperature", 0.9)
 
     def with_callback_handler(
         self, callback_handler: BaseCallbackHandler
