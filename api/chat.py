@@ -8,13 +8,13 @@ from api.dependencies import verify_profile_from_token
 from backend.factory import backend
 from backend.models import UUID, JobCreate, Profile
 from lib.logger import configure_logger
-from services.chat import (
+from services.core.chat_service import (
     get_job_history,
     get_thread_history,
     process_chat_message,
-    running_jobs,
 )
-from services.websocket import websocket_manager
+from services.processing.streaming_service import running_jobs
+from services.communication.websocket_service import websocket_manager
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -373,7 +373,9 @@ async def websocket_endpoint(
         if connection_accepted:
             try:
                 # Ensure all jobs for this session are marked as disconnected
-                from services.chat import mark_jobs_disconnected_for_session
+                from services.processing.streaming_service import (
+                    mark_jobs_disconnected_for_session,
+                )
 
                 await asyncio.wait_for(
                     mark_jobs_disconnected_for_session(session_id), timeout=2.0

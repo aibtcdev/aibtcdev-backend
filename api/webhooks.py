@@ -4,9 +4,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.dependencies import verify_webhook_auth
 from lib.logger import configure_logger
-from services.webhooks.base import WebhookResponse
-from services.webhooks.chainhook import ChainhookService
-from services.webhooks.dao import DAOService
+from services.integrations.webhooks.base import WebhookResponse
+from services.integrations.webhooks.chainhook import ChainhookService
+from services.integrations.webhooks.dao import DAOService
 
 # Configure logger
 logger = configure_logger(__name__)

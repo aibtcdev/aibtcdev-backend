@@ -22,12 +22,12 @@ from backend.models import (  # Added Profile, AgentFilter, Wallet
 from config import config  # Added config import
 from lib.logger import configure_logger
 from lib.tools import Tool, get_available_tools
-from services.workflows.agents.proposal_metadata import (
+from services.ai.workflows.agents.proposal_metadata import (
     ProposalMetadataAgent,
 )
 
 # Import the proposal recommendation agent and metadata agent
-from services.workflows.agents.proposal_recommendation import (
+from services.ai.workflows.agents.proposal_recommendation import (
     ProposalRecommendationAgent,
 )
 from tools.dao_ext_action_proposals import (

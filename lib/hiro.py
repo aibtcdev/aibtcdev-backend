@@ -10,7 +10,7 @@ from cachetools import TTLCache, cached
 
 from config import config
 from lib.logger import configure_logger
-from services.webhooks.chainhook import models
+from services.integrations.webhooks.chainhook import models
 
 logger = configure_logger(__name__)
 
