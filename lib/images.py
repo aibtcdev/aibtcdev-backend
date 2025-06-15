@@ -1,5 +1,5 @@
 import openai
-import requests
+import httpx
 
 from config import config
 
@@ -75,11 +75,8 @@ An easily recognizable, mission-aligned icon with one strong centerpiece, minima
         if not image_url:
             raise ImageGenerationError("Failed to get image URL")
 
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            raise ImageGenerationError(
-                f"Failed to download image: HTTP {response.status_code}"
-            )
+        response = httpx.get(image_url)
+        response.raise_for_status()
 
         if not response.content:
             raise ImageGenerationError("Downloaded image is empty")
@@ -88,6 +85,12 @@ An easily recognizable, mission-aligned icon with one strong centerpiece, minima
 
     except ImageGenerationError:
         raise  # Re-raise ImageGenerationError as is
+    except httpx.HTTPStatusError as e:
+        raise ImageGenerationError(
+            f"Failed to download image: HTTP {e.response.status_code}"
+        ) from e
+    except httpx.RequestError as e:
+        raise ImageGenerationError(f"Failed to download image: {str(e)}") from e
     except Exception as e:
         raise ImageGenerationError(
             f"Unexpected error generating token image: {str(e)}"

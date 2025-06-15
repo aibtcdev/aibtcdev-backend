@@ -4,7 +4,7 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from backend.models import UUID
-from services.bot import _bot_service
+from services.communication.telegram_bot_service import _bot_service
 
 
 class SendTelegramNotificationInput(BaseModel):

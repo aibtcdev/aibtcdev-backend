@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
 from config import config
-from lib.hiro import HiroApi
+from services.integrations.hiro.hiro_api import HiroApi
 from lib.logger import configure_logger
 from services.infrastructure.job_management.base import (
     BaseTask,

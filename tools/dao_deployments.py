@@ -14,7 +14,7 @@ from backend.models import (
     TokenBase,
 )
 from lib.logger import configure_logger
-from services.daos import (
+from services.core.dao_service import (
     TokenServiceError,
     bind_token_to_dao,
     generate_dao_dependencies,

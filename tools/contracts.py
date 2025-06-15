@@ -4,8 +4,8 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from backend.models import UUID
-from lib.hiro import HiroApi
-from services.daos import TokenServiceError, generate_token_dependencies
+from services.integrations.hiro.hiro_api import HiroApi
+from services.core.dao_service import TokenServiceError, generate_token_dependencies
 
 from .bun import BunScriptRunner
 

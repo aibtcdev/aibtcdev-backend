@@ -11,7 +11,7 @@ from backend.models import (
     HolderFilter,
     WalletFilter,
 )
-from lib.hiro import HiroApi
+from services.integrations.hiro.hiro_api import HiroApi
 from lib.logger import configure_logger
 from services.infrastructure.job_management.base import (
     BaseTask,
