@@ -5,7 +5,7 @@ import sys
 
 from config import config
 from lib.logger import configure_logger
-from services import startup
+from services.infrastructure.startup_service import run_standalone
 
 # Configure module logger
 logger = configure_logger(__name__)
@@ -26,7 +26,7 @@ async def main():
         # - Telegram bot (if enabled)
         # - WebSocket cleanup tasks
         # - System metrics monitoring
-        await startup.run_standalone()
+        await run_standalone()
 
     except KeyboardInterrupt:
         logger.info("Worker mode interrupted by user")

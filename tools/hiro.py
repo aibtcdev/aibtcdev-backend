@@ -24,7 +24,7 @@ class STXPriceTool(BaseTool):
         Returns:
             float: The current STX price
         """
-        from lib.hiro import HiroApi
+        from services.integrations.hiro.hiro_api import HiroApi
 
         api = HiroApi()
         return str(api.get_stx_price())
@@ -69,7 +69,7 @@ class STXGetPrincipalAddressBalanceTool(BaseTool):
         Returns:
             str: The balance and holdings of the address
         """
-        from lib.hiro import HiroApi
+        from services.integrations.hiro.hiro_api import HiroApi
 
         api = HiroApi()
         return str(api.get_address_balance(address))
@@ -112,7 +112,7 @@ class STXGetContractInfoTool(BaseTool):
         Returns:
             str: The contract information
         """
-        from lib.hiro import HiroApi
+        from services.integrations.hiro.hiro_api import HiroApi
 
         api = HiroApi()
         return str(api.get_contract_by_id(contract_id))

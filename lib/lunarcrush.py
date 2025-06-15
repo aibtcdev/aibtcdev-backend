@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from config import config
 
@@ -20,13 +20,21 @@ class LunarCrushApi:
                 "Authorization": f"Bearer {self.api_key}",
             }
             # Make the GET request
-            response = requests.get(url, headers=headers, params=params)
+            response = httpx.get(url, headers=headers, params=params)
 
             # Check for HTTP errors
             response.raise_for_status()
 
             # Return the JSON response data
             return response.json()
+        except httpx.HTTPStatusError as e:
+            # Raise an exception with a custom error message
+            raise Exception(
+                f"Lunarcrush API GET request error: HTTP {e.response.status_code} - {str(e)}"
+            )
+        except httpx.RequestError as e:
+            # Raise an exception with a custom error message
+            raise Exception(f"Lunarcrush API GET request error: {str(e)}")
         except Exception as e:
             # Raise an exception with a custom error message
             raise Exception(f"Lunarcrush API GET request error: {str(e)}")

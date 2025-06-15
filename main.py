@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import chat, tools, webhooks
 from config import config
 from lib.logger import configure_logger
-from services.websocket import websocket_manager
+from services.communication.websocket_service import websocket_manager
 
 # Configure module logger
 logger = configure_logger(__name__)
