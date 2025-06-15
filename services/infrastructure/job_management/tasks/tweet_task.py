@@ -20,8 +20,8 @@ from backend.models import (
 )
 from config import config
 from lib.logger import configure_logger
-from lib.twitter import TwitterService
 from lib.utils import extract_image_urls
+from services.communication.twitter_service import TwitterService
 from services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,

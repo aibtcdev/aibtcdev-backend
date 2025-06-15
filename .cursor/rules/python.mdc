@@ -17,6 +17,9 @@ alwaysApply: true
 - Use absolute imports rather than relative imports.
 - Avoid wildcard imports (from module import *).
 
+# Dependencies
+- uv dependency manager
+
 # Naming Conventions
 - Use snake_case for variables, functions, and methods.
 - Use PascalCase for class names.

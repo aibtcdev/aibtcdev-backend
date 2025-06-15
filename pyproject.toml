@@ -24,7 +24,6 @@ dependencies = [
     "python-magic==0.4.27",
     "python-telegram-bot==22.1",
     "python-twitter-v2==0.9.2",
-    "requests==2.32.3",
     "sqlalchemy==2.0.41",
     "starlette==0.46.0",
     "supabase==2.15.2",

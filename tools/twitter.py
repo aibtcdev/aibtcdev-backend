@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from backend.factory import backend
 from backend.models import UUID, XCredsFilter
 from lib.logger import configure_logger
-from lib.twitter import TwitterService
+from services.communication.twitter_service import TwitterService
 
 logger = configure_logger(__name__)
 
