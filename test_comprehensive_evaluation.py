@@ -8,6 +8,7 @@ This test uses the ComprehensiveEvaluatorAgent that performs all evaluations
 Usage:
     python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
     python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Proposal content" --debug-level 2
+    python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2  # Lookup from database
 """
 
 import argparse
@@ -15,12 +16,14 @@ import asyncio
 import json
 import os
 import sys
+from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from services.ai.workflows.comprehensive_evaluation import (
     evaluate_proposal_comprehensive,
 )
+from backend.factory import get_backend
 
 
 async def main():
@@ -29,9 +32,13 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic comprehensive evaluation
+  # Basic comprehensive evaluation with proposal data
   python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
     --proposal-data "Proposal to fund development of new feature"
+  
+  # Lookup proposal from database
+  python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
+    --debug-level 2
   
   # Verbose debugging
   python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
@@ -50,8 +57,8 @@ Examples:
     parser.add_argument(
         "--proposal-data",
         type=str,
-        required=True,
-        help="Content/data of the proposal to evaluate",
+        required=False,
+        help="Content/data of the proposal to evaluate (optional - will lookup from database if not provided)",
     )
 
     # Optional arguments
@@ -89,11 +96,45 @@ Examples:
 
     args = parser.parse_args()
 
+    # If proposal_data is not provided, look it up from the database
+    proposal_data = args.proposal_data
+    if not proposal_data:
+        print("📋 No proposal data provided, looking up from database...")
+        try:
+            backend = get_backend()
+            proposal_uuid = UUID(args.proposal_id)
+            proposal = backend.get_proposal(proposal_uuid)
+
+            if not proposal:
+                print(
+                    f"❌ Error: Proposal with ID {args.proposal_id} not found in database"
+                )
+                sys.exit(1)
+
+            if not proposal.content:
+                print(f"❌ Error: Proposal {args.proposal_id} has no content")
+                sys.exit(1)
+
+            proposal_data = proposal.content
+            print(f"✅ Found proposal in database: {proposal.title or 'Untitled'}")
+
+            # Update DAO ID if not provided and available in proposal
+            if not args.dao_id and proposal.dao_id:
+                args.dao_id = str(proposal.dao_id)
+                print(f"✅ Using DAO ID from proposal: {args.dao_id}")
+
+        except ValueError as e:
+            print(f"❌ Error: Invalid proposal ID format: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"❌ Error looking up proposal: {e}")
+            sys.exit(1)
+
     print("🚀 Starting Comprehensive Proposal Evaluation Test")
     print("=" * 60)
     print(f"Proposal ID: {args.proposal_id}")
     print(
-        f"Proposal Data: {args.proposal_data[:100]}{'...' if len(args.proposal_data) > 100 else ''}"
+        f"Proposal Data: {proposal_data[:100]}{'...' if len(proposal_data) > 100 else ''}"
     )
     print(f"Agent ID: {args.agent_id}")
     print(f"DAO ID: {args.dao_id}")
@@ -123,7 +164,7 @@ Examples:
         print("🔍 Running comprehensive evaluation...")
         result = await evaluate_proposal_comprehensive(
             proposal_id=args.proposal_id,
-            proposal_data=args.proposal_data,
+            proposal_data=proposal_data,
             config=config,
             dao_id=args.dao_id,
             agent_id=args.agent_id,

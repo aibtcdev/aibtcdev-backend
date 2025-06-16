@@ -26,7 +26,6 @@ from services.ai.workflows.mixins.vector_mixin import (
 from services.ai.workflows.mixins.web_search_mixin import WebSearchCapability
 from services.ai.workflows.proposal_evaluation import (
     ProposalEvaluationWorkflow,
-    evaluate_and_vote_on_proposal,
 )
 from services.ai.workflows.tweet_analysis import (
     TweetAnalysisWorkflow,
@@ -78,7 +77,6 @@ __all__ = [
     "TweetAnalysisWorkflow",
     "TweetGeneratorWorkflow",
     "analyze_tweet",
-    "evaluate_and_vote_on_proposal",
     "generate_dao_tweet",
     "ChatService",
     "ChatWorkflow",

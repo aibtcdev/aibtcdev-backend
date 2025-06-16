@@ -1,93 +1,81 @@
 #!/usr/bin/env python3
 """
-Simple CLI test script for proposal evaluation workflow.
+Simple CLI test script for proposal evaluation workflow (multi-agent).
+
+This test uses the multi-agent ProposalEvaluationWorkflow that runs multiple
+specialized agents (core, financial, historical, social, reasoning) in sequence.
 
 Usage:
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000"
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --wallet-id "456e7890-e89b-12d3-a456-426614174001" --auto-vote
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2
+    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
+    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Proposal content" --debug-level 2
+    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2  # Lookup from database
 """
 
 import argparse
 import asyncio
 import json
-
-# Add the project root to Python path
 import os
 import sys
-from typing import Optional
 from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from services.ai.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
-
-
-def parse_uuid(value: str) -> Optional[UUID]:
-    """Parse a UUID string, return None if invalid."""
-    try:
-        return UUID(value) if value else None
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"Invalid UUID format: {value}")
+from services.ai.workflows.proposal_evaluation import evaluate_proposal
+from backend.factory import get_backend
 
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Test proposal evaluation workflow",
+        description="Test proposal evaluation workflow (multi-agent)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic evaluation (no voting)
-  python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc"
-  
-  # Evaluation with auto-voting
+  # Basic multi-agent evaluation with proposal data
   python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
-    --wallet-id "87654321-4321-8765-2109-987654321cba" --auto-vote
+    --proposal-data "Proposal to fund development of new feature"
+  
+  # Lookup proposal from database
+  python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
+    --debug-level 2
   
   # Verbose debugging
   python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
-    --debug-level 2
+    --proposal-data "Proposal content" --debug-level 2
         """,
     )
 
     # Required arguments
     parser.add_argument(
         "--proposal-id",
-        type=parse_uuid,
+        type=str,
         required=True,
-        help="UUID of the proposal to evaluate",
+        help="ID of the proposal to evaluate",
+    )
+
+    parser.add_argument(
+        "--proposal-data",
+        type=str,
+        required=False,
+        help="Content/data of the proposal to evaluate (optional - will lookup from database if not provided)",
     )
 
     # Optional arguments
     parser.add_argument(
-        "--wallet-id",
-        type=parse_uuid,
-        help="UUID of the wallet (required for voting)",
-    )
-
-    parser.add_argument(
         "--agent-id",
-        type=parse_uuid,
-        help="UUID of the agent",
+        type=str,
+        help="ID of the agent",
     )
 
     parser.add_argument(
         "--dao-id",
-        type=parse_uuid,
-        help="UUID of the DAO",
+        type=str,
+        help="ID of the DAO",
     )
 
     parser.add_argument(
-        "--auto-vote",
-        action="store_true",
-        help="Enable automatic voting based on evaluation",
-    )
-
-    parser.add_argument(
-        "--confidence-threshold",
-        type=float,
-        default=0.7,
-        help="Confidence threshold for auto-voting (default: 0.7)",
+        "--profile-id",
+        type=str,
+        help="ID of the profile",
     )
 
     parser.add_argument(
@@ -99,101 +87,160 @@ Examples:
     )
 
     parser.add_argument(
-        "--evaluation-only",
-        action="store_true",
-        help="Only evaluate, never vote (overrides --auto-vote)",
+        "--model-name",
+        type=str,
+        help="Override the default model name for evaluation",
     )
 
     args = parser.parse_args()
 
-    print("🚀 Starting Proposal Evaluation Test")
-    print("=" * 50)
+    # If proposal_data is not provided, look it up from the database
+    proposal_data = args.proposal_data
+    if not proposal_data:
+        print("📋 No proposal data provided, looking up from database...")
+        try:
+            backend = get_backend()
+            proposal_uuid = UUID(args.proposal_id)
+            proposal = backend.get_proposal(proposal_uuid)
+
+            if not proposal:
+                print(
+                    f"❌ Error: Proposal with ID {args.proposal_id} not found in database"
+                )
+                sys.exit(1)
+
+            if not proposal.content:
+                print(f"❌ Error: Proposal {args.proposal_id} has no content")
+                sys.exit(1)
+
+            proposal_data = proposal.content
+            print(f"✅ Found proposal in database: {proposal.title or 'Untitled'}")
+
+            # Update DAO ID if not provided and available in proposal
+            if not args.dao_id and proposal.dao_id:
+                args.dao_id = str(proposal.dao_id)
+                print(f"✅ Using DAO ID from proposal: {args.dao_id}")
+
+        except ValueError as e:
+            print(f"❌ Error: Invalid proposal ID format: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"❌ Error looking up proposal: {e}")
+            sys.exit(1)
+
+    print("🚀 Starting Multi-Agent Proposal Evaluation Test")
+    print("=" * 60)
     print(f"Proposal ID: {args.proposal_id}")
-    print(f"Wallet ID: {args.wallet_id}")
+    print(
+        f"Proposal Data: {proposal_data[:100]}{'...' if len(proposal_data) > 100 else ''}"
+    )
     print(f"Agent ID: {args.agent_id}")
     print(f"DAO ID: {args.dao_id}")
-    print(f"Auto Vote: {args.auto_vote and not args.evaluation_only}")
-    print(f"Confidence Threshold: {args.confidence_threshold}")
+    print(f"Profile ID: {args.profile_id}")
     print(f"Debug Level: {args.debug_level}")
-    print(f"Evaluation Only: {args.evaluation_only}")
-    print("=" * 50)
+    print(f"Model Name: {args.model_name}")
+    print("=" * 60)
+    print("🧠 Using Multi-Agent ProposalEvaluationWorkflow")
+    print("=" * 60)
 
     try:
-        if args.evaluation_only:
-            print("🔍 Running evaluation only...")
-            result = await evaluate_and_vote_on_proposal(
-                proposal_id=args.proposal_id,
-                wallet_id=args.wallet_id,
-                agent_id=args.agent_id,
-                dao_id=args.dao_id,
-                auto_vote=False,
-            )
-        else:
-            print("🔍 Running evaluation with voting option...")
-            result = await evaluate_and_vote_on_proposal(
-                proposal_id=args.proposal_id,
-                wallet_id=args.wallet_id,
-                agent_id=args.agent_id,
-                auto_vote=args.auto_vote,
-                confidence_threshold=args.confidence_threshold,
-                dao_id=args.dao_id,
-                debug_level=args.debug_level,
-            )
+        # Set up config
+        config = {
+            "debug_level": args.debug_level,
+        }
 
-        print("\n✅ Evaluation Complete!")
-        print("=" * 50)
+        if args.model_name:
+            config["model_name"] = args.model_name
+
+        if args.debug_level >= 1:
+            # For verbose debugging, customize agent settings
+            config["approval_threshold"] = 70
+            config["veto_threshold"] = 30
+            config["consensus_threshold"] = 10
+
+        # Run multi-agent evaluation
+        print("🔍 Running multi-agent evaluation...")
+        result = await evaluate_proposal(
+            proposal_id=args.proposal_id,
+            proposal_data=proposal_data,
+            config=config,
+            dao_id=args.dao_id,
+            agent_id=args.agent_id,
+            profile_id=args.profile_id,
+        )
+
+        print("\n✅ Multi-Agent Evaluation Complete!")
+        print("=" * 60)
 
         # Pretty print the result
         if "error" in result:
             print(f"❌ Error: {result['error']}")
         else:
-            evaluation = result.get("evaluation", {})
-            vote_result = result.get("vote_result")
-            message = result.get("message", "")
+            print("📊 Multi-Agent Evaluation Results:")
+            print(
+                f"   • Approval: {'✅ APPROVE' if result.get('approve') else '❌ REJECT'}"
+            )
+            print(f"   • Overall Score: {result.get('overall_score', 0)}")
+            print(f"   • Evaluation Type: {result.get('evaluation_type', 'unknown')}")
 
-            print("📊 Evaluation Results:")
-            if evaluation:
-                print(
-                    f"   • Approval: {'✅ APPROVE' if evaluation.get('approve') else '❌ REJECT'}"
-                )
-                print(f"   • Confidence: {evaluation.get('confidence_score', 0):.2f}")
-                print(f"   • Reasoning: {evaluation.get('reasoning', 'N/A')}")
+            # Show reasoning (truncated for readability)
+            reasoning = result.get("reasoning", "N/A")
+            if len(reasoning) > 500:
+                reasoning = reasoning[:500] + "... (truncated)"
+            print(f"   • Reasoning: {reasoning}")
 
-                scores = evaluation.get("scores", {})
-                if scores:
-                    print("   • Detailed Scores:")
-                    for score_type, score_value in scores.items():
-                        print(f"     - {score_type.title()}: {score_value}")
+            scores = result.get("scores", {})
+            if scores:
+                print("   • Detailed Scores:")
+                for score_type, score_value in scores.items():
+                    print(f"     - {score_type.title()}: {score_value}")
 
-                flags = evaluation.get("flags", [])
-                if flags:
-                    print(f"   • Flags: {', '.join(flags)}")
+            flags = result.get("flags", [])
+            if flags:
+                print(f"   • Flags: {', '.join(flags[:5])}")  # Show first 5 flags
+                if len(flags) > 5:
+                    print(f"     ... and {len(flags) - 5} more flags")
 
-                token_usage = evaluation.get("token_usage", {})
-                if token_usage:
-                    print("   • Token Usage:")
-                    print(f"     - Input: {token_usage.get('input_tokens', 0)}")
-                    print(f"     - Output: {token_usage.get('output_tokens', 0)}")
-                    print(f"     - Total: {token_usage.get('total_tokens', 0)}")
+            token_usage = result.get("token_usage", {})
+            if token_usage:
+                print("   • Token Usage:")
+                print(f"     - Input: {token_usage.get('input_tokens', 0):,}")
+                print(f"     - Output: {token_usage.get('output_tokens', 0):,}")
+                print(f"     - Total: {token_usage.get('total_tokens', 0):,}")
 
-            if vote_result:
-                print("\n🗳️  Voting Results:")
-                print(f"   • Status: {vote_result}")
-            elif args.auto_vote and not args.evaluation_only:
-                print(f"\n🗳️  Voting: {message}")
+            workflow_step = result.get("workflow_step", "unknown")
+            completed_steps = result.get("completed_steps", [])
+            if workflow_step or completed_steps:
+                print("   • Workflow Progress:")
+                print(f"     - Current Step: {workflow_step}")
+                if completed_steps:
+                    print(f"     - Completed Steps: {', '.join(completed_steps)}")
+
+            summaries = result.get("summaries", {})
+            if summaries and args.debug_level >= 1:
+                print("   • Summaries:")
+                for summary_type, summary_text in summaries.items():
+                    truncated_summary = (
+                        summary_text[:200] + "..."
+                        if len(summary_text) > 200
+                        else summary_text
+                    )
+                    print(
+                        f"     - {summary_type.replace('_', ' ').title()}: {truncated_summary}"
+                    )
 
         print("\n📄 Full Result JSON:")
         print(json.dumps(result, indent=2, default=str))
 
     except Exception as e:
-        print(f"\n❌ Error during evaluation: {str(e)}")
+        print(f"\n❌ Error during multi-agent evaluation: {str(e)}")
         if args.debug_level >= 1:
             import traceback
 
             traceback.print_exc()
         sys.exit(1)
 
-    print("\n🎉 Test completed successfully!")
+    print("\n🎉 Multi-agent evaluation test completed successfully!")
 
 
 if __name__ == "__main__":

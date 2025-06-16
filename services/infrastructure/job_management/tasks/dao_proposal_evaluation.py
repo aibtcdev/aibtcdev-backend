@@ -21,7 +21,7 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
-from services.ai.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
+from services.ai.workflows.proposal_evaluation import evaluate_proposal
 
 logger = configure_logger(__name__)
 
@@ -65,7 +65,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     """
 
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_evaluation")
-    DEFAULT_CONFIDENCE_THRESHOLD = 0.7
+    DEFAULT_SCORE_THRESHOLD = 70.0
     DEFAULT_AUTO_VOTE = False
     DEFAULT_MAX_CONCURRENT_EVALUATIONS = (
         5  # Limit concurrent evaluations to avoid rate limits
@@ -196,18 +196,27 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             # Execute the proposal evaluation workflow
             logger.info(f"Evaluating proposal {proposal.id} for DAO {dao.name}")
 
-            result = await evaluate_and_vote_on_proposal(
-                proposal_id=proposal.id,
-                wallet_id=wallet_id,
-                auto_vote=self.DEFAULT_AUTO_VOTE,  # Don't auto-vote, just evaluate
-                confidence_threshold=self.DEFAULT_CONFIDENCE_THRESHOLD,
-                dao_id=dao_id,
+            # Get proposal data
+            proposal_data = proposal.content or "No content provided"
+
+            # Set up config for evaluation
+            config = {
+                "debug_level": 0,  # Normal debug level
+            }
+
+            evaluation = await evaluate_proposal(
+                proposal_id=str(proposal.id),
+                proposal_data=proposal_data,
+                config=config,
+                dao_id=str(dao_id) if dao_id else None,
+                agent_id=None,  # No specific agent for job processing
+                profile_id=None,  # No specific profile for job processing
             )
 
-            # Extract evaluation results
-            evaluation = result.get("evaluation", {})
+            # Extract evaluation results (evaluation is now the direct result)
+            result = {"evaluation": evaluation}
             approval = evaluation.get("approve", False)
-            confidence = evaluation.get("confidence_score", 0.0)
+            overall_score = evaluation.get("overall_score", 0)
             reasoning = evaluation.get("reasoning", "No reasoning provided")
             formatted_prompt = result.get("formatted_prompt", "")
             total_cost = result.get("total_overall_cost", 0.0)
@@ -219,7 +228,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
-                f"{'FOR' if approval else 'AGAINST'} with confidence {confidence:.2f}"
+                f"{'FOR' if approval else 'AGAINST'} with score {overall_score}"
             )
 
             wallet = backend.get_wallet(wallet_id)
@@ -234,7 +243,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 proposal_id=proposal_id,
                 answer=approval,
                 reasoning=reasoning,
-                confidence=confidence,
+                confidence=overall_score
+                / 100.0,  # Convert score to 0-1 range for compatibility
                 prompt=formatted_prompt,
                 cost=total_cost,
                 model=model,
@@ -260,7 +270,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 "success": True,
                 "vote_id": str(vote.id),
                 "approve": approval,
-                "confidence": confidence,
+                "overall_score": overall_score,
             }
 
         except Exception as e:
