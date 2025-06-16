@@ -22,6 +22,7 @@ from services.ai.workflows.utils.state_reducers import (
     no_update_reducer,
     set_once,
 )
+from services.ai.workflows.utils.model_factory import get_default_model_name
 from tools.dao_ext_action_proposals import VoteOnActionProposalTool
 from tools.tools_factory import filter_tools_by_names, initialize_tools
 
@@ -324,7 +325,7 @@ async def evaluate_proposal(
         config = {}
 
     # Use model name from config or default
-    model_name = config.get("model_name", "gpt-4.1")
+    model_name = config.get("model_name", get_default_model_name())
 
     workflow = ProposalEvaluationWorkflow(config)
 

@@ -2,10 +2,13 @@ import asyncio
 from typing import Any, Dict, Optional
 
 from langchain_core.prompts.chat import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
 from lib.logger import configure_logger
+from services.ai.workflows.utils.model_factory import (
+    create_chat_openai,
+    create_reasoning_llm,
+)
 from services.ai.workflows.chat import StreamingCallbackHandler
 from services.ai.workflows.mixins.capability_mixins import (
     BaseCapabilityMixin,
@@ -39,7 +42,7 @@ class ReasoningAgent(
         # Create callback handler and planning_llm for PlanningCapability
         # These won't be used since we don't actually use the planning functionality
         self.dummy_callback = StreamingCallbackHandler(queue=self.dummy_queue)
-        self.dummy_llm = ChatOpenAI()
+        self.dummy_llm = create_chat_openai()
 
         # Pass the required arguments to PlanningCapability.__init__
         PlanningCapability.__init__(
@@ -54,7 +57,7 @@ class ReasoningAgent(
         self.veto_threshold = config.get("veto_threshold", 30)
         self.consensus_threshold = config.get("consensus_threshold", 10)
         self.confidence_adjustment = config.get("confidence_adjustment", 0.15)
-        self.llm = ChatOpenAI(model="o3-mini")
+        self.llm = create_reasoning_llm()  # Uses o3-mini by default for reasoning
 
     def _initialize_planning_capability(self):
         """Initialize the planning capability if not already initialized."""

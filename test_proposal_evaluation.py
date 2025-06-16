@@ -20,7 +20,7 @@ from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from services.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
+from services.ai.workflows.proposal_evaluation import evaluate_and_vote_on_proposal
 
 
 def parse_uuid(value: str) -> Optional[UUID]:

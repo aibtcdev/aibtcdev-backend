@@ -13,6 +13,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import Graph, StateGraph
 
 from lib.logger import configure_logger
+from services.ai.workflows.utils.model_factory import create_chat_openai
 
 logger = configure_logger(__name__)
 
@@ -57,25 +58,24 @@ class BaseWorkflow(Generic[StateType]):
 
     def __init__(
         self,
-        model_name: str = "gpt-4.1",
-        temperature: Optional[float] = 0.9,
-        streaming: bool = True,
+        model_name: Optional[str] = None,
+        temperature: Optional[float] = None,
+        streaming: Optional[bool] = None,
         callbacks: Optional[List[Any]] = None,
     ):
         """Initialize the workflow.
 
         Args:
-            model_name: LLM model to use
-            temperature: Temperature for LLM generation, can be a float or None
-            streaming: Whether to enable streaming
+            model_name: LLM model to use. If None, uses default from ModelConfig
+            temperature: Temperature for LLM generation. If None, uses default from ModelConfig
+            streaming: Whether to enable streaming. If None, uses default from ModelConfig
             callbacks: Optional callback handlers
         """
-        self.llm = ChatOpenAI(
-            temperature=temperature,
+        self.llm = create_chat_openai(
             model=model_name,
+            temperature=temperature,
             streaming=streaming,
-            stream_usage=True,
-            callbacks=callbacks or [],
+            callbacks=callbacks,
         )
         self.logger = configure_logger(self.__class__.__name__)
         self.required_fields: List[str] = []
@@ -122,11 +122,9 @@ class BaseWorkflow(Generic[StateType]):
         Returns:
             A new ChatOpenAI instance with the specified callbacks
         """
-        return ChatOpenAI(
-            model=self.model_name,
-            temperature=self.temperature,
-            streaming=True,
-            stream_usage=True,
+        return create_chat_openai(
+            model=getattr(self.llm, "model_name", None),
+            temperature=getattr(self.llm, "temperature", None),
             callbacks=callbacks,
         )
 

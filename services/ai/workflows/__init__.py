@@ -43,6 +43,14 @@ from services.ai.workflows.workflow_service import (
     WorkflowService,
     execute_workflow_stream,
 )
+from services.ai.workflows.utils.model_factory import (
+    ModelConfig,
+    create_chat_openai,
+    create_planning_llm,
+    create_reasoning_llm,
+    get_default_model_name,
+    get_default_temperature,
+)
 
 __all__ = [
     "BaseWorkflow",
@@ -78,4 +86,11 @@ __all__ = [
     "PlanningCapability",
     "WebSearchCapability",
     "add_documents_to_vectors",
+    # Model factory exports
+    "ModelConfig",
+    "create_chat_openai",
+    "create_planning_llm",
+    "create_reasoning_llm",
+    "get_default_model_name",
+    "get_default_temperature",
 ]

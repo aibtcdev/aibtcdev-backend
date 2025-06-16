@@ -13,7 +13,7 @@ from typing import (
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
@@ -31,6 +31,7 @@ from services.ai.workflows.mixins.vector_mixin import (
     VectorRetrievalCapability,
 )
 from services.ai.workflows.mixins.web_search_mixin import WebSearchCapability
+from services.ai.workflows.utils.model_factory import create_planning_llm
 
 logger = configure_logger(__name__)
 
@@ -87,9 +88,8 @@ class ChatWorkflow(
         self.llm = self.create_llm_with_callbacks([callback_handler]).bind_tools(tools)
 
         # Create a separate LLM for planning with streaming enabled
-        self.planning_llm = ChatOpenAI(
+        self.planning_llm = create_planning_llm(
             model="o4-mini",
-            streaming=True,
             callbacks=[callback_handler],
         )
 
