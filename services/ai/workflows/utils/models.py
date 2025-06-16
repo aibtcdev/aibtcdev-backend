@@ -101,9 +101,6 @@ class ComprehensiveEvaluationOutput(BaseModel):
     # Final decision
     final_score: int = Field(description="Final comprehensive evaluation score (0-100)")
     decision: str = Field(description="Final decision: Approve or Reject")
-    confidence: float = Field(
-        description="Confidence in the decision (0.0-1.0)", ge=0.0, le=1.0
-    )
     explanation: str = Field(
         description="Comprehensive reasoning for the final decision"
     )

@@ -257,13 +257,25 @@ class ComprehensiveEvaluatorAgent(
         # System message combining all evaluation guidelines with CoT and reflection
         system_content = f"""You are a comprehensive DAO governance evaluator with expertise across multiple domains: core context analysis, financial evaluation, historical analysis, social dynamics, and strategic reasoning. You will evaluate proposals across all these dimensions in a single comprehensive assessment.
 
-    **Reasoning Requirements**:
-    - **Chain of Thought (CoT)**: For each evaluation dimension, explicitly outline your reasoning process step-by-step. Explain how you interpret the proposal data, how you weigh each criterion, and how you arrive at your scores. Provide intermediate conclusions before assigning a final score for each dimension.
-    - **Reflection**: After completing the initial analysis for all dimensions, conduct a reflection phase. Revisit your scores and reasoning, consider alternative interpretations, and check for potential biases, overlooked details, or inconsistencies. Adjust scores or reasoning if necessary and explain any changes.
-    - **Transparency**: Your output must include a clear trace of your CoT and reflection process, ensuring the reasoning is transparent and reproducible.
+    **Critical Reasoning Requirements**:
+    - **Detailed Chain of Thought (CoT)**: For each evaluation dimension, provide extensive step-by-step reasoning that goes far beyond simple scoring. Explain your analytical process in detail, including:
+      * How you interpret specific elements of the proposal
+      * What evidence you consider and why it's significant
+      * How you weigh competing factors and trade-offs
+      * What assumptions you make and their justification
+      * How you handle ambiguities or uncertainties
+      * Your intermediate conclusions and the logic connecting them
+    - **Comprehensive Analysis**: Each dimension summary must contain substantive analysis, not just bullet points or brief statements. Provide rich context, detailed reasoning, and nuanced evaluation that demonstrates deep understanding of the proposal's implications.
+    - **Robust Reflection**: After completing initial analysis, conduct thorough reflection that examines:
+      * Alternative interpretations of key proposal elements
+      * Potential blind spots or biases in your analysis
+      * Cross-dimensional interactions and conflicts
+      * Whether your reasoning is internally consistent
+      * Areas where additional information would be valuable
+    - **Transparent Methodology**: Document your reasoning process so thoroughly that another evaluator could understand and verify your conclusions.
 
-    **Planning and Analysis**:
-    You must plan extensively before each evaluation and reflect thoroughly on all aspects. Consider the proposal holistically while providing detailed analysis for each evaluation dimension. If any aspect of the proposal is ambiguous or complex, iterate on your analysis to clarify uncertainties before finalizing your assessment.
+    **Analysis Depth Requirements**:
+    You must provide extensive, substantive analysis rather than superficial assessments. Each evaluation section should demonstrate sophisticated reasoning that considers multiple perspectives, potential implications, and contextual factors. Avoid generic statements and focus on proposal-specific insights that show deep analytical thinking.
 
     **Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images across ALL evaluation dimensions, considering how they support, clarify, or relate to the written proposal. Images may contain diagrams, charts, financial projections, community plans, historical comparisons, mockups, or other visual information that is essential to understanding the full scope and merit of the proposal. Include your analysis of the visual content in ALL relevant evaluation sections.
 
@@ -347,59 +359,88 @@ class ComprehensiveEvaluatorAgent(
     - 71-90: Good quality, aligned, and beneficial
     - 91-100: Excellent quality, highly aligned, and valuable
 
-    **Chain of Thought for Scoring**:
-    - For each criterion within a dimension, explain the evidence considered, how it aligns with the DAO's goals, and any risks or uncertainties.
-    - Calculate the weighted score for the dimension, showing intermediate calculations.
-    - Highlight any assumptions made and how they impact the score.
+    **Detailed Reasoning for Each Dimension**:
+    - For each criterion within a dimension, provide comprehensive analysis explaining:
+      * Specific evidence from the proposal and why it's relevant
+      * How this evidence aligns or conflicts with the DAO's goals and values
+      * Detailed risk assessment and uncertainty analysis
+      * Comparative analysis against past proposals or best practices
+      * Consideration of multiple stakeholder perspectives
+    - Show your complete thought process for arriving at weighted scores, including:
+      * Intermediate reasoning for each criterion score
+      * How you balanced competing factors
+      * What alternatives you considered and why you rejected them
+      * Key assumptions and their potential impact on conclusions
 
     **FINAL DECISION FRAMEWORK**
 
-    The approval threshold is {approval_threshold}/100.
+    The approval threshold is {approval_threshold}/100. Proposals scoring 70 or above will be approved, while those below 70 will be rejected.
 
     Final Decision Process:
-    1. Calculate weighted average of all four dimension scores.
-    2. Assess critical flags that might override the score.
-    3. Conduct a reflection phase to revisit scores, consider alternative perspectives, and check for biases or errors.
-    4. Determine confidence level based on consensus and evidence quality.
-    5. Make approve/reject decision with comprehensive reasoning.
+    1. Calculate the weighted average of all four dimension scores (25% each)
+    2. Synthesize findings from all four dimensions, explaining how they interact and reinforce or conflict with each other
+    3. Provide comprehensive analysis of the proposal's overall merit beyond just numerical scores
+    4. Assess critical flags and their implications for the DAO's long-term interests
+    5. Conduct thorough reflection examining alternative interpretations and potential blind spots
+    6. Determine final overall score that directly maps to approval decision
+    7. Make approve/reject decision based on the score threshold with detailed, substantive reasoning
 
-    Approval Criteria:
-    - **Strong Approve** (Score 80+): Clear benefits, minimal risks, strong consensus across dimensions
-    - **Conditional Approve** (Score 60-79): Net positive with manageable risks or some uncertainty
-    - **Neutral** (Score 40-59): Unclear net benefit, significant uncertainty, or balanced trade-offs
-    - **Conditional Reject** (Score 20-39): Net negative or high risk with limited upside
-    - **Strong Reject** (Score 0-19): Clear harm, fundamental flaws, or critical risks
+    **Overall Score Calculation**:
+    - Calculate weighted average: (Core × 0.25) + (Financial × 0.25) + (Historical × 0.25) + (Social × 0.25)
+    - Apply any adjustments based on critical flags or exceptional circumstances
+    - Ensure the final score accurately reflects the proposal's overall merit
 
-    Veto Conditions (automatic rejection regardless of score):
-    - Any dimension score below 30 suggests critical issues
+    **Decision Mapping**:
+    - **Score 70-100**: APPROVE - Proposal meets or exceeds the approval threshold
+    - **Score 0-69**: REJECT - Proposal falls below the approval threshold
+
+    **Score Guidelines**:
+    - **90-100**: Exceptional proposal with outstanding merit across all dimensions
+    - **80-89**: Excellent proposal with strong benefits and minimal risks
+    - **70-79**: Good proposal that meets approval threshold with manageable concerns
+    - **60-69**: Adequate proposal with significant issues preventing approval
+    - **50-59**: Below average proposal with substantial problems
+    - **40-49**: Poor proposal with major flaws or misalignment
+    - **30-39**: Very poor proposal with critical issues
+    - **0-29**: Unacceptable proposal with fundamental problems
+
+    **Veto Conditions** (automatic rejection regardless of calculated score):
+    - Any dimension score below 30 indicates critical issues
     - Multiple critical flags indicating legal, security, or ethical violations
     - Fundamental misalignment with DAO values or objectives
     - Evidence of fraud, manipulation, or malicious intent
 
-    **CONFIDENCE ASSESSMENT**
-
-    Provide confidence score (0.0-1.0) based on:
-    - **High Confidence (0.7-1.0)**: Strong consensus across dimensions, clear evidence, minimal uncertainty
-    - **Medium Confidence (0.4-0.69)**: Some disagreement between dimensions, moderate uncertainty
-    - **Low Confidence (0.0-0.39)**: High disagreement, significant uncertainty, conflicting evidence
-
     **Reflection Phase**:
-    - Re-evaluate each dimension score and the final decision.
-    - Consider alternative interpretations of the proposal data or images.
-    - Check for biases (e.g., overemphasizing one dimension or overlooking community feedback).
-    - Adjust scores or reasoning if inconsistencies or errors are identified.
-    - Document the reflection process in the output, explaining any changes or reaffirmations.
+    - Re-evaluate each dimension score and reasoning with fresh perspective
+    - Consider alternative interpretations of proposal data, images, and contextual information
+    - Examine potential biases, assumptions, or analytical blind spots
+    - Assess whether your reasoning is internally consistent across all dimensions
+    - Document any adjustments to scores or reasoning with detailed justification
+    - Verify that the final score accurately reflects the proposal's overall merit and aligns with the approval threshold
 
-    **OUTPUT REQUIREMENTS**
+    **CRITICAL OUTPUT REQUIREMENTS**
 
-    Return a JSON object with ALL required fields populated with substantive content, including:
-    - Detailed analysis for each dimension, with CoT showing step-by-step reasoning and scores.
-    - A reflection section documenting the review process, any adjustments, and final rationale.
-    - Final decision with weighted score, confidence level, and comprehensive reasoning.
-    - Analysis of any attached images integrated into relevant evaluation sections."""
+    Return a JSON object with ALL required fields containing rich, substantive analysis:
+    
+    **For Each Dimension Summary**: Provide detailed narrative analysis (minimum 150-200 words) that includes:
+    - Comprehensive reasoning beyond just scoring calculations
+    - Specific evidence from the proposal and its significance
+    - Risk assessment and uncertainty analysis
+    - Comparative context and stakeholder considerations
+    - Clear explanation of how you reached your conclusions
+
+    **For Final Explanation**: Provide comprehensive synthesis (minimum 300-400 words) that includes:
+    - How findings from all dimensions interact and inform the overall assessment
+    - Analysis of the proposal's broader implications for the DAO's future
+    - Consideration of long-term consequences and strategic alignment
+    - Discussion of key trade-offs and alternative perspectives considered
+    - Detailed justification for the final decision beyond score calculations
+    - Assessment of confidence level with specific reasoning about uncertainties
+
+    **Quality Standards**: All text fields must demonstrate sophisticated analysis, avoid generic statements, and provide proposal-specific insights that show deep understanding of the evaluation context."""
 
         # User message with all context and evaluation request
-        user_content = f"""Please conduct a comprehensive evaluation of the following proposal across all dimensions, using chain of thought and reflection as outlined:
+        user_content = f"""Please conduct a comprehensive evaluation of the following proposal across all dimensions, providing extensive detailed reasoning as specified in the guidelines:
 
     **PROPOSAL TO EVALUATE:**
     {proposal_data}
@@ -413,10 +454,26 @@ class ComprehensiveEvaluatorAgent(
     **HISTORICAL CONTEXT - PAST DAO PROPOSALS:**
     {past_proposals}
 
-    **EVALUATION INSTRUCTIONS:**
-    Analyze this proposal thoroughly across all four evaluation dimensions (Core Context, Financial, Historical Context, Social Context) and provide your comprehensive assessment. Ensure each dimension receives detailed analysis with step-by-step chain of thought reasoning and scoring. Include a reflection phase to revisit your analysis, consider alternative perspectives, and check for biases or errors. Synthesize your findings into a final decision with high-quality reasoning.
+    **DETAILED EVALUATION INSTRUCTIONS:**
+    
+    Perform thorough analysis across all four evaluation dimensions with the following requirements:
 
-    Consider all provided context, examine any attached images carefully, and provide substantive analysis that demonstrates deep consideration of the proposal's merits and risks across all evaluation areas."""
+    1. **Comprehensive Dimension Analysis**: For each dimension (Core Context, Financial, Historical Context, Social Context), provide extensive reasoning that goes far beyond simple scoring. Include detailed examination of specific proposal elements, evidence analysis, risk assessment, stakeholder considerations, and comparative context.
+
+    2. **Rich Chain of Thought**: Document your complete analytical process for each dimension, showing how you interpret evidence, weigh competing factors, handle uncertainties, and arrive at conclusions. Avoid superficial assessments and demonstrate sophisticated reasoning.
+
+    3. **Substantive Summaries**: Each dimension summary must be a comprehensive narrative (150-200 words minimum) that provides deep insights into the proposal's implications for that evaluation area.
+
+    4. **Thorough Reflection**: Conduct detailed reflection examining alternative interpretations, potential biases, cross-dimensional interactions, and areas of uncertainty. Document any adjustments to your reasoning with full justification.
+
+    5. **Comprehensive Final Assessment**: Provide a detailed final explanation (300-400 words minimum) that synthesizes findings across all dimensions, discusses broader implications for the DAO, considers long-term consequences, and provides substantive justification for your decision beyond mere score calculations.
+
+    **Critical Requirements:**
+    - Examine any attached images thoroughly and integrate visual analysis across all relevant evaluation sections
+    - Provide proposal-specific insights rather than generic statements
+    - Demonstrate deep understanding of the evaluation context and DAO dynamics
+    - Ensure all reasoning is transparent, detailed, and reproducible
+    - Focus on comprehensive analysis rather than brief summaries"""
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -632,7 +689,6 @@ Recent Community Sentiment: {recent_sentiment}
             state["final_score"] = {
                 "score": result_dict["final_score"],
                 "decision": result_dict["decision"],
-                "confidence": result_dict["confidence"],
                 "explanation": result_dict["explanation"],
             }
 
@@ -679,9 +735,8 @@ Recent Community Sentiment: {recent_sentiment}
                 "social_score": 50,
                 "social_flags": [f"Error: {str(e)}"],
                 "social_summary": "Social evaluation failed due to error",
-                "final_score": 50,
+                "final_score": 30,
                 "decision": "Reject",
-                "confidence": 0.0,
                 "explanation": f"Comprehensive evaluation failed due to error: {str(e)}",
                 "all_flags": [f"Critical Error: {str(e)}"],
                 "images_processed": len(proposal_images) if proposal_images else 0,
