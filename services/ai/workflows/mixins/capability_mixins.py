@@ -4,15 +4,14 @@ This module provides a standardized approach to creating and integrating
 capabilities into LangGraph workflows through a mixin system.
 """
 
-import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, TypeVar
 
 from langchain_core.prompts.chat import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
 from backend.factory import backend
+from services.ai.workflows.utils.model_factory import create_chat_openai, ModelConfig
 from backend.models import PromptFilter
 from lib.logger import configure_logger
 
@@ -83,11 +82,11 @@ class BaseCapabilityMixin(CapabilityMixin):
             self.config.update(kwargs)
 
         # Create the LLM instance
-        self.llm = ChatOpenAI(
-            model=self.config.get("model_name", "gpt-4.1"),
-            temperature=self.config.get("temperature", 0.9),
-            streaming=self.config.get("streaming", True),
-            callbacks=self.config.get("callbacks", []),
+        self.llm = create_chat_openai(
+            model=self.config.get("model_name"),
+            temperature=self.config.get("temperature"),
+            streaming=self.config.get("streaming"),
+            callbacks=self.config.get("callbacks"),
         )
 
         if "state_key" in kwargs:
@@ -264,70 +263,50 @@ class PromptCapability:
     ) -> Optional[Dict[str, Any]]:
         """Fetch custom prompt for the given context.
 
+        Only returns a custom prompt if there's an active agent_id set for the specific DAO.
+        Otherwise returns None.
+
         Args:
-            dao_id: Optional DAO ID to find DAO-specific prompts
-            agent_id: Optional agent ID to find agent-specific prompts
-            profile_id: Optional profile ID to find user-specific prompts
+            dao_id: DAO ID to check for agent-specific prompts
+            agent_id: Agent ID to find agent-specific prompts
+            profile_id: Not used in current implementation
             prompt_type: Type of prompt (used in prompt_text search)
 
         Returns:
-            Dictionary containing prompt_text, model, and temperature if found
+            Dictionary containing prompt_text, model, and temperature if agent prompt found
         """
         try:
-            # Create filter based on available IDs, prioritizing specificity
-            PromptFilter(is_active=True)
+            # Only proceed if both dao_id and agent_id are provided
+            if not dao_id or not agent_id:
+                return None
 
-            # Try to find prompts in order of specificity:
-            # 1. Agent-specific prompts
-            # 2. DAO-specific prompts
-            # 3. Profile-specific prompts
-
-            prompt_candidates = []
-
-            if agent_id:
-                agent_filter = PromptFilter(agent_id=agent_id, is_active=True)
-                agent_prompts = backend.list_prompts(agent_filter)
-                prompt_candidates.extend(
-                    [(prompt, "agent") for prompt in agent_prompts]
-                )
-
-            if dao_id:
-                dao_filter = PromptFilter(dao_id=dao_id, is_active=True)
-                dao_prompts = backend.list_prompts(dao_filter)
-                prompt_candidates.extend([(prompt, "dao") for prompt in dao_prompts])
-
-            if profile_id:
-                profile_filter = PromptFilter(profile_id=profile_id, is_active=True)
-                profile_prompts = backend.list_prompts(profile_filter)
-                prompt_candidates.extend(
-                    [(prompt, "profile") for prompt in profile_prompts]
-                )
+            # Look for active agent-specific prompts only
+            agent_filter = PromptFilter(agent_id=agent_id, is_active=True)
+            agent_prompts = backend.list_prompts(agent_filter)
 
             # Filter prompts that might be relevant to this prompt type
             relevant_prompts = []
-            for prompt, source in prompt_candidates:
+            for prompt in agent_prompts:
                 if prompt.prompt_text and (
                     prompt_type.lower() in prompt.prompt_text.lower()
                     or "evaluation" in prompt.prompt_text.lower()
                     or len(prompt.prompt_text) > 100  # Assume longer prompts are custom
                 ):
-                    relevant_prompts.append((prompt, source))
+                    relevant_prompts.append(prompt)
 
             if relevant_prompts:
-                # Use the most specific prompt (agent > dao > profile)
-                priority_order = {"agent": 1, "dao": 2, "profile": 3}
-                best_prompt = min(relevant_prompts, key=lambda x: priority_order[x[1]])[
-                    0
-                ]
+                # Use the first relevant prompt found
+                best_prompt = relevant_prompts[0]
 
                 self.logger.debug(
-                    f"Using custom prompt for {prompt_type} from {best_prompt.dao_id or best_prompt.agent_id or best_prompt.profile_id}"
+                    f"Using custom prompt for {prompt_type} from agent {agent_id}"
                 )
 
                 return {
                     "prompt_text": best_prompt.prompt_text,
-                    "model": best_prompt.model or "gpt-4o",
-                    "temperature": best_prompt.temperature or 0.9,
+                    "model": best_prompt.model or ModelConfig.get_default_model(),
+                    "temperature": best_prompt.temperature
+                    or ModelConfig.get_default_temperature(),
                 }
 
         except Exception as e:
@@ -344,14 +323,15 @@ class PromptCapability:
         try:
             if hasattr(self, "llm") and custom_prompt_data:
                 # Update LLM with custom settings
-                model = custom_prompt_data.get("model", "gpt-4.1")
-                temperature = custom_prompt_data.get("temperature", 0.9)
+                model = custom_prompt_data.get("model")
+                temperature = custom_prompt_data.get("temperature")
 
-                if model != self.llm.model_name or temperature != self.llm.temperature:
-                    self.llm = ChatOpenAI(
+                if model != getattr(
+                    self.llm, "model_name", None
+                ) or temperature != getattr(self.llm, "temperature", None):
+                    self.llm = create_chat_openai(
                         model=model,
                         temperature=temperature,
-                        api_key=os.getenv("OPENAI_API_KEY"),
                     )
                     self.logger.debug(
                         f"Updated LLM settings: model={model}, temperature={temperature}"

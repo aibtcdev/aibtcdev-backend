@@ -2,10 +2,13 @@ import asyncio
 from typing import Any, Dict, Optional
 
 from langchain_core.prompts.chat import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 
 from lib.logger import configure_logger
+from services.ai.workflows.utils.model_factory import (
+    create_chat_openai,
+    create_reasoning_llm,
+)
 from services.ai.workflows.chat import StreamingCallbackHandler
 from services.ai.workflows.mixins.capability_mixins import (
     BaseCapabilityMixin,
@@ -39,7 +42,7 @@ class ReasoningAgent(
         # Create callback handler and planning_llm for PlanningCapability
         # These won't be used since we don't actually use the planning functionality
         self.dummy_callback = StreamingCallbackHandler(queue=self.dummy_queue)
-        self.dummy_llm = ChatOpenAI()
+        self.dummy_llm = create_chat_openai()
 
         # Pass the required arguments to PlanningCapability.__init__
         PlanningCapability.__init__(
@@ -54,7 +57,7 @@ class ReasoningAgent(
         self.veto_threshold = config.get("veto_threshold", 30)
         self.consensus_threshold = config.get("consensus_threshold", 10)
         self.confidence_adjustment = config.get("confidence_adjustment", 0.15)
-        self.llm = ChatOpenAI(model="o3-mini")
+        self.llm = create_reasoning_llm()  # Uses o3-mini by default for reasoning
 
     def _initialize_planning_capability(self):
         """Initialize the planning capability if not already initialized."""
@@ -172,45 +175,31 @@ class ReasoningAgent(
       - Evidence of fraud, manipulation, or malicious intent
     </veto_conditions>
     
-    <confidence_assessment>
-      You must also provide a confidence score (0.0-1.0) for your decision based on:
+    <scoring_methodology>
+      You must provide a final overall score (0-100) that directly maps to the approval decision:
       
-      <high_confidence_indicators>
-        - Strong consensus among agents (score range < 15 points)
-        - Detailed, evidence-based reasoning from multiple agents
-        - Clear alignment between different evaluation dimensions
-        - Minimal or well-understood risks
-        - Consistent quality across agent evaluations
-        - Clear proposal with well-defined outcomes
-      </high_confidence_indicators>
+      <score_calculation>
+        - Start with the weighted average of reliable agent scores
+        - Adjust based on flag severity and cross-agent insights
+        - Apply contextual weighting based on proposal type and DAO priorities
+        - Ensure the final score accurately reflects the proposal's overall merit
+      </score_calculation>
       
-      <medium_confidence_indicators>
-        - Moderate consensus (score range 15-30 points)
-        - Some agents provide detailed analysis, others are superficial
-        - Mixed signals across evaluation dimensions
-        - Some uncertainty about outcomes or implementation
-        - Moderate disagreement that can be reasonably reconciled
-      </medium_confidence_indicators>
+      <score_adjustment_factors>
+        - Strong consensus among agents (minimal adjustments needed)
+        - Detailed, evidence-based reasoning from multiple agents (higher confidence in scores)
+        - Clear alignment between different evaluation dimensions (scores are reliable)
+        - Conflicting evidence or contradictory assessments (may require score adjustments)
+        - Critical flags or red flags (may require significant score reductions)
+        - Missing critical information (may require score reductions due to uncertainty)
+      </score_adjustment_factors>
       
-      <low_confidence_indicators>
-        - High disagreement among agents (score range > 30 points)
-        - Superficial or poorly reasoned agent evaluations
-        - Conflicting evidence or contradictory assessments
-        - High uncertainty about proposal viability or impact
-        - Missing critical information for evaluation
-        - Borderline scores near decision thresholds
-      </low_confidence_indicators>
-      
-      <confidence_factors_to_consider>
-        - How much do agents agree vs. disagree?
-        - Are the agent evaluations thorough and well-reasoned?
-        - Is there sufficient information to make a sound judgment?
-        - Are there any critical unknowns or uncertainties?
-        - How clear-cut is the decision given the threshold?
-        - Are there any red flags or concerning inconsistencies?
-        - Does the proposal type lend itself to confident evaluation?
-      </confidence_factors_to_consider>
-    </confidence_assessment>
+      <threshold_alignment>
+        The approval threshold is 70/100. Ensure your final score reflects:
+        - Score 70-100: APPROVE - Proposal meets or exceeds the approval threshold
+        - Score 0-69: REJECT - Proposal falls below the approval threshold
+      </threshold_alignment>
+    </scoring_methodology>
   </decision_guidelines>
   
   <reasoning_process>
@@ -233,26 +222,17 @@ class ReasoningAgent(
   
   <output_requirements>
     <score>
-      - Provide a final score from 0-100
+      - Provide a final overall score from 0-100
       - Justify how you arrived at this specific score
       - Explain any adjustments made to the base average
+      - Ensure the score accurately reflects the proposal's merit relative to the 70-point threshold
     </score>
     
     <decision>
       - State clearly "Approve" or "Reject"
-      - Ensure decision aligns with score and threshold
-      - Consider confidence level in borderline cases
+      - Ensure decision aligns with score and 70-point threshold
+      - Score 70+ = Approve, Score <70 = Reject
     </decision>
-    
-    <confidence>
-      - Provide a confidence score from 0.0-1.0
-      - 0.9-1.0: Very high confidence (strong consensus, clear evidence)
-      - 0.7-0.89: High confidence (good agreement, solid reasoning)
-      - 0.5-0.69: Medium confidence (some uncertainty, moderate disagreement)
-      - 0.3-0.49: Low confidence (significant uncertainty, high disagreement)
-      - 0.0-0.29: Very low confidence (major uncertainties, conflicting evidence)
-      - Justify your confidence level based on the factors outlined above
-    </confidence>
     
     <explanation>
       Your explanation should be comprehensive and structured, providing stakeholders with a complete understanding of your reasoning process. Include the following elements in a detailed narrative:
@@ -288,16 +268,16 @@ class ReasoningAgent(
       **Decision Rationale (150-250 words)**:
       - Explain your specific scoring methodology and how you arrived at the final number
       - Justify any significant adjustments made to the simple average of agent scores
-      - Discuss how the score translates to your approve/reject decision
-      - Address whether this is a confident decision or a borderline case
-      - Explain how uncertainty was factored into your decision-making
+      - Discuss how the score translates to your approve/reject decision relative to the 70-point threshold
+      - Address whether this is a clear-cut decision or a borderline case
+      - Explain how uncertainty and disagreement between agents were factored into the final score
 
-      **Confidence Assessment (100-150 words)**:
-      - Provide specific reasoning for your confidence level
-      - Identify the main sources of uncertainty in your evaluation
-      - Discuss what additional information would increase confidence
-      - Explain how disagreement between agents affected your confidence
-      - Address whether the proposal type or complexity contributed to uncertainty
+      **Score Justification (100-150 words)**:
+      - Provide specific reasoning for your final score
+      - Identify the main factors that influenced your scoring decision
+      - Discuss what additional information might have changed the score
+      - Explain how disagreement between agents affected your scoring
+      - Address whether the proposal type or complexity contributed to scoring challenges
 
       **Contextual Considerations (100-200 words)**:
       - Discuss any DAO-specific factors that influenced your assessment
@@ -325,7 +305,9 @@ class ReasoningAgent(
   <final_instruction>
     Think step-by-step through this analytical framework. Don't just average scores - synthesize insights, weigh evidence quality, and provide a thoughtful evaluation that helps stakeholders understand both the decision and the reasoning behind it. Your analysis should demonstrate deep consideration of all available information.
     
-    Return only a JSON object with exactly these four fields: score, decision, confidence, and explanation.
+    Ensure your final score accurately reflects the proposal's merit and aligns with the 70-point approval threshold. Score 70 or above means approval, below 70 means rejection.
+    
+    Return only a JSON object with exactly these three fields: score, decision, and explanation.
   </final_instruction>
 </reasoning_evaluation>"""
         )
@@ -537,8 +519,8 @@ Score Statistics:
                 },
             }
 
-            # Confidence is now provided by the LLM in the structured output
-            # No need for manual calculation - the LLM considers all factors contextually
+            # Score and decision are now provided by the LLM in the structured output
+            # The LLM ensures score aligns with the 70-point approval threshold
 
             # Add flags to the result
             result_dict["flags"] = flags
@@ -567,9 +549,8 @@ Score Statistics:
                 f"[DEBUG:ReasoningAgent:{proposal_id}] Error in reasoning: {str(e)}"
             )
             return {
-                "score": 50,
+                "score": 30,  # Below threshold, ensuring rejection
                 "decision": "Reject",
-                "confidence": 0.0,
                 "explanation": f"Evaluation failed due to error: {str(e)}",
                 "flags": [f"Error: {str(e)}"],
             }

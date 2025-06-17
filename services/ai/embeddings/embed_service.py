@@ -9,31 +9,36 @@ from lib.logger import configure_logger
 
 logger = configure_logger(__name__)
 
-EMBEDDING_MODEL = "text-embedding-ada-002"
-
 
 class EmbedService:
     """Service for generating text embeddings using OpenAI."""
 
-    def __init__(self, model_name: str = EMBEDDING_MODEL):
+    def __init__(self, model_name: Optional[str] = None):
         """Initialize the embedding service.
 
         Args:
-            model_name: The OpenAI embedding model to use
+            model_name: The OpenAI embedding model to use. If None, uses configured default.
         """
-        self.model_name = model_name
+        self.model_name = model_name or config.embedding.default_model
         self._embeddings_client: Optional[OpenAIEmbeddings] = None
 
     @property
     def embeddings_client(self) -> OpenAIEmbeddings:
         """Get or create the OpenAI embeddings client."""
         if self._embeddings_client is None:
-            if not config.api.openai_api_key:
-                raise ValueError("OpenAI API key not configured")
+            if not config.embedding.api_key:
+                raise ValueError("Embedding API key not configured")
 
-            self._embeddings_client = OpenAIEmbeddings(
-                model=self.model_name, openai_api_key=config.api.openai_api_key
-            )
+            embedding_config = {
+                "model": self.model_name,
+                "api_key": config.embedding.api_key,
+            }
+
+            # Add base_url if configured
+            if config.embedding.api_base:
+                embedding_config["base_url"] = config.embedding.api_base
+
+            self._embeddings_client = OpenAIEmbeddings(**embedding_config)
         return self._embeddings_client
 
     async def embed_text(self, text: str) -> Optional[List[float]]:
@@ -93,7 +98,7 @@ class EmbedService:
             True if the service is properly configured and available
         """
         try:
-            return bool(config.api.openai_api_key)
+            return bool(config.embedding.api_key)
         except Exception as e:
             logger.error(f"Error checking embedding service availability: {str(e)}")
             return False

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Simple CLI test script for proposal evaluation workflow (multi-agent).
+Simple CLI test script for comprehensive proposal evaluation workflow.
 
-This test uses the multi-agent ProposalEvaluationWorkflow that runs multiple
-specialized agents (core, financial, historical, social, reasoning) in sequence.
+This test uses the ComprehensiveEvaluatorAgent that performs all evaluations
+(core, financial, historical, social, and reasoning) in a single LLM pass.
 
 Usage:
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Proposal content" --debug-level 2
-    python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2  # Lookup from database
+    python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
+    python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Proposal content" --debug-level 2
+    python test_comprehensive_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2  # Lookup from database
 """
 
 import argparse
@@ -20,26 +20,28 @@ from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from services.ai.workflows.proposal_evaluation import evaluate_proposal
+from services.ai.workflows.comprehensive_evaluation import (
+    evaluate_proposal_comprehensive,
+)
 from backend.factory import get_backend
 
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Test proposal evaluation workflow (multi-agent)",
+        description="Test comprehensive proposal evaluation workflow (single-agent)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic multi-agent evaluation with proposal data
-  python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
+  # Basic comprehensive evaluation with proposal data
+  python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
     --proposal-data "Proposal to fund development of new feature"
   
   # Lookup proposal from database
-  python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
+  python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
     --debug-level 2
   
   # Verbose debugging
-  python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
+  python test_comprehensive_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
     --proposal-data "Proposal content" --debug-level 2
         """,
     )
@@ -128,7 +130,7 @@ Examples:
             print(f"❌ Error looking up proposal: {e}")
             sys.exit(1)
 
-    print("🚀 Starting Multi-Agent Proposal Evaluation Test")
+    print("🚀 Starting Comprehensive Proposal Evaluation Test")
     print("=" * 60)
     print(f"Proposal ID: {args.proposal_id}")
     print(
@@ -140,7 +142,7 @@ Examples:
     print(f"Debug Level: {args.debug_level}")
     print(f"Model Name: {args.model_name}")
     print("=" * 60)
-    print("🧠 Using Multi-Agent ProposalEvaluationWorkflow")
+    print("🧠 Using ComprehensiveEvaluatorAgent (Single LLM Pass)")
     print("=" * 60)
 
     try:
@@ -158,9 +160,9 @@ Examples:
             config["veto_threshold"] = 30
             config["consensus_threshold"] = 10
 
-        # Run multi-agent evaluation
-        print("🔍 Running multi-agent evaluation...")
-        result = await evaluate_proposal(
+        # Run comprehensive evaluation
+        print("🔍 Running comprehensive evaluation...")
+        result = await evaluate_proposal_comprehensive(
             proposal_id=args.proposal_id,
             proposal_content=proposal_content,
             config=config,
@@ -169,14 +171,14 @@ Examples:
             profile_id=args.profile_id,
         )
 
-        print("\n✅ Multi-Agent Evaluation Complete!")
+        print("\n✅ Comprehensive Evaluation Complete!")
         print("=" * 60)
 
         # Pretty print the result
         if "error" in result:
             print(f"❌ Error: {result['error']}")
         else:
-            print("📊 Multi-Agent Evaluation Results:")
+            print("📊 Comprehensive Evaluation Results:")
             print(
                 f"   • Approval: {'✅ APPROVE' if result.get('approve') else '❌ REJECT'}"
             )
@@ -208,13 +210,9 @@ Examples:
                 print(f"     - Output: {token_usage.get('output_tokens', 0):,}")
                 print(f"     - Total: {token_usage.get('total_tokens', 0):,}")
 
-            workflow_step = result.get("workflow_step", "unknown")
-            completed_steps = result.get("completed_steps", [])
-            if workflow_step or completed_steps:
-                print("   • Workflow Progress:")
-                print(f"     - Current Step: {workflow_step}")
-                if completed_steps:
-                    print(f"     - Completed Steps: {', '.join(completed_steps)}")
+            images_processed = result.get("images_processed", 0)
+            if images_processed > 0:
+                print(f"   • Images Processed: {images_processed}")
 
             summaries = result.get("summaries", {})
             if summaries and args.debug_level >= 1:
@@ -233,14 +231,14 @@ Examples:
         print(json.dumps(result, indent=2, default=str))
 
     except Exception as e:
-        print(f"\n❌ Error during multi-agent evaluation: {str(e)}")
+        print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
         if args.debug_level >= 1:
             import traceback
 
             traceback.print_exc()
         sys.exit(1)
 
-    print("\n🎉 Multi-agent evaluation test completed successfully!")
+    print("\n🎉 Comprehensive evaluation test completed successfully!")
 
 
 if __name__ == "__main__":

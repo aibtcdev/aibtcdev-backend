@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 from lib.logger import configure_logger
 from lib.utils import calculate_token_cost
+from services.ai.workflows.utils.model_factory import get_default_model_name
 
 logger = configure_logger(__name__)
 
@@ -42,7 +43,7 @@ class TokenUsageMixin:
                 return token_usage_data
 
         # Fallback to estimation
-        llm_model_name = getattr(self.llm, "model_name", "gpt-4.1")
+        llm_model_name = getattr(self.llm, "model_name", get_default_model_name())
         token_count = len(prompt_text) // 4  # Simple estimation
         token_usage_dict = {"input_tokens": token_count}
         calculate_token_cost(token_usage_dict, llm_model_name)

@@ -57,11 +57,11 @@ class ImageProcessingNode(BaseCapabilityMixin):
             List of dictionaries containing processed images in a format suitable for LLM
         """
         proposal_id = state.get("proposal_id", "unknown")
-        proposal_data_str = state.get("proposal_data", "")
+        proposal_content = state.get("proposal_content", "")
 
-        if not proposal_data_str:
+        if not proposal_content:
             self.logger.info(
-                f"[ImageProcessorNode:{proposal_id}] No proposal_data, skipping."
+                f"[ImageProcessorNode:{proposal_id}] No proposal_content, skipping."
             )
             # Return empty list to ensure state is updated
             return []
@@ -69,7 +69,7 @@ class ImageProcessingNode(BaseCapabilityMixin):
         self.logger.info(
             f"[ImageProcessorNode:{proposal_id}] Starting image processing."
         )
-        image_urls = extract_image_urls(proposal_data_str)
+        image_urls = extract_image_urls(proposal_content)
 
         if not image_urls:
             self.logger.info(f"[ImageProcessorNode:{proposal_id}] No image URLs found.")
