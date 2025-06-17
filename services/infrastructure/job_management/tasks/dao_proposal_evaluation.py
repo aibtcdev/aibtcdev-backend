@@ -21,7 +21,9 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
-from services.ai.workflows.proposal_evaluation import evaluate_proposal
+from services.ai.workflows.comprehensive_evaluation import (
+    evaluate_proposal_comprehensive,
+)
 
 logger = configure_logger(__name__)
 
@@ -204,7 +206,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 "debug_level": 0,  # Normal debug level
             }
 
-            evaluation = await evaluate_proposal(
+            evaluation = await evaluate_proposal_comprehensive(
                 proposal_id=str(proposal.id),
                 proposal_content=proposal_content,
                 config=config,
