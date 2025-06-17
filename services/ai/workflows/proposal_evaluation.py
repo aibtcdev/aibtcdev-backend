@@ -29,7 +29,7 @@ class ProposalEvaluationState(TypedDict):
     """Type definition for the proposal evaluation state."""
 
     proposal_id: Annotated[str, no_update_reducer]
-    proposal_data: Annotated[str, no_update_reducer]
+    proposal_content: Annotated[str, no_update_reducer]
     dao_id: Annotated[Optional[str], no_update_reducer]
     agent_id: Annotated[Optional[str], no_update_reducer]
     profile_id: Annotated[Optional[str], no_update_reducer]
@@ -98,7 +98,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
         self.hierarchical_workflow.set_entry_point("image_processor")
         self.hierarchical_workflow.set_supervisor_logic(self._supervisor_logic)
         self.hierarchical_workflow.set_halt_condition(self._halt_condition)
-        self.required_fields = ["proposal_id", "proposal_data"]
+        self.required_fields = ["proposal_id", "proposal_content"]
 
     def _supervisor_logic(
         self, state: ProposalEvaluationState
@@ -300,7 +300,7 @@ class ProposalEvaluationWorkflow(BaseWorkflow[ProposalEvaluationState]):
 
 async def evaluate_proposal(
     proposal_id: str,
-    proposal_data: str,
+    proposal_content: str,
     config: Optional[Dict[str, Any]] = None,
     dao_id: Optional[str] = None,
     agent_id: Optional[str] = None,
@@ -310,7 +310,7 @@ async def evaluate_proposal(
 
     Args:
         proposal_id: Unique identifier for the proposal
-        proposal_data: Proposal content
+        proposal_content: Proposal content
         config: Optional configuration for the workflow
         dao_id: Optional DAO ID
         agent_id: Optional agent ID
@@ -331,7 +331,7 @@ async def evaluate_proposal(
     # Create initial state with improved tracking
     initial_state = {
         "proposal_id": proposal_id,
-        "proposal_data": proposal_data,
+        "proposal_content": proposal_content,
         "dao_id": dao_id,
         "agent_id": agent_id,
         "profile_id": profile_id,

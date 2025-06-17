@@ -94,9 +94,9 @@ Examples:
 
     args = parser.parse_args()
 
-    # If proposal_data is not provided, look it up from the database
-    proposal_data = args.proposal_data
-    if not proposal_data:
+    # If proposal_content is not provided, look it up from the database
+    proposal_content = args.proposal_content
+    if not proposal_content:
         print("📋 No proposal data provided, looking up from database...")
         try:
             backend = get_backend()
@@ -113,7 +113,7 @@ Examples:
                 print(f"❌ Error: Proposal {args.proposal_id} has no content")
                 sys.exit(1)
 
-            proposal_data = proposal.content
+            proposal_content = proposal.content
             print(f"✅ Found proposal in database: {proposal.title or 'Untitled'}")
 
             # Update DAO ID if not provided and available in proposal
@@ -132,7 +132,7 @@ Examples:
     print("=" * 60)
     print(f"Proposal ID: {args.proposal_id}")
     print(
-        f"Proposal Data: {proposal_data[:100]}{'...' if len(proposal_data) > 100 else ''}"
+        f"Proposal Data: {proposal_content[:100]}{'...' if len(proposal_content) > 100 else ''}"
     )
     print(f"Agent ID: {args.agent_id}")
     print(f"DAO ID: {args.dao_id}")
@@ -162,7 +162,7 @@ Examples:
         print("🔍 Running multi-agent evaluation...")
         result = await evaluate_proposal(
             proposal_id=args.proposal_id,
-            proposal_data=proposal_data,
+            proposal_content=proposal_content,
             config=config,
             dao_id=args.dao_id,
             agent_id=args.agent_id,

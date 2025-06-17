@@ -197,7 +197,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(f"Evaluating proposal {proposal.id} for DAO {dao.name}")
 
             # Get proposal data
-            proposal_data = proposal.content or "No content provided"
+            proposal_content = proposal.content or "No content provided"
 
             # Set up config for evaluation
             config = {
@@ -206,7 +206,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
             evaluation = await evaluate_proposal(
                 proposal_id=str(proposal.id),
-                proposal_data=proposal_data,
+                proposal_content=proposal_content,
                 config=config,
                 dao_id=str(dao_id) if dao_id else None,
                 agent_id=None,  # No specific agent for job processing

@@ -10,21 +10,25 @@ logger = configure_logger(__name__)
 
 async def evaluate_proposal_comprehensive(
     proposal_id: str,
-    proposal_data: str,
+    proposal_content: Optional[str] = None,
     config: Optional[Dict[str, Any]] = None,
     dao_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     profile_id: Optional[str] = None,
+    custom_system_prompt: Optional[str] = None,
+    custom_user_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Evaluate a proposal using the ComprehensiveEvaluatorAgent in a single pass.
 
     Args:
         proposal_id: Unique identifier for the proposal
-        proposal_data: Proposal content
+        proposal_content: Proposal content
         config: Optional configuration for the agent
         dao_id: Optional DAO ID
         agent_id: Optional agent ID
         profile_id: Optional profile ID
+        custom_system_prompt: Optional custom system prompt to override default
+        custom_user_prompt: Optional custom user prompt to override default
 
     Returns:
         Dictionary containing evaluation results
@@ -46,7 +50,7 @@ async def evaluate_proposal_comprehensive(
         image_processor = ImageProcessingNode(config=config)
         initial_state = {
             "proposal_id": proposal_id,
-            "proposal_data": proposal_data,
+            "proposal_content": proposal_content,
             "dao_id": dao_id,
             "agent_id": agent_id,
             "profile_id": profile_id,
@@ -73,11 +77,13 @@ async def evaluate_proposal_comprehensive(
         # Create state for the evaluator
         evaluator_state = {
             "proposal_id": proposal_id,
-            "proposal_data": proposal_data,
+            "proposal_content": proposal_content,
             "dao_id": dao_id,
             "agent_id": agent_id,
             "profile_id": profile_id,
             "proposal_images": proposal_images,
+            "custom_system_prompt": custom_system_prompt,
+            "custom_user_prompt": custom_user_prompt,
             "flags": [],
             "summaries": {},
             "token_usage": {},

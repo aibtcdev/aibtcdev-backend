@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field  # Added import for Pydantic models
@@ -6,6 +6,7 @@ from starlette.responses import JSONResponse
 
 from api.dependencies import (
     verify_profile_from_token,  # Added verify_profile_from_token
+    verify_profile,
 )
 from backend.factory import backend  # Added backend factory
 from backend.models import (  # Added Profile, AgentFilter, Wallet
@@ -29,6 +30,13 @@ from services.ai.workflows.agents.proposal_metadata import (
 # Import the proposal recommendation agent and metadata agent
 from services.ai.workflows.agents.proposal_recommendation import (
     ProposalRecommendationAgent,
+)
+from services.ai.workflows.comprehensive_evaluation import (
+    evaluate_proposal_comprehensive,
+)
+from services.ai.workflows.agents.evaluator import (
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_USER_PROMPT_TEMPLATE,
 )
 from tools.dao_ext_action_proposals import (
     ProposeActionSendMessageTool,  # Added ProposeActionSendMessageTool
@@ -128,7 +136,7 @@ async def _create_proposal_from_tool_result(
         )
 
         # Create the proposal record
-        proposal_data = ProposalCreate(
+        proposal_content = ProposalCreate(
             dao_id=dao_id,
             title=title if title else "Action Proposal",
             content=enhanced_message,
@@ -143,7 +151,7 @@ async def _create_proposal_from_tool_result(
             memo=payload.memo,
         )
 
-        proposal = backend.create_proposal(proposal_data)
+        proposal = backend.create_proposal(proposal_content)
         logger.info(f"Created proposal record {proposal.id} for transaction {tx_id}")
         return proposal
 
@@ -243,6 +251,48 @@ class ProposalRecommendationRequest(BaseModel):
         description="Temperature for LLM generation (0.0-2.0). Lower = more focused, Higher = more creative",
         ge=0.0,
         le=2.0,
+    )
+
+
+class ComprehensiveEvaluationRequest(BaseModel):
+    """Request body for comprehensive proposal evaluation."""
+
+    proposal_id: str = Field(
+        ...,
+        description="Unique identifier for the proposal being evaluated.",
+    )
+    proposal_content: Optional[str] = Field(
+        None,
+        description="Optional proposal content to override the default proposal content.",
+    )
+    dao_id: Optional[UUID] = Field(
+        None,
+        description="Optional DAO ID for context.",
+    )
+    custom_system_prompt: Optional[str] = Field(
+        None,
+        description="Optional custom system prompt to override the default evaluation prompt.",
+    )
+    custom_user_prompt: Optional[str] = Field(
+        None,
+        description="Optional custom user prompt to override the default evaluation instructions.",
+    )
+    config: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Optional configuration for the evaluation agent.",
+    )
+
+
+class DefaultPromptsResponse(BaseModel):
+    """Response body for default evaluation prompts."""
+
+    system_prompt: str = Field(
+        ...,
+        description="The default system prompt used for comprehensive evaluation.",
+    )
+    user_prompt_template: str = Field(
+        ...,
+        description="The default user prompt template used for comprehensive evaluation.",
     )
 
 
@@ -891,4 +941,129 @@ async def fund_with_testnet_sbtc_faucet(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to request testnet sBTC from Faktory faucet: {str(e)}",
+        )
+
+
+@router.get("/evaluation/default_prompts", response_model=DefaultPromptsResponse)
+async def get_default_evaluation_prompts(
+    request: Request,
+    profile: Profile = Depends(verify_profile),
+) -> JSONResponse:
+    """Get the default system and user prompts for comprehensive evaluation.
+
+    This endpoint returns the default prompts used by the comprehensive
+    evaluation system. These can be used as templates for custom evaluation
+    prompts in the frontend.
+
+    Args:
+        request: The FastAPI request object.
+        profile: The authenticated user's profile.
+
+    Returns:
+        JSONResponse: The default system and user prompt templates.
+
+    Raises:
+        HTTPException: If there's an error retrieving the prompts.
+    """
+    try:
+        logger.info(
+            f"Default evaluation prompts request received from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
+        )
+
+        # Return the default prompts
+        response_data = {
+            "system_prompt": DEFAULT_SYSTEM_PROMPT,
+            "user_prompt_template": DEFAULT_USER_PROMPT_TEMPLATE,
+        }
+
+        logger.debug(f"Returning default evaluation prompts for profile {profile.id}")
+        return JSONResponse(content=response_data)
+
+    except Exception as e:
+        logger.error(
+            f"Failed to retrieve default evaluation prompts for profile {profile.id}",
+            exc_info=e,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve default evaluation prompts: {str(e)}",
+        )
+
+
+@router.post("/evaluation/comprehensive")
+async def run_comprehensive_evaluation(
+    request: Request,
+    payload: ComprehensiveEvaluationRequest,
+    profile: Profile = Depends(verify_profile),
+) -> JSONResponse:
+    """Run comprehensive evaluation on a proposal with optional custom prompts.
+
+    This endpoint allows an authenticated user to run the comprehensive
+    evaluation workflow on a proposal, with optional custom system and user
+    prompts to override the defaults.
+
+    Args:
+        request: The FastAPI request object.
+        payload: The request body containing proposal data and optional custom prompts.
+        profile: The authenticated user's profile.
+
+    Returns:
+        JSONResponse: The comprehensive evaluation results.
+
+    Raises:
+        HTTPException: If there's an error during evaluation.
+    """
+    try:
+        logger.info(
+            f"Comprehensive evaluation request received from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
+        )
+
+        # Get agent from profile for context
+        agents = backend.list_agents(AgentFilter(profile_id=profile.id))
+        agent_id = None
+        if agents:
+            agent_id = str(agents[0].id)
+
+        # Look up the proposal to get its content
+        proposal = backend.get_proposal(payload.proposal_id)
+        if not proposal:
+            logger.error(f"Proposal with ID {payload.proposal_id} not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Proposal with ID {payload.proposal_id} not found",
+            )
+
+        proposal_content = payload.proposal_content or proposal.content or ""
+
+        logger.info(
+            f"Starting comprehensive evaluation for proposal {payload.proposal_id} with agent {agent_id}"
+        )
+
+        # Run the comprehensive evaluation
+        result = await evaluate_proposal_comprehensive(
+            proposal_id=payload.proposal_id,
+            proposal_content=proposal_content,
+            config=payload.config,
+            dao_id=str(payload.dao_id) if payload.dao_id else None,
+            agent_id=agent_id,
+            profile_id=str(profile.id),
+            custom_system_prompt=payload.custom_system_prompt,
+            custom_user_prompt=payload.custom_user_prompt,
+        )
+
+        logger.debug(
+            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {result.get('approve', 'Unknown')}"
+        )
+        return JSONResponse(content=result)
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(
+            f"Failed to run comprehensive evaluation for profile {profile.id}",
+            exc_info=e,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to run comprehensive evaluation: {str(e)}",
         )

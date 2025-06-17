@@ -224,14 +224,14 @@ class HistoricalContextAgent(
 
     def _create_chat_messages(
         self,
-        proposal_data: str,
+        proposal_content: str,
         past_proposals: str,
         proposal_images: List[Dict[str, Any]] = None,
     ) -> List:
         """Create chat messages for historical context evaluation.
 
         Args:
-            proposal_data: The current proposal content to evaluate
+            proposal_content: The current proposal content to evaluate
             past_proposals: Formatted past proposals text
             proposal_images: List of processed images
 
@@ -282,7 +282,7 @@ Provide a JSON object with exactly these fields:
         user_content = f"""Please evaluate the following proposal against the DAO's historical context and past proposals:
 
 Current Proposal to Evaluate:
-{proposal_data}
+{proposal_content}
 
 Past DAO Proposals:
 {past_proposals}
@@ -320,7 +320,7 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
         """
         self._initialize_vector_capability()
         proposal_id = state.get("proposal_id", "unknown")
-        proposal_content = state.get("proposal_data", "")
+        proposal_content = state.get("proposal_content", "")
 
         # Ensure proposal content is safely handled as plain text
         if proposal_content:
@@ -401,7 +401,7 @@ Analyze this proposal for duplicates, sequences, and potential gaming attempts. 
         try:
             # Create chat messages
             messages = self._create_chat_messages(
-                proposal_data=proposal_content,
+                proposal_content=proposal_content,
                 past_proposals=past_proposals_text
                 or "<no_proposals>No past proposals available for comparison.</no_proposals>",
                 proposal_images=proposal_images,
