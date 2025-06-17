@@ -292,7 +292,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             proposal_number = proposal.proposal_id
             dao_name = dao_data["name"]
             reward_amount = 1000
-            proposal_url = f"{config.api.base_url}/proposals/{dao_data['id']}"
+            proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
 
             follow_up_message = (
                 f"This message was approved by proposal #{proposal_number} of {dao_name}.\n\n"
