@@ -83,6 +83,18 @@ async def evaluate_proposal_comprehensive(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Processed Twitter content, found {len(tweet_images)} tweet images"
         )
 
+        if tweet_content:
+            logger.debug(
+                f"[DEBUG:ComprehensiveEval:{proposal_id}] Tweet content length: {len(tweet_content)} characters"
+            )
+            logger.debug(
+                f"[DEBUG:ComprehensiveEval:{proposal_id}] Tweet content preview: {tweet_content[:300]}..."
+            )
+        else:
+            logger.debug(
+                f"[DEBUG:ComprehensiveEval:{proposal_id}] No tweet content found"
+            )
+
         # Step 3: Run comprehensive evaluation
         logger.debug(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Starting comprehensive evaluation"

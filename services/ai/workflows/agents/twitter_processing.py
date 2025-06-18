@@ -93,9 +93,32 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                     "attachments": getattr(tweet, "attachments", {}),
                 }
 
-                # Handle media expansion for API v2
-                # Extract media objects from the includes section of the response
+                # Extract author information from includes if available
                 if hasattr(tweet_response, "includes") and tweet_response.includes:
+                    if "users" in tweet_response.includes:
+                        # Find the author user in the includes
+                        for user in tweet_response.includes["users"]:
+                            user_id = None
+                            if hasattr(user, "id"):
+                                user_id = str(user.id)
+                            elif isinstance(user, dict):
+                                user_id = str(user.get("id", ""))
+
+                            if user_id == str(tweet.author_id):
+                                # Extract user information
+                                if hasattr(user, "name"):
+                                    tweet_data["author_name"] = user.name
+                                elif isinstance(user, dict):
+                                    tweet_data["author_name"] = user.get("name", "")
+
+                                if hasattr(user, "username"):
+                                    tweet_data["author_username"] = user.username
+                                elif isinstance(user, dict):
+                                    tweet_data["author_username"] = user.get(
+                                        "username", ""
+                                    )
+                                break
+
                     if "media" in tweet_response.includes:
                         tweet_data["media_objects"] = tweet_response.includes["media"]
                         self.logger.debug(
@@ -349,6 +372,10 @@ class TwitterProcessingNode(BaseCapabilityMixin):
             # Format tweet content
             formatted_tweet = self._format_tweet_for_content(tweet_data)
             tweet_contents.append(formatted_tweet)
+
+            self.logger.debug(
+                f"[TwitterProcessorNode:{proposal_id}] Formatted tweet content: {formatted_tweet[:200]}..."
+            )
 
             # Extract images from tweet
             tweet_image_urls = self._extract_images_from_tweet(tweet_data)
