@@ -1,8 +1,11 @@
+import re
+from io import BytesIO
 from typing import Dict, List, Optional, TypedDict
+from urllib.parse import urlparse
 
+import requests
+import tweepy
 from pydantic import BaseModel
-from pytwitter import Api
-from pytwitter.models import Tweet, User
 
 from backend.factory import backend
 from backend.models import (
@@ -37,30 +40,177 @@ class TwitterService:
         self.client_id = client_id
         self.client_secret = client_secret
         self.client = None
+        self.api = None
 
     async def _ainitialize(self) -> None:
         self.initialize()
 
     def initialize(self) -> None:
-        """Initialize the Twitter client."""
+        """Initialize the Twitter client and API."""
         try:
-            self.client = Api(
-                client_id=self.client_id,
-                client_secret=self.client_secret,
+            # Initialize OAuth1 handler for API v1.1 (needed for media upload)
+            auth = tweepy.OAuth1UserHandler(
+                self.consumer_key,
+                self.consumer_secret,
+                self.access_token,
+                self.access_secret,
+            )
+            self.api = tweepy.API(auth, wait_on_rate_limit=True)
+
+            # Initialize Client for API v2 (used for tweet creation)
+            self.client = tweepy.Client(
                 consumer_key=self.consumer_key,
                 consumer_secret=self.consumer_secret,
                 access_token=self.access_token,
-                access_secret=self.access_secret,
-                application_only_auth=False,
+                access_token_secret=self.access_secret,
+                wait_on_rate_limit=True,
             )
-            logger.info("Twitter client initialized successfully")
+            logger.info("Twitter client and API initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Twitter client: {str(e)}")
             raise
 
+    def _get_extension(self, url: str) -> str:
+        """Extract file extension from URL."""
+        path = urlparse(url).path.lower()
+        for ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            if path.endswith(ext):
+                return ext
+        return ".jpg"
+
+    def _split_text_into_chunks(self, text: str, limit: int = 280) -> List[str]:
+        """Split text into chunks not exceeding the limit without cutting words."""
+        words = text.split()
+        chunks = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + (1 if current else 0) <= limit:
+                current = f"{current} {word}".strip()
+            else:
+                if current:
+                    chunks.append(current)
+                current = word
+        if current:
+            chunks.append(current)
+        return chunks
+
+    async def post_tweet_with_media(
+        self,
+        image_url: str,
+        text: str,
+        reply_id: Optional[str] = None,
+    ) -> Optional[tweepy.Response]:
+        """Post a tweet with media attachment."""
+        try:
+            if self.api is None or self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBTC Bot/1.0)"}
+            response = requests.get(image_url, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            # Validate content type and size
+            content_type = response.headers.get("content-type", "").lower()
+            if not any(
+                ct in content_type
+                for ct in ["image/jpeg", "image/png", "image/gif", "image/webp"]
+            ):
+                logger.warning(f"Unsupported content type: {content_type}")
+                return None
+
+            if len(response.content) > 5 * 1024 * 1024:  # 5MB limit
+                logger.warning(f"Image too large: {len(response.content)} bytes")
+                return None
+
+            # Upload media using API v1.1
+            extension = self._get_extension(image_url)
+            media = self.api.media_upload(
+                filename=f"image{extension}",
+                file=BytesIO(response.content),
+            )
+
+            # Create tweet with media using API v2
+            result = self.client.create_tweet(
+                text=text,
+                media_ids=[media.media_id_string],
+                in_reply_to_tweet_id=reply_id,
+            )
+
+            if result and result.data:
+                logger.info(
+                    f"Successfully posted tweet with media: {result.data['id']}"
+                )
+                return result
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to post tweet with media: {str(e)}")
+            return None
+
+    async def post_tweet_with_chunks(
+        self,
+        text: str,
+        image_url: Optional[str] = None,
+        reply_id: Optional[str] = None,
+    ) -> Optional[List[tweepy.Response]]:
+        """Post a tweet, splitting into chunks if necessary and handling media."""
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            # Process image URL if present
+            if image_url:
+                # Remove image URL from text
+                text = re.sub(re.escape(image_url), "", text).strip()
+                text = re.sub(r"\s+", " ", text)
+
+            # Split text into chunks
+            chunks = self._split_text_into_chunks(text)
+            previous_tweet_id = reply_id
+            responses = []
+
+            for index, chunk in enumerate(chunks):
+                try:
+                    if index == 0 and image_url:
+                        # First chunk with media
+                        response = await self.post_tweet_with_media(
+                            image_url=image_url,
+                            text=chunk,
+                            reply_id=previous_tweet_id,
+                        )
+                    else:
+                        # Regular tweet
+                        response = await self._apost_tweet(
+                            text=chunk,
+                            reply_in_reply_to_tweet_id=previous_tweet_id,
+                        )
+
+                    if response and response.data:
+                        responses.append(response)
+                        previous_tweet_id = response.data["id"]
+                        logger.info(
+                            f"Successfully posted tweet chunk {index + 1}: {response.data['id']}"
+                        )
+                    else:
+                        logger.error(f"Failed to send tweet chunk {index + 1}")
+                        if index == 0:  # If first chunk fails, whole message fails
+                            return None
+
+                except Exception as chunk_error:
+                    logger.error(f"Error sending chunk {index + 1}: {str(chunk_error)}")
+                    if index == 0:  # Critical failure on first chunk
+                        raise chunk_error
+
+            return responses if responses else None
+
+        except Exception as e:
+            logger.error(f"Error posting tweet with chunks: {str(e)}")
+            return None
+
     async def _apost_tweet(
         self, text: str, reply_in_reply_to_tweet_id: Optional[str] = None
-    ) -> Optional[Tweet]:
+    ) -> Optional[tweepy.Response]:
         """
         Post a new tweet or reply to an existing tweet.
 
@@ -69,13 +219,13 @@ class TwitterService:
             reply_in_reply_to_tweet_id: Optional ID of tweet to reply to
 
         Returns:
-            Tweet data if successful, None if failed
+            Tweet response if successful, None if failed
         """
-        return self.post_tweet(text, reply_in_reply_to_tweet_id)
+        return await self.post_tweet(text, reply_in_reply_to_tweet_id)
 
-    def post_tweet(
+    async def post_tweet(
         self, text: str, reply_in_reply_to_tweet_id: Optional[str] = None
-    ) -> Optional[Tweet]:
+    ) -> Optional[tweepy.Response]:
         """
         Post a new tweet or reply to an existing tweet.
 
@@ -84,22 +234,30 @@ class TwitterService:
             reply_in_reply_to_tweet_id: Optional ID of tweet to reply to
 
         Returns:
-            Tweet data if successful, None if failed
+            Tweet response if successful, None if failed
         """
         try:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
+
             response = self.client.create_tweet(
-                text=text, reply_in_reply_to_tweet_id=reply_in_reply_to_tweet_id
+                text=text, in_reply_to_tweet_id=reply_in_reply_to_tweet_id
             )
-            logger.info(f"Successfully posted tweet: {text[:20]}...")
-            if isinstance(response, Tweet):
+
+            if response and response.data:
+                logger.info(
+                    f"Successfully posted tweet: {text[:20]}... (ID: {response.data['id']})"
+                )
                 return response
+            else:
+                logger.error(f"Failed to post tweet: {text[:20]}...")
+                return None
+
         except Exception as e:
             logger.error(f"Failed to post tweet: {str(e)}")
             return None
 
-    async def get_user_by_username(self, username: str) -> Optional[User]:
+    async def get_user_by_username(self, username: str) -> Optional[tweepy.User]:
         """
         Get user information by username.
 
@@ -112,19 +270,22 @@ class TwitterService:
         try:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
+
             response = self.client.get_user(username=username)
-            if isinstance(response, User):
-                return response
+            if response and response.data:
+                return response.data
+            return None
+
         except Exception as e:
             logger.error(f"Failed to get user info for {username}: {str(e)}")
             return None
 
-    async def get_user_by_user_id(self, user_id: str) -> Optional[User]:
+    async def get_user_by_user_id(self, user_id: str) -> Optional[tweepy.User]:
         """
         Get user information by user ID.
 
         Args:
-            username: Twitter username without @ symbol
+            user_id: Twitter user ID
 
         Returns:
             User data if found, None if not found or error
@@ -132,16 +293,19 @@ class TwitterService:
         try:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
-            response = self.client.get_user(user_id=user_id)
-            if isinstance(response, User):
-                return response
+
+            response = self.client.get_user(id=user_id)
+            if response and response.data:
+                return response.data
+            return None
+
         except Exception as e:
             logger.error(f"Failed to get user info for {user_id}: {str(e)}")
             return None
 
     async def get_mentions_by_user_id(
         self, user_id: str, max_results: int = 100
-    ) -> List[Tweet]:
+    ) -> List[tweepy.Tweet]:
         """
         Get mentions for a specific user.
 
@@ -155,9 +319,10 @@ class TwitterService:
         try:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
+
             response = self.client.get_mentions(
-                user_id=user_id,
-                max_results=max_results,
+                id=user_id,
+                max_results=min(max_results, 100),  # API limit
                 tweet_fields=[
                     "id",
                     "text",
@@ -229,14 +394,19 @@ class TwitterService:
                     "voting_status",
                 ],
             )
-            logger.info(f"Successfully retrieved {len(response.data)} mentions")
-            return response.data
+
+            if response and response.data:
+                logger.info(f"Successfully retrieved {len(response.data)} mentions")
+                return response.data
+            else:
+                logger.info("No mentions found")
+                return []
 
         except Exception as e:
             logger.error(f"Failed to get mentions: {str(e)}")
             return []
 
-    async def get_me(self) -> Optional[User]:
+    async def get_me(self) -> Optional[tweepy.User]:
         """
         Get information about the authenticated user.
 
@@ -246,10 +416,12 @@ class TwitterService:
         try:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
+
             response = self.client.get_me()
-            if isinstance(response, User):
-                return response
+            if response and response.data:
+                return response.data
             return None
+
         except Exception as e:
             logger.error(f"Failed to get authenticated user info: {str(e)}")
             return None
@@ -268,20 +440,18 @@ class TwitterService:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
 
-            # Get authenticated user's ID
-            me = await self.get_me()
-            if not me:
-                raise Exception("Failed to get authenticated user info")
-
             # Get target user's ID
             target_user = await self.get_user_by_username(target_username)
             if not target_user:
                 raise Exception(f"Failed to get user info for {target_username}")
 
             # Follow the user
-            self.client.follow_user(user_id=me.id, target_user_id=target_user.id)
-            logger.info(f"Successfully followed user: {target_username}")
-            return True
+            response = self.client.follow_user(target_user_id=target_user.id)
+            if response:
+                logger.info(f"Successfully followed user: {target_username}")
+                return True
+            return False
+
         except Exception as e:
             logger.error(f"Failed to follow user {target_username}: {str(e)}")
             return False
@@ -300,23 +470,139 @@ class TwitterService:
             if self.client is None:
                 raise Exception("Twitter client is not initialized")
 
-            # Get authenticated user's ID
-            me = await self.get_me()
-            if not me:
-                raise Exception("Failed to get authenticated user info")
-
             # Get target user's ID
             target_user = await self.get_user_by_username(target_username)
             if not target_user:
                 raise Exception(f"Failed to get user info for {target_username}")
 
             # Unfollow the user
-            self.client.unfollow_user(user_id=me.id, target_user_id=target_user.id)
-            logger.info(f"Successfully unfollowed user: {target_username}")
-            return True
+            response = self.client.unfollow_user(target_user_id=target_user.id)
+            if response:
+                logger.info(f"Successfully unfollowed user: {target_username}")
+                return True
+            return False
+
         except Exception as e:
             logger.error(f"Failed to unfollow user {target_username}: {str(e)}")
             return False
+
+    async def get_tweet_by_id(self, tweet_id: str) -> Optional[tweepy.Tweet]:
+        """
+        Get a tweet by its ID using Twitter API v2.
+
+        Args:
+            tweet_id: The ID of the tweet to retrieve
+
+        Returns:
+            Tweet data if found, None if not found or error
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            response = self.client.get_tweet(
+                id=tweet_id,
+                tweet_fields=[
+                    "id",
+                    "text",
+                    "created_at",
+                    "author_id",
+                    "conversation_id",
+                    "in_reply_to_user_id",
+                    "referenced_tweets",
+                    "public_metrics",
+                    "entities",
+                    "attachments",
+                    "context_annotations",
+                    "withheld",
+                    "reply_settings",
+                    "lang",
+                ],
+                expansions=[
+                    "author_id",
+                    "referenced_tweets.id",
+                    "referenced_tweets.id.author_id",
+                    "entities.mentions.username",
+                    "attachments.media_keys",
+                    "attachments.poll_ids",
+                    "in_reply_to_user_id",
+                    "geo.place_id",
+                ],
+                user_fields=[
+                    "id",
+                    "name",
+                    "username",
+                    "created_at",
+                    "description",
+                    "entities",
+                    "location",
+                    "pinned_tweet_id",
+                    "profile_image_url",
+                    "protected",
+                    "public_metrics",
+                    "url",
+                    "verified",
+                    "withheld",
+                ],
+                media_fields=[
+                    "duration_ms",
+                    "height",
+                    "media_key",
+                    "preview_image_url",
+                    "type",
+                    "url",
+                    "width",
+                    "public_metrics",
+                    "alt_text",
+                ],
+            )
+
+            if response and response.data:
+                logger.info(f"Successfully retrieved tweet: {tweet_id}")
+                return response.data
+            else:
+                logger.warning(f"Tweet not found: {tweet_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to get tweet {tweet_id}: {str(e)}")
+            return None
+
+    async def get_status_by_id(
+        self, tweet_id: str, tweet_mode: str = "extended"
+    ) -> Optional[tweepy.models.Status]:
+        """
+        Get a tweet by its ID using Twitter API v1.1 (for extended tweet support).
+
+        Args:
+            tweet_id: The ID of the tweet to retrieve
+            tweet_mode: Tweet mode - "extended" for full text, "compat" for compatibility mode
+
+        Returns:
+            Status object if found, None if not found or error
+        """
+        try:
+            if self.api is None:
+                raise Exception("Twitter API is not initialized")
+
+            status = self.api.get_status(
+                id=tweet_id,
+                tweet_mode=tweet_mode,
+                include_entities=True,
+                include_ext_alt_text=True,
+                include_card_uri=True,
+            )
+
+            if status:
+                logger.info(f"Successfully retrieved status: {tweet_id}")
+                return status
+            else:
+                logger.warning(f"Status not found: {tweet_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to get status {tweet_id}: {str(e)}")
+            return None
 
 
 class UserProfile(TypedDict):
@@ -334,6 +620,16 @@ class TweetData(BaseModel):
     author_id: Optional[str] = None
     text: Optional[str] = None
     conversation_id: Optional[str] = None
+
+    @classmethod
+    def from_tweepy_tweet(cls, tweet: "tweepy.Tweet") -> "TweetData":
+        """Create TweetData from a tweepy Tweet object."""
+        return cls(
+            tweet_id=tweet.id,
+            author_id=tweet.author_id,
+            text=tweet.text,
+            conversation_id=tweet.conversation_id,
+        )
 
 
 class TwitterConfig(BaseModel):
@@ -538,12 +834,7 @@ class TwitterMentionHandler:
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention for analysis."""
-        tweet_data = TweetData(
-            tweet_id=mention.id,
-            author_id=mention.author_id,
-            text=mention.text,
-            conversation_id=mention.conversation_id,
-        )
+        tweet_data = TweetData.from_tweepy_tweet(mention)
 
         logger.debug(
             f"Processing mention - Tweet ID: {tweet_data.tweet_id}, "
@@ -670,6 +961,18 @@ def create_twitter_handler() -> TwitterMentionHandler:
     tweet_analyzer = TweetAnalyzer(tweet_repository)
 
     return TwitterMentionHandler(twitter_config, tweet_repository, tweet_analyzer)
+
+
+def create_twitter_service_from_config() -> TwitterService:
+    """Factory function to create TwitterService using config credentials."""
+    return TwitterService(
+        consumer_key=config.twitter.consumer_key,
+        consumer_secret=config.twitter.consumer_secret,
+        client_id=config.twitter.client_id,
+        client_secret=config.twitter.client_secret,
+        access_token=config.twitter.access_token,
+        access_secret=config.twitter.access_secret,
+    )
 
 
 # Global handler instance

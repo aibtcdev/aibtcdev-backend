@@ -6,6 +6,7 @@ from .proposal_metadata import ProposalMetadataAgent
 from .proposal_recommendation import ProposalRecommendationAgent
 from .reasoning import ReasoningAgent
 from .social_context import SocialContextAgent
+from .twitter_processing import TwitterProcessingNode
 
 __all__ = [
     "CoreContextAgent",
@@ -16,4 +17,5 @@ __all__ = [
     "ProposalRecommendationAgent",
     "ReasoningAgent",
     "SocialContextAgent",
+    "TwitterProcessingNode",
 ]
