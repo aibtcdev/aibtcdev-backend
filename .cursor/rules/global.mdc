@@ -1,0 +1,99 @@
+---
+description: 
+globs: *.py,**/*.py
+alwaysApply: false
+---
+# Global Cursor Rules for Python Development
+
+## Code Style and Formatting
+-e quotes for strings, as specified in configuration for `ruff`.
+- Indent with 4 spaces; avoid tabs.
+- Adhere to a maximum line length of 88 characters, per `ruff`'s default.
+- Employ type hints from the `typing` module for all function parameters, return types, and variable declarations where applicable.
+- Provide docstrings for all modules, classes, and functions in Google style format.
+- Prefer f-strings for string interpolation, except when no variables are involved, to maintain clarity.
+- Organize import statements at the file's top, grouped as follows with a blank line between groups:
+  1. Standard library imports (e.g., `import os`)
+  2. Third-party imports (e.g., `import numpy`)
+  3. Local application/library imports (e.g., `from myapp.utils import helper`)
+- Use absolute imports over relative imports for consistency and clarity.
+- Prohibit wildcard imports (`from module import *`) to prevent namespace pollution.
+
+## Dependencies
+- Manage dependencies using the `uv` dependency manager, with lock files stored in `uv.lock`.
+- Document all dependencies in `pyproject.toml`.
+- Regularly update dependencies to address security vulnerabilities and maintain compatibility.
+
+## Naming Conventions
+- Use `snake_case` for variables, functions, and methods.
+- Use `PascalCase` for class and type names.
+- Use `UPPER_SNAKE_CASE` for constants.
+- Prefix private attributes and methods with a single underscore (e.g., `_private_method`).
+- Choose descriptive, self-explanatory names that reflect the purpose or behavior of variables, functions, or classes.
+- Avoid ambiguous abbreviations unless widely understood (e.g., `id` is acceptable; `tmp` is not).
+
+## Code Organization
+- Ensure each module has a single, well-defined responsibility (e.g., `api/chat.py` for chat endpoints, `services/ai/workflows/agents/evaluator.py` for evaluation logic).
+- Keep modules focused on a single responsibility. Split large modules into smaller, more manageable ones when they become difficult to navigate or maintain.
+- Limit directory nesting to three levels where possible (e.g., `services/ai/workflows` is acceptable; avoid deeper nesting like `services/ai/workflows/agents/handlers` unless justified).
+- Consolidate utility modules (e.g., `utils.py`) into domain-specific modules or packages (e.g., move `services/ai/workflows/utils/model_factory.py` to `services/ai/workflows/models/factory.py`) to avoid generic naming.
+- Organize the `tools` directory by domain, creating subdirectories like `tools/blockchain` for DAO-related utilities and `tools/integrations` for external services (e.g., Twitter, LunarCrush).
+- Place test files in a `tests` directory with a mirrored structure (e.g., `tests/services/ai/workflows/test_evaluator.py` for `services/ai/workflows/agents/evaluator.py`) or alongside modules if small (e.g., `services/ai/workflows/agents/test_evaluator.py`).
+- Include a `README.md` or module-level docstring in each major directory (e.g., `services/ai`, `services/integrations`) to document purpose, usage, and key components.
+- Structure files with imports at the top, followed by constants, classes, and then functions, maintaining a logical flow.
+- Group related functionality within packages (e.g., keep all webhook handlers in `services/integrations/webhooks`) and avoid duplicating functionality across directories (e.g., `lib/utils.py` vs. `services/ai/workflows/utils`).
+
+## Error Handling
+- Catch specific exception types (e.g., `ValueError`, `KeyError`) rather than the generic `Exception`, except in cases where catching all exceptions is necessary, such as in top-level error handlers.
+- Handle exceptions at the appropriate abstraction level, avoiding overly broad try-except blocks.
+- Include descriptive error messages in raised exceptions to aid debugging.
+- Use context managers (`with` statements) for resource management (e.g., file operations, database connections).
+
+## Logging
+- Utilize the project's standard logging setup via `configure_logger`.
+- Apply appropriate log levels:
+  - `DEBUG`: Detailed information for debugging.
+  - `INFO`: Confirmation of normal operation.
+  - `WARNING`: Indications of potential issues.
+  - `ERROR`: Errors that impact functionality.
+  - `CRITICAL`: Severe errors that may cause termination.
+- Include sufficient context in log messages (e.g., relevant variables or state) to facilitate troubleshooting.
+
+## Performance
+- Use list, dictionary, or set comprehensions for concise and efficient data transformations when appropriate.
+- Employ generators or lazy evaluation for processing large datasets to optimize memory usage.
+- Evaluate algorithms for time and space complexity, favoring efficient solutions for critical paths.
+- Profile code to identify and address performance bottlenecks.
+- Use `httpx` for any web api calls. 
+
+## Security
+- Avoid hardcoding sensitive information (e.g., API keys, passwords); use environment variables or secret management tools.
+- Validate and sanitize all user inputs to prevent injection attacks or invalid data.
+- Adhere to the principle of least privilege when accessing resources or assigning permissions.
+- Use secure protocols for network operations (e.g., `https`) and appropriate libraries for security-sensitive operations (e.g., `bcrypt` or `argon2` for password hashing).
+
+## Testing
+- Write unit tests for all public functions, methods, and classes using a framework like `pytest`.
+- Achieve at least 80% test coverage for critical modules; aim for 100% in security-sensitive code.
+- Write tests that cover happy paths, edge cases, and error conditions to ensure robustness.
+- Include integration tests for interactions between modules or external systems.
+- Mock external dependencies in tests to ensure isolation and reproducibility.
+- Run tests automatically in CI/CD pipelines to catch regressions early.
+
+## Documentation
+- Maintain a `README.md` with project setup, usage, and contribution guidelines.
+- Document public APIs and interfaces in docstrings, including parameters, return values, and exceptions.
+- Keep inline documentation (e.g., comments, docstrings) up-to-date with code changes.
+- Use type hints as a form of self-documentation to improve code clarity and IDE support.
+
+## Maintenance
+- Remove unused imports, variables, or functions using tools like `ruff`.
+- Refactor duplicated code into reusable functions, classes, or modules to reduce technical debt.
+- Regularly review and update dependencies to mitigate vulnerabilities and ensure compatibility.
+- Use static analysis tools (e.g., `ruff`, `ty`) to enforce code quality and catch potential issues.
+
+## Tooling
+- Format and lint code with `ruff` to ensure consistency and catch potential errors.
+- Type-check code with `ty` to validate type hints.
+- Manage dependencies and virtual environments with `uv` for reproducibility.
+- Integrate tools into CI/CD pipelines to enforce compliance with these rules.

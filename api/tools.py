@@ -1052,9 +1052,9 @@ async def run_comprehensive_evaluation(
         )
 
         logger.debug(
-            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {result.get('approve', 'Unknown')}"
+            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {'Approved' if result.decision else 'Rejected'}"
         )
-        return JSONResponse(content=result)
+        return JSONResponse(content=result.model_dump())
 
     except HTTPException as he:
         raise he

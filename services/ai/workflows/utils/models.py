@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -65,44 +65,64 @@ class ProposalMetadataOutput(BaseModel):
     )
 
 
+class EvaluationCategory(BaseModel):
+    """Model for a single evaluation category."""
+
+    category: str = Field(description="Category name")
+    score: int = Field(description="Score from 1-100", ge=1, le=100)
+    weight: float = Field(
+        description="Weight of this category in final decision (0.0-1.0)",
+        ge=0.0,
+        le=1.0,
+    )
+    reasoning: List[str] = Field(
+        description="Reasoning in 3 or less bullet points", max_length=3
+    )
+
+
 class ComprehensiveEvaluationOutput(BaseModel):
-    """Output model for comprehensive single-pass proposal evaluation."""
+    """Output model for comprehensive single-pass proposal evaluation with dynamic categories."""
 
-    # Core evaluation
-    core_score: int = Field(description="Core context evaluation score (0-100)")
-    core_flags: List[str] = Field(description="Core context critical issues")
-    core_summary: str = Field(description="Core context evaluation summary")
-
-    # Financial evaluation
-    financial_score: int = Field(description="Financial evaluation score (0-100)")
-    financial_flags: List[str] = Field(description="Financial critical issues")
-    financial_summary: str = Field(description="Financial evaluation summary")
-
-    # Historical evaluation
-    historical_score: int = Field(
-        description="Historical context evaluation score (0-100)"
+    categories: List[EvaluationCategory] = Field(
+        description="List of evaluation categories with scores, weights, and reasoning"
     )
-    historical_flags: List[str] = Field(
-        description="Historical context critical issues"
+    final_score: int = Field(
+        description="Final comprehensive evaluation score (1-100)", ge=1, le=100
     )
-    historical_summary: str = Field(description="Historical context evaluation summary")
-    sequence_analysis: str = Field(
-        description="Analysis of proposal sequences and relationships"
+    decision: bool = Field(
+        description="Final decision: True to approve (vote FOR), false to reject (vote AGAINST)"
     )
-
-    # Social evaluation
-    social_score: int = Field(description="Social context evaluation score (0-100)")
-    social_flags: List[str] = Field(description="Social context critical issues")
-    social_summary: str = Field(description="Social context evaluation summary")
-
-    # Final decision
-    final_score: int = Field(description="Final comprehensive evaluation score (0-100)")
-    decision: str = Field(description="Final decision: Approve or Reject")
     explanation: str = Field(
         description="Comprehensive reasoning for the final decision"
     )
-
-    # Overall flags from all evaluations
-    all_flags: List[str] = Field(
+    flags: List[str] = Field(
         description="All critical issues identified across evaluations"
+    )
+    summary: str = Field(description="Summary of the evaluation")
+
+
+class ComprehensiveEvaluatorAgentProcessOutput(BaseModel):
+    """Output model for the ComprehensiveEvaluatorAgent's process method."""
+
+    categories: List[EvaluationCategory] = Field(
+        description="List of evaluation categories with scores, weights, and reasoning"
+    )
+    final_score: int = Field(
+        description="Final comprehensive evaluation score (1-100)", ge=1, le=100
+    )
+    decision: bool = Field(
+        description="Final decision: True to approve (vote FOR), false to reject (vote AGAINST)"
+    )
+    explanation: str = Field(
+        description="Comprehensive reasoning for the final decision"
+    )
+    flags: List[str] = Field(
+        description="All critical issues identified across evaluations"
+    )
+    summary: str = Field(description="Summary of the evaluation")
+    token_usage: Dict[str, Union[int, str]] = Field(
+        default_factory=dict, description="Token usage statistics for the evaluation"
+    )
+    images_processed: int = Field(
+        default=0, description="Number of images processed during evaluation"
     )
