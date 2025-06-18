@@ -181,10 +181,55 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                 # This happens when the API response includes expanded media
                 media_objects = tweet_data.get("media_objects", [])
                 for media in media_objects:
-                    if media.get("type") == "photo":
-                        media_url = media.get("url")
-                        if media_url:
-                            image_urls.append(media_url)
+                    media_url = None
+                    media_type = None
+
+                    # Handle media objects that might be Python objects or dictionaries
+                    if hasattr(media, "type"):
+                        media_type = media.type
+                    elif isinstance(media, dict):
+                        media_type = media.get("type")
+
+                    # Extract image URL based on media type
+                    if media_type == "photo":
+                        # For photos, get the direct URL
+                        if hasattr(media, "url"):
+                            media_url = media.url
+                        elif isinstance(media, dict):
+                            media_url = media.get("url")
+
+                    elif media_type in ["animated_gif", "video"]:
+                        # For animated GIFs and videos, use the preview image URL
+                        if hasattr(media, "preview_image_url"):
+                            media_url = media.preview_image_url
+                        elif isinstance(media, dict):
+                            media_url = media.get("preview_image_url")
+
+                    # If we still don't have a URL, check nested data object
+                    if not media_url:
+                        data_obj = None
+                        if hasattr(media, "data"):
+                            data_obj = media.data
+                        elif isinstance(media, dict) and "data" in media:
+                            data_obj = media["data"]
+
+                        if data_obj:
+                            if media_type == "photo":
+                                if isinstance(data_obj, dict):
+                                    media_url = data_obj.get("url")
+                                elif hasattr(data_obj, "url"):
+                                    media_url = data_obj.url
+                            elif media_type in ["animated_gif", "video"]:
+                                if isinstance(data_obj, dict):
+                                    media_url = data_obj.get("preview_image_url")
+                                elif hasattr(data_obj, "preview_image_url"):
+                                    media_url = data_obj.preview_image_url
+
+                    if media_url:
+                        image_urls.append(media_url)
+                        self.logger.debug(
+                            f"Extracted {media_type} image URL: {media_url}"
+                        )
 
                 # If no media objects in tweet_data, log that media expansion is needed
                 if not media_objects:
