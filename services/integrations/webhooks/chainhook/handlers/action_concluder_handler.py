@@ -278,17 +278,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
         proposal_passed = proposal.passed or False
 
         if proposal_passed:
-            # Create queue messages for both Twitter and Discord if proposal passed
-            tweet_message = backend.create_queue_message(
-                QueueMessageCreate(
-                    type=QueueMessageType.get_or_create("tweet"),
-                    message={"message": clean_message},
-                    dao_id=dao_data["id"],
-                )
-            )
-            self.logger.info(f"Created tweet queue message: {tweet_message.id}")
-
-            # CREATE SECOND TWEET (FOLLOW-UP POST) - ADD THIS BLOCK HERE
+            # Create follow-up message content for threading
             proposal_number = proposal.proposal_id
             dao_name = dao_data["name"]
             reward_amount = 1000
@@ -300,17 +290,18 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 f"View proposal details: {proposal_url}"
             )
 
-            follow_up_tweet = backend.create_queue_message(
+            # Create queue message for Twitter with follow-up content for threading
+            tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
-                    message={"message": follow_up_message},
+                    message={
+                        "message": clean_message,
+                        "follow_up_message": follow_up_message
+                    },
                     dao_id=dao_data["id"],
                 )
             )
-            self.logger.info(
-                f"Created follow-up tweet queue message: {follow_up_tweet.id}"
-            )
-            # END OF SECOND TWEET BLOCK
+            self.logger.info(f"Created tweet queue message with follow-up thread: {tweet_message.id}")
 
             # Calculate participation and approval percentages for passed proposal
             votes_for = int(proposal.votes_for or 0)
