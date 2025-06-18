@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 from lib.logger import configure_logger
 from services.ai.workflows.agents.evaluator import ComprehensiveEvaluatorAgent
 from services.ai.workflows.agents.image_processing import ImageProcessingNode
-from services.ai.workflows.utils.model_factory import get_default_model_name
+from services.ai.workflows.utils.models import ComprehensiveEvaluatorAgentProcessOutput
 
 logger = configure_logger(__name__)
 
@@ -17,7 +17,7 @@ async def evaluate_proposal_comprehensive(
     profile_id: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> ComprehensiveEvaluatorAgentProcessOutput:
     """Evaluate a proposal using the ComprehensiveEvaluatorAgent in a single pass.
 
     Args:
@@ -31,14 +31,11 @@ async def evaluate_proposal_comprehensive(
         custom_user_prompt: Optional custom user prompt to override default
 
     Returns:
-        Dictionary containing evaluation results
+        ComprehensiveEvaluatorAgentProcessOutput containing evaluation results
     """
     # Set up configuration with defaults if not provided
     if config is None:
         config = {}
-
-    # Use model name from config or default
-    model_name = config.get("model_name", get_default_model_name())
 
     try:
         logger.info(
@@ -90,85 +87,40 @@ async def evaluate_proposal_comprehensive(
         }
 
         # Run the comprehensive evaluation
-        result = await evaluator.process(evaluator_state)
-
-        logger.info(
-            f"[DEBUG:ComprehensiveEval:{proposal_id}] Evaluation complete, result keys: {list(result.keys())}"
+        result: ComprehensiveEvaluatorAgentProcessOutput = await evaluator.process(
+            evaluator_state
         )
 
-        # Extract results from the comprehensive evaluation
-        # The comprehensive evaluator returns all scores in the result
-        core_score = result.get("core_score", 0)
-        historical_score = result.get("historical_score", 0)
-        financial_score = result.get("financial_score", 0)
-        social_score = result.get("social_score", 0)
-        final_score = result.get("final_score", 0)
-
-        # Get decision and explanation
-        final_decision = result.get("decision", "Undecided")
-        final_explanation = result.get("explanation", "No explanation provided.")
-
-        # Determine approval based on final score and threshold
-        approval = final_score >= 70
-
-        # Get token usage (single agent usage)
-        token_usage_data = result.get("token_usage", {})
-        total_token_usage = {
-            "input_tokens": token_usage_data.get("input_tokens", 0),
-            "output_tokens": token_usage_data.get("output_tokens", 0),
-            "total_tokens": token_usage_data.get("total_tokens", 0),
-        }
-
-        # Get summaries and flags
-        summaries = {
-            "core_score": result.get("core_summary", "No core summary available."),
-            "financial_score": result.get(
-                "financial_summary", "No financial summary available."
-            ),
-            "historical_score": result.get(
-                "historical_summary", "No historical summary available."
-            ),
-            "social_score": result.get(
-                "social_summary", "No social summary available."
-            ),
-        }
-
-        flags = result.get("all_flags", [])
-
-        # Return formatted result
-        evaluation_result = {
-            "proposal_id": proposal_id,
-            "approve": approval,
-            "overall_score": final_score,
-            "reasoning": final_explanation,
-            "scores": {
-                "core": core_score,
-                "historical": historical_score,
-                "financial": financial_score,
-                "social": social_score,
-                "final": final_score,
-            },
-            "flags": flags,
-            "summaries": summaries,
-            "token_usage": total_token_usage,
-            "model_name": model_name,
-            "workflow_step": "comprehensive_evaluation_complete",
-            "images_processed": len(proposal_images),
-            "evaluation_type": "comprehensive_single_pass",
-        }
+        logger.info(
+            f"[DEBUG:ComprehensiveEval:{proposal_id}] Evaluation complete, returning typed result"
+        )
 
         logger.info(
-            f"Completed comprehensive proposal evaluation for proposal {proposal_id}: {final_decision}"
+            f"Completed comprehensive proposal evaluation for proposal {proposal_id}: {'Approved' if result.decision else 'Rejected'}"
         )
-        return evaluation_result
+        return result
 
     except Exception as e:
         logger.error(f"Error in comprehensive proposal evaluation: {str(e)}")
-        return {
-            "proposal_id": proposal_id,
-            "approve": False,
-            "overall_score": 0,
-            "reasoning": f"Comprehensive evaluation failed due to error: {str(e)}",
-            "error": str(e),
-            "evaluation_type": "comprehensive_single_pass_error",
-        }
+        # Return a ComprehensiveEvaluatorAgentProcessOutput with error data
+        from services.ai.workflows.utils.models import EvaluationCategory
+
+        return ComprehensiveEvaluatorAgentProcessOutput(
+            categories=[
+                EvaluationCategory(
+                    category="Error",
+                    score=0,
+                    weight=1.0,
+                    reasoning=[
+                        f"Comprehensive evaluation failed due to error: {str(e)}"
+                    ],
+                )
+            ],
+            final_score=0,
+            decision=False,
+            explanation=f"Comprehensive evaluation failed due to error: {str(e)}",
+            flags=[f"Critical Error: {str(e)}"],
+            summary="Evaluation failed due to error",
+            token_usage={},
+            images_processed=0,
+        )
