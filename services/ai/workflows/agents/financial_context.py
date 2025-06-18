@@ -30,13 +30,13 @@ class FinancialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapabili
 
     def _create_chat_messages(
         self,
-        proposal_data: str,
+        proposal_content: str,
         proposal_images: List[Dict[str, Any]] = None,
     ) -> List:
         """Create chat messages for financial context evaluation.
 
         Args:
-            proposal_data: The proposal content to evaluate
+            proposal_content: The proposal content to evaluate
             proposal_images: List of processed images
 
         Returns:
@@ -90,7 +90,7 @@ Provide a JSON object with exactly these fields:
 4. Overall financial risk and feasibility
 
 Proposal to Evaluate:
-{proposal_data}
+{proposal_content}
 
 Based on the evaluation criteria, provide your assessment of the proposal's financial merit, focusing on the value provided for the 1000 token investment and any additional financial aspects."""
 
@@ -124,7 +124,7 @@ Based on the evaluation criteria, provide your assessment of the proposal's fina
             Dictionary containing financial evaluation results
         """
         proposal_id = state.get("proposal_id", "unknown")
-        proposal_content = state.get("proposal_data", "")
+        proposal_content = state.get("proposal_content", "")
         state.get("dao_id")
         state.get("agent_id")
         state.get("profile_id")
@@ -139,7 +139,7 @@ Based on the evaluation criteria, provide your assessment of the proposal's fina
         try:
             # Create chat messages
             messages = self._create_chat_messages(
-                proposal_data=proposal_content,
+                proposal_content=proposal_content,
                 proposal_images=proposal_images,
             )
 

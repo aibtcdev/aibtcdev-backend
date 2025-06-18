@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import openai
-from langchain_openai import OpenAIEmbeddings
 
 from backend.factory import backend
 from backend.models import Proposal, ProposalBase, ProposalFilter
 from config import config
 from lib.logger import configure_logger
+from services.ai.workflows.mixins.vector_mixin import create_embedding_model
 from services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -21,7 +21,6 @@ from services.infrastructure.job_management.decorators import JobPriority, job
 logger = configure_logger(__name__)
 
 PROPOSAL_COLLECTION_NAME = "dao_proposals"
-EMBEDDING_MODEL = "text-embedding-ada-002"
 
 
 @dataclass
@@ -60,9 +59,9 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate DAO proposal embedder task configuration."""
         try:
-            if not config.api.openai_api_key:
+            if not config.embedding.api_key:
                 logger.error(
-                    "OpenAI API key not configured for DAO proposal embeddings"
+                    "Embedding API key not configured for DAO proposal embeddings"
                 )
                 return False
             if not backend.vecs_client:
@@ -81,14 +80,14 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for DAO proposal embeddings."""
         try:
-            # Test OpenAI embeddings
+            # Test embeddings using configured model
             try:
-                embeddings_model = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+                embeddings_model = create_embedding_model()
                 test_embedding = await embeddings_model.aembed_query(
                     "test dao proposal"
                 )
                 if not test_embedding:
-                    logger.error("OpenAI embeddings test failed for DAO proposals")
+                    logger.error("Embeddings test failed for DAO proposals")
                     return False
             except Exception as e:
                 logger.error(
@@ -156,9 +155,9 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
         return "\n".join(parts)
 
     async def _get_embeddings(self, texts: List[str]) -> Optional[List[List[float]]]:
-        """Get embeddings for a list of texts using OpenAI API."""
+        """Get embeddings for a list of texts using configured embedding model."""
         try:
-            embeddings_model = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+            embeddings_model = create_embedding_model()
             embeddings = await embeddings_model.aembed_documents(texts)
             return embeddings
         except Exception as e:
@@ -238,7 +237,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 ]
 
             # Ensure OpenAI client is configured
-            openai.api_key = config.api.openai_api_key
+            openai.api_key = config.embedding.api_key
 
             # Ensure the vector collection exists
             try:
@@ -250,7 +249,9 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.info(
                     f"Collection '{PROPOSAL_COLLECTION_NAME}' not found, creating..."
                 )
-                collection = backend.create_vector_collection(PROPOSAL_COLLECTION_NAME)
+                collection = backend.create_vector_collection(
+                    PROPOSAL_COLLECTION_NAME, dimensions=config.embedding.dimensions
+                )
                 backend.create_vector_index(PROPOSAL_COLLECTION_NAME)
                 logger.info(
                     f"Created new vector collection: {PROPOSAL_COLLECTION_NAME}"
@@ -288,7 +289,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
 
             # Get embeddings
             logger.info(
-                f"Requesting embeddings for {len(texts_to_embed)} NEW DAO proposals"
+                f"Requesting embeddings for {len(texts_to_embed)} NEW DAO proposals using model: {config.embedding.default_model}"
             )
             embeddings_list = await self._get_embeddings(texts_to_embed)
 

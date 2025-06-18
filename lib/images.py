@@ -3,8 +3,6 @@ import httpx
 
 from config import config
 
-openai.api_key = config.api.openai_api_key
-
 
 class ImageGenerationError(Exception):
     """Raised when image generation fails"""
@@ -25,7 +23,10 @@ def generate_image(prompt: str) -> str:
         ImageGenerationError: If image generation fails
     """
     try:
-        client = openai.OpenAI()
+        client = openai.OpenAI(
+            api_key=config.chat_llm.api_key,
+            base_url=config.chat_llm.api_base if config.chat_llm.api_base else None,
+        )
         response = client.images.generate(
             model="dall-e-3", quality="hd", prompt=prompt, n=1, size="1024x1024"
         )

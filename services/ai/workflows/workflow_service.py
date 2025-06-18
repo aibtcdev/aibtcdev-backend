@@ -15,6 +15,10 @@ from services.ai.workflows.chat import (
     MessageProcessor,
     StreamingCallbackHandler,
 )
+from services.ai.workflows.utils.model_factory import (
+    get_default_model_name,
+    get_default_temperature,
+)
 
 logger = configure_logger(__name__)
 
@@ -421,8 +425,8 @@ class WorkflowBuilder:
         self.kwargs = kwargs
         self.callback_handler = None
         self.tools = []
-        self.model_name = kwargs.get("model_name", "gpt-4.1")
-        self.temperature = kwargs.get("temperature", 0.9)
+        self.model_name = kwargs.get("model_name", get_default_model_name())
+        self.temperature = kwargs.get("temperature", get_default_temperature())
 
     def with_callback_handler(
         self, callback_handler: BaseCallbackHandler

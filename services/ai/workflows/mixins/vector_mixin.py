@@ -5,10 +5,35 @@ from langchain_openai import OpenAIEmbeddings
 from langgraph.graph import StateGraph
 
 from backend.factory import backend
+from config import config
 from lib.logger import configure_logger
 from services.ai.workflows.base import BaseWorkflowMixin
 
 logger = configure_logger(__name__)
+
+
+def create_embedding_model() -> OpenAIEmbeddings:
+    """Create an OpenAI embeddings model using the configured settings.
+
+    Returns:
+        Configured OpenAIEmbeddings instance
+    """
+    embedding_config = {
+        "model": config.embedding.default_model,
+    }
+
+    # Add base_url if configured
+    if config.embedding.api_base:
+        embedding_config["base_url"] = config.embedding.api_base
+
+    # Add api_key if configured
+    if config.embedding.api_key:
+        embedding_config["api_key"] = config.embedding.api_key
+
+    logger.debug(
+        f"Creating OpenAI embeddings with model: {config.embedding.default_model}"
+    )
+    return OpenAIEmbeddings(**embedding_config)
 
 
 class VectorRetrievalCapability(BaseWorkflowMixin):
@@ -24,7 +49,7 @@ class VectorRetrievalCapability(BaseWorkflowMixin):
         if not hasattr(self, "collection_names"):
             self.collection_names = ["knowledge_collection", "dao_collection"]
         if not hasattr(self, "embeddings"):
-            self.embeddings = OpenAIEmbeddings()
+            self.embeddings = create_embedding_model()
         if not hasattr(self, "vector_results_cache"):
             self.vector_results_cache = {}
 
@@ -138,21 +163,20 @@ async def add_documents_to_vectors(
     Args:
         collection_name: Name of the collection to add to
         documents: List of LangChain Document objects
-        embeddings: Optional embeddings model to use
+        embeddings: Optional embeddings model to use. If None, uses configured model.
 
     Returns:
         Dictionary mapping collection name to list of document IDs
     """
     if embeddings is None:
-        raise ValueError(
-            "Embeddings model must be provided to add documents to vector store"
-        )
+        embeddings = create_embedding_model()
+
     collection_doc_ids = {}
     try:
         try:
             backend.get_vector_collection(collection_name)
         except Exception:
-            embed_dim = 1536
+            embed_dim = config.embedding.dimensions
             if hasattr(embeddings, "embedding_dim"):
                 embed_dim = embeddings.embedding_dim
             backend.create_vector_collection(collection_name, dimensions=embed_dim)

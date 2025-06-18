@@ -61,6 +61,35 @@ class DiscordConfig:
 
 
 @dataclass
+class ChatLLMConfig:
+    """Configuration for chat-based LLM models."""
+
+    default_model: str = os.getenv("AIBTC_CHAT_DEFAULT_MODEL", "gpt-4.1")
+    default_temperature: float = float(
+        os.getenv("AIBTC_CHAT_DEFAULT_TEMPERATURE", "0.9")
+    )
+    api_base: str = os.getenv("AIBTC_CHAT_API_BASE", "")
+    api_key: str = os.getenv("AIBTC_CHAT_API_KEY", "")
+    # Reasoning-specific model settings
+    reasoning_model: str = os.getenv("AIBTC_CHAT_REASONING_MODEL", "o3-mini")
+    reasoning_temperature: float = float(
+        os.getenv("AIBTC_CHAT_REASONING_TEMPERATURE", "0.9")
+    )
+
+
+@dataclass
+class EmbeddingConfig:
+    """Configuration for embedding models."""
+
+    default_model: str = os.getenv(
+        "AIBTC_EMBEDDING_DEFAULT_MODEL", "text-embedding-ada-002"
+    )
+    api_base: str = os.getenv("AIBTC_EMBEDDING_API_BASE", "")
+    api_key: str = os.getenv("AIBTC_EMBEDDING_API_KEY", "")
+    dimensions: int = int(os.getenv("AIBTC_EMBEDDING_DIMENSIONS", "1536"))
+
+
+@dataclass
 class SchedulerConfig:
     sync_enabled: bool = (
         os.getenv("AIBTC_SCHEDULE_SYNC_ENABLED", "false").lower() == "true"
@@ -165,7 +194,6 @@ class APIConfig:
     webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH_TOKEN", "Bearer 1234567890")
     lunarcrush_api_key: str = os.getenv("AIBTC_LUNARCRUSH_API_KEY", "")
     cmc_api_key: str = os.getenv("AIBTC_CMC_API_KEY", "")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
 
 @dataclass
@@ -183,6 +211,8 @@ class Config:
     network: NetworkConfig = field(default_factory=NetworkConfig)
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     backend_wallet: BackendWalletConfig = field(default_factory=BackendWalletConfig)
+    chat_llm: ChatLLMConfig = field(default_factory=ChatLLMConfig)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
 
     @classmethod
     def load(cls) -> "Config":

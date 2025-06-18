@@ -30,7 +30,7 @@ class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability)
 
     def _create_chat_messages(
         self,
-        proposal_data: str,
+        proposal_content: str,
         community_info: str,
         search_results: str,
         proposal_images: List[Dict[str, Any]] = None,
@@ -38,7 +38,7 @@ class SocialContextAgent(BaseCapabilityMixin, TokenUsageMixin, PromptCapability)
         """Create chat messages for social context evaluation.
 
         Args:
-            proposal_data: The proposal content to evaluate
+            proposal_content: The proposal content to evaluate
             community_info: Information about the DAO community
             search_results: External context from web search
             proposal_images: List of processed images
@@ -84,7 +84,7 @@ Provide a JSON object with exactly these fields:
         user_content = f"""Please evaluate the social and community aspects of the following proposal:
 
 Proposal to Evaluate:
-{proposal_data}
+{proposal_content}
 
 Community Information:
 {community_info}
@@ -124,7 +124,7 @@ Based on the evaluation criteria and community context, provide your assessment 
             Dictionary containing social evaluation results
         """
         proposal_id = state.get("proposal_id", "unknown")
-        proposal_content = state.get("proposal_data", "")
+        proposal_content = state.get("proposal_content", "")
         state.get("dao_id")
         state.get("agent_id")
         state.get("profile_id")
@@ -158,7 +158,7 @@ Recent Community Sentiment: {recent_sentiment}
         try:
             # Create chat messages
             messages = self._create_chat_messages(
-                proposal_data=proposal_content,
+                proposal_content=proposal_content,
                 community_info=community_info,
                 search_results=search_results_text,
                 proposal_images=proposal_images,

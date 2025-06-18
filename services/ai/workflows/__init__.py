@@ -26,7 +26,6 @@ from services.ai.workflows.mixins.vector_mixin import (
 from services.ai.workflows.mixins.web_search_mixin import WebSearchCapability
 from services.ai.workflows.proposal_evaluation import (
     ProposalEvaluationWorkflow,
-    evaluate_and_vote_on_proposal,
 )
 from services.ai.workflows.tweet_analysis import (
     TweetAnalysisWorkflow,
@@ -42,6 +41,14 @@ from services.ai.workflows.workflow_service import (
     WorkflowFactory,
     WorkflowService,
     execute_workflow_stream,
+)
+from services.ai.workflows.utils.model_factory import (
+    ModelConfig,
+    create_chat_openai,
+    create_planning_llm,
+    create_reasoning_llm,
+    get_default_model_name,
+    get_default_temperature,
 )
 
 __all__ = [
@@ -70,7 +77,6 @@ __all__ = [
     "TweetAnalysisWorkflow",
     "TweetGeneratorWorkflow",
     "analyze_tweet",
-    "evaluate_and_vote_on_proposal",
     "generate_dao_tweet",
     "ChatService",
     "ChatWorkflow",
@@ -78,4 +84,11 @@ __all__ = [
     "PlanningCapability",
     "WebSearchCapability",
     "add_documents_to_vectors",
+    # Model factory exports
+    "ModelConfig",
+    "create_chat_openai",
+    "create_planning_llm",
+    "create_reasoning_llm",
+    "get_default_model_name",
+    "get_default_temperature",
 ]
