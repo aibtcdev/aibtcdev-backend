@@ -80,8 +80,9 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                     return None
 
             # Try API v2 first
-            tweet = await self.twitter_service.get_tweet_by_id(tweet_id)
-            if tweet:
+            tweet_response = await self.twitter_service.get_tweet_by_id(tweet_id)
+            if tweet_response and tweet_response.data:
+                tweet = tweet_response.data
                 tweet_data = {
                     "id": tweet.id,
                     "text": tweet.text,
@@ -91,6 +92,16 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                     "entities": getattr(tweet, "entities", {}),
                     "attachments": getattr(tweet, "attachments", {}),
                 }
+
+                # Handle media expansion for API v2
+                # Extract media objects from the includes section of the response
+                if hasattr(tweet_response, "includes") and tweet_response.includes:
+                    if "media" in tweet_response.includes:
+                        tweet_data["media_objects"] = tweet_response.includes["media"]
+                        self.logger.debug(
+                            f"Found {len(tweet_response.includes['media'])} media objects in API v2 response"
+                        )
+
                 self.logger.info(f"Successfully fetched tweet {tweet_id} using API v2")
                 return tweet_data
 
@@ -106,8 +117,8 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                     "created_at": status.created_at,
                     "retweet_count": status.retweet_count,
                     "favorite_count": status.favorite_count,
-                    "entities": status.entities,
-                    "extended_entities": getattr(status, "extended_entities", {}),
+                    "entities": getattr(status, "entities", None),
+                    "extended_entities": getattr(status, "extended_entities", None),
                 }
                 self.logger.info(
                     f"Successfully fetched tweet {tweet_id} using API v1.1"
@@ -134,8 +145,12 @@ class TwitterProcessingNode(BaseCapabilityMixin):
 
         try:
             # Check extended_entities for media (API v1.1)
-            extended_entities = tweet_data.get("extended_entities", {})
-            if "media" in extended_entities:
+            extended_entities = tweet_data.get("extended_entities")
+            if (
+                extended_entities
+                and isinstance(extended_entities, dict)
+                and "media" in extended_entities
+            ):
                 for media in extended_entities["media"]:
                     if media.get("type") == "photo":
                         media_url = media.get("media_url_https") or media.get(
@@ -145,8 +160,8 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                             image_urls.append(media_url)
 
             # Check entities for media (fallback)
-            entities = tweet_data.get("entities", {})
-            if "media" in entities:
+            entities = tweet_data.get("entities")
+            if entities and isinstance(entities, dict) and "media" in entities:
                 for media in entities["media"]:
                     if media.get("type") == "photo":
                         media_url = media.get("media_url_https") or media.get(
@@ -156,13 +171,26 @@ class TwitterProcessingNode(BaseCapabilityMixin):
                             image_urls.append(media_url)
 
             # Check attachments for media keys (API v2)
-            attachments = tweet_data.get("attachments", {})
-            if "media_keys" in attachments:
-                # Note: For API v2, we would need to make additional calls to get media URLs
-                # This is a simplified version - full implementation would require media expansion
-                self.logger.debug(
-                    f"Found media keys in tweet, but media expansion not implemented: {attachments['media_keys']}"
-                )
+            attachments = tweet_data.get("attachments")
+            if (
+                attachments
+                and isinstance(attachments, dict)
+                and "media_keys" in attachments
+            ):
+                # For API v2, we need to check if media objects are in the tweet_data
+                # This happens when the API response includes expanded media
+                media_objects = tweet_data.get("media_objects", [])
+                for media in media_objects:
+                    if media.get("type") == "photo":
+                        media_url = media.get("url")
+                        if media_url:
+                            image_urls.append(media_url)
+
+                # If no media objects in tweet_data, log that media expansion is needed
+                if not media_objects:
+                    self.logger.debug(
+                        f"Found media keys in tweet, but no expanded media objects: {attachments['media_keys']}"
+                    )
 
             # Remove duplicates
             image_urls = list(set(image_urls))

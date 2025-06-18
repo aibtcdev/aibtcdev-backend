@@ -489,7 +489,7 @@ class TwitterService:
             logger.error(f"Failed to unfollow user {target_username}: {str(e)}")
             return False
 
-    async def get_tweet_by_id(self, tweet_id: str) -> Optional[tweepy.Tweet]:
+    async def get_tweet_by_id(self, tweet_id: str) -> Optional[tweepy.Response]:
         """
         Get a tweet by its ID using Twitter API v2.
 
@@ -497,7 +497,7 @@ class TwitterService:
             tweet_id: The ID of the tweet to retrieve
 
         Returns:
-            Tweet data if found, None if not found or error
+            Full response object if found, None if not found or error
         """
         try:
             if self.client is None:
@@ -557,12 +557,13 @@ class TwitterService:
                     "width",
                     "public_metrics",
                     "alt_text",
+                    "variants",
                 ],
             )
 
             if response and response.data:
                 logger.info(f"Successfully retrieved tweet: {tweet_id}")
-                return response.data
+                return response
             else:
                 logger.warning(f"Tweet not found: {tweet_id}")
                 return None
