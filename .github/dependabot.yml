@@ -11,11 +11,24 @@ updates:
       interval: "daily"
     target-branch: "staging"
     groups:
+      web-framework:
+        patterns:
+          - "fastapi*"
+          - "starlette*"
+          - "uvicorn*"
       dev-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "fastapi*"
+          - "starlette*"
+          - "uvicorn*"
     ignore:
       - dependency-name: "pgvector"
         versions: [">=0.3.1"]
+      # Ignore starlette versions that are incompatible with current fastapi
       - dependency-name: "starlette"
-        versions: [">=0.46.0" , "<=0.47.0"]
+        versions: [">=0.47.0"]
+      # Ignore fastapi versions that might introduce starlette compatibility issues
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
