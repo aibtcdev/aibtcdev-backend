@@ -31,6 +31,7 @@ class TwitterService:
         access_secret: str,
         client_id: str,
         client_secret: str,
+        bearer_token: str,
     ):
         """Initialize the Twitter service with API credentials."""
         self.consumer_key = consumer_key
@@ -39,6 +40,7 @@ class TwitterService:
         self.access_secret = access_secret
         self.client_id = client_id
         self.client_secret = client_secret
+        self.bearer_token = bearer_token
         self.client = None
         self.api = None
 
@@ -63,6 +65,7 @@ class TwitterService:
                 consumer_secret=self.consumer_secret,
                 access_token=self.access_token,
                 access_token_secret=self.access_secret,
+                bearer_token=self.bearer_token,
                 wait_on_rate_limit=True,
             )
             logger.info("Twitter client and API initialized successfully")
@@ -641,6 +644,7 @@ class TwitterConfig(BaseModel):
     client_secret: str
     access_token: str
     access_secret: str
+    bearer_token: str
     user_id: str
     whitelisted_authors: List[str]
     whitelist_enabled: bool = False
@@ -808,6 +812,7 @@ class TwitterMentionHandler:
             client_secret=config.client_secret,
             access_token=config.access_token,
             access_secret=config.access_secret,
+            bearer_token=config.bearer_token,
         )
 
     async def _post_response(
@@ -952,6 +957,7 @@ def create_twitter_handler() -> TwitterMentionHandler:
         client_secret=config.twitter.client_secret,
         access_token=config.twitter.access_token,
         access_secret=config.twitter.access_secret,
+        bearer_token=config.twitter.bearer_token,
         user_id=config.twitter.automated_user_id,
         whitelisted_authors=config.twitter.whitelisted_authors,
         whitelist_enabled=False,
@@ -972,6 +978,7 @@ def create_twitter_service_from_config() -> TwitterService:
         client_secret=config.twitter.client_secret,
         access_token=config.twitter.access_token,
         access_secret=config.twitter.access_secret,
+        bearer_token=config.twitter.bearer_token,
     )
 
 

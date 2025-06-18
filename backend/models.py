@@ -232,6 +232,7 @@ class XCredsBase(CustomBaseModel):
     client_secret: Optional[str] = None
     username: Optional[str] = None
     dao_id: Optional[UUID] = None
+    bearer_token: Optional[str] = None
 
 
 class XCredsCreate(XCredsBase):

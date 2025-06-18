@@ -70,6 +70,7 @@ class TwitterPostTweetTool(BaseTool):
                 access_secret=x_creds.access_secret,
                 client_id=x_creds.client_id,
                 client_secret=x_creds.client_secret,
+                bearer_token=x_creds.bearer_token,
             )
             twitter_service.initialize()
             response = twitter_service.post_tweet(text=content)
@@ -129,6 +130,7 @@ class TwitterGetTweetTool(BaseTool):
                 access_secret=x_creds.access_secret,
                 client_id=x_creds.client_id,
                 client_secret=x_creds.client_secret,
+                bearer_token=x_creds.bearer_token,
             )
             twitter_service.initialize()
 

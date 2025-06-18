@@ -215,18 +215,34 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 profile_id=None,  # No specific profile for job processing
             )
 
-            # Extract evaluation results (evaluation is now the direct result)
-            result = {"evaluation": evaluation}
-            approval = evaluation.get("approve", False)
-            overall_score = evaluation.get("overall_score", 0)
-            reasoning = evaluation.get("reasoning", "No reasoning provided")
-            formatted_prompt = result.get("formatted_prompt", "")
-            total_cost = result.get("total_overall_cost", 0.0)
-            model = evaluation.get("model_name", "Unknown")
-            evaluation_scores = evaluation.get(
-                "scores", {}
-            )  # Extract the full scores data
-            evaluation_flags = evaluation.get("flags", [])  # Extract the flags data
+            # Extract evaluation results from the Pydantic model
+            approval = evaluation.decision
+            overall_score = evaluation.final_score
+            reasoning = evaluation.explanation
+            formatted_prompt = ""  # Not available in the new model structure
+            total_cost = (
+                evaluation.token_usage.get("total_cost", 0.0)
+                if evaluation.token_usage
+                else 0.0
+            )
+            model = (
+                evaluation.token_usage.get("model", "Unknown")
+                if evaluation.token_usage
+                else "Unknown"
+            )
+            evaluation_scores = {
+                "categories": [
+                    {
+                        "category": cat.category,
+                        "score": cat.score,
+                        "weight": cat.weight,
+                        "reasoning": cat.reasoning,
+                    }
+                    for cat in evaluation.categories
+                ],
+                "final_score": evaluation.final_score,
+            }  # Convert categories to scores format
+            evaluation_flags = evaluation.flags
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
@@ -253,7 +269,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 profile_id=wallet.profile_id if wallet else None,
                 evaluation_score=evaluation_scores,  # Store the complete evaluation scores
                 flags=evaluation_flags,  # Store the evaluation flags
-                evaluation=evaluation,
+                evaluation=evaluation.model_dump(),  # Convert Pydantic model to dict for storage
             )
 
             # Create the vote record
