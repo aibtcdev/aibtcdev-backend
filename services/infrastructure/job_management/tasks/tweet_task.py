@@ -1,14 +1,8 @@
 """Enhanced Tweet Task using the new job queue system."""
 
-import re
 from dataclasses import dataclass
-from io import BytesIO
 from typing import List, Optional
-from urllib.parse import urlparse
 from uuid import UUID
-
-import requests
-import tweepy
 
 from backend.factory import backend
 from backend.models import (
@@ -65,30 +59,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self._pending_messages: Optional[List[QueueMessage]] = None
         self._twitter_services: dict[UUID, TwitterService] = {}
 
-    def _split_text_into_chunks(self, text: str, limit: int = 280) -> List[str]:
-        """Split text into chunks not exceeding the limit without cutting words."""
-        words = text.split()
-        chunks = []
-        current = ""
-        for word in words:
-            if len(current) + len(word) + (1 if current else 0) <= limit:
-                current = f"{current} {word}".strip()
-            else:
-                if current:
-                    chunks.append(current)
-                current = word
-        if current:
-            chunks.append(current)
-        return chunks
-
-    def _get_extension(self, url: str) -> str:
-        """Extract file extension from URL."""
-        path = urlparse(url).path.lower()
-        for ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            if path.endswith(ext):
-                return ext
-        return ".jpg"
-
     async def _get_twitter_service(self, dao_id: UUID) -> Optional[TwitterService]:
         """Get or create Twitter service for a DAO with caching."""
         if dao_id in self._twitter_services:
@@ -123,63 +93,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 exc_info=True,
             )
             return None
-
-    def _post_tweet_with_media(
-        self,
-        twitter_service: TwitterService,
-        image_url: str,
-        text: str,
-        reply_id: Optional[str] = None,
-    ):
-        """Post a tweet with media attachment."""
-        try:
-            headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBTC Bot/1.0)"}
-            response = requests.get(image_url, headers=headers, timeout=30)
-            response.raise_for_status()
-
-            # Validate content type and size
-            content_type = response.headers.get("content-type", "").lower()
-            if not any(
-                ct in content_type
-                for ct in ["image/jpeg", "image/png", "image/gif", "image/webp"]
-            ):
-                logger.warning(f"Unsupported content type: {content_type}")
-                return None
-
-            if len(response.content) > 5 * 1024 * 1024:  # 5MB limit
-                logger.warning(f"Image too large: {len(response.content)} bytes")
-                return None
-
-            auth = tweepy.OAuth1UserHandler(
-                twitter_service.consumer_key,
-                twitter_service.consumer_secret,
-                twitter_service.access_token,
-                twitter_service.access_secret,
-            )
-            api = tweepy.API(auth)
-            extension = self._get_extension(image_url)
-            media = api.media_upload(
-                filename=f"image{extension}",
-                file=BytesIO(response.content),
-            )
-
-            client = tweepy.Client(
-                consumer_key=twitter_service.consumer_key,
-                consumer_secret=twitter_service.consumer_secret,
-                access_token=twitter_service.access_token,
-                access_token_secret=twitter_service.access_secret,
-            )
-
-            result = client.create_tweet(
-                text=text,
-                media_ids=[media.media_id_string],
-                in_reply_to_tweet_id=reply_id,
-            )
-            if result and result.data:
-                return type("Obj", (), {"id": result.data["id"]})()
-        except Exception as e:
-            logger.error(f"Failed to post tweet with media: {str(e)}")
-        return None
 
     async def _initialize_twitter_service(self, dao_id: UUID) -> bool:
         """Initialize Twitter service with credentials from config."""
@@ -217,8 +130,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             return True
 
         except Exception as e:
-            logger.error(f"Failed to post tweet with media: {str(e)}")
-            return None
+            logger.error(f"Failed to initialize Twitter service: {str(e)}")
+            return False
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
@@ -417,63 +330,35 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             image_urls = extract_image_urls(tweet_text)
             image_url = image_urls[0] if image_urls else None
 
-            if image_url:
-                # Remove image URL from text
-                tweet_text = re.sub(re.escape(image_url), "", tweet_text).strip()
-                tweet_text = re.sub(r"\s+", " ", tweet_text)
-
-            # Split tweet text if necessary
-            chunks = self._split_text_into_chunks(tweet_text)
-            previous_tweet_id = message.tweet_id
-            tweet_response = None
-            tweets_sent = 0
-
-            for index, chunk in enumerate(chunks):
-                try:
-                    if index == 0 and image_url:
-                        tweet_response = self._post_tweet_with_media(
-                            twitter_service=twitter_service,
-                            image_url=image_url,
-                            text=chunk,
-                            reply_id=previous_tweet_id,
-                        )
-                    else:
-                        tweet_response = await twitter_service._apost_tweet(
-                            text=chunk,
-                            reply_in_reply_to_tweet_id=previous_tweet_id,
-                        )
-
-                    if tweet_response:
-                        tweets_sent += 1
-                        previous_tweet_id = tweet_response.id
-                        logger.info(
-                            f"Successfully posted tweet chunk {index + 1}: {tweet_response.id}"
-                        )
-                    else:
-                        logger.error(f"Failed to send tweet chunk {index + 1}")
-                        if index == 0:  # If first chunk fails, whole message fails
-                            return TweetProcessingResult(
-                                success=False,
-                                message="Failed to send first tweet chunk",
-                                dao_id=message.dao_id,
-                                tweet_id=previous_tweet_id,
-                                chunks_processed=index,
-                            )
-                        # For subsequent chunks, we can continue
-
-                except Exception as chunk_error:
-                    logger.error(f"Error sending chunk {index + 1}: {str(chunk_error)}")
-                    if index == 0:  # Critical failure on first chunk
-                        raise chunk_error
-
-            return TweetProcessingResult(
-                success=tweets_sent > 0,
-                message=f"Successfully sent {tweets_sent}/{len(chunks)} tweet chunks",
-                tweet_id=previous_tweet_id,
-                dao_id=message.dao_id,
-                tweets_sent=tweets_sent,
-                chunks_processed=len(chunks),
+            # Use the Twitter service to post tweet with chunks and media handling
+            responses = await twitter_service.post_tweet_with_chunks(
+                text=tweet_text,
+                image_url=image_url,
+                reply_id=getattr(message, "tweet_id", None),
             )
+
+            if responses:
+                tweets_sent = len(responses)
+                last_tweet_id = responses[-1].data["id"] if responses[-1].data else None
+
+                logger.info(f"Successfully posted {tweets_sent} tweet(s)")
+                return TweetProcessingResult(
+                    success=True,
+                    message=f"Successfully sent {tweets_sent} tweet chunk(s)",
+                    tweet_id=last_tweet_id,
+                    dao_id=message.dao_id,
+                    tweets_sent=tweets_sent,
+                    chunks_processed=tweets_sent,
+                )
+            else:
+                logger.error("Failed to send any tweets")
+                return TweetProcessingResult(
+                    success=False,
+                    message="Failed to send tweet",
+                    dao_id=message.dao_id,
+                    tweet_id=getattr(message, "tweet_id", None),
+                    chunks_processed=0,
+                )
 
         except Exception as e:
             logger.error(
@@ -489,23 +374,38 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
     def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
         """Determine if error should trigger retry."""
-        # Retry on network errors, API rate limits, temporary failures
-        retry_errors = (
-            ConnectionError,
-            TimeoutError,
-            requests.exceptions.RequestException,
-            tweepy.TooManyRequests,
-            tweepy.ServiceUnavailable,
-        )
-        return isinstance(error, retry_errors)
+        # Import tweepy exceptions for retry logic
+        try:
+            import tweepy
+
+            retry_errors = (
+                ConnectionError,
+                TimeoutError,
+                tweepy.TooManyRequests,
+                tweepy.ServiceUnavailable,
+            )
+            return isinstance(error, retry_errors)
+        except ImportError:
+            # Fallback if tweepy not available
+            retry_errors = (ConnectionError, TimeoutError)
+            return isinstance(error, retry_errors)
 
     async def _handle_execution_error(
         self, error: Exception, context: JobContext
     ) -> Optional[List[TweetProcessingResult]]:
         """Handle execution errors with recovery logic."""
-        if isinstance(error, tweepy.TooManyRequests):
-            logger.warning("Twitter API rate limit reached, will retry later")
-            return None  # Let default retry handling take over
+        try:
+            import tweepy
+
+            if isinstance(error, tweepy.TooManyRequests):
+                logger.warning("Twitter API rate limit reached, will retry later")
+                return None  # Let default retry handling take over
+
+            if isinstance(error, tweepy.ServiceUnavailable):
+                logger.warning("Twitter service unavailable, will retry later")
+                return None
+        except ImportError:
+            pass
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(f"Network error: {str(error)}, will retry")

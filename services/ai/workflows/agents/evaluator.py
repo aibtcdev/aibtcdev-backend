@@ -14,169 +14,45 @@ from services.ai.workflows.mixins.vector_mixin import VectorRetrievalCapability
 from services.ai.workflows.utils.models import (
     ComprehensiveEvaluationOutput,
     ComprehensiveEvaluatorAgentProcessOutput,
-    EvaluationCategory,
 )
 from services.ai.workflows.utils.token_usage import TokenUsageMixin
 
 # Add these constants after the imports, before the class definition
 
 # Default prompts for comprehensive evaluation
-DEFAULT_SYSTEM_PROMPT = """You are a comprehensive DAO governance evaluator with expertise across multiple domains. You will evaluate proposals across configurable evaluation categories in a single comprehensive assessment.
+DEFAULT_SYSTEM_PROMPT = """You are a DAO governance evaluator. Evaluate proposals comprehensively and provide detailed reasoning.
 
-**Critical Reasoning Requirements**:
-- **Detailed Chain of Thought (CoT)**: For each evaluation category, provide extensive step-by-step reasoning that goes far beyond simple scoring. Explain your analytical process in detail, including:
-  * How you interpret specific elements of the proposal
-  * What evidence you consider and why it's significant
-  * How you weigh competing factors and trade-offs
-  * What assumptions you make and their justification
-  * How you handle ambiguities or uncertainties
-  * Your intermediate conclusions and the logic connecting them
-- **Comprehensive Analysis**: Each category evaluation must contain substantive analysis, not just bullet points or brief statements. Provide rich context, detailed reasoning, and nuanced evaluation that demonstrates deep understanding of the proposal's implications.
-- **Robust Reflection**: After completing initial analysis, conduct thorough reflection that examines:
-  * Alternative interpretations of key proposal elements
-  * Potential blind spots or biases in your analysis
-  * Cross-category interactions and conflicts
-  * Whether your reasoning is internally consistent
-  * Areas where additional information would be valuable
-- **Transparent Methodology**: Document your reasoning process so thoroughly that another evaluator could understand and verify your conclusions.
+**Key Requirements**:
+- Provide detailed reasoning for your evaluation decisions
+- Consider the proposal's alignment with DAO mission and values
+- Analyze potential risks and benefits
+- Review any attached images as part of the proposal content
+- Review any referenced tweets that are part of the proposal context
+- Score on a scale of 1-100 where 70+ is approve, below 70 is reject
 
-**Analysis Depth Requirements**:
-You must provide extensive, substantive analysis rather than superficial assessments. Each evaluation section should demonstrate sophisticated reasoning that considers multiple perspectives, potential implications, and contextual factors. Avoid generic statements and focus on proposal-specific insights that show deep analytical thinking.
+**Content Evaluation**:
+- If images are attached, they are an integral part of the proposal content
+- If tweets are referenced, they provide additional context and should be evaluated as supporting material
+- Both visual content and social media references should inform your overall assessment
 
-**Image Evaluation**: If images are attached to this proposal, they are an integral part of the proposal content. You must carefully examine and evaluate any provided images across ALL evaluation categories, considering how they support, clarify, or relate to the written proposal. Images may contain diagrams, charts, financial projections, community plans, historical comparisons, mockups, or other visual information that is essential to understanding the full scope and merit of the proposal. Include your analysis of the visual content in ALL relevant evaluation sections.
+**Output Format**:
+Return a JSON object with evaluation results, scores, reasoning, and final decision."""
 
-**DYNAMIC EVALUATION FRAMEWORK**
+DEFAULT_USER_PROMPT_TEMPLATE = """Evaluate this proposal:
 
-You will evaluate the proposal across the following categories with their specified weights:
-
-{evaluation_categories}
-
-**SCORING METHODOLOGY**
-
-For each evaluation category, provide scores from 1-100:
-- 1-20: Critical issues, not aligned, or harmful
-- 21-50: Significant issues or missing details
-- 51-70: Adequate but with some concerns or minor risks
-- 71-90: Good quality, aligned, and beneficial
-- 91-100: Excellent quality, highly aligned, and valuable
-
-**Detailed Reasoning for Each Category**:
-- For each category, provide comprehensive analysis explaining:
-  * Specific evidence from the proposal and why it's relevant
-  * How this evidence aligns or conflicts with the DAO's goals and values
-  * Detailed risk assessment and uncertainty analysis
-  * Comparative analysis against past proposals or best practices
-  * Consideration of multiple stakeholder perspectives
-- Show your complete thought process for arriving at scores, including:
-  * Intermediate reasoning for each criterion score
-  * How you balanced competing factors
-  * What alternatives you considered and why you rejected them
-  * Key assumptions and their potential impact on conclusions
-- **Limit reasoning to 3 bullet points maximum per category** - make each bullet point comprehensive and substantive
-
-**FINAL DECISION FRAMEWORK**
-
-The final decision will be based on the weighted average of all category scores. Proposals scoring 70 or above will be approved, while those below 70 will be rejected.
-
-Final Decision Process:
-1. Calculate the weighted average of all category scores using their specified weights
-2. Synthesize findings from all categories, explaining how they interact and reinforce or conflict with each other
-3. Provide comprehensive analysis of the proposal's overall merit beyond just numerical scores
-4. Assess critical flags and their implications for the DAO's long-term interests
-5. Conduct thorough reflection examining alternative interpretations and potential blind spots
-6. Determine final overall score that directly maps to approval decision
-7. Make approve/reject decision (true/false) based on the score threshold with detailed, substantive reasoning
-
-**Overall Score Calculation**:
-- Calculate weighted average using the provided category weights
-- Apply any adjustments based on critical flags or exceptional circumstances
-- Ensure the final score accurately reflects the proposal's overall merit
-
-**Decision Mapping**:
-- **Score 70-100**: APPROVE (decision = true) - Proposal meets or exceeds the approval threshold
-- **Score 1-69**: REJECT (decision = false) - Proposal falls below the approval threshold
-
-**Score Guidelines**:
-- **90-100**: Exceptional proposal with outstanding merit across all categories
-- **80-89**: Excellent proposal with strong benefits and minimal risks
-- **70-79**: Good proposal that meets approval threshold with manageable concerns
-- **60-69**: Adequate proposal with significant issues preventing approval
-- **50-59**: Below average proposal with substantial problems
-- **40-49**: Poor proposal with major flaws or misalignment
-- **30-39**: Very poor proposal with critical issues
-- **1-29**: Unacceptable proposal with fundamental problems
-
-**Veto Conditions** (automatic rejection regardless of calculated score):
-- Any category score below 30 indicates critical issues
-- Multiple critical flags indicating legal, security, or ethical violations
-- Fundamental misalignment with DAO values or objectives
-- Evidence of fraud, manipulation, or malicious intent
-
-**Reflection Phase**:
-- Re-evaluate each category score and reasoning with fresh perspective
-- Consider alternative interpretations of proposal data, images, and contextual information
-- Examine potential biases, assumptions, or analytical blind spots
-- Assess whether your reasoning is internally consistent across all categories
-- Document any adjustments to scores or reasoning with detailed justification
-- Verify that the final score accurately reflects the proposal's overall merit and aligns with the approval threshold
-
-**CRITICAL OUTPUT REQUIREMENTS**
-
-Return a JSON object with ALL required fields containing rich, substantive analysis:
-
-**For Each Category**: Provide comprehensive reasoning (maximum 3 bullet points) that includes:
-- Specific evidence from the proposal and its significance
-- Risk assessment and uncertainty analysis
-- Clear explanation of how you reached your conclusions
-
-**For Final Explanation**: Provide comprehensive synthesis (minimum 300-400 words) that includes:
-- How findings from all categories interact and inform the overall assessment
-- Analysis of the proposal's broader implications for the DAO's future
-- Consideration of long-term consequences and strategic alignment
-- Discussion of key trade-offs and alternative perspectives considered
-- Detailed justification for the final decision beyond score calculations
-- Assessment of confidence level with specific reasoning about uncertainties
-
-**Quality Standards**: All text fields must demonstrate sophisticated analysis, avoid generic statements, and provide proposal-specific insights that show deep understanding of the evaluation context."""
-
-DEFAULT_USER_PROMPT_TEMPLATE = """Please conduct a comprehensive evaluation of the following proposal across all specified categories, providing extensive detailed reasoning as specified in the guidelines:
-
-**PROPOSAL TO EVALUATE:**
+**PROPOSAL:**
 {proposal_content}
 
 **DAO MISSION:**
 {dao_mission}
 
-**COMMUNITY INFORMATION:**
+**COMMUNITY INFO:**
 {community_info}
 
-**HISTORICAL CONTEXT - PAST DAO PROPOSALS:**
+**PAST PROPOSALS:**
 {past_proposals}
 
-**EVALUATION CATEGORIES:**
-{evaluation_categories}
-
-**DETAILED EVALUATION INSTRUCTIONS:**
-
-Perform thorough analysis across all specified evaluation categories with the following requirements:
-
-1. **Comprehensive Category Analysis**: For each category, provide extensive reasoning that goes far beyond simple scoring. Include detailed examination of specific proposal elements, evidence analysis, risk assessment, stakeholder considerations, and comparative context.
-
-2. **Rich Chain of Thought**: Document your complete analytical process for each category, showing how you interpret evidence, weigh competing factors, handle uncertainties, and arrive at conclusions. Avoid superficial assessments and demonstrate sophisticated reasoning.
-
-3. **Concise but Substantive Reasoning**: Each category reasoning must be limited to 3 bullet points maximum, but each bullet point should be comprehensive and contain substantive analysis that provides deep insights into the proposal's implications for that evaluation area.
-
-4. **Thorough Reflection**: Conduct detailed reflection examining alternative interpretations, potential biases, cross-category interactions, and areas of uncertainty. Document any adjustments to your reasoning with full justification.
-
-5. **Comprehensive Final Assessment**: Provide a detailed final explanation (300-400 words minimum) that synthesizes findings across all categories, discusses broader implications for the DAO, considers long-term consequences, and provides substantive justification for your decision beyond mere score calculations.
-
-**Critical Requirements:**
-- Examine any attached images thoroughly and integrate visual analysis across all relevant evaluation sections
-- Provide proposal-specific insights rather than generic statements
-- Demonstrate deep understanding of the evaluation context and DAO dynamics
-- Ensure all reasoning is transparent, detailed, and reproducible
-- Focus on comprehensive analysis rather than brief summaries
-- **Limit each category reasoning to exactly 3 bullet points, but make each bullet point rich and substantive**"""
+Provide detailed reasoning for your evaluation and final decision."""
 
 logger = configure_logger(__name__)
 
@@ -391,23 +267,23 @@ class ComprehensiveEvaluatorAgent(
         dao_mission: str,
         community_info: str,
         past_proposals: str,
-        evaluation_categories: List[Dict[str, Any]],
         proposal_images: List[Dict[str, Any]] = None,
+        tweet_content: Optional[str] = None,
         dao_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         profile_id: Optional[str] = None,
         custom_system_prompt: Optional[str] = None,
         custom_user_prompt: Optional[str] = None,
     ) -> List:
-        """Create chat messages for comprehensive evaluation with dynamic categories.
+        """Create chat messages for comprehensive evaluation.
 
         Args:
             proposal_content: The proposal content to evaluate
             dao_mission: The DAO mission statement
             community_info: Information about the DAO community
             past_proposals: Formatted past proposals text
-            evaluation_categories: List of evaluation categories with names, weights, and descriptions
             proposal_images: List of processed images
+            tweet_content: Optional tweet content from linked tweets
             dao_id: Optional DAO ID for custom prompt injection
             agent_id: Optional agent ID for custom prompt injection
             profile_id: Optional profile ID for custom prompt injection
@@ -417,28 +293,12 @@ class ComprehensiveEvaluatorAgent(
         Returns:
             List of chat messages
         """
-        # Format evaluation categories for prompt
-        categories_text = ""
-        for i, category in enumerate(evaluation_categories, 1):
-            name = category.get("name", f"Category {i}")
-            weight = category.get("weight", 0.25)
-            description = category.get("description", "No description provided")
 
-            categories_text += f"""
-**{i}. {name.upper()} EVALUATION ({weight * 100:.0f}% of final decision weight)**
-{description}
-
-"""
-
-        # Use custom system prompt or default, format with categories
+        # Use custom system prompt or default
         if custom_system_prompt:
-            system_content = custom_system_prompt.format(
-                evaluation_categories=categories_text.strip()
-            )
+            system_content = custom_system_prompt
         else:
-            system_content = DEFAULT_SYSTEM_PROMPT.format(
-                evaluation_categories=categories_text.strip()
-            )
+            system_content = DEFAULT_SYSTEM_PROMPT
 
         # Use custom user prompt or default, format with data
         if custom_user_prompt:
@@ -448,7 +308,6 @@ class ComprehensiveEvaluatorAgent(
                 dao_mission=dao_mission,
                 community_info=community_info,
                 past_proposals=past_proposals,
-                evaluation_categories=categories_text.strip(),
             )
         else:
             user_content = DEFAULT_USER_PROMPT_TEMPLATE.format(
@@ -456,10 +315,18 @@ class ComprehensiveEvaluatorAgent(
                 dao_mission=dao_mission,
                 community_info=community_info,
                 past_proposals=past_proposals,
-                evaluation_categories=categories_text.strip(),
             )
 
         messages = [{"role": "system", "content": system_content}]
+
+        # Add tweet content as separate user message if available
+        if tweet_content and tweet_content.strip():
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Referenced tweets in this proposal:\n\n{tweet_content}",
+                }
+            )
 
         # Create user message content - start with text
         user_message_content = [{"type": "text", "text": user_content}]
@@ -528,65 +395,6 @@ class ComprehensiveEvaluatorAgent(
         # Initialize token usage tracking in state if not present
         if "token_usage" not in state:
             state["token_usage"] = {}
-
-        # Get evaluation categories from config or use defaults
-        evaluation_categories = state.get("evaluation_categories") or self.config.get(
-            "evaluation_categories",
-            [
-                {
-                    "name": "Core Context",
-                    "weight": 0.25,
-                    "description": """Evaluate against DAO mission and fundamental standards:
-
-Key Considerations:
-- Does this align with the DAO's core mission and values?
-- Is the proposal clear and well-structured?
-- Is it technically and practically feasible?
-- Will it benefit the broader community?""",
-                },
-                {
-                    "name": "Financial",
-                    "weight": 0.25,
-                    "description": """Evaluate financial aspects and resource allocation:
-
-**Default Financial Context**: 
-- If this proposal passes, it will automatically distribute 1000 tokens from the treasury to the proposer
-- Beyond this default payout, evaluate any additional financial requests, promises, or money/crypto-related aspects mentioned in the proposal
-
-Key Considerations:
-- Are any additional funding requests beyond the 1000 tokens reasonable and well-justified?
-- Are there any promises or commitments in the proposal that involve money, crypto, or treasury resources?
-- What are the financial risks or implications of the proposal?
-- Does the proposal represent good value for the default 1000 token investment?""",
-                },
-                {
-                    "name": "Historical Context",
-                    "weight": 0.25,
-                    "description": """Evaluate against DAO historical context and past decisions:
-
-The DAO has a 1000 token payout limit per proposal, and submitters might try to game this by splitting large requests across multiple proposals.
-
-Key Red Flags:
-- Exact duplicates of previous proposals
-- Similar requesters, recipients, or incremental funding for the same project
-- Proposals that contradict previous decisions
-- Suspicious sequence patterns attempting to game token limits""",
-                },
-                {
-                    "name": "Social Context",
-                    "weight": 0.25,
-                    "description": """Evaluate social and community aspects:
-
-Key Considerations:
-- Will this proposal benefit the broader community or just a few members?
-- Is there likely community support or opposition?
-- Does it foster inclusivity and participation?
-- Does it align with the community's values and interests?
-- Could it cause controversy or division?
-- Does it consider the needs of diverse stakeholders?""",
-                },
-            ],
-        )
 
         # Get DAO mission from database using dao_id
         dao_mission_text = self.config.get("dao_mission", "")
@@ -691,6 +499,9 @@ Recent Community Sentiment: {recent_sentiment}
         proposal_images = state.get("proposal_images", [])
 
         try:
+            # Get tweet content from state
+            tweet_content = state.get("tweet_content", "")
+
             # Create chat messages or get custom prompt template
             messages_or_template = self._create_chat_messages(
                 proposal_content=proposal_content,
@@ -698,8 +509,8 @@ Recent Community Sentiment: {recent_sentiment}
                 community_info=community_info,
                 past_proposals=past_proposals_text
                 or "<no_proposals>No past proposals available for comparison.</no_proposals>",
-                evaluation_categories=evaluation_categories,
                 proposal_images=proposal_images,
+                tweet_content=tweet_content,
                 dao_id=dao_id,
                 agent_id=agent_id,
                 profile_id=profile_id,
@@ -782,15 +593,7 @@ Recent Community Sentiment: {recent_sentiment}
                 f"[DEBUG:ComprehensiveEvaluator:{proposal_id}] Error in comprehensive evaluation: {str(e)}"
             )
             return ComprehensiveEvaluatorAgentProcessOutput(
-                categories=[
-                    EvaluationCategory(
-                        category=cat["name"],
-                        score=50,
-                        weight=cat["weight"],
-                        reasoning=[f"Error: {str(e)}"],
-                    )
-                    for cat in evaluation_categories
-                ],
+                categories=[],
                 final_score=30,
                 decision=False,
                 explanation=f"Comprehensive evaluation failed due to error: {str(e)}",

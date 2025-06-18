@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 from lib.logger import configure_logger
 from services.ai.workflows.agents.evaluator import ComprehensiveEvaluatorAgent
 from services.ai.workflows.agents.image_processing import ImageProcessingNode
+from services.ai.workflows.agents.twitter_processing import TwitterProcessingNode
 from services.ai.workflows.utils.models import ComprehensiveEvaluatorAgentProcessOutput
 
 logger = configure_logger(__name__)
@@ -63,7 +64,26 @@ async def evaluate_proposal_comprehensive(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Processed {len(proposal_images)} images"
         )
 
-        # Step 2: Run comprehensive evaluation
+        # Step 2: Process Twitter content (if any)
+        logger.debug(
+            f"[DEBUG:ComprehensiveEval:{proposal_id}] Processing Twitter content"
+        )
+        twitter_processor = TwitterProcessingNode(config=config)
+
+        # Process Twitter URLs and get tweet content
+        tweet_content = await twitter_processor.process(initial_state)
+
+        # Get tweet images from state (TwitterProcessingNode updates the state)
+        tweet_images = initial_state.get("tweet_images", [])
+
+        # Combine proposal images and tweet images
+        all_proposal_images = proposal_images + tweet_images
+
+        logger.debug(
+            f"[DEBUG:ComprehensiveEval:{proposal_id}] Processed Twitter content, found {len(tweet_images)} tweet images"
+        )
+
+        # Step 3: Run comprehensive evaluation
         logger.debug(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Starting comprehensive evaluation"
         )
@@ -78,7 +98,8 @@ async def evaluate_proposal_comprehensive(
             "dao_id": dao_id,
             "agent_id": agent_id,
             "profile_id": profile_id,
-            "proposal_images": proposal_images,
+            "proposal_images": all_proposal_images,
+            "tweet_content": tweet_content,
             "custom_system_prompt": custom_system_prompt,
             "custom_user_prompt": custom_user_prompt,
             "flags": [],
