@@ -23,6 +23,7 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
+import re
 
 logger = configure_logger(__name__)
 
