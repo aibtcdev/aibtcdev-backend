@@ -368,7 +368,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage
     ) -> TweetProcessingResult:
         """Process a single tweet message with enhanced error handling and threading support.
-        
+
         Supports the following message structure:
         {
             "message": "Main tweet content",
@@ -420,7 +420,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             # Check for threading information
             reply_to_tweet_id = message.message.get("reply_to_tweet_id")
             if reply_to_tweet_id:
-                logger.info(f"Tweet will be threaded as reply to tweet ID: {reply_to_tweet_id}")
+                logger.info(
+                    f"Tweet will be threaded as reply to tweet ID: {reply_to_tweet_id}"
+                )
 
             logger.info(f"Sending tweet for DAO {message.dao_id}")
             logger.debug(f"Tweet content: {tweet_text[:100]}...")
@@ -491,12 +493,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             # Check if there's a follow-up message to create as a thread
             if result.success and result.tweet_id:
-                follow_up_tweet_id = await self._create_follow_up_tweet(message, result.tweet_id)
+                follow_up_tweet_id = await self._create_follow_up_tweet(
+                    message, result.tweet_id
+                )
                 if follow_up_tweet_id:
                     result.tweets_sent += 1
-                    result.tweet_id = follow_up_tweet_id  # Update to the last tweet in the thread
-                    result.message += f" with follow-up thread"
-                    logger.info(f"Successfully created follow-up tweet thread: {follow_up_tweet_id}")
+                    result.tweet_id = (
+                        follow_up_tweet_id  # Update to the last tweet in the thread
+                    )
+                    result.message += " with follow-up thread"
+                    logger.info(
+                        f"Successfully created follow-up tweet thread: {follow_up_tweet_id}"
+                    )
 
             return result
 
@@ -634,11 +642,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return None
 
             logger.info(f"Creating follow-up tweet as thread to {original_tweet_id}")
-            
+
             # Get Twitter service for this DAO
             twitter_service = await self._get_twitter_service(message.dao_id)
             if not twitter_service:
-                logger.error(f"Failed to get Twitter service for follow-up tweet")
+                logger.error("Failed to get Twitter service for follow-up tweet")
                 return None
 
             # Check for image URLs in the follow-up text
@@ -647,13 +655,15 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             if image_url:
                 # Remove image URL from text
-                follow_up_content = re.sub(re.escape(image_url), "", follow_up_content).strip()
+                follow_up_content = re.sub(
+                    re.escape(image_url), "", follow_up_content
+                ).strip()
                 follow_up_content = re.sub(r"\s+", " ", follow_up_content)
 
             # Split follow-up text if necessary
             chunks = self._split_text_into_chunks(follow_up_content)
             previous_tweet_id = original_tweet_id
-            
+
             for index, chunk in enumerate(chunks):
                 try:
                     if index == 0 and image_url:
@@ -671,13 +681,19 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
                     if tweet_response:
                         previous_tweet_id = tweet_response.id
-                        logger.info(f"Successfully posted follow-up tweet chunk {index + 1}: {tweet_response.id}")
+                        logger.info(
+                            f"Successfully posted follow-up tweet chunk {index + 1}: {tweet_response.id}"
+                        )
                     else:
-                        logger.error(f"Failed to send follow-up tweet chunk {index + 1}")
+                        logger.error(
+                            f"Failed to send follow-up tweet chunk {index + 1}"
+                        )
                         break
 
                 except Exception as chunk_error:
-                    logger.error(f"Error sending follow-up tweet chunk {index + 1}: {str(chunk_error)}")
+                    logger.error(
+                        f"Error sending follow-up tweet chunk {index + 1}: {str(chunk_error)}"
+                    )
                     break
 
             return previous_tweet_id

@@ -296,12 +296,14 @@ class ActionConcluderHandler(ChainhookEventHandler):
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
                         "message": clean_message,
-                        "follow_up_message": follow_up_message
+                        "follow_up_message": follow_up_message,
                     },
                     dao_id=dao_data["id"],
                 )
             )
-            self.logger.info(f"Created tweet queue message with follow-up thread: {tweet_message.id}")
+            self.logger.info(
+                f"Created tweet queue message with follow-up thread: {tweet_message.id}"
+            )
 
             # Calculate participation and approval percentages for passed proposal
             votes_for = int(proposal.votes_for or 0)
