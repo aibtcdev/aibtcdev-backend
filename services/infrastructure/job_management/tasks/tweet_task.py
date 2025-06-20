@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 from uuid import UUID
 
+
 from backend.factory import backend
 from backend.models import (
     QueueMessage,
@@ -361,8 +362,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             for index, chunk in enumerate(chunks):
                 try:
                     if index == 0 and image_url:
-                        tweet_response = self._post_tweet_with_media(
-                            twitter_service=twitter_service,
+                        tweet_response = await twitter_service.post_tweet_with_media(
                             image_url=image_url,
                             text=chunk,
                             reply_id=previous_tweet_id,
@@ -451,6 +451,22 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             # Fallback if tweepy not available
             retry_errors = (ConnectionError, TimeoutError)
             return isinstance(error, retry_errors)
+
+    def _split_text_into_chunks(self, text: str, limit: int = 280) -> List[str]:
+        """Split text into chunks not exceeding the limit without cutting words."""
+        words = text.split()
+        chunks = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + (1 if current else 0) <= limit:
+                current = f"{current} {word}".strip()
+            else:
+                if current:
+                    chunks.append(current)
+                current = word
+        if current:
+            chunks.append(current)
+        return chunks
 
     async def _handle_execution_error(
         self, error: Exception, context: JobContext
@@ -596,8 +612,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             for index, chunk in enumerate(chunks):
                 try:
                     if index == 0 and image_url:
-                        tweet_response = self._post_tweet_with_media(
-                            twitter_service=twitter_service,
+                        tweet_response = await twitter_service.post_tweet_with_media(
                             image_url=image_url,
                             text=chunk,
                             reply_id=previous_tweet_id,
