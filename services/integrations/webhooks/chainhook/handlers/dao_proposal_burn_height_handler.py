@@ -249,7 +249,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"**Veto Window Details:**\n"
                 f"• Opens at: Block {proposal.vote_end}\n"
                 f"• Closes at: Block {proposal.exec_start}\n\n"
-                f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
+                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}"
             )
 
             backend.create_queue_message(
@@ -286,7 +286,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"**Status:**\n"
                 f"• Veto window has now closed\n"
                 f"• Proposal will be executed if it passed voting\n\n"
-                f"View proposal details: {config.api.base_url}/proposals/{dao.id}"
+                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}"
             )
 
             backend.create_queue_message(
