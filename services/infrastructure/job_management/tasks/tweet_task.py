@@ -453,7 +453,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     if index == 0:  # If first chunk fails, whole message fails
                         return TweetProcessingResult(
                             success=False,
-                            message=f"Failed to send first tweet chunk",
+                            message="Failed to send first tweet chunk",
                             dao_id=message.dao_id,
                             tweet_id=previous_tweet_id,
                             chunks_processed=index,
