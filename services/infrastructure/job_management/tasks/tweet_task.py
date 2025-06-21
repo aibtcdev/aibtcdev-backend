@@ -247,35 +247,70 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
                 return False
 
-            if "message" not in message.message:
+            # Check for new chunked format
+            if "chunks" in message.message:
+                chunks = message.message["chunks"]
+                if not isinstance(chunks, list):
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: 'chunks' is not a list, got {type(chunks)}"
+                    )
+                    return False
+
+                if not chunks:
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: 'chunks' array is empty"
+                    )
+                    return False
+
+                # Validate each chunk
+                for i, chunk in enumerate(chunks):
+                    if not isinstance(chunk, str):
+                        logger.debug(
+                            f"Tweet message {message.id} invalid: chunk {i} is not a string, got {type(chunk)}"
+                        )
+                        return False
+                    if not chunk.strip():
+                        logger.debug(
+                            f"Tweet message {message.id} invalid: chunk {i} is empty or whitespace"
+                        )
+                        return False
+
                 logger.debug(
-                    f"Tweet message {message.id} invalid: 'message' key not found in message dict. Keys: {list(message.message.keys())}"
+                    f"Tweet message {message.id} is valid with {len(chunks)} chunks"
+                )
+                return True
+
+            # Check for legacy format (backward compatibility)
+            elif "message" in message.message:
+                tweet_text = message.message["message"]
+                if not tweet_text:
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: tweet text is None or empty"
+                    )
+                    return False
+
+                if not isinstance(tweet_text, str):
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: tweet text is not a string, got {type(tweet_text)}"
+                    )
+                    return False
+
+                if not tweet_text.strip():
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: tweet text is only whitespace"
+                    )
+                    return False
+
+                logger.debug(
+                    f"Tweet message {message.id} is valid (legacy format) with content: {tweet_text[:50]}..."
+                )
+                return True
+            else:
+                logger.debug(
+                    f"Tweet message {message.id} invalid: neither 'chunks' nor 'message' key found. Keys: {list(message.message.keys())}"
                 )
                 return False
 
-            tweet_text = message.message["message"]
-            if not tweet_text:
-                logger.debug(
-                    f"Tweet message {message.id} invalid: tweet text is None or empty"
-                )
-                return False
-
-            if not isinstance(tweet_text, str):
-                logger.debug(
-                    f"Tweet message {message.id} invalid: tweet text is not a string, got {type(tweet_text)}"
-                )
-                return False
-
-            if not tweet_text.strip():
-                logger.debug(
-                    f"Tweet message {message.id} invalid: tweet text is only whitespace"
-                )
-                return False
-
-            logger.debug(
-                f"Tweet message {message.id} is valid with content: {tweet_text[:50]}..."
-            )
-            return True
         except Exception as e:
             logger.debug(f"Tweet message {message.id} validation error: {str(e)}")
             return False
@@ -285,11 +320,17 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     ) -> TweetProcessingResult:
         """Process a single tweet message with enhanced error handling and threading support.
 
-        Supports the following message structure:
+        Now supports the new chunked message format:
+        {
+            "chunks": ["chunk1", "chunk2", "chunk3", ...],
+            "total_chunks": 3
+        }
+
+        Also maintains backward compatibility with legacy format:
         {
             "message": "Main tweet content",
-            "reply_to_tweet_id": "optional_tweet_id_to_reply_to",  # For threading to existing tweets
-            "follow_up_message": "optional_follow_up_content"      # Creates a threaded follow-up tweet
+            "reply_to_tweet_id": "optional_tweet_id_to_reply_to",
+            "follow_up_message": "optional_follow_up_content"
         }
         """
         try:
@@ -304,14 +345,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            if "message" not in message.message:
-                logger.warning(f"Tweet message {message.id} missing 'message' key")
-                return TweetProcessingResult(
-                    success=False,
-                    message="Tweet message missing 'message' key",
-                    dao_id=message.dao_id,
-                )
-
             # Get Twitter service for this DAO
             twitter_service = await self._get_twitter_service(message.dao_id)
             if not twitter_service:
@@ -321,107 +354,37 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            # Extract tweet text
-            tweet_text = message.message["message"]
-            if not isinstance(tweet_text, str):
-                logger.warning(
-                    f"Tweet message {message.id} content is not a string: {type(tweet_text)}"
+            # Check for new chunked format
+            if "chunks" in message.message:
+                chunks = message.message["chunks"]
+
+                logger.info(
+                    f"Processing chunked tweet message for DAO {message.dao_id} with {len(chunks)} chunks"
                 )
+                logger.debug(
+                    f"First chunk preview: {chunks[0][:100]}..."
+                    if chunks
+                    else "No chunks"
+                )
+
+                return await self._process_chunked_message(
+                    message, twitter_service, chunks
+                )
+
+            # Handle legacy format for backward compatibility
+            elif "message" in message.message:
+                logger.info(
+                    f"Processing legacy format tweet message for DAO {message.dao_id}"
+                )
+                return await self._process_legacy_message(message, twitter_service)
+
+            else:
+                logger.warning(f"Tweet message {message.id} has unrecognized format")
                 return TweetProcessingResult(
                     success=False,
-                    message=f"Tweet content is not a string: {type(tweet_text)}",
+                    message="Tweet message format not recognized",
                     dao_id=message.dao_id,
                 )
-
-            # Check for threading information
-            reply_to_tweet_id = message.message.get("reply_to_tweet_id")
-            if reply_to_tweet_id:
-                logger.info(
-                    f"Tweet will be threaded as reply to tweet ID: {reply_to_tweet_id}"
-                )
-
-            logger.info(f"Sending tweet for DAO {message.dao_id}")
-            logger.debug(f"Tweet content: {tweet_text[:100]}...")
-            logger.debug(f"Message structure: {message.message}")
-
-            # Look for image URLs in the text
-            image_urls = extract_image_urls(tweet_text)
-            image_url = image_urls[0] if image_urls else None
-
-            if image_url:
-                # Remove image URL from text
-                tweet_text = re.sub(re.escape(image_url), "", tweet_text).strip()
-                tweet_text = re.sub(r"\s+", " ", tweet_text)
-
-            # Split tweet text if necessary
-            chunks = self._split_text_into_chunks(tweet_text)
-            # Use reply_to_tweet_id as initial thread ID, or message.tweet_id for continuation
-            previous_tweet_id = reply_to_tweet_id or message.tweet_id
-            tweet_response = None
-            tweets_sent = 0
-
-            for index, chunk in enumerate(chunks):
-                try:
-                    if index == 0 and image_url:
-                        tweet_response = await twitter_service.post_tweet_with_media(
-                            image_url=image_url,
-                            text=chunk,
-                            reply_id=previous_tweet_id,
-                        )
-                    else:
-                        tweet_response = await twitter_service._apost_tweet(
-                            text=chunk,
-                            reply_in_reply_to_tweet_id=previous_tweet_id,
-                        )
-
-                    if tweet_response:
-                        tweets_sent += 1
-                        previous_tweet_id = tweet_response.id
-                        logger.info(
-                            f"Successfully posted tweet chunk {index + 1}: {tweet_response.id}"
-                        )
-                    else:
-                        logger.error(f"Failed to send tweet chunk {index + 1}")
-                        if index == 0:  # If first chunk fails, whole message fails
-                            return TweetProcessingResult(
-                                success=False,
-                                message="Failed to send first tweet chunk",
-                                dao_id=message.dao_id,
-                                tweet_id=previous_tweet_id,
-                                chunks_processed=index,
-                            )
-                        # For subsequent chunks, we can continue
-
-                except Exception as chunk_error:
-                    logger.error(f"Error sending chunk {index + 1}: {str(chunk_error)}")
-                    if index == 0:  # Critical failure on first chunk
-                        raise chunk_error
-
-            result = TweetProcessingResult(
-                success=tweets_sent > 0,
-                message=f"Successfully sent {tweets_sent}/{len(chunks)} tweet chunks",
-                tweet_id=previous_tweet_id,
-                dao_id=message.dao_id,
-                tweets_sent=tweets_sent,
-                chunks_processed=len(chunks),
-            )
-
-            # Check if there's a follow-up message to create as a thread
-            if result.success and result.tweet_id:
-                follow_up_tweet_id = await self._create_follow_up_tweet(
-                    message, result.tweet_id
-                )
-                if follow_up_tweet_id:
-                    result.tweets_sent += 1
-                    result.tweet_id = (
-                        follow_up_tweet_id  # Update to the last tweet in the thread
-                    )
-                    result.message += " with follow-up thread"
-                    logger.info(
-                        f"Successfully created follow-up tweet thread: {follow_up_tweet_id}"
-                    )
-
-            return result
 
         except Exception as e:
             logger.error(
@@ -434,6 +397,186 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 tweet_id=getattr(message, "tweet_id", None),
                 dao_id=message.dao_id,
             )
+
+    async def _process_chunked_message(
+        self, message: QueueMessage, twitter_service: TwitterService, chunks: List[str]
+    ) -> TweetProcessingResult:
+        """Process a message with pre-chunked content."""
+        previous_tweet_id = message.tweet_id  # Use existing tweet_id if threading
+        tweets_sent = 0
+
+        # Check if chunks already have thread indices (e.g., "(1/3)")
+        has_indices = len(chunks) > 1 and any(
+            "(" in chunk and "/" in chunk and ")" in chunk for chunk in chunks
+        )
+
+        logger.info(
+            f"Processing {len(chunks)} pre-chunked tweets for DAO {message.dao_id}"
+            f"{' with thread indices' if has_indices else ''}"
+        )
+
+        for index, chunk in enumerate(chunks):
+            try:
+                # Check for image URLs in the chunk
+                image_urls = extract_image_urls(chunk)
+                image_url = image_urls[0] if image_urls else None
+
+                if image_url:
+                    # Remove image URL from text
+                    chunk = re.sub(re.escape(image_url), "", chunk).strip()
+                    chunk = re.sub(r"\s+", " ", chunk)
+
+                # Post the tweet
+                if index == 0 and image_url:
+                    tweet_response = await twitter_service.post_tweet_with_media(
+                        image_url=image_url,
+                        text=chunk,
+                        reply_id=previous_tweet_id,
+                    )
+                else:
+                    tweet_response = await twitter_service._apost_tweet(
+                        text=chunk,
+                        reply_in_reply_to_tweet_id=previous_tweet_id,
+                    )
+
+                if tweet_response:
+                    tweets_sent += 1
+                    previous_tweet_id = tweet_response.id
+                    logger.info(
+                        f"Successfully posted tweet chunk {index + 1}/{len(chunks)}: {tweet_response.id}"
+                        f"{f' - {chunk[:50]}...' if len(chunk) > 50 else f' - {chunk}'}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to send tweet chunk {index + 1}/{len(chunks)}"
+                    )
+                    if index == 0:  # If first chunk fails, whole message fails
+                        return TweetProcessingResult(
+                            success=False,
+                            message="Failed to send first tweet chunk",
+                            dao_id=message.dao_id,
+                            tweet_id=previous_tweet_id,
+                            chunks_processed=index,
+                        )
+                    # For subsequent chunks, we can continue
+
+            except Exception as chunk_error:
+                logger.error(
+                    f"Error sending chunk {index + 1}/{len(chunks)}: {str(chunk_error)}"
+                )
+                if index == 0:  # Critical failure on first chunk
+                    raise chunk_error
+
+        return TweetProcessingResult(
+            success=tweets_sent > 0,
+            message=f"Successfully sent {tweets_sent}/{len(chunks)} tweet chunks"
+            f"{' with thread indices' if has_indices else ''}",
+            tweet_id=previous_tweet_id,
+            dao_id=message.dao_id,
+            tweets_sent=tweets_sent,
+            chunks_processed=len(chunks),
+        )
+
+    async def _process_legacy_message(
+        self, message: QueueMessage, twitter_service: TwitterService
+    ) -> TweetProcessingResult:
+        """Process a message in the legacy format for backward compatibility."""
+        # Extract tweet text
+        tweet_text = message.message["message"]
+        if not isinstance(tweet_text, str):
+            logger.warning(
+                f"Tweet message {message.id} content is not a string: {type(tweet_text)}"
+            )
+            return TweetProcessingResult(
+                success=False,
+                message=f"Tweet content is not a string: {type(tweet_text)}",
+                dao_id=message.dao_id,
+            )
+
+        # Check for threading information
+        reply_to_tweet_id = message.message.get("reply_to_tweet_id")
+        if reply_to_tweet_id:
+            logger.info(
+                f"Tweet will be threaded as reply to tweet ID: {reply_to_tweet_id}"
+            )
+
+        logger.info(f"Sending legacy format tweet for DAO {message.dao_id}")
+        logger.debug(f"Tweet content: {tweet_text[:100]}...")
+
+        # Look for image URLs in the text
+        image_urls = extract_image_urls(tweet_text)
+        image_url = image_urls[0] if image_urls else None
+
+        if image_url:
+            # Remove image URL from text
+            tweet_text = re.sub(re.escape(image_url), "", tweet_text).strip()
+            tweet_text = re.sub(r"\s+", " ", tweet_text)
+
+        # Split tweet text if necessary
+        chunks = self._split_text_into_chunks(tweet_text)
+        # Use reply_to_tweet_id as initial thread ID, or message.tweet_id for continuation
+        previous_tweet_id = reply_to_tweet_id or message.tweet_id
+        tweets_sent = 0
+
+        for index, chunk in enumerate(chunks):
+            try:
+                if index == 0 and image_url:
+                    tweet_response = await twitter_service.post_tweet_with_media(
+                        image_url=image_url,
+                        text=chunk,
+                        reply_id=previous_tweet_id,
+                    )
+                else:
+                    tweet_response = await twitter_service._apost_tweet(
+                        text=chunk,
+                        reply_in_reply_to_tweet_id=previous_tweet_id,
+                    )
+
+                if tweet_response:
+                    tweets_sent += 1
+                    previous_tweet_id = tweet_response.id
+                    logger.info(
+                        f"Successfully posted tweet chunk {index + 1}: {tweet_response.id}"
+                    )
+                else:
+                    logger.error(f"Failed to send tweet chunk {index + 1}")
+                    if index == 0:
+                        return TweetProcessingResult(
+                            success=False,
+                            message="Failed to send first tweet chunk",
+                            dao_id=message.dao_id,
+                            tweet_id=previous_tweet_id,
+                            chunks_processed=index,
+                        )
+
+            except Exception as chunk_error:
+                logger.error(f"Error sending chunk {index + 1}: {str(chunk_error)}")
+                if index == 0:
+                    raise chunk_error
+
+        result = TweetProcessingResult(
+            success=tweets_sent > 0,
+            message=f"Successfully sent {tweets_sent}/{len(chunks)} tweet chunks",
+            tweet_id=previous_tweet_id,
+            dao_id=message.dao_id,
+            tweets_sent=tweets_sent,
+            chunks_processed=len(chunks),
+        )
+
+        # Check if there's a follow-up message to create as a thread
+        if result.success and result.tweet_id:
+            follow_up_tweet_id = await self._create_follow_up_tweet(
+                message, result.tweet_id
+            )
+            if follow_up_tweet_id:
+                result.tweets_sent += 1
+                result.tweet_id = follow_up_tweet_id
+                result.message += " with follow-up thread"
+                logger.info(
+                    f"Successfully created follow-up tweet thread: {follow_up_tweet_id}"
+                )
+
+        return result
 
     def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
         """Determine if error should trigger retry."""
@@ -581,7 +724,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _create_follow_up_tweet(
         self, message: QueueMessage, original_tweet_id: str
     ) -> Optional[str]:
-        """Create a follow-up tweet as a thread to the original tweet."""
+        """Create a follow-up tweet as a thread to the original tweet (legacy format only)."""
         try:
             follow_up_content = message.message.get("follow_up_message")
             if not follow_up_content:

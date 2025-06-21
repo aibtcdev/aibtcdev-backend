@@ -156,6 +156,30 @@ class QueueMessageType:
 #  QUEUE MESSAGES
 #
 class QueueMessageBase(CustomBaseModel):
+    """Base model for queue messages.
+
+    The message field supports multiple formats:
+
+    1. New chunked format (recommended for tweets):
+    {
+        "chunks": ["First chunk text (1/3)", "Second chunk text (2/3)", "Third chunk text (3/3)"],
+        "total_chunks": 3
+    }
+
+    2. Legacy format (backward compatibility):
+    {
+        "message": "Main message content",
+        "follow_up_message": "Optional follow-up content",
+        "reply_to_tweet_id": "optional_tweet_id_for_threading"
+    }
+
+    3. Discord format:
+    {
+        "content": "Discord message content",
+        "proposal_status": "passed" or "failed"
+    }
+    """
+
     type: Optional[QueueMessageType] = None
     message: Optional[dict] = None
     is_processed: Optional[bool] = False
