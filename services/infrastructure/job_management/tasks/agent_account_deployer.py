@@ -171,19 +171,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 seed_phrase=config.backend_wallet.seed_phrase
             )
 
-            # Determine owner address based on network and wallet configuration
-            if config.network.network == "mainnet":
-                # For mainnet, try to derive from backend wallet or use configured address
-                owner_address = (
-                    config.backend_wallet.address
-                    or "SP1HTBVD3JG9C05J7HDJKDYR99M9Q4JKJECEWC9S"
-                )
-            else:
-                # For testnet/other networks
-                owner_address = (
-                    config.backend_wallet.address
-                    or "ST1994Y3P6ZDJX476QFSABEFE5T6YMTJT0T7RSQDW"
-                )
+            owner_address = message_data["owner_address"]
 
             # Execute the deployment
             logger.debug("Executing deployment...")
