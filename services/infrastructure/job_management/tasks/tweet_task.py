@@ -356,7 +356,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             # Check for new chunked format
             if "chunks" in message.message:
                 chunks = message.message["chunks"]
-                total_chunks = message.message.get("total_chunks", len(chunks))
 
                 logger.info(
                     f"Processing chunked tweet message for DAO {message.dao_id} with {len(chunks)} chunks"
