@@ -12,7 +12,7 @@ from backend.models import (
     QueueMessageType,
 )
 from config import config
-from lib.utils import strip_metadata_section
+from lib.utils import strip_metadata_section, create_message_chunks
 from services.integrations.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.integrations.webhooks.chainhook.models import (
     Event,
@@ -291,19 +291,28 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 f"View proposal details: {proposal_url}"
             )
 
-            # Create queue message for Twitter with follow-up content for threading
+            # Create chunked message array from main message only
+            main_chunks = create_message_chunks(clean_message, add_indices=True)
+            
+            # Add the follow-up message as a separate final chunk in the thread
+            follow_up_chunk = f"({len(main_chunks) + 1}/{len(main_chunks) + 1}) {follow_up_message}"
+            
+            # Combine main chunks with follow-up chunk
+            message_chunks = main_chunks + [follow_up_chunk]
+
+            # Create queue message for Twitter with chunked message array
             tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
-                        "message": clean_message,
-                        "follow_up_message": follow_up_message,
+                        "chunks": message_chunks,
+                        "total_chunks": len(message_chunks),
                     },
                     dao_id=dao_data["id"],
                 )
             )
             self.logger.info(
-                f"Created tweet queue message with follow-up thread: {tweet_message.id}"
+                f"Created tweet queue message with {len(message_chunks)} chunks: {tweet_message.id}"
             )
 
             # Calculate participation and approval percentages for passed proposal
@@ -346,7 +355,10 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 f"Created Discord queue message (proposal passed): {discord_message.id}"
             )
         else:
-            # Create queue message only for Discord if proposal failed with header and footer
+            # For failed proposals, create only Discord message (no Twitter)
+            # But still chunk the message for consistency (if needed for future use)
+            message_chunks = create_message_chunks(clean_message, add_indices=True)
+            
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)
