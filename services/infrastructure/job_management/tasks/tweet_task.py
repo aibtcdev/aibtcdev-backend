@@ -254,7 +254,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         f"Tweet message {message.id} invalid: 'chunks' is not a list, got {type(chunks)}"
                     )
                     return False
-                    
+
                 if not chunks:
                     logger.debug(
                         f"Tweet message {message.id} invalid: 'chunks' array is empty"
@@ -324,7 +324,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             "chunks": ["chunk1", "chunk2", "chunk3", ...],
             "total_chunks": 3
         }
-        
+
         Also maintains backward compatibility with legacy format:
         {
             "message": "Main tweet content",
@@ -357,15 +357,25 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             if "chunks" in message.message:
                 chunks = message.message["chunks"]
                 total_chunks = message.message.get("total_chunks", len(chunks))
-                
-                logger.info(f"Processing chunked tweet message for DAO {message.dao_id} with {len(chunks)} chunks")
-                logger.debug(f"First chunk preview: {chunks[0][:100]}..." if chunks else "No chunks")
 
-                return await self._process_chunked_message(message, twitter_service, chunks)
+                logger.info(
+                    f"Processing chunked tweet message for DAO {message.dao_id} with {len(chunks)} chunks"
+                )
+                logger.debug(
+                    f"First chunk preview: {chunks[0][:100]}..."
+                    if chunks
+                    else "No chunks"
+                )
+
+                return await self._process_chunked_message(
+                    message, twitter_service, chunks
+                )
 
             # Handle legacy format for backward compatibility
             elif "message" in message.message:
-                logger.info(f"Processing legacy format tweet message for DAO {message.dao_id}")
+                logger.info(
+                    f"Processing legacy format tweet message for DAO {message.dao_id}"
+                )
                 return await self._process_legacy_message(message, twitter_service)
 
             else:
@@ -396,8 +406,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         tweets_sent = 0
 
         # Check if chunks already have thread indices (e.g., "(1/3)")
-        has_indices = len(chunks) > 1 and any("(" in chunk and "/" in chunk and ")" in chunk for chunk in chunks)
-        
+        has_indices = len(chunks) > 1 and any(
+            "(" in chunk and "/" in chunk and ")" in chunk for chunk in chunks
+        )
+
         logger.info(
             f"Processing {len(chunks)} pre-chunked tweets for DAO {message.dao_id}"
             f"{' with thread indices' if has_indices else ''}"
@@ -435,7 +447,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         f"{f' - {chunk[:50]}...' if len(chunk) > 50 else f' - {chunk}'}"
                     )
                 else:
-                    logger.error(f"Failed to send tweet chunk {index + 1}/{len(chunks)}")
+                    logger.error(
+                        f"Failed to send tweet chunk {index + 1}/{len(chunks)}"
+                    )
                     if index == 0:  # If first chunk fails, whole message fails
                         return TweetProcessingResult(
                             success=False,
@@ -447,14 +461,16 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     # For subsequent chunks, we can continue
 
             except Exception as chunk_error:
-                logger.error(f"Error sending chunk {index + 1}/{len(chunks)}: {str(chunk_error)}")
+                logger.error(
+                    f"Error sending chunk {index + 1}/{len(chunks)}: {str(chunk_error)}"
+                )
                 if index == 0:  # Critical failure on first chunk
                     raise chunk_error
 
         return TweetProcessingResult(
             success=tweets_sent > 0,
             message=f"Successfully sent {tweets_sent}/{len(chunks)} tweet chunks"
-                   f"{' with thread indices' if has_indices else ''}",
+            f"{' with thread indices' if has_indices else ''}",
             tweet_id=previous_tweet_id,
             dao_id=message.dao_id,
             tweets_sent=tweets_sent,
@@ -524,7 +540,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     )
                 else:
                     logger.error(f"Failed to send tweet chunk {index + 1}")
-                    if index == 0:  
+                    if index == 0:
                         return TweetProcessingResult(
                             success=False,
                             message="Failed to send first tweet chunk",
@@ -535,7 +551,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
             except Exception as chunk_error:
                 logger.error(f"Error sending chunk {index + 1}: {str(chunk_error)}")
-                if index == 0:  
+                if index == 0:
                     raise chunk_error
 
         result = TweetProcessingResult(

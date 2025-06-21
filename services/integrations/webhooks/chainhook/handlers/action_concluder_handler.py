@@ -293,10 +293,12 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
             # Create chunked message array from main message only
             main_chunks = create_message_chunks(clean_message, add_indices=True)
-            
+
             # Add the follow-up message as a separate final chunk in the thread
-            follow_up_chunk = f"({len(main_chunks) + 1}/{len(main_chunks) + 1}) {follow_up_message}"
-            
+            follow_up_chunk = (
+                f"({len(main_chunks) + 1}/{len(main_chunks) + 1}) {follow_up_message}"
+            )
+
             # Combine main chunks with follow-up chunk
             message_chunks = main_chunks + [follow_up_chunk]
 
@@ -358,7 +360,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # For failed proposals, create only Discord message (no Twitter)
             # But still chunk the message for consistency (if needed for future use)
             message_chunks = create_message_chunks(clean_message, add_indices=True)
-            
+
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)

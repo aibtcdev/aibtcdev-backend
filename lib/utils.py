@@ -12,21 +12,21 @@ logger = logging.getLogger(__name__)
 
 def split_text_into_chunks(text: str, limit: int = 280) -> List[str]:
     """Split text into chunks not exceeding the limit without cutting words.
-    
+
     Args:
         text: The text to split into chunks
         limit: Maximum character limit per chunk (default 280 for Twitter)
-        
+
     Returns:
         List of text chunks, each under the limit
     """
     if not text or not text.strip():
         return []
-        
+
     words = text.split()
     chunks = []
     current = ""
-    
+
     for word in words:
         # Check if adding this word would exceed the limit
         test_length = len(current) + len(word) + (1 if current else 0)
@@ -37,115 +37,123 @@ def split_text_into_chunks(text: str, limit: int = 280) -> List[str]:
             if current:
                 chunks.append(current)
             current = word
-            
+
     # Add the final chunk if it exists
     if current:
         chunks.append(current)
-        
+
     return chunks
 
 
 def create_message_chunks(
-    main_message: str, 
-    follow_up_message: Optional[str] = None, 
-    limit: int = 280, 
+    main_message: str,
+    follow_up_message: Optional[str] = None,
+    limit: int = 280,
     add_indices: bool = True,
-    append_to_each: bool = False
+    append_to_each: bool = False,
 ) -> List[str]:
     """Create an array of message chunks from main message and optional follow-up.
-    
+
     Args:
         main_message: The primary message content
         follow_up_message: Optional follow-up message to append
         limit: Maximum character limit per chunk (default 280 for Twitter)
         add_indices: Whether to add thread indices like "(1/4)" to each chunk
         append_to_each: If True, append follow_up_message to each chunk instead of creating separate chunks
-        
+
     Returns:
         List of chunked messages ready for sequential posting
     """
     chunks = []
-    
+
     # Chunk the main message
     if main_message and main_message.strip():
         main_chunks = split_text_into_chunks(main_message.strip(), limit)
         chunks.extend(main_chunks)
-    
+
     # Handle follow-up message based on append_to_each flag
     if follow_up_message and follow_up_message.strip():
         if append_to_each and chunks:
             # When appending to each chunk, we need to optimize space usage
             separator = "\n\n"
             follow_up_with_separator = f"{separator}{follow_up_message.strip()}"
-            
+
             # Start with initial chunks and iteratively optimize
             optimized_chunks = []
             main_text = main_message.strip()
             words = main_text.split()
             word_index = 0
             chunk_number = 1
-            
+
             while word_index < len(words):
                 # Estimate the index text for this chunk (we'll refine this)
                 estimated_total_chunks = max(len(chunks), chunk_number)
-                temp_index_text = f"({chunk_number}/{estimated_total_chunks}) " if add_indices else ""
-                
+                temp_index_text = (
+                    f"({chunk_number}/{estimated_total_chunks}) " if add_indices else ""
+                )
+
                 # Calculate available space for main content in this chunk
                 reserved_space = len(follow_up_with_separator) + len(temp_index_text)
                 available_main_space = limit - reserved_space
-                
+
                 # Build the chunk by adding words until we approach the limit
                 current_chunk = ""
                 chunk_words = []
-                
+
                 while word_index < len(words):
                     word = words[word_index]
-                    test_chunk = f"{current_chunk} {word}".strip() if current_chunk else word
-                    
+                    test_chunk = (
+                        f"{current_chunk} {word}".strip() if current_chunk else word
+                    )
+
                     if len(test_chunk) <= available_main_space:
                         current_chunk = test_chunk
                         chunk_words.append(word)
                         word_index += 1
                     else:
                         break
-                
+
                 # If we couldn't fit any words, force at least one word to prevent infinite loop
                 if not chunk_words and word_index < len(words):
                     current_chunk = words[word_index]
                     word_index += 1
-                
+
                 optimized_chunks.append(current_chunk)
                 chunk_number += 1
-            
+
             # Now we know the exact number of chunks, create final versions with correct indices
             total_chunks = len(optimized_chunks)
             final_chunks = []
-            
+
             for i, chunk in enumerate(optimized_chunks, 1):
                 # Calculate exact index text at the beginning
-                index_text = f"({i}/{total_chunks}) " if add_indices and total_chunks > 1 else ""
-                
+                index_text = (
+                    f"({i}/{total_chunks}) " if add_indices and total_chunks > 1 else ""
+                )
+
                 # Calculate exact available space for this specific chunk
                 reserved_space = len(follow_up_with_separator) + len(index_text)
                 available_main_space = limit - reserved_space
-                
+
                 # Trim chunk if needed to fit exactly (shouldn't happen often with our optimization)
                 if len(chunk) > available_main_space:
                     words = chunk.split()
                     trimmed_chunk = ""
-                    
+
                     for word in words:
-                        test_length = len(trimmed_chunk) + len(word) + (1 if trimmed_chunk else 0)
+                        test_length = (
+                            len(trimmed_chunk) + len(word) + (1 if trimmed_chunk else 0)
+                        )
                         if test_length <= available_main_space:
                             trimmed_chunk = f"{trimmed_chunk} {word}".strip()
                         else:
                             break
-                    
+
                     chunk = trimmed_chunk
-                
+
                 # Create the final chunk with index at the beginning - should be as close to 280 as possible
                 final_chunk = f"{index_text}{chunk}{follow_up_with_separator}"
-                
+
                 # Verify we didn't exceed the limit (safety check)
                 if len(final_chunk) > limit:
                     # This shouldn't happen, but if it does, we need to trim more aggressively
@@ -154,50 +162,52 @@ def create_message_chunks(
                     while words and excess > 0:
                         removed_word = words.pop()
                         excess -= len(removed_word) + 1  # +1 for space
-                    
+
                     chunk = " ".join(words)
                     final_chunk = f"{index_text}{chunk}{follow_up_with_separator}"
-                
+
                 final_chunks.append(final_chunk)
-            
+
             return final_chunks
         else:
             # Add follow-up as separate chunks (original behavior)
             follow_up_chunks = split_text_into_chunks(follow_up_message.strip(), limit)
             chunks.extend(follow_up_chunks)
-    
+
     # Add thread indices if requested and we have multiple chunks (for non-append_to_each case)
     if add_indices and len(chunks) > 1 and not (append_to_each and follow_up_message):
         indexed_chunks = []
         total_chunks = len(chunks)
-        
+
         for i, chunk in enumerate(chunks, 1):
             # Calculate space needed for index at the beginning like "(3/4) "
             index_text = f"({i}/{total_chunks}) "
             index_length = len(index_text)
-            
+
             # If adding the index would exceed the limit, trim the chunk
             if len(chunk) + index_length > limit:
                 # Trim the chunk to make room for the index, ensuring we don't cut words
                 available_space = limit - index_length
                 words = chunk.split()
                 trimmed_chunk = ""
-                
+
                 for word in words:
-                    test_length = len(trimmed_chunk) + len(word) + (1 if trimmed_chunk else 0)
+                    test_length = (
+                        len(trimmed_chunk) + len(word) + (1 if trimmed_chunk else 0)
+                    )
                     if test_length <= available_space:
                         trimmed_chunk = f"{trimmed_chunk} {word}".strip()
                     else:
                         break
-                
+
                 chunk = trimmed_chunk
-            
+
             # Add the index to the beginning of the chunk
             indexed_chunk = f"{index_text}{chunk}"
             indexed_chunks.append(indexed_chunk)
-        
+
         return indexed_chunks
-        
+
     return chunks
 
 
