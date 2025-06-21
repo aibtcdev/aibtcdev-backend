@@ -149,6 +149,7 @@ class SellEventHandler(ChainhookEventHandler):
                             token_id=record.token_id,
                             dao_id=record.dao_id,
                             amount=str(new_amount),
+                            address=sender,
                         )
                         backend.update_holder(record.id, update_data)
                         self.logger.info(

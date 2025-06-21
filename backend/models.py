@@ -773,11 +773,11 @@ class XTweetFilter(CustomBaseModel):
 # HOLDERS
 #
 class HolderBase(CustomBaseModel):
-    wallet_id: UUID
-    token_id: UUID
-    agent_id: UUID
-    dao_id: UUID  # Direct reference to the DAO for easier queries
-    address: str
+    wallet_id: Optional[UUID] = None
+    token_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None  # Direct reference to the DAO for easier queries
+    address: Optional[str] = None
     amount: str  # String to handle large numbers precisely
     updated_at: datetime = datetime.now()
 

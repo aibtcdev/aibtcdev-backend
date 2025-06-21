@@ -275,7 +275,9 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                                 f"Updating holder {address}: {existing_holder.amount} -> {balance}"
                             )
                             update_data = HolderBase(
-                                amount=str(balance), updated_at=datetime.now()
+                                amount=str(balance),
+                                updated_at=datetime.now(),
+                                address=address,
                             )
                             backend.update_holder(existing_holder.id, update_data)
                             result.holders_updated += 1
@@ -290,6 +292,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             dao_id=token.dao_id,
                             amount=str(balance),
                             updated_at=datetime.now(),
+                            address=address,
                         )
                         backend.create_holder(holder_create)
                         result.holders_created += 1
