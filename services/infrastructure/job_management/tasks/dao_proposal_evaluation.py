@@ -281,7 +281,15 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(f"Created vote record {vote.id} for proposal {proposal_id}")
 
             # Mark the evaluation message as processed
-            update_data = QueueMessageBase(is_processed=True)
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": True,
+                    "vote_id": str(vote.id),
+                    "approve": approval,
+                    "overall_score": overall_score,
+                },
+            )
             backend.update_queue_message(message_id, update_data)
 
             return {
@@ -294,6 +302,15 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": False,
+                    "error": error_msg,
+                },
+            )
+            backend.update_queue_message(message_id, update_data)
+
             return {"success": False, "error": error_msg}
 
     async def get_pending_messages(self) -> List[QueueMessage]:

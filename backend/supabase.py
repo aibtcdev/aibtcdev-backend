@@ -689,10 +689,6 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("type", filters.type)
             if filters.is_processed is not None:
                 query = query.eq("is_processed", filters.is_processed)
-            if filters.tweet_id is not None:
-                query = query.eq("tweet_id", filters.tweet_id)
-            if filters.conversation_id is not None:
-                query = query.eq("conversation_id", filters.conversation_id)
             if filters.wallet_id is not None:
                 query = query.eq("wallet_id", filters.wallet_id)
             if filters.dao_id is not None:
@@ -941,12 +937,8 @@ class SupabaseBackend(AbstractBackend):
     def list_agents(self, filters: Optional["AgentFilter"] = None) -> List["Agent"]:
         query = self.client.table("agents").select("*")
         if filters:
-            if filters.name is not None:
-                query = query.eq("name", filters.name)
-            if filters.role is not None:
-                query = query.eq("role", filters.role)
-            if filters.goal is not None:
-                query = query.eq("goal", filters.goal)
+            if filters.is_archived is not None:
+                query = query.eq("is_archived", filters.is_archived)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
         response = query.execute()
@@ -1074,8 +1066,6 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("is_deployed", filters.is_deployed)
             if filters.is_broadcasted is not None:
                 query = query.eq("is_broadcasted", filters.is_broadcasted)
-            if filters.wallet_id is not None:
-                query = query.eq("wallet_id", str(filters.wallet_id))
         response = query.execute()
         data = response.data or []
         return [DAO(**row) for row in data]

@@ -159,8 +159,6 @@ class QueueMessageBase(CustomBaseModel):
     type: Optional[QueueMessageType] = None
     message: Optional[dict] = None
     is_processed: Optional[bool] = False
-    tweet_id: Optional[str] = None
-    conversation_id: Optional[str] = None
     dao_id: Optional[UUID] = None
     wallet_id: Optional[UUID] = None
     result: Optional[dict] = None
@@ -248,13 +246,8 @@ class XCreds(XCredsBase):
 #  AGENTS
 #
 class AgentBase(CustomBaseModel):
-    name: Optional[str] = None
-    role: Optional[str] = None
-    goal: Optional[str] = None
-    backstory: Optional[str] = None
     profile_id: Optional[UUID] = None
-    agent_tools: Optional[List[str]] = None
-    image_url: Optional[str] = None
+    is_archived: Optional[bool] = False
 
 
 class AgentCreate(AgentBase):
@@ -297,8 +290,6 @@ class DAOBase(CustomBaseModel):
     description: Optional[str] = None
     is_deployed: Optional[bool] = False
     is_broadcasted: Optional[bool] = False
-    wallet_id: Optional[UUID] = None
-    author_id: Optional[UUID] = None
 
 
 class DAOCreate(DAOBase):
@@ -633,16 +624,12 @@ class WalletFilterN(CustomBaseModel):
 class QueueMessageFilter(CustomBaseModel):
     type: Optional[QueueMessageType] = None
     is_processed: Optional[bool] = None
-    tweet_id: Optional[str] = None
-    conversation_id: Optional[str] = None
     wallet_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
 
 
 class AgentFilter(CustomBaseModel):
-    name: Optional[str] = None
-    role: Optional[str] = None
-    goal: Optional[str] = None
+    is_archived: Optional[bool] = None
     profile_id: Optional[UUID] = None
 
 
@@ -658,7 +645,6 @@ class DAOFilter(CustomBaseModel):
     name: Optional[str] = None
     is_deployed: Optional[bool] = None
     is_broadcasted: Optional[bool] = None
-    wallet_id: Optional[UUID] = None
 
 
 class ThreadFilter(CustomBaseModel):
@@ -789,7 +775,9 @@ class XTweetFilter(CustomBaseModel):
 class HolderBase(CustomBaseModel):
     wallet_id: UUID
     token_id: UUID
+    agent_id: UUID
     dao_id: UUID  # Direct reference to the DAO for easier queries
+    address: str
     amount: str  # String to handle large numbers precisely
     updated_at: datetime = datetime.now()
 
@@ -804,9 +792,11 @@ class Holder(HolderBase):
 
 
 class HolderFilter(CustomBaseModel):
+    agent_id: Optional[UUID] = None
     wallet_id: Optional[UUID] = None
     token_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
+    address: Optional[str] = None
 
 
 #

@@ -352,7 +352,10 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             if result.success:
                 backend.update_queue_message(
                     queue_message_id=message.id,
-                    update_data=QueueMessageBase(is_processed=True),
+                    update_data=QueueMessageBase(
+                        is_processed=True,
+                        result=result.model_dump(),
+                    ),
                 )
                 logger.debug(f"Marked DAO deployment message {message.id} as processed")
                 logger.info("DAO deployment task completed successfully")
