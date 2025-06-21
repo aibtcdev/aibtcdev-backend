@@ -136,7 +136,7 @@ class SchedulerService:
                     "content": "Sure, what exactly would you like to know?",
                 }
             ]
-            persona = generate_persona(agent)
+            persona = generate_persona()
             tools_map = initialize_tools(profile, agent.id)
             tools_map_filtered = exclude_tools_by_names(
                 ["db_update_scheduled_task", "db_add_scheduled_task"], tools_map

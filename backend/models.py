@@ -854,7 +854,6 @@ class VoteFilter(CustomBaseModel):
 # Add this to your backend interface class to get agents by tokens
 class AgentWithWalletTokenDTO(CustomBaseModel):
     agent_id: UUID
-    agent_name: str
     wallet_id: UUID
     wallet_address: str
     token_id: UUID

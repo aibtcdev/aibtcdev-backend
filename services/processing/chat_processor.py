@@ -387,7 +387,7 @@ class ChatProcessor:
                 if not agent:
                     logger.error(f"Agent with ID {self.agent_id} not found")
                     return
-                persona = generate_persona(agent)
+                persona = generate_persona()
             else:
                 persona = generate_static_persona()
 
