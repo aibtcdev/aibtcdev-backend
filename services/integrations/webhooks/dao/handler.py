@@ -70,6 +70,7 @@ class DAOHandler(WebhookHandler):
                 access_token=config.twitter.default_access_token,
                 access_secret=config.twitter.default_access_secret,
                 username=config.twitter.default_username,
+                bearer_token=config.twitter.default_bearer_token,
             )
 
             x_creds = self.db.create_x_creds(new_cred)

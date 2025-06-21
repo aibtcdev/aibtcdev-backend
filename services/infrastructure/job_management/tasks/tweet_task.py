@@ -81,6 +81,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 client_secret=creds[0].client_secret,
                 access_token=creds[0].access_token,
                 access_secret=creds[0].access_secret,
+                bearer_token=creds[0].bearer_token,
             )
             await twitter_service._ainitialize()
 

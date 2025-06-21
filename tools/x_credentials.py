@@ -13,13 +13,13 @@ logger = configure_logger(__name__)
 class CollectXCredentialsInput(BaseModel):
     """Input schema for collecting X API credentials."""
 
-    contract_principal: str = Field(..., description="Contract Principal")
     consumer_key: str = Field(..., description="X API Key")
     consumer_secret: str = Field(..., description="X API Secret")
     access_token: str = Field(..., description="X API Access Token")
     access_secret: str = Field(..., description="X API Access Secret")
     client_id: str = Field(..., description="OAuth 2.0 Client ID")
     client_secret: str = Field(..., description="OAuth 2.0 Client Secret")
+    bearer_token: str = Field(..., description="OAuth 2.0 Bearer Token")
     username: str = Field(..., description="X Username")
 
 
@@ -42,13 +42,13 @@ class CollectXCredentialsTool(BaseTool):
 
     def _deploy(
         self,
-        contract_principal: str,
         consumer_key: str,
         consumer_secret: str,
         access_token: str,
         access_secret: str,
         client_id: str,
         client_secret: str,
+        bearer_token: str,
         username: str,
         **kwargs,
     ) -> str:
@@ -59,12 +59,10 @@ class CollectXCredentialsTool(BaseTool):
 
         try:
             logger.info("Attempting to store credentials")
-            logger.debug(f"Received Contract Principal: {contract_principal}")
 
             # Create XCreds object
             x_creds = XCredsCreate(
                 profile_id=self.profile_id,
-                contract_principal=contract_principal,
                 consumer_key=consumer_key,
                 consumer_secret=consumer_secret,
                 access_token=access_token,
@@ -72,16 +70,15 @@ class CollectXCredentialsTool(BaseTool):
                 client_id=client_id,
                 client_secret=client_secret,
                 username=username,
+                bearer_token=bearer_token,
             )
 
             # Store in database
             stored_creds = backend.create_x_creds(x_creds)
 
             if stored_creds:
-                logger.info(
-                    f"Successfully stored X credentials for user {username} with Contract Principal {contract_principal}"
-                )
-                return f"Successfully stored X credentials for {username} with Contract Principal {contract_principal}"
+                logger.info(f"Successfully stored X credentials for user {username}")
+                return f"Successfully stored X credentials for {username}"
             logger.error("Failed to store X credentials - no response from backend")
             return "Failed to store X credentials"
         except Exception as e:
@@ -90,7 +87,6 @@ class CollectXCredentialsTool(BaseTool):
 
     def _run(
         self,
-        contract_principal: str,
         consumer_key: str,
         consumer_secret: str,
         access_token: str,
@@ -98,11 +94,11 @@ class CollectXCredentialsTool(BaseTool):
         client_id: str,
         client_secret: str,
         username: str,
+        bearer_token: str,
         **kwargs,
     ) -> str:
         """Sync version of the tool."""
         return self._deploy(
-            contract_principal=contract_principal,
             consumer_key=consumer_key,
             consumer_secret=consumer_secret,
             access_token=access_token,
@@ -110,12 +106,12 @@ class CollectXCredentialsTool(BaseTool):
             client_id=client_id,
             client_secret=client_secret,
             username=username,
+            bearer_token=bearer_token,
             **kwargs,
         )
 
     async def _arun(
         self,
-        contract_principal: str,
         consumer_key: str,
         consumer_secret: str,
         access_token: str,
@@ -123,11 +119,11 @@ class CollectXCredentialsTool(BaseTool):
         client_id: str,
         client_secret: str,
         username: str,
+        bearer_token: str,
         **kwargs,
     ) -> str:
         """Async version of the tool."""
         return self._deploy(
-            contract_principal=contract_principal,
             consumer_key=consumer_key,
             consumer_secret=consumer_secret,
             access_token=access_token,
@@ -135,5 +131,6 @@ class CollectXCredentialsTool(BaseTool):
             client_id=client_id,
             client_secret=client_secret,
             username=username,
+            bearer_token=bearer_token,
             **kwargs,
         )
