@@ -302,13 +302,12 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Combine main chunks with follow-up chunk
             message_chunks = main_chunks + [follow_up_chunk]
 
-            # Create queue message for Twitter with chunked message array
+            # Create queue message for Twitter with new "posts" format
             tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
-                        "message": message_chunks,
-                        "total_chunks": len(message_chunks),
+                        "posts": message_chunks,
                     },
                     dao_id=dao_data["id"],
                 )
