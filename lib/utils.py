@@ -242,6 +242,7 @@ def extract_image_urls(text: str) -> List[str]:
         "image/tiff",
         "image/ico",
         "image/x-icon",
+    
     }
 
     # Use httpx for better async support and modern HTTP handling
