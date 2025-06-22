@@ -388,6 +388,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         logger.info(f"Processing {len(posts)} posts for DAO {message.dao_id}")
 
+        # Debug: Log all post content to identify duplicates
+        for i, post in enumerate(posts):
+            logger.debug(f"Post {i + 1} content: '{post}'")
+
         for index, post in enumerate(posts):
             try:
                 # Check for image URLs in the post
@@ -426,18 +430,19 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                             text=post,
                             reply_in_reply_to_tweet_id=previous_tweet_id,
                         )
+                logger.debug(f"Tweet response: {tweet_response}")
 
-                if tweet_response:
+                if tweet_response and tweet_response.data:
                     tweets_sent += 1
-                    previous_tweet_id = tweet_response.id
+                    previous_tweet_id = tweet_response.data["id"]
                     if index == 0:
                         logger.info(
-                            f"Successfully created new thread with tweet {tweet_response.id}"
+                            f"Successfully created new thread with tweet {tweet_response.data['id']}"
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                     else:
                         logger.info(
-                            f"Successfully posted thread reply {index + 1}/{len(posts)}: {tweet_response.id}"
+                            f"Successfully posted thread reply {index + 1}/{len(posts)}: {tweet_response.data['id']}"
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                 else:
@@ -453,9 +458,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     # For subsequent posts, we can continue
 
             except Exception as post_error:
-                logger.error(
-                    f"Error sending post {index + 1}/{len(posts)}: {str(post_error)}"
-                )
+                # Check if it's a Twitter duplicate content error
+                error_message = str(post_error)
+                if "duplicate content" in error_message.lower():
+                    logger.error(
+                        f"Twitter duplicate content error for post {index + 1}/{len(posts)}: '{post}'"
+                    )
+                    logger.error(f"Full error: {error_message}")
+                else:
+                    logger.error(
+                        f"Error sending post {index + 1}/{len(posts)}: {error_message}"
+                    )
+
                 if index == 0:  # Critical failure on first post
                     raise post_error
 
