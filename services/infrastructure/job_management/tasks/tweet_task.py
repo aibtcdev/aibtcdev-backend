@@ -453,7 +453,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage, twitter_service: TwitterService, chunks: List[str]
     ) -> TweetProcessingResult:
         """Process a message with pre-chunked content."""
-        previous_tweet_id = getattr(message, 'tweet_id', None)  # Use existing tweet_id if threading
+        previous_tweet_id = getattr(
+            message, "tweet_id", None
+        )  # Use existing tweet_id if threading
         tweets_sent = 0
 
         # Check if chunks already have thread indices (e.g., "(1/3)")
@@ -566,7 +568,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         # Split tweet text if necessary
         chunks = self._split_text_into_chunks(tweet_text)
         # Use reply_to_tweet_id as initial thread ID, or message.tweet_id for continuation
-        previous_tweet_id = reply_to_tweet_id or getattr(message, 'tweet_id', None)
+        previous_tweet_id = reply_to_tweet_id or getattr(message, "tweet_id", None)
         tweets_sent = 0
 
         for index, chunk in enumerate(chunks):

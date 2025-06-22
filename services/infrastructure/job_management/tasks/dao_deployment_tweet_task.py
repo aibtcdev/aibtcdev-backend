@@ -228,7 +228,7 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                     success=False,
                     message="Failed to generate congratulatory tweet content for DAO deployment",
                     dao_id=dao.id,
-                    tweet_id=getattr(message, 'tweet_id', None),
+                    tweet_id=getattr(message, "tweet_id", None),
                 )
 
             # Create a new congratulatory tweet message in the queue
@@ -237,7 +237,7 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                     type=QueueMessageType.get_or_create("tweet"),
                     dao_id=dao.id,
                     message={"message": generated_congratulatory_tweet["tweet_text"]},
-                    tweet_id=getattr(message, 'tweet_id', None),
+                    tweet_id=getattr(message, "tweet_id", None),
                 )
             )
 
@@ -255,7 +255,7 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                 success=True,
                 message="Successfully generated congratulatory tweet for DAO deployment",
                 dao_id=dao.id,
-                tweet_id=getattr(message, 'tweet_id', None),
+                tweet_id=getattr(message, "tweet_id", None),
                 congratulatory_tweets_generated=1,
                 tweet_messages_created=1,
             )
