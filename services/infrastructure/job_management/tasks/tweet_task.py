@@ -43,7 +43,7 @@ class TweetProcessingResult(RunnerResult):
     job_type="tweet",
     name="Tweet Processor",
     description="Processes and sends tweets for DAOs with automatic retry and error handling",
-    interval_seconds=30,
+    interval_seconds=5,
     priority=JobPriority.HIGH,
     max_retries=3,
     retry_delay_seconds=60,
