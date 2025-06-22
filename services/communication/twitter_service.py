@@ -1,6 +1,6 @@
 import re
 from io import BytesIO
-from typing import Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 from urllib.parse import urlparse
 
 import requests
