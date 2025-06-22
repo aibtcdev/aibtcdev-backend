@@ -162,7 +162,7 @@ class QueueMessageBase(CustomBaseModel):
 
     1. New chunked format (recommended for tweets):
     {
-        "chunks": ["First chunk text (1/3)", "Second chunk text (2/3)", "Third chunk text (3/3)"],
+        "message": ["First chunk text (1/3)", "Second chunk text (2/3)", "Third chunk text (3/3)"],
         "total_chunks": 3
     }
 
@@ -186,6 +186,7 @@ class QueueMessageBase(CustomBaseModel):
     dao_id: Optional[UUID] = None
     wallet_id: Optional[UUID] = None
     result: Optional[dict] = None
+    tweet_id: Optional[str] = None  # For threading tweets
 
 
 class QueueMessageCreate(QueueMessageBase):

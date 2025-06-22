@@ -247,7 +247,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
                 return False
 
-            # Check for message field
+            # Check for message field (new format) or chunks field (alternative format)
             if "message" in message.message:
                 tweet_data = message.message["message"]
                 if not tweet_data:
@@ -300,6 +300,44 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         f"Tweet message {message.id} invalid: message data is not a string or array, got {type(tweet_data)}"
                     )
                     return False
+            elif "chunks" in message.message:
+                # Handle alternative chunks format
+                tweet_data = message.message["chunks"]
+                if not tweet_data:
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: chunks data is None or empty"
+                    )
+                    return False
+
+                if isinstance(tweet_data, list):
+                    if not tweet_data:
+                        logger.debug(
+                            f"Tweet message {message.id} invalid: chunks array is empty"
+                        )
+                        return False
+
+                    # Validate each chunk
+                    for i, chunk in enumerate(tweet_data):
+                        if not isinstance(chunk, str):
+                            logger.debug(
+                                f"Tweet message {message.id} invalid: chunk {i} is not a string, got {type(chunk)}"
+                            )
+                            return False
+                        if not chunk.strip():
+                            logger.debug(
+                                f"Tweet message {message.id} invalid: chunk {i} is empty or whitespace"
+                            )
+                            return False
+
+                    logger.debug(
+                        f"Tweet message {message.id} is valid with {len(tweet_data)} chunks (chunks format)"
+                    )
+                    return True
+                else:
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: chunks data is not an array, got {type(tweet_data)}"
+                    )
+                    return False
             else:
                 logger.debug(
                     f"Tweet message {message.id} invalid: neither 'chunks' nor 'message' key found. Keys: {list(message.message.keys())}"
@@ -349,7 +387,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            # Handle message field (can be array or string)
+            # Handle message field (can be array or string) or chunks field
             if "message" in message.message:
                 tweet_data = message.message["message"]
 
@@ -375,6 +413,22 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     )
                     return await self._process_legacy_message(message, twitter_service)
 
+            elif "chunks" in message.message:
+                # Handle alternative chunks format
+                tweet_data = message.message["chunks"]
+                logger.info(
+                    f"Processing chunked tweet message (chunks format) for DAO {message.dao_id} with {len(tweet_data)} chunks"
+                )
+                logger.debug(
+                    f"First chunk preview: {tweet_data[0][:100]}..."
+                    if tweet_data
+                    else "No chunks"
+                )
+
+                return await self._process_chunked_message(
+                    message, twitter_service, tweet_data
+                )
+
             else:
                 logger.warning(f"Tweet message {message.id} has unrecognized format")
                 return TweetProcessingResult(
@@ -399,7 +453,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage, twitter_service: TwitterService, chunks: List[str]
     ) -> TweetProcessingResult:
         """Process a message with pre-chunked content."""
-        previous_tweet_id = message.tweet_id  # Use existing tweet_id if threading
+        previous_tweet_id = getattr(message, 'tweet_id', None)  # Use existing tweet_id if threading
         tweets_sent = 0
 
         # Check if chunks already have thread indices (e.g., "(1/3)")
@@ -512,7 +566,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         # Split tweet text if necessary
         chunks = self._split_text_into_chunks(tweet_text)
         # Use reply_to_tweet_id as initial thread ID, or message.tweet_id for continuation
-        previous_tweet_id = reply_to_tweet_id or message.tweet_id
+        previous_tweet_id = reply_to_tweet_id or getattr(message, 'tweet_id', None)
         tweets_sent = 0
 
         for index, chunk in enumerate(chunks):

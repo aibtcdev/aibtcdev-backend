@@ -228,7 +228,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 f"Token Max Supply: {params['token_max_supply']}\n"
                 f"Token Decimals: {params['token_decimals']}\n"
                 f"Origin Address: {params['origin_address']}\n"
-                f"Tweet Origin: {message.tweet_id}\n"
+                f"Tweet Origin: {getattr(message, 'tweet_id', 'N/A')}\n"
                 f"Mission: {params['mission']}"
             )
         except KeyError as e:

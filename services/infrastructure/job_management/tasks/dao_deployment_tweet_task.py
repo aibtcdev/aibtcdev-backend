@@ -228,17 +228,16 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                     success=False,
                     message="Failed to generate congratulatory tweet content for DAO deployment",
                     dao_id=dao.id,
-                    tweet_id=message.tweet_id,
+                    tweet_id=getattr(message, 'tweet_id', None),
                 )
 
             # Create a new congratulatory tweet message in the queue
             congratulatory_tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
-                    type="tweet",
+                    type=QueueMessageType.get_or_create("tweet"),
                     dao_id=dao.id,
                     message={"message": generated_congratulatory_tweet["tweet_text"]},
-                    tweet_id=message.tweet_id,
-                    conversation_id=message.conversation_id,
+                    tweet_id=getattr(message, 'tweet_id', None),
                 )
             )
 
@@ -256,7 +255,7 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                 success=True,
                 message="Successfully generated congratulatory tweet for DAO deployment",
                 dao_id=dao.id,
-                tweet_id=message.tweet_id,
+                tweet_id=getattr(message, 'tweet_id', None),
                 congratulatory_tweets_generated=1,
                 tweet_messages_created=1,
             )
