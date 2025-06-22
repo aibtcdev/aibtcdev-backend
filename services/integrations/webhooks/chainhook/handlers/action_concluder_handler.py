@@ -307,7 +307,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
-                        "chunks": message_chunks,
+                        "message": message_chunks,
                         "total_chunks": len(message_chunks),
                     },
                     dao_id=dao_data["id"],

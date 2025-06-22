@@ -247,64 +247,59 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
                 return False
 
-            # Check for new chunked format
-            if "chunks" in message.message:
-                chunks = message.message["chunks"]
-                if not isinstance(chunks, list):
+            # Check for message field
+            if "message" in message.message:
+                tweet_data = message.message["message"]
+                if not tweet_data:
                     logger.debug(
-                        f"Tweet message {message.id} invalid: 'chunks' is not a list, got {type(chunks)}"
+                        f"Tweet message {message.id} invalid: message data is None or empty"
                     )
                     return False
 
-                if not chunks:
-                    logger.debug(
-                        f"Tweet message {message.id} invalid: 'chunks' array is empty"
-                    )
-                    return False
-
-                # Validate each chunk
-                for i, chunk in enumerate(chunks):
-                    if not isinstance(chunk, str):
+                # Handle new chunked array format
+                if isinstance(tweet_data, list):
+                    if not tweet_data:
                         logger.debug(
-                            f"Tweet message {message.id} invalid: chunk {i} is not a string, got {type(chunk)}"
-                        )
-                        return False
-                    if not chunk.strip():
-                        logger.debug(
-                            f"Tweet message {message.id} invalid: chunk {i} is empty or whitespace"
+                            f"Tweet message {message.id} invalid: message array is empty"
                         )
                         return False
 
-                logger.debug(
-                    f"Tweet message {message.id} is valid with {len(chunks)} chunks"
-                )
-                return True
+                    # Validate each chunk
+                    for i, chunk in enumerate(tweet_data):
+                        if not isinstance(chunk, str):
+                            logger.debug(
+                                f"Tweet message {message.id} invalid: chunk {i} is not a string, got {type(chunk)}"
+                            )
+                            return False
+                        if not chunk.strip():
+                            logger.debug(
+                                f"Tweet message {message.id} invalid: chunk {i} is empty or whitespace"
+                            )
+                            return False
 
-            # Check for legacy format (backward compatibility)
-            elif "message" in message.message:
-                tweet_text = message.message["message"]
-                if not tweet_text:
                     logger.debug(
-                        f"Tweet message {message.id} invalid: tweet text is None or empty"
+                        f"Tweet message {message.id} is valid with {len(tweet_data)} chunks"
+                    )
+                    return True
+
+                # Handle legacy string format for backward compatibility
+                elif isinstance(tweet_data, str):
+                    if not tweet_data.strip():
+                        logger.debug(
+                            f"Tweet message {message.id} invalid: tweet text is only whitespace"
+                        )
+                        return False
+
+                    logger.debug(
+                        f"Tweet message {message.id} is valid (legacy format) with content: {tweet_data[:50]}..."
+                    )
+                    return True
+
+                else:
+                    logger.debug(
+                        f"Tweet message {message.id} invalid: message data is not a string or array, got {type(tweet_data)}"
                     )
                     return False
-
-                if not isinstance(tweet_text, str):
-                    logger.debug(
-                        f"Tweet message {message.id} invalid: tweet text is not a string, got {type(tweet_text)}"
-                    )
-                    return False
-
-                if not tweet_text.strip():
-                    logger.debug(
-                        f"Tweet message {message.id} invalid: tweet text is only whitespace"
-                    )
-                    return False
-
-                logger.debug(
-                    f"Tweet message {message.id} is valid (legacy format) with content: {tweet_text[:50]}..."
-                )
-                return True
             else:
                 logger.debug(
                     f"Tweet message {message.id} invalid: neither 'chunks' nor 'message' key found. Keys: {list(message.message.keys())}"
@@ -354,29 +349,31 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     dao_id=message.dao_id,
                 )
 
-            # Check for new chunked format
-            if "chunks" in message.message:
-                chunks = message.message["chunks"]
+            # Handle message field (can be array or string)
+            if "message" in message.message:
+                tweet_data = message.message["message"]
 
-                logger.info(
-                    f"Processing chunked tweet message for DAO {message.dao_id} with {len(chunks)} chunks"
-                )
-                logger.debug(
-                    f"First chunk preview: {chunks[0][:100]}..."
-                    if chunks
-                    else "No chunks"
-                )
+                # Handle new chunked array format
+                if isinstance(tweet_data, list):
+                    logger.info(
+                        f"Processing chunked tweet message for DAO {message.dao_id} with {len(tweet_data)} chunks"
+                    )
+                    logger.debug(
+                        f"First chunk preview: {tweet_data[0][:100]}..."
+                        if tweet_data
+                        else "No chunks"
+                    )
 
-                return await self._process_chunked_message(
-                    message, twitter_service, chunks
-                )
+                    return await self._process_chunked_message(
+                        message, twitter_service, tweet_data
+                    )
 
-            # Handle legacy format for backward compatibility
-            elif "message" in message.message:
-                logger.info(
-                    f"Processing legacy format tweet message for DAO {message.dao_id}"
-                )
-                return await self._process_legacy_message(message, twitter_service)
+                # Handle legacy string format for backward compatibility
+                elif isinstance(tweet_data, str):
+                    logger.info(
+                        f"Processing legacy format tweet message for DAO {message.dao_id}"
+                    )
+                    return await self._process_legacy_message(message, twitter_service)
 
             else:
                 logger.warning(f"Tweet message {message.id} has unrecognized format")

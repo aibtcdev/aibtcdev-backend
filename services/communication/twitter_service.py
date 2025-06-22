@@ -608,6 +608,286 @@ class TwitterService:
             logger.error(f"Failed to get status {tweet_id}: {str(e)}")
             return None
 
+    async def search_tweets_by_conversation_id(
+        self, conversation_id: str, max_results: int = 100
+    ) -> List[tweepy.Tweet]:
+        """
+        Search for tweets in a specific conversation using conversation_id.
+
+        Args:
+            conversation_id: The conversation ID to search for
+            max_results: Maximum number of tweets to return (default 100, max 100)
+
+        Returns:
+            List of tweets in the conversation
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            query = f"conversation_id:{conversation_id}"
+            
+            response = self.client.search_recent_tweets(
+                query=query,
+                max_results=min(max_results, 100),  # API limit
+                tweet_fields=[
+                    "id",
+                    "text",
+                    "created_at",
+                    "author_id",
+                    "conversation_id",
+                    "in_reply_to_user_id",
+                    "referenced_tweets",
+                    "public_metrics",
+                    "entities",
+                    "attachments",
+                    "context_annotations",
+                    "withheld",
+                    "reply_settings",
+                    "lang",
+                ],
+                expansions=[
+                    "author_id",
+                    "referenced_tweets.id",
+                    "referenced_tweets.id.author_id",
+                    "entities.mentions.username",
+                    "attachments.media_keys",
+                    "attachments.poll_ids",
+                    "in_reply_to_user_id",
+                    "geo.place_id",
+                ],
+                user_fields=[
+                    "id",
+                    "name",
+                    "username",
+                    "created_at",
+                    "description",
+                    "entities",
+                    "location",
+                    "pinned_tweet_id",
+                    "profile_image_url",
+                    "protected",
+                    "public_metrics",
+                    "url",
+                    "verified",
+                    "withheld",
+                ],
+                media_fields=[
+                    "duration_ms",
+                    "height",
+                    "media_key",
+                    "preview_image_url",
+                    "type",
+                    "url",
+                    "width",
+                    "public_metrics",
+                    "alt_text",
+                    "variants",
+                ],
+            )
+
+            if response and response.data:
+                logger.info(f"Found {len(response.data)} tweets in conversation {conversation_id}")
+                return response.data
+            else:
+                logger.info(f"No tweets found in conversation {conversation_id}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Failed to search tweets by conversation ID {conversation_id}: {str(e)}")
+            return []
+
+    async def get_conversation_context(
+        self, tweet_id: str, include_later_replies: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get full conversation context for any tweet ID following the decision tree:
+        
+        1. Fetch the tweet info
+        2. Check if it's the original post (tweet.id == tweet.conversation_id)
+        3. If original: get all replies
+        4. If reply: get original + this tweet + optionally later replies
+        
+        Args:
+            tweet_id: ID of any tweet in the conversation
+            include_later_replies: Whether to include replies that came after the given tweet
+            
+        Returns:
+            Dictionary containing:
+            - original_tweet: The original tweet that started the conversation
+            - target_tweet: The tweet that was requested (if different from original)
+            - replies: List of reply tweets
+            - is_original: Boolean indicating if the requested tweet is the original
+            - conversation_id: The conversation ID
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            # Step 1: Fetch the tweet info
+            tweet_response = await self.get_tweet_by_id(tweet_id)
+            if not tweet_response or not tweet_response.data:
+                logger.error(f"Could not fetch tweet {tweet_id}")
+                return {
+                    "original_tweet": None,
+                    "target_tweet": None,
+                    "replies": [],
+                    "is_original": False,
+                    "conversation_id": None,
+                    "error": f"Tweet {tweet_id} not found"
+                }
+
+            target_tweet = tweet_response.data
+            conversation_id = target_tweet.conversation_id
+
+            # Step 2: Check if it's the original post
+            is_original = str(target_tweet.id) == str(conversation_id)
+            
+            logger.info(f"Tweet {tweet_id} - Original: {is_original}, Conversation: {conversation_id}")
+
+            if is_original:
+                # This is the original post - get all replies
+                logger.debug(f"Fetching replies for original tweet {tweet_id}")
+                all_conversation_tweets = await self.search_tweets_by_conversation_id(conversation_id)
+                
+                # Filter out the original tweet from replies
+                replies = [
+                    tweet for tweet in all_conversation_tweets 
+                    if str(tweet.id) != str(conversation_id)
+                ]
+                
+                # Sort replies by creation time
+                replies.sort(key=lambda x: x.created_at if hasattr(x, 'created_at') and x.created_at else '')
+                
+                return {
+                    "original_tweet": target_tweet,
+                    "target_tweet": target_tweet,
+                    "replies": replies,
+                    "is_original": True,
+                    "conversation_id": conversation_id,
+                    "total_tweets": len(replies) + 1
+                }
+            else:
+                # This is a reply - get the original and conversation context
+                logger.debug(f"Fetching original tweet and context for reply {tweet_id}")
+                
+                # Get the original tweet
+                original_response = await self.get_tweet_by_id(conversation_id)
+                original_tweet = original_response.data if original_response else None
+                
+                if not original_tweet:
+                    logger.error(f"Could not fetch original tweet {conversation_id}")
+                    return {
+                        "original_tweet": None,
+                        "target_tweet": target_tweet,
+                        "replies": [],
+                        "is_original": False,
+                        "conversation_id": conversation_id,
+                        "error": f"Original tweet {conversation_id} not found"
+                    }
+                
+                # Get all tweets in the conversation
+                all_conversation_tweets = await self.search_tweets_by_conversation_id(conversation_id)
+                
+                # Sort all tweets by creation time
+                all_tweets = [original_tweet] + all_conversation_tweets
+                all_tweets.sort(key=lambda x: x.created_at if hasattr(x, 'created_at') and x.created_at else '')
+                
+                # Find the position of the target tweet
+                target_position = -1
+                for i, tweet in enumerate(all_tweets):
+                    if str(tweet.id) == str(tweet_id):
+                        target_position = i
+                        break
+                
+                if include_later_replies and target_position >= 0:
+                    # Include tweets from the original up to and including later replies
+                    relevant_tweets = all_tweets
+                    replies = [tweet for tweet in relevant_tweets if str(tweet.id) != str(conversation_id)]
+                else:
+                    # Include tweets from the original up to the target tweet
+                    if target_position >= 0:
+                        relevant_tweets = all_tweets[:target_position + 1]
+                        replies = [tweet for tweet in relevant_tweets if str(tweet.id) != str(conversation_id)]
+                    else:
+                        # Fallback: just return what we have
+                        replies = [tweet for tweet in all_conversation_tweets if str(tweet.id) != str(conversation_id)]
+                
+                return {
+                    "original_tweet": original_tweet,
+                    "target_tweet": target_tweet,
+                    "replies": replies,
+                    "is_original": False,
+                    "conversation_id": conversation_id,
+                    "total_tweets": len(replies) + 1
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to get conversation context for tweet {tweet_id}: {str(e)}")
+            return {
+                "original_tweet": None,
+                "target_tweet": None,
+                "replies": [],
+                "is_original": False,
+                "conversation_id": None,
+                "error": str(e)
+            }
+
+    async def is_original_tweet(self, tweet_id: str) -> Optional[bool]:
+        """
+        Check if a tweet is the original post in a conversation.
+        
+        Args:
+            tweet_id: ID of the tweet to check
+            
+        Returns:
+            True if original, False if reply, None if error/not found
+        """
+        try:
+            tweet_response = await self.get_tweet_by_id(tweet_id)
+            if not tweet_response or not tweet_response.data:
+                return None
+                
+            tweet = tweet_response.data
+            return str(tweet.id) == str(tweet.conversation_id)
+            
+        except Exception as e:
+            logger.error(f"Failed to check if tweet {tweet_id} is original: {str(e)}")
+            return None
+
+    async def get_tweet_replies(self, tweet_id: str) -> List[tweepy.Tweet]:
+        """
+        Get all replies to a specific tweet (only works if the tweet is the original post).
+        
+        Args:
+            tweet_id: ID of the original tweet
+            
+        Returns:
+            List of reply tweets
+        """
+        try:
+            # First verify this is an original tweet
+            is_original = await self.is_original_tweet(tweet_id)
+            if not is_original:
+                logger.warning(f"Tweet {tweet_id} is not an original tweet, cannot get direct replies")
+                return []
+            
+            # Get all tweets in the conversation
+            all_tweets = await self.search_tweets_by_conversation_id(tweet_id)
+            
+            # Filter out the original tweet
+            replies = [tweet for tweet in all_tweets if str(tweet.id) != str(tweet_id)]
+            
+            # Sort by creation time
+            replies.sort(key=lambda x: x.created_at if hasattr(x, 'created_at') and x.created_at else '')
+            
+            logger.info(f"Found {len(replies)} replies to tweet {tweet_id}")
+            return replies
+            
+        except Exception as e:
+            logger.error(f"Failed to get replies for tweet {tweet_id}: {str(e)}")
+            return []
+
 
 class UserProfile(TypedDict):
     """Type definition for user profile data."""
