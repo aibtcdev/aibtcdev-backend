@@ -381,7 +381,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage, twitter_service: TwitterService, posts: List[str]
     ) -> TweetProcessingResult:
         """Process posts in the new format with automatic threading."""
-        previous_tweet_id = message.tweet_id  # Use existing tweet_id if threading
+        previous_tweet_id = (
+            None  # Start with no previous tweet - first post creates new thread
+        )
         tweets_sent = 0
 
         logger.info(f"Processing {len(posts)} posts for DAO {message.dao_id}")
@@ -398,25 +400,46 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     post = re.sub(r"\s+", " ", post)
 
                 # Post the tweet
-                if index == 0 and image_url:
-                    tweet_response = await twitter_service.post_tweet_with_media(
-                        image_url=image_url,
-                        text=post,
-                        reply_id=previous_tweet_id,
-                    )
+                if index == 0:
+                    # First post - create new thread (no reply_id)
+                    if image_url:
+                        tweet_response = await twitter_service.post_tweet_with_media(
+                            image_url=image_url,
+                            text=post,
+                            reply_id=None,  # No reply for first post
+                        )
+                    else:
+                        tweet_response = await twitter_service._apost_tweet(
+                            text=post,
+                            reply_in_reply_to_tweet_id=None,  # No reply for first post
+                        )
                 else:
-                    tweet_response = await twitter_service._apost_tweet(
-                        text=post,
-                        reply_in_reply_to_tweet_id=previous_tweet_id,
-                    )
+                    # Subsequent posts - reply to previous tweet to continue thread
+                    if image_url:
+                        tweet_response = await twitter_service.post_tweet_with_media(
+                            image_url=image_url,
+                            text=post,
+                            reply_id=previous_tweet_id,
+                        )
+                    else:
+                        tweet_response = await twitter_service._apost_tweet(
+                            text=post,
+                            reply_in_reply_to_tweet_id=previous_tweet_id,
+                        )
 
                 if tweet_response:
                     tweets_sent += 1
                     previous_tweet_id = tweet_response.id
-                    logger.info(
-                        f"Successfully posted tweet {index + 1}/{len(posts)}: {tweet_response.id}"
-                        f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
-                    )
+                    if index == 0:
+                        logger.info(
+                            f"Successfully created new thread with tweet {tweet_response.id}"
+                            f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
+                        )
+                    else:
+                        logger.info(
+                            f"Successfully posted thread reply {index + 1}/{len(posts)}: {tweet_response.id}"
+                            f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
+                        )
                 else:
                     logger.error(f"Failed to send tweet {index + 1}/{len(posts)}")
                     if index == 0:  # If first post fails, whole message fails
@@ -424,7 +447,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                             success=False,
                             message="Failed to send first tweet post",
                             dao_id=message.dao_id,
-                            tweet_id=previous_tweet_id,
+                            tweet_id=None,
                             chunks_processed=index,
                         )
                     # For subsequent posts, we can continue
@@ -438,7 +461,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         return TweetProcessingResult(
             success=tweets_sent > 0,
-            message=f"Successfully sent {tweets_sent}/{len(posts)} tweet posts",
+            message=f"Successfully sent {tweets_sent}/{len(posts)} tweet posts as thread",
             tweet_id=previous_tweet_id,
             dao_id=message.dao_id,
             tweets_sent=tweets_sent,
