@@ -307,7 +307,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
-                        "chunks": message_chunks,
+                        "message": message_chunks,
                         "total_chunks": len(message_chunks),
                     },
                     dao_id=dao_data["id"],
@@ -385,7 +385,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             formatted_message += "---\n\n"
             formatted_message += f"{clean_message}\n\n"
             formatted_message += "---\n\n"
-            formatted_message += f"Start: Block {proposal.vote_start or 'N/A'}\n"
+            formatted_message += f"Start: Block{proposal.vote_start or 'N/A'}\n"
             formatted_message += f"End: Block {proposal.vote_end or 'N/A'}\n"
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
             formatted_message += f"Approval: {approval_pct:.1f}%"
