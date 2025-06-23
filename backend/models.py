@@ -394,6 +394,8 @@ class ProfileBase(CustomBaseModel):
     email: Optional[str] = None
     has_dao_agent: Optional[bool] = False
     has_completed_guide: Optional[bool] = False
+    mainnet_address: Optional[str] = None
+    testnet_address: Optional[str] = None
 
 
 class ProfileCreate(ProfileBase):
