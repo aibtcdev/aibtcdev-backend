@@ -39,8 +39,10 @@ from services.ai.workflows.agents.evaluator import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
 )
+from tools.agent_account import (
+    AgentAccountCreateActionProposalTool,  # Added AgentAccountCreateActionProposalTool
+)
 from tools.dao_ext_action_proposals import (
-    ProposeActionSendMessageTool,  # Added ProposeActionSendMessageTool
     VetoActionProposalTool,  # Added VetoActionProposalTool
 )
 from tools.faktory import (
@@ -179,8 +181,12 @@ class FaktoryBuyTokenRequest(BaseModel):
 
 
 class ProposeSendMessageRequest(BaseModel):
-    """Request body for proposing a DAO action to send a message."""
+    """Request body for proposing a DAO action to send a message via agent account."""
 
+    agent_account_contract: str = Field(
+        ...,
+        description="Contract principal of the agent account to use for creating the proposal.",
+    )
     action_proposals_voting_extension: str = Field(
         ...,
         description="Contract principal where the DAO creates action proposals for voting by DAO members.",
@@ -585,12 +591,16 @@ async def propose_dao_action_send_message(
             # Continue with original message if enhancement fails
             enhanced_message = payload.message
 
-        tool = ProposeActionSendMessageTool(wallet_id=wallet.id)
+        # Convert message to hex format for the agent account tool
+        message_hex = enhanced_message.encode("utf-8").hex()
+
+        tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
-            action_proposals_voting_extension=payload.action_proposals_voting_extension,
-            action_proposal_contract_to_execute=payload.action_proposal_contract_to_execute,
-            dao_token_contract_address=payload.dao_token_contract_address,
-            message=enhanced_message,
+            agent_account_contract=payload.agent_account_contract,
+            voting_contract=payload.action_proposals_voting_extension,
+            dao_token_contract=payload.dao_token_contract_address,
+            action_contract=payload.action_proposal_contract_to_execute,
+            parameters_hex=message_hex,
             memo=payload.memo,
         )
 
