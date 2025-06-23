@@ -6,10 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
 from backend.models import (
+    AgentBase,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
+    WalletFilter,
 )
 from config import config
 from lib.logger import configure_logger
@@ -139,7 +141,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     def _validate_message_data(self, message_data: Dict[str, Any]) -> bool:
         """Validate the message data contains required fields."""
         required_fields = [
-            "owner_address",
+            "agent_mainnet_address",
+            "agent_testnet_address",
             "dao_token_contract",
             "dao_token_dex_contract",
         ]
@@ -165,23 +168,120 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
                 return result
 
+            # Determine which agent address to use based on network configuration
+            if config.network.network == "mainnet":
+                agent_address = message_data["agent_mainnet_address"]
+                wallet_filters = WalletFilter(mainnet_address=agent_address)
+            else:
+                agent_address = message_data["agent_testnet_address"]
+                wallet_filters = WalletFilter(testnet_address=agent_address)
+
+            logger.debug(
+                f"Looking up wallet for {config.network.network} agent address: {agent_address}"
+            )
+
+            wallets = backend.list_wallets(wallet_filters)
+
+            if not wallets:
+                error_msg = f"No wallet found for {config.network.network} agent address: {agent_address}"
+                logger.error(error_msg)
+                result = {"success": False, "error": error_msg}
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
+
+            wallet = wallets[0]
+
+            # Get the profile associated with this wallet
+            if not wallet.profile_id:
+                error_msg = f"No profile associated with wallet {wallet.id}"
+                logger.error(error_msg)
+                result = {"success": False, "error": error_msg}
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
+
+            profile = backend.get_profile(wallet.profile_id)
+            if not profile:
+                error_msg = f"Profile {wallet.profile_id} not found"
+                logger.error(error_msg)
+                result = {"success": False, "error": error_msg}
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
+
+            # Determine the correct owner address based on network configuration
+            if config.network.network == "mainnet":
+                owner_address = profile.mainnet_address
+            else:
+                owner_address = profile.testnet_address
+
+            if not owner_address:
+                error_msg = f"No {config.network.network} address found for profile {profile.id}"
+                logger.error(error_msg)
+                result = {"success": False, "error": error_msg}
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
+
+            logger.debug(
+                f"Using owner address {owner_address} for {config.network.network} network"
+            )
+
             # Initialize the AgentAccountDeployTool with seed phrase
             logger.debug("Preparing to deploy agent account")
             deploy_tool = AgentAccountDeployTool(
                 seed_phrase=config.backend_wallet.seed_phrase
             )
 
-            owner_address = message_data["owner_address"]
-
             # Execute the deployment
             logger.debug("Executing deployment...")
             deployment_result = await deploy_tool._arun(
                 owner_address=owner_address,
-                agent_address=message_data["owner_address"],
+                agent_address=agent_address,
                 dao_token_contract=message_data["dao_token_contract"],
                 dao_token_dex_contract=message_data["dao_token_dex_contract"],
             )
             logger.debug(f"Deployment result: {deployment_result}")
+
+            # Extract contract address from deployment result and update agent record
+            if (
+                deployment_result.get("success")
+                and deployment_result.get("data")
+                and deployment_result["data"].get("contract_address")
+            ):
+                contract_address = deployment_result["data"]["contract_address"]
+                contract_name = deployment_result["data"].get("contract_name", "")
+                full_contract_principal = f"{contract_address}.{contract_name}"
+
+                logger.info(
+                    f"Agent account deployed with contract: {full_contract_principal}"
+                )
+
+                # Update the agent with the deployed contract address
+                try:
+                    if wallet.agent_id:
+                        # Update the agent with the deployed contract address
+                        agent_update = AgentBase(
+                            account_contract=full_contract_principal
+                        )
+                        backend.update_agent(wallet.agent_id, agent_update)
+                        logger.info(
+                            f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to update agent with contract address: {str(e)}",
+                        exc_info=True,
+                    )
+                    # Don't fail the entire deployment if agent update fails
+            else:
+                logger.warning("No contract address found in deployment result")
 
             result = {"success": True, "deployed": True, "result": deployment_result}
 

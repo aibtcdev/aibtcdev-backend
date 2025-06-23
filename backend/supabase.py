@@ -940,6 +940,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("is_archived", filters.is_archived)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
+            if filters.account_contract is not None:
+                query = query.eq("account_contract", filters.account_contract)
         response = query.execute()
         data = response.data or []
         return [Agent(**row) for row in data]

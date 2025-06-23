@@ -22,7 +22,7 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
-from tools.dao_ext_action_proposals import VoteOnActionProposalTool
+from tools.agent_account import AgentAccountVoteTool
 
 logger = configure_logger(__name__)
 
@@ -212,17 +212,44 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 f"Found {len(unvoted_votes)} unvoted votes for proposal {proposal_id} and wallet {wallet_id}"
             )
 
+            # Get the agent to access the account contract
+            if not wallet.agent_id:
+                error_msg = f"Wallet {wallet_id} is not associated with an agent"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                }
+
+            agent = backend.get_agent(wallet.agent_id)
+            if not agent:
+                error_msg = f"Agent {wallet.agent_id} not found for wallet {wallet_id}"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                }
+
+            if not agent.account_contract:
+                error_msg = f"Agent {agent.id} does not have an account contract"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                }
+
             # Initialize the voting tool
-            voting_tool = VoteOnActionProposalTool(wallet_id=wallet_id)
+            voting_tool = AgentAccountVoteTool(wallet_id=wallet_id)
 
             # Process each unvoted vote
             results = []
             for vote in unvoted_votes:
                 # Submit the vote
                 vote_result = await voting_tool._arun(
-                    dao_action_proposal_voting_contract=proposal.contract_principal,
+                    agent_account_contract=agent.account_contract,
+                    voting_contract=proposal.contract_principal,
                     proposal_id=proposal.proposal_id,
-                    vote_for=vote.answer,
+                    vote=vote.answer,
                 )
 
                 if not vote_result.get("success", False):
