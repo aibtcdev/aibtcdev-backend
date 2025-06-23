@@ -280,41 +280,57 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             "output"
                         ):
                             deployer_address = address_result["output"].strip()
-                            logger.debug(
-                                f"Derived deployer address: {deployer_address}"
-                            )
 
-                            # Construct the full contract principal
-                            full_contract_principal = (
-                                f"{deployer_address}.{contract_name}"
-                            )
-
-                            logger.info(
-                                f"Agent account deployed with contract: {full_contract_principal}"
-                            )
-
-                            # Update the agent with the deployed contract address
-                            try:
-                                if wallet.agent_id:
-                                    # Update the agent with the deployed contract address
-                                    agent_update = AgentBase(
-                                        account_contract=full_contract_principal
-                                    )
-                                    backend.update_agent(wallet.agent_id, agent_update)
-                                    logger.info(
-                                        f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
-                                    )
-                                else:
-                                    logger.warning(
-                                        f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
-                                    )
-
-                            except Exception as e:
+                            # Validate that we got a proper Stacks address
+                            if not deployer_address:
                                 logger.error(
-                                    f"Failed to update agent with contract address: {str(e)}",
-                                    exc_info=True,
+                                    "Empty deployer address returned from script"
                                 )
-                                # Don't fail the entire deployment if agent update fails
+                            elif not (
+                                deployer_address.startswith("ST")
+                                or deployer_address.startswith("SP")
+                            ):
+                                logger.error(
+                                    f"Invalid Stacks address format: {deployer_address}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"Derived deployer address: {deployer_address}"
+                                )
+
+                                # Construct the full contract principal
+                                full_contract_principal = (
+                                    f"{deployer_address}.{contract_name}"
+                                )
+
+                                logger.info(
+                                    f"Agent account deployed with contract: {full_contract_principal}"
+                                )
+
+                                # Update the agent with the deployed contract address
+                                try:
+                                    if wallet.agent_id:
+                                        # Update the agent with the deployed contract address
+                                        agent_update = AgentBase(
+                                            account_contract=full_contract_principal
+                                        )
+                                        backend.update_agent(
+                                            wallet.agent_id, agent_update
+                                        )
+                                        logger.info(
+                                            f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                                        )
+
+                                except Exception as e:
+                                    logger.error(
+                                        f"Failed to update agent with contract address: {str(e)}",
+                                        exc_info=True,
+                                    )
+                                    # Don't fail the entire deployment if agent update fails
                         else:
                             logger.error(
                                 f"Failed to derive deployer address: {address_result}"
