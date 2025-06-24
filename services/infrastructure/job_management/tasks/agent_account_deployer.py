@@ -437,19 +437,17 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         contract_name = None
                         deployer_address = None
 
-                        # Method 1: Try to parse the nested JSON in the error message
+                        # Method 1: Try to parse the nested JSON in the error message for contractName
                         message = output_data.get("message", "")
-                        if "displayName" in message:
-                            # Extract displayName from the error message JSON
-                            display_name_match = re.search(
-                                r'"displayName":"([^"]+)"', message
+                        if "contractName" in message:
+                            # Extract contractName from the error message JSON
+                            contract_name_match = re.search(
+                                r'"contractName":"([^"]+)"', message
                             )
-                            if display_name_match:
-                                display_name = display_name_match.group(1)
-                                # Use the actual displayName as the contract name
-                                contract_name = display_name
+                            if contract_name_match:
+                                contract_name = contract_name_match.group(1)
                                 logger.debug(
-                                    f"Found displayName in error: {display_name}, using contract name: {contract_name}"
+                                    f"Found contractName in error: {contract_name}"
                                 )
 
                         # Method 2: Try to extract from contract_identifier if available
