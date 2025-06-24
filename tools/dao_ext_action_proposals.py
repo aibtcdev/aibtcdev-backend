@@ -82,8 +82,8 @@ class ProposeActionSendMessageTool(BaseTool):
         args = [
             action_proposals_voting_extension,
             action_proposal_contract_to_execute,
-            message,
             dao_token_contract_address,
+            message,
         ]
 
         if memo:
@@ -284,9 +284,9 @@ class ConcludeActionProposalTool(BaseTool):
 
         args = [
             action_proposals_voting_extension,
-            str(proposal_id),
             action_proposal_contract_to_execute,
             dao_token_contract_address,
+            str(proposal_id),
         ]
 
         # Use seed phrase if available, otherwise fall back to wallet_id
