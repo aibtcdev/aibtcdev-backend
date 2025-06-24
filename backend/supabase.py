@@ -936,8 +936,6 @@ class SupabaseBackend(AbstractBackend):
     def list_agents(self, filters: Optional["AgentFilter"] = None) -> List["Agent"]:
         query = self.client.table("agents").select("*")
         if filters:
-            if filters.is_archived is not None:
-                query = query.eq("is_archived", filters.is_archived)
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
             if filters.account_contract is not None:

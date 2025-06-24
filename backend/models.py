@@ -271,7 +271,6 @@ class XCreds(XCredsBase):
 #
 class AgentBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
-    is_archived: Optional[bool] = False
     account_contract: Optional[str] = None
 
 
@@ -656,7 +655,6 @@ class QueueMessageFilter(CustomBaseModel):
 
 
 class AgentFilter(CustomBaseModel):
-    is_archived: Optional[bool] = None
     profile_id: Optional[UUID] = None
     account_contract: Optional[str] = None
 
