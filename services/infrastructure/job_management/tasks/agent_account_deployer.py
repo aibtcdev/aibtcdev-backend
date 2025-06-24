@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+import time
 from typing import Any, Dict, List, Optional
 
 from backend.factory import backend
@@ -460,6 +461,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             deployed_count += 1
                     else:
                         errors.append(result.get("error", "Unknown error"))
+
+                    time.sleep(5)
 
                 except Exception as e:
                     error_msg = f"Exception processing message {message.id}: {str(e)}"
