@@ -262,10 +262,25 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             if deployment_result.get("success") and deployment_result.get("output"):
                 # Parse the JSON output to get the actual response data
                 try:
-                    output_data = json.loads(
-                        deployment_result["output"].split("\n")[-1]
-                    )  # Get the last JSON line
-                    if output_data.get("success") and output_data.get("data"):
+                    # Try to parse JSON from the output, handling multiple possible formats
+                    output_lines = deployment_result["output"].split("\n")
+                    output_data = None
+
+                    # Try to find a line that contains valid JSON
+                    for line in reversed(output_lines):  # Start from the end
+                        line = line.strip()
+                        if line and line.startswith("{") and line.endswith("}"):
+                            try:
+                                output_data = json.loads(line)
+                                break
+                            except json.JSONDecodeError:
+                                continue
+
+                    if (
+                        output_data
+                        and output_data.get("success")
+                        and output_data.get("data")
+                    ):
                         data = output_data["data"]
                     else:
                         logger.warning("Output data missing success or data fields")
@@ -431,8 +446,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             )
                             if display_name_match:
                                 display_name = display_name_match.group(1)
-                                # Use the base contract name instead of displayName
-                                contract_name = "aibtc-agent-account"
+                                # Use the actual displayName as the contract name
+                                contract_name = display_name
                                 logger.debug(
                                     f"Found displayName in error: {display_name}, using contract name: {contract_name}"
                                 )
