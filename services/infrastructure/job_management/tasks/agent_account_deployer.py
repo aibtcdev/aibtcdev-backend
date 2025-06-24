@@ -437,18 +437,17 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         contract_name = None
                         deployer_address = None
 
-                        # Method 1: Try to parse the nested JSON in the error message for contractName
+                        # Method 1: Extract aibtc-acct pattern directly from the message
                         message = output_data.get("message", "")
-                        if "contractName" in message:
-                            # Extract contractName from the error message JSON
-                            contract_name_match = re.search(
-                                r'"contractName":"([^"]+)"', message
+                        aibtc_acct_match = re.search(
+                            r"aibtc-acct-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}",
+                            message,
+                        )
+                        if aibtc_acct_match:
+                            contract_name = aibtc_acct_match.group(0)
+                            logger.debug(
+                                f"Found aibtc-acct pattern in error: {contract_name}"
                             )
-                            if contract_name_match:
-                                contract_name = contract_name_match.group(1)
-                                logger.debug(
-                                    f"Found contractName in error: {contract_name}"
-                                )
 
                         # Method 2: Try to extract from contract_identifier if available
                         if not contract_name and "contract_identifier" in message:
@@ -469,6 +468,25 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         f"Extracted deployer: {deployer_address}, contract: {contract_name}"
                                     )
 
+                        # Method 2b: Also try to extract deployer address from contract_identifier even if we already have contract_name
+                        if (
+                            contract_name
+                            and not deployer_address
+                            and "contract_identifier" in message
+                        ):
+                            contract_id_match = re.search(
+                                r'"contract_identifier":"([^"]+)"', message
+                            )
+                            if contract_id_match:
+                                contract_identifier = contract_id_match.group(1)
+                                if "." in contract_identifier:
+                                    deployer_address, _ = contract_identifier.split(
+                                        ".", 1
+                                    )
+                                    logger.debug(
+                                        f"Extracted deployer address from contract_identifier: {deployer_address}"
+                                    )
+
                         # Method 3: Try to extract from reason_data if available
                         if not contract_name and "reason_data" in message:
                             reason_data_match = re.search(
@@ -486,6 +504,26 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                     )
                                     logger.debug(
                                         f"Extracted deployer: {deployer_address}, contract: {contract_name}"
+                                    )
+
+                        # Method 3b: Also try to extract deployer address from reason_data even if we already have contract_name
+                        if (
+                            contract_name
+                            and not deployer_address
+                            and "reason_data" in message
+                        ):
+                            reason_data_match = re.search(
+                                r'"reason_data":{[^}]*"contract_identifier":"([^"]+)"',
+                                message,
+                            )
+                            if reason_data_match:
+                                contract_identifier = reason_data_match.group(1)
+                                if "." in contract_identifier:
+                                    deployer_address, _ = contract_identifier.split(
+                                        ".", 1
+                                    )
+                                    logger.debug(
+                                        f"Extracted deployer address from reason_data: {deployer_address}"
                                     )
 
                         # If we still don't have a deployer address, derive it from seed phrase
