@@ -246,105 +246,125 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             logger.debug(f"Deployment result: {deployment_result}")
 
             # Extract contract information from deployment result and update agent record
-            if deployment_result.get("success") and deployment_result.get("data"):
-                data = deployment_result["data"]
+            if deployment_result.get("success") and deployment_result.get("output"):
+                # Parse the JSON output to get the actual response data
+                try:
+                    output_data = json.loads(
+                        deployment_result["output"].split("\n")[-1]
+                    )  # Get the last JSON line
+                    if output_data.get("success") and output_data.get("data"):
+                        data = output_data["data"]
+                    else:
+                        logger.warning("Output data missing success or data fields")
+                        data = None
+                except (json.JSONDecodeError, IndexError) as e:
+                    logger.error(f"Failed to parse deployment output: {str(e)}")
+                    data = None
 
-                # Try to extract contract information from different possible fields
-                contract_name = None
-                deployer_address = None
+                if data:
+                    # Try to extract contract information from different possible fields
+                    contract_name = None
+                    deployer_address = None
 
-                # Check for displayName first (this is what we see in the logs)
-                if data.get("displayName"):
-                    contract_name = data["displayName"]
-                    logger.debug(f"Found contract name in displayName: {contract_name}")
-
-                # Fallback to name field
-                elif data.get("name"):
-                    contract_name = data["name"]
-                    logger.debug(f"Found contract name in name field: {contract_name}")
-
-                # If we have a contract name, we need to derive the deployer address
-                if contract_name:
-                    # The deployer address should be derived from the backend wallet seed phrase
-                    # For now, we'll use a simple approach to get the address
-                    try:
-                        # Use the BunScriptRunner to get the deployer address
-                        from tools.bun import BunScriptRunner
-
-                        address_result = BunScriptRunner.bun_run_with_seed_phrase(
-                            config.backend_wallet.seed_phrase,
-                            "stacks-wallet",
-                            "get-my-wallet-address.ts",
+                    # Check for displayName first (this is what we see in the logs)
+                    if data.get("displayName"):
+                        contract_name = data["displayName"]
+                        logger.debug(
+                            f"Found contract name in displayName: {contract_name}"
                         )
 
-                        if address_result.get("success") and address_result.get(
-                            "output"
-                        ):
-                            deployer_address = address_result["output"].strip()
+                    # Fallback to name field
+                    elif data.get("name"):
+                        contract_name = data["name"]
+                        logger.debug(
+                            f"Found contract name in name field: {contract_name}"
+                        )
 
-                            # Validate that we got a proper Stacks address
-                            if not deployer_address:
-                                logger.error(
-                                    "Empty deployer address returned from script"
-                                )
-                            elif not (
-                                deployer_address.startswith("ST")
-                                or deployer_address.startswith("SP")
-                            ):
-                                logger.error(
-                                    f"Invalid Stacks address format: {deployer_address}"
-                                )
-                            else:
-                                logger.debug(
-                                    f"Derived deployer address: {deployer_address}"
-                                )
+                    # If we have a contract name, we need to derive the deployer address
+                    if contract_name:
+                        # The deployer address should be derived from the backend wallet seed phrase
+                        # For now, we'll use a simple approach to get the address
+                        try:
+                            # Use the BunScriptRunner to get the deployer address
+                            from tools.bun import BunScriptRunner
 
-                                # Construct the full contract principal
-                                full_contract_principal = (
-                                    f"{deployer_address}.{contract_name}"
-                                )
-
-                                logger.info(
-                                    f"Agent account deployed with contract: {full_contract_principal}"
-                                )
-
-                                # Update the agent with the deployed contract address
-                                try:
-                                    if wallet.agent_id:
-                                        # Update the agent with the deployed contract address
-                                        agent_update = AgentBase(
-                                            account_contract=full_contract_principal
-                                        )
-                                        backend.update_agent(
-                                            wallet.agent_id, agent_update
-                                        )
-                                        logger.info(
-                                            f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
-                                        )
-
-                                except Exception as e:
-                                    logger.error(
-                                        f"Failed to update agent with contract address: {str(e)}",
-                                        exc_info=True,
-                                    )
-                                    # Don't fail the entire deployment if agent update fails
-                        else:
-                            logger.error(
-                                f"Failed to derive deployer address: {address_result}"
+                            address_result = BunScriptRunner.bun_run_with_seed_phrase(
+                                config.backend_wallet.seed_phrase,
+                                "stacks-wallet",
+                                "get-my-wallet-address.ts",
                             )
 
-                    except Exception as e:
-                        logger.error(
-                            f"Error deriving deployer address: {str(e)}", exc_info=True
-                        )
+                            if address_result.get("success") and address_result.get(
+                                "output"
+                            ):
+                                deployer_address = address_result["output"].strip()
+
+                                # Validate that we got a proper Stacks address
+                                if not deployer_address:
+                                    logger.error(
+                                        "Empty deployer address returned from script"
+                                    )
+                                elif not (
+                                    deployer_address.startswith("ST")
+                                    or deployer_address.startswith("SP")
+                                ):
+                                    logger.error(
+                                        f"Invalid Stacks address format: {deployer_address}"
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"Derived deployer address: {deployer_address}"
+                                    )
+
+                                    # Construct the full contract principal
+                                    full_contract_principal = (
+                                        f"{deployer_address}.{contract_name}"
+                                    )
+
+                                    logger.info(
+                                        f"Agent account deployed with contract: {full_contract_principal}"
+                                    )
+
+                                    # Update the agent with the deployed contract address
+                                    try:
+                                        if wallet.agent_id:
+                                            # Update the agent with the deployed contract address
+                                            agent_update = AgentBase(
+                                                account_contract=full_contract_principal
+                                            )
+                                            backend.update_agent(
+                                                wallet.agent_id, agent_update
+                                            )
+                                            logger.info(
+                                                f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
+                                            )
+                                        else:
+                                            logger.warning(
+                                                f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                                            )
+
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Failed to update agent with contract address: {str(e)}",
+                                            exc_info=True,
+                                        )
+                                        # Don't fail the entire deployment if agent update fails
+                            else:
+                                logger.error(
+                                    f"Failed to derive deployer address: {address_result}"
+                                )
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error deriving deployer address: {str(e)}",
+                                exc_info=True,
+                            )
+                    else:
+                        logger.warning("No contract name found in deployment result")
                 else:
                     logger.warning("No contract name found in deployment result")
             else:
-                logger.warning("Deployment result missing success or data fields")
+                logger.warning("Deployment result missing success or output fields")
 
             result = {"success": True, "deployed": True, "result": deployment_result}
 
