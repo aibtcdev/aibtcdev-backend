@@ -246,6 +246,18 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
             logger.debug(f"Deployment result: {deployment_result}")
 
+            # Check if this is a ContractAlreadyExists case first
+            is_contract_already_exists = (
+                deployment_result.get("success") is False
+                and deployment_result.get("output")
+                and "ContractAlreadyExists" in deployment_result.get("output", "")
+            )
+
+            if is_contract_already_exists:
+                logger.info(
+                    "Contract already exists - this will be treated as a successful deployment"
+                )
+
             # Extract contract information from deployment result and update agent record
             if deployment_result.get("success") and deployment_result.get("output"):
                 # Parse the JSON output to get the actual response data
@@ -372,19 +384,43 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 "output"
             ):
                 try:
-                    # Parse the JSON output to get the actual response data
-                    output_data = json.loads(
-                        deployment_result["output"].split("\n")[-1]
-                    )  # Get the last JSON line
+                    # Try to parse JSON from the output, handling multiple possible formats
+                    output_lines = deployment_result["output"].split("\n")
+                    output_data = None
 
-                    if output_data.get(
-                        "success"
-                    ) is False and "ContractAlreadyExists" in str(
-                        output_data.get("message", "")
+                    # Try to find a line that contains valid JSON
+                    for line in reversed(output_lines):  # Start from the end
+                        line = line.strip()
+                        if line and line.startswith("{") and line.endswith("}"):
+                            try:
+                                output_data = json.loads(line)
+                                break
+                            except json.JSONDecodeError:
+                                continue
+
+                    # If no valid JSON found, try to extract from the raw output string
+                    if (
+                        not output_data
+                        and "ContractAlreadyExists" in deployment_result["output"]
+                    ):
+                        # Create a synthetic output_data structure for processing
+                        output_data = {
+                            "success": False,
+                            "message": deployment_result["output"],
+                        }
+
+                    if output_data and (
+                        output_data.get("success") is False
+                        and "ContractAlreadyExists"
+                        in str(output_data.get("message", ""))
                     ):
                         logger.info(
                             "Contract already exists - attempting to extract contract info from error"
                         )
+
+                        # Initialize variables
+                        contract_name = None
+                        deployer_address = None
 
                         # Method 1: Try to parse the nested JSON in the error message
                         message = output_data.get("message", "")
@@ -415,6 +451,25 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                     )
                                     logger.debug(
                                         f"Found contract identifier: {contract_identifier}"
+                                    )
+                                    logger.debug(
+                                        f"Extracted deployer: {deployer_address}, contract: {contract_name}"
+                                    )
+
+                        # Method 3: Try to extract from reason_data if available
+                        if not contract_name and "reason_data" in message:
+                            reason_data_match = re.search(
+                                r'"reason_data":{[^}]*"contract_identifier":"([^"]+)"',
+                                message,
+                            )
+                            if reason_data_match:
+                                contract_identifier = reason_data_match.group(1)
+                                if "." in contract_identifier:
+                                    deployer_address, contract_name = (
+                                        contract_identifier.split(".", 1)
+                                    )
+                                    logger.debug(
+                                        f"Found contract identifier in reason_data: {contract_identifier}"
                                     )
                                     logger.debug(
                                         f"Extracted deployer: {deployer_address}, contract: {contract_name}"
@@ -475,13 +530,29 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                 )
                         else:
                             logger.warning(
-                                "Could not extract contract information from ContractAlreadyExists error"
+                                "Could not extract contract information from ContractAlreadyExists error - "
+                                "but will still treat as successful deployment"
                             )
 
                 except (json.JSONDecodeError, Exception) as e:
                     logger.error(f"Failed to parse failed deployment output: {str(e)}")
+                    # Still treat ContractAlreadyExists as successful even if parsing fails
+                    if is_contract_already_exists:
+                        logger.info(
+                            "Despite parsing error, treating ContractAlreadyExists as successful deployment"
+                        )
 
-            result = {"success": True, "deployed": True, "result": deployment_result}
+            # Determine if this should be considered a successful deployment
+            # Both successful deployments and ContractAlreadyExists should be considered successful
+            deployed = (
+                deployment_result.get("success") is True or is_contract_already_exists
+            )
+
+            result = {
+                "success": True,
+                "deployed": deployed,
+                "result": deployment_result,
+            }
 
             # Store result and mark as processed
             update_data = QueueMessageBase(is_processed=True, result=result)
