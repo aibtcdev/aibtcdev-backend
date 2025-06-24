@@ -591,16 +591,13 @@ async def propose_dao_action_send_message(
             # Continue with original message if enhancement fails
             enhanced_message = payload.message
 
-        # Convert message to hex format for the agent account tool
-        message_hex = enhanced_message.encode("utf-8").hex()
-
         tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
             agent_account_contract=payload.agent_account_contract,
-            voting_contract=payload.action_proposals_voting_extension,
+            dao_action_proposal_voting_contract=payload.action_proposals_voting_extension,
+            action_contract_to_execute=payload.action_proposal_contract_to_execute,
             dao_token_contract=payload.dao_token_contract_address,
-            action_contract=payload.action_proposal_contract_to_execute,
-            parameters_hex=message_hex,
+            message_to_send=enhanced_message,
             memo=payload.memo,
         )
 
