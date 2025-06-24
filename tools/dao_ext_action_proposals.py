@@ -26,7 +26,9 @@ class ProposeActionSendMessageInput(BaseModel):
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action proposal that executes sending a message through the DAO.",
-        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"],
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"
+        ],
     )
     dao_token_contract_address: str = Field(
         ...,
@@ -226,7 +228,9 @@ class ConcludeActionProposalInput(BaseModel):
     action_proposal_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the original action proposal submitted for execution as part of the proposal",
-        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"],
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"
+        ],
     )
     dao_token_contract_address: str = Field(
         ...,
