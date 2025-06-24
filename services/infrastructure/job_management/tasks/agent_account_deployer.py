@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -348,7 +349,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                             f"Failed to update agent with contract address: {str(e)}",
                                             exc_info=True,
                                         )
-                                        # Don't fail the entire deployment if agent update fails
+                                # Don't fail the entire deployment if agent update fails
                             else:
                                 logger.error(
                                     f"Failed to derive deployer address: {address_result}"
@@ -365,6 +366,120 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     logger.warning("No contract name found in deployment result")
             else:
                 logger.warning("Deployment result missing success or output fields")
+
+            # Also check for failed deployments with ContractAlreadyExists error
+            if deployment_result.get("success") is False and deployment_result.get(
+                "output"
+            ):
+                try:
+                    # Parse the JSON output to get the actual response data
+                    output_data = json.loads(
+                        deployment_result["output"].split("\n")[-1]
+                    )  # Get the last JSON line
+
+                    if output_data.get(
+                        "success"
+                    ) is False and "ContractAlreadyExists" in str(
+                        output_data.get("message", "")
+                    ):
+                        logger.info(
+                            "Contract already exists - attempting to extract contract info from error"
+                        )
+
+                        # Method 1: Try to parse the nested JSON in the error message
+                        message = output_data.get("message", "")
+                        if "displayName" in message:
+                            # Extract displayName from the error message JSON
+                            display_name_match = re.search(
+                                r'"displayName":"([^"]+)"', message
+                            )
+                            if display_name_match:
+                                display_name = display_name_match.group(1)
+                                # Use the base contract name instead of displayName
+                                contract_name = "aibtc-agent-account"
+                                logger.debug(
+                                    f"Found displayName in error: {display_name}, using contract name: {contract_name}"
+                                )
+
+                        # Method 2: Try to extract from contract_identifier if available
+                        if not contract_name and "contract_identifier" in message:
+                            contract_id_match = re.search(
+                                r'"contract_identifier":"([^"]+)"', message
+                            )
+                            if contract_id_match:
+                                contract_identifier = contract_id_match.group(1)
+                                # Extract deployer address and contract name from identifier
+                                if "." in contract_identifier:
+                                    deployer_address, contract_name = (
+                                        contract_identifier.split(".", 1)
+                                    )
+                                    logger.debug(
+                                        f"Found contract identifier: {contract_identifier}"
+                                    )
+                                    logger.debug(
+                                        f"Extracted deployer: {deployer_address}, contract: {contract_name}"
+                                    )
+
+                        # If we still don't have a deployer address, derive it from seed phrase
+                        if contract_name and not deployer_address:
+                            try:
+                                from tools.bun import BunScriptRunner
+
+                                address_result = (
+                                    BunScriptRunner.bun_run_with_seed_phrase(
+                                        config.backend_wallet.seed_phrase,
+                                        "stacks-wallet",
+                                        "get-my-wallet-address.ts",
+                                    )
+                                )
+
+                                if address_result.get("success") and address_result.get(
+                                    "output"
+                                ):
+                                    deployer_address = address_result["output"].strip()
+                                    logger.debug(
+                                        f"Derived deployer address: {deployer_address}"
+                                    )
+                            except Exception as e:
+                                logger.error(
+                                    f"Error deriving deployer address: {str(e)}"
+                                )
+
+                        # If we have both contract name and deployer address, update the agent
+                        if contract_name and deployer_address:
+                            full_contract_principal = (
+                                f"{deployer_address}.{contract_name}"
+                            )
+
+                            logger.info(
+                                f"Contract already exists: {full_contract_principal}"
+                            )
+
+                            try:
+                                if wallet.agent_id:
+                                    agent_update = AgentBase(
+                                        account_contract=full_contract_principal
+                                    )
+                                    backend.update_agent(wallet.agent_id, agent_update)
+                                    logger.info(
+                                        f"Updated agent {wallet.agent_id} with existing contract: {full_contract_principal}"
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                                    )
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to update agent with existing contract: {str(e)}",
+                                    exc_info=True,
+                                )
+                        else:
+                            logger.warning(
+                                "Could not extract contract information from ContractAlreadyExists error"
+                            )
+
+                except (json.JSONDecodeError, Exception) as e:
+                    logger.error(f"Failed to parse failed deployment output: {str(e)}")
 
             result = {"success": True, "deployed": True, "result": deployment_result}
 
