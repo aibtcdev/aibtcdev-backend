@@ -39,7 +39,7 @@ from services.ai.workflows.agents.evaluator import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
 )
-from tools.agent_account import (
+from tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,  # Added AgentAccountCreateActionProposalTool
 )
 from tools.dao_ext_action_proposals import (

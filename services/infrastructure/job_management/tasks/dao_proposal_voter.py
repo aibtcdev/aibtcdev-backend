@@ -22,7 +22,7 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
-from tools.agent_account import AgentAccountVoteTool
+from tools.agent_account_action_proposals import AgentAccountVoteTool
 
 logger = configure_logger(__name__)
 
