@@ -7,7 +7,13 @@ from backend.factory import backend
 from backend.models import UUID, Profile, WalletFilter
 from lib.logger import configure_logger
 
-from .agent_account import AgentAccountDeployTool
+from .agent_account import AgentAccountBuyAssetTool, AgentAccountDeployTool
+from .agent_account_action_proposals import (
+    AgentAccountConcludeActionProposalTool,
+    AgentAccountCreateActionProposalTool,
+    AgentAccountVetoActionProposalTool,
+    AgentAccountVoteTool,
+)
 from .bitflow import BitflowExecuteTradeTool
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_ext_action_proposals import (
@@ -145,6 +151,17 @@ def initialize_tools(
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
         "agent_account_deploy": AgentAccountDeployTool(wallet_id),
+        "agent_account_buy_asset": AgentAccountBuyAssetTool(wallet_id),
+        "agent_account_create_action_proposal": AgentAccountCreateActionProposalTool(
+            wallet_id
+        ),
+        "agent_account_vote_on_proposal": AgentAccountVoteTool(wallet_id),
+        "agent_account_conclude_action_proposal": AgentAccountConcludeActionProposalTool(
+            wallet_id
+        ),
+        "agent_account_veto_action_proposal": AgentAccountVetoActionProposalTool(
+            wallet_id
+        ),
     }
 
     return tools
