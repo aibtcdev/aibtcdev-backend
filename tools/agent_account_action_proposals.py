@@ -60,7 +60,7 @@ class AgentAccountCreateActionProposalTool(BaseTool):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
 
-    def _deploy(
+    def _run_script(
         self,
         agent_account_contract: str,
         dao_action_proposal_voting_contract: str,
@@ -107,7 +107,7 @@ class AgentAccountCreateActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             action_contract_to_execute,
@@ -128,7 +128,7 @@ class AgentAccountCreateActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             action_contract_to_execute,
@@ -139,7 +139,7 @@ class AgentAccountCreateActionProposalTool(BaseTool):
         )
 
 
-class AgentAccountVoteInput(BaseModel):
+class AgentAccountVoteOnActionProposalInput(BaseModel):
     """Input schema for voting on action proposals through an agent account."""
 
     agent_account_contract: str = Field(
@@ -165,13 +165,13 @@ class AgentAccountVoteInput(BaseModel):
     )
 
 
-class AgentAccountVoteTool(BaseTool):
-    name: str = "agent_account_vote_on_proposal"
+class AgentAccountVoteOnActionProposalTool(BaseTool):
+    name: str = "agent_account_vote_on_action_proposal"
     description: str = (
         "Vote on an action proposal through an agent account contract. "
         "Returns the transaction ID and details of the vote."
     )
-    args_schema: Type[BaseModel] = AgentAccountVoteInput
+    args_schema: Type[BaseModel] = AgentAccountVoteOnActionProposalInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None
 
@@ -183,7 +183,7 @@ class AgentAccountVoteTool(BaseTool):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
 
-    def _deploy(
+    def _run_script(
         self,
         agent_account_contract: str,
         dao_action_proposal_voting_contract: str,
@@ -222,7 +222,7 @@ class AgentAccountVoteTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             proposal_id,
@@ -239,7 +239,7 @@ class AgentAccountVoteTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             proposal_id,
@@ -287,7 +287,7 @@ class AgentAccountVetoActionProposalTool(BaseTool):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
 
-    def _deploy(
+    def _run_script(
         self,
         agent_account_contract: str,
         dao_action_proposal_voting_contract: str,
@@ -323,7 +323,7 @@ class AgentAccountVetoActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             proposal_id,
@@ -338,7 +338,7 @@ class AgentAccountVetoActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             proposal_id,
@@ -395,7 +395,7 @@ class AgentAccountConcludeActionProposalTool(BaseTool):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
 
-    def _deploy(
+    def _run_script(
         self,
         agent_account_contract: str,
         dao_action_proposal_voting_contract: str,
@@ -437,7 +437,7 @@ class AgentAccountConcludeActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             action_contract_to_execute,
@@ -456,7 +456,7 @@ class AgentAccountConcludeActionProposalTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._deploy(
+        return self._run_script(
             agent_account_contract,
             dao_action_proposal_voting_contract,
             action_contract_to_execute,
