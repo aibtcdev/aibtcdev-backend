@@ -20,16 +20,6 @@ class AgentAccountDeployInput(BaseModel):
         description="Stacks address of the agent",
         example="ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
     )
-    dao_token_contract: str = Field(
-        ...,
-        description="Contract principal of the DAO token",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token",
-    )
-    dao_token_dex_contract: str = Field(
-        ...,
-        description="Contract principal of the DAO token DEX",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token-dex",
-    )
     save_to_file: bool = Field(
         False,
         description="Whether to save the contract to a file",
@@ -61,8 +51,6 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
-        dao_token_contract: str,
-        dao_token_dex_contract: str,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -77,8 +65,6 @@ class AgentAccountDeployTool(BaseTool):
         args = [
             owner_address,
             agent_address,
-            dao_token_contract,
-            dao_token_dex_contract,
             str(save_to_file).lower(),
         ]
 
@@ -102,8 +88,6 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
-        dao_token_contract: str,
-        dao_token_dex_contract: str,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -111,8 +95,6 @@ class AgentAccountDeployTool(BaseTool):
         return self._run_script(
             owner_address,
             agent_address,
-            dao_token_contract,
-            dao_token_dex_contract,
             save_to_file,
             **kwargs,
         )
@@ -121,8 +103,6 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
-        dao_token_contract: str,
-        dao_token_dex_contract: str,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -130,8 +110,6 @@ class AgentAccountDeployTool(BaseTool):
         return self._run_script(
             owner_address,
             agent_address,
-            dao_token_contract,
-            dao_token_dex_contract,
             save_to_file,
             **kwargs,
         )
