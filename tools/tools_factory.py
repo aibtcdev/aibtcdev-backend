@@ -167,7 +167,6 @@ def initialize_tools(
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
-        
         # --- MODIFIED AGENT ACCOUNT TOOLS ---
         "agent_account_deploy": AgentAccountDeployTool(wallet_id),
         "agent_account_create_action_proposal": AgentAccountCreateActionProposalTool(

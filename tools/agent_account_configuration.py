@@ -70,9 +70,7 @@ class AgentAccountApproveContractTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(
-            agent_account_contract, contract_to_approve, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_to_approve, **kwargs)
 
     async def _arun(
         self,
@@ -81,9 +79,7 @@ class AgentAccountApproveContractTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(
-            agent_account_contract, contract_to_approve, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_to_approve, **kwargs)
 
 
 class AgentAccountRevokeContractInput(BaseModel):
@@ -149,9 +145,7 @@ class AgentAccountRevokeContractTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(
-            agent_account_contract, contract_to_revoke, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_to_revoke, **kwargs)
 
     async def _arun(
         self,
@@ -160,6 +154,4 @@ class AgentAccountRevokeContractTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(
-            agent_account_contract, contract_to_revoke, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_to_revoke, **kwargs)

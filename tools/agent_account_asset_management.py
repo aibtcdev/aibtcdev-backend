@@ -154,9 +154,7 @@ class AgentAccountDepositFtTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(
-            agent_account_contract, ft_contract, amount, **kwargs
-        )
+        return self._run_script(agent_account_contract, ft_contract, amount, **kwargs)
 
     async def _arun(
         self,
@@ -166,9 +164,7 @@ class AgentAccountDepositFtTool(BaseTool):
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(
-            agent_account_contract, ft_contract, amount, **kwargs
-        )
+        return self._run_script(agent_account_contract, ft_contract, amount, **kwargs)
 
 
 class AgentAccountGetConfigurationInput(BaseModel):
@@ -183,9 +179,7 @@ class AgentAccountGetConfigurationInput(BaseModel):
 
 class AgentAccountGetConfigurationTool(BaseTool):
     name: str = "agent_account_get_configuration"
-    description: str = (
-        "Retrieves the configuration of an agent account, including owner, agent, and sBTC addresses."
-    )
+    description: str = "Retrieves the configuration of an agent account, including owner, agent, and sBTC addresses."
     args_schema: Type[BaseModel] = AgentAccountGetConfigurationInput
     return_direct: bool = False
     wallet_id: Optional[UUID] = None
@@ -198,9 +192,7 @@ class AgentAccountGetConfigurationTool(BaseTool):
         super().__init__(**kwargs)
         self.wallet_id = wallet_id
 
-    def _run_script(
-        self, agent_account_contract: str, **kwargs
-    ) -> Dict[str, Any]:
+    def _run_script(self, agent_account_contract: str, **kwargs) -> Dict[str, Any]:
         """Execute the tool to get configuration."""
         if self.wallet_id is None:
             return {
@@ -280,14 +272,10 @@ class AgentAccountIsApprovedContractTool(BaseTool):
         self, agent_account_contract: str, contract_principal: str, **kwargs
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(
-            agent_account_contract, contract_principal, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_principal, **kwargs)
 
     async def _arun(
         self, agent_account_contract: str, contract_principal: str, **kwargs
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(
-            agent_account_contract, contract_principal, **kwargs
-        )
+        return self._run_script(agent_account_contract, contract_principal, **kwargs)
