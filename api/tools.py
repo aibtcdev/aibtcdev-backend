@@ -141,7 +141,7 @@ async def _create_proposal_from_tool_result(
         # Extract Twitter/X URL from the message content
         x_url = None
         # Look for Twitter/X URLs in the enhanced message
-        twitter_url_pattern = r'https?://(?:twitter\.com|x\.com)/[^\s]+'
+        twitter_url_pattern = r"https?://(?:twitter\.com|x\.com)/[^\s]+"
         twitter_match = re.search(twitter_url_pattern, enhanced_message)
         if twitter_match:
             x_url = twitter_match.group(0)

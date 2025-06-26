@@ -280,12 +280,10 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
         if proposal_passed:
             # Create follow-up message content for threading
-            
+
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
 
-            follow_up_message = (
-                f"View proposal details: {proposal_url}"
-            )
+            follow_up_message = f"View proposal details: {proposal_url}"
 
             # Create chunked message array from main message only
             main_chunks = create_message_chunks(clean_message, add_indices=True)
