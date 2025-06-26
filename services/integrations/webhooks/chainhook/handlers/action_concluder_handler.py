@@ -284,8 +284,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
 
             follow_up_message = (
-                f"View proposal details: 
-                {proposal_url}"
+                f"View proposal details: {proposal_url}"
             )
 
             # Create chunked message array from main message only
