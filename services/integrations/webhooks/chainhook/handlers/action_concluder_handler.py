@@ -348,9 +348,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             )
         else:
             # For failed proposals, create only Discord message (no Twitter)
-            # But still chunk the message for consistency (if needed for future use)
-            message_chunks = create_message_chunks(clean_message, add_indices=True)
-
+            
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)
