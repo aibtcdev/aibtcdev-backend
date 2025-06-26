@@ -348,7 +348,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             )
         else:
             # For failed proposals, create only Discord message (no Twitter)
-            
+
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
             votes_against = int(proposal.votes_against or 0)
