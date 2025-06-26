@@ -12,7 +12,7 @@ from backend.models import (
     QueueMessageType,
 )
 from config import config
-from lib.utils import strip_metadata_section, create_message_chunks
+from lib.utils import strip_metadata_section
 from services.integrations.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.integrations.webhooks.chainhook.models import (
     Event,
