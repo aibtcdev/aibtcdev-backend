@@ -284,7 +284,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             follow_up_message = f"View proposal details: {proposal_url}"
 
             # Create the first post with the approved contribution format
-            first_post = f"Approved: Contribution #{proposal.proposal_id}\n{proposal.title}\nReward: 1,000 $FACES"
+            first_post = f"✅ Approved: Contribution #{proposal.proposal_id}\n📝 {proposal.title}\n⭐️ Reward: 1,000 $FACES"
 
             # Add x_url if available (will be implemented soon)
             if proposal.x_url:
