@@ -280,15 +280,12 @@ class ActionConcluderHandler(ChainhookEventHandler):
 
         if proposal_passed:
             # Create follow-up message content for threading
-            proposal_number = proposal.proposal_id
-            dao_name = dao_data["name"]
-            reward_amount = 1000
+            
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
 
             follow_up_message = (
-                f"This message was approved by proposal #{proposal_number} of {dao_name}.\n\n"
-                f"{reward_amount:,} DAO tokens has been rewarded to the submitter.\n\n"
-                f"View proposal details: {proposal_url}"
+                f"View proposal details: 
+                {proposal_url}"
             )
 
             # Create chunked message array from main message only
