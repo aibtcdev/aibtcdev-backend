@@ -12,7 +12,7 @@ from backend.models import (
     QueueMessageType,
 )
 from config import config
-from lib.utils import strip_metadata_section, create_message_chunks
+from lib.utils import strip_metadata_section
 from services.integrations.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from services.integrations.webhooks.chainhook.models import (
     Event,
@@ -279,41 +279,32 @@ class ActionConcluderHandler(ChainhookEventHandler):
         proposal_passed = proposal.passed or False
 
         if proposal_passed:
-            # Create follow-up message content for threading
-            proposal_number = proposal.proposal_id
-            dao_name = dao_data["name"]
-            reward_amount = 1000
+            # Create the new post format for approved proposals
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
+            follow_up_message = f"View proposal details: {proposal_url}"
 
-            follow_up_message = (
-                f"This message was approved by proposal #{proposal_number} of {dao_name}.\n\n"
-                f"{reward_amount:,} DAO tokens has been rewarded to the submitter.\n\n"
-                f"View proposal details: {proposal_url}"
-            )
+            # Create the first post with the approved contribution format
+            first_post = f"✅ Approved: Contribution #{proposal.proposal_id}\n📝 {proposal.title}\n⭐️ Reward: 1,000 $FACES"
 
-            # Create chunked message array from main message only
-            main_chunks = create_message_chunks(clean_message, add_indices=True)
+            # Add x_url if available (will be implemented soon)
+            if proposal.x_url:
+                first_post += f"\n{proposal.x_url}"
 
-            # Add the follow-up message as a separate final chunk in the thread
-            follow_up_chunk = (
-                f"({len(main_chunks) + 1}/{len(main_chunks) + 1}) {follow_up_message}"
-            )
-
-            # Combine main chunks with follow-up chunk
-            message_chunks = main_chunks + [follow_up_chunk]
+            # Create the posts array with the new format
+            posts = [first_post, follow_up_message]
 
             # Create queue message for Twitter with new "posts" format
             tweet_message = backend.create_queue_message(
                 QueueMessageCreate(
                     type=QueueMessageType.get_or_create("tweet"),
                     message={
-                        "posts": message_chunks,
+                        "posts": posts,
                     },
                     dao_id=dao_data["id"],
                 )
             )
             self.logger.info(
-                f"Created tweet queue message with {len(message_chunks)} chunks: {tweet_message.id}"
+                f"Created tweet queue message with {len(posts)} posts (new approved format): {tweet_message.id}"
             )
 
             # Calculate participation and approval percentages for passed proposal
@@ -357,8 +348,6 @@ class ActionConcluderHandler(ChainhookEventHandler):
             )
         else:
             # For failed proposals, create only Discord message (no Twitter)
-            # But still chunk the message for consistency (if needed for future use)
-            message_chunks = create_message_chunks(clean_message, add_indices=True)
 
             # Calculate participation and approval percentages
             votes_for = int(proposal.votes_for or 0)
