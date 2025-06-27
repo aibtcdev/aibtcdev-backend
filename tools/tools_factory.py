@@ -7,13 +7,30 @@ from backend.factory import backend
 from backend.models import UUID, Profile, WalletFilter
 from lib.logger import configure_logger
 
-from .agent_account import AgentAccountBuyAssetTool, AgentAccountDeployTool
+# --- MODIFIED IMPORTS ---
+from .agent_account import AgentAccountDeployTool
 from .agent_account_action_proposals import (
     AgentAccountConcludeActionProposalTool,
     AgentAccountCreateActionProposalTool,
     AgentAccountVetoActionProposalTool,
-    AgentAccountVoteTool,
+    AgentAccountVoteOnActionProposalTool,  # Renamed from AgentAccountVoteTool
 )
+from .agent_account_asset_management import (
+    AgentAccountDepositFtTool,
+    AgentAccountDepositStxTool,
+    AgentAccountGetConfigurationTool,
+    AgentAccountIsApprovedContractTool,
+)
+from .agent_account_configuration import (
+    AgentAccountApproveContractTool,
+    AgentAccountRevokeContractTool,
+)
+from .agent_account_faktory import (
+    AgentAccountFaktoryBuyAssetTool,
+    AgentAccountFaktorySellAssetTool,
+)
+# --- END MODIFIED IMPORTS ---
+
 from .bitflow import BitflowExecuteTradeTool
 from .contracts import ContractSIP10InfoTool, FetchContractSourceTool
 from .dao_ext_action_proposals import (
@@ -150,18 +167,31 @@ def initialize_tools(
         "wallet_get_my_transactions": WalletGetMyTransactions(wallet_id),
         "wallet_send_sip10": WalletSIP10SendTool(wallet_id),
         "x_credentials": CollectXCredentialsTool(profile_id),
+        # --- MODIFIED AGENT ACCOUNT TOOLS ---
         "agent_account_deploy": AgentAccountDeployTool(wallet_id),
-        "agent_account_buy_asset": AgentAccountBuyAssetTool(wallet_id),
         "agent_account_create_action_proposal": AgentAccountCreateActionProposalTool(
             wallet_id
         ),
-        "agent_account_vote_on_proposal": AgentAccountVoteTool(wallet_id),
+        "agent_account_vote_on_action_proposal": AgentAccountVoteOnActionProposalTool(
+            wallet_id
+        ),
         "agent_account_conclude_action_proposal": AgentAccountConcludeActionProposalTool(
             wallet_id
         ),
         "agent_account_veto_action_proposal": AgentAccountVetoActionProposalTool(
             wallet_id
         ),
+        "agent_account_faktory_buy_asset": AgentAccountFaktoryBuyAssetTool(wallet_id),
+        "agent_account_faktory_sell_asset": AgentAccountFaktorySellAssetTool(wallet_id),
+        "agent_account_deposit_stx": AgentAccountDepositStxTool(wallet_id),
+        "agent_account_deposit_ft": AgentAccountDepositFtTool(wallet_id),
+        "agent_account_get_configuration": AgentAccountGetConfigurationTool(wallet_id),
+        "agent_account_is_approved_contract": AgentAccountIsApprovedContractTool(
+            wallet_id
+        ),
+        "agent_account_approve_contract": AgentAccountApproveContractTool(wallet_id),
+        "agent_account_revoke_contract": AgentAccountRevokeContractTool(wallet_id),
+        # --- END MODIFIED AGENT ACCOUNT TOOLS ---
     }
 
     return tools

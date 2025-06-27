@@ -145,8 +145,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         required_fields = [
             "agent_mainnet_address",
             "agent_testnet_address",
-            "dao_token_contract",
-            "dao_token_dex_contract",
         ]
         return all(field in message_data for field in required_fields)
 
@@ -241,8 +239,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             deployment_result = await deploy_tool._arun(
                 owner_address=owner_address,
                 agent_address=agent_address,
-                dao_token_contract=message_data["dao_token_contract"],
-                dao_token_dex_contract=message_data["dao_token_dex_contract"],
             )
             logger.debug(f"Deployment result: {deployment_result}")
 
