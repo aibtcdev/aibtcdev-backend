@@ -453,6 +453,7 @@ class ProposalBase(CustomBaseModel):
     has_embedding: Optional[bool] = (
         False  # Flag to track if proposal has been embedded in vector store
     )
+    x_url: Optional[str] = None  # Twitter/X URL associated with the proposal
 
 
 class ProposalCreate(ProposalBase):

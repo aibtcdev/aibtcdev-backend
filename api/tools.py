@@ -138,6 +138,15 @@ async def _create_proposal_from_tool_result(
             else wallet.testnet_address
         )
 
+        # Extract Twitter/X URL from the message content
+        x_url = None
+        # Look for Twitter/X URLs in the enhanced message
+        twitter_url_pattern = r"https?://(?:twitter\.com|x\.com)/[^\s]+"
+        twitter_match = re.search(twitter_url_pattern, enhanced_message)
+        if twitter_match:
+            x_url = twitter_match.group(0)
+            logger.info(f"Extracted Twitter URL from proposal: {x_url}")
+
         # Create the proposal record
         proposal_content = ProposalCreate(
             dao_id=dao_id,
@@ -152,6 +161,7 @@ async def _create_proposal_from_tool_result(
             # Additional fields that might be available
             creator=creator_address or "Unknown",
             memo=payload.memo,
+            x_url=x_url,  # Store the extracted Twitter URL
         )
 
         proposal = backend.create_proposal(proposal_content)
