@@ -57,11 +57,20 @@ class TwitterPostTweetTool(BaseTool):
             return "Error: Tweet content exceeds 280 characters limit. Please shorten your message."
 
         try:
+            # Find the DAO associated with this agent through holders
+            from backend.models import HolderFilter
+
+            holders = backend.list_holders(filters=HolderFilter(agent_id=self.agent_id))
+            if not holders:
+                return "No DAO association found for this agent"
+
+            # Get X creds for the DAO
+            dao_id = holders[0].dao_id
             x_creds = backend.list_x_creds(
-                filters=XCredsFilter(agent_id=self.agent_id),
+                filters=XCredsFilter(dao_id=dao_id),
             )
             if not x_creds:
-                return "No X creds found for this agent"
+                return "No X creds found for this agent's DAO"
             x_creds = x_creds[0]
             twitter_service = TwitterService(
                 consumer_key=x_creds.consumer_key,
@@ -116,11 +125,20 @@ class TwitterGetTweetTool(BaseTool):
             raise ValueError("Agent ID is required")
 
         try:
+            # Find the DAO associated with this agent through holders
+            from backend.models import HolderFilter
+
+            holders = backend.list_holders(filters=HolderFilter(agent_id=self.agent_id))
+            if not holders:
+                return "No DAO association found for this agent"
+
+            # Get X creds for the DAO
+            dao_id = holders[0].dao_id
             x_creds = backend.list_x_creds(
-                filters=XCredsFilter(agent_id=self.agent_id),
+                filters=XCredsFilter(dao_id=dao_id),
             )
             if not x_creds:
-                return "No X creds found for this agent"
+                return "No X creds found for this agent's DAO"
 
             x_creds = x_creds[0]
             twitter_service = TwitterService(
@@ -314,11 +332,20 @@ class TwitterGetTweetTool(BaseTool):
             raise ValueError("Agent ID is required")
 
         try:
+            # Find the DAO associated with this agent through holders
+            from backend.models import HolderFilter
+
+            holders = backend.list_holders(filters=HolderFilter(agent_id=self.agent_id))
+            if not holders:
+                return "No DAO association found for this agent"
+
+            # Get X creds for the DAO
+            dao_id = holders[0].dao_id
             x_creds = backend.list_x_creds(
-                filters=XCredsFilter(agent_id=self.agent_id),
+                filters=XCredsFilter(dao_id=dao_id),
             )
             if not x_creds:
-                return "No X creds found for this agent"
+                return "No X creds found for this agent's DAO"
 
             x_creds = x_creds[0]
             twitter_service = TwitterService(
