@@ -63,14 +63,14 @@ class DAOHandler(WebhookHandler):
             # Create X credentials for the DAO
             new_cred = XCredsCreate(
                 dao_id=dao.id,
-                consumer_key=config.twitter.default_consumer_key,
-                consumer_secret=config.twitter.default_consumer_secret,
-                client_id=config.twitter.default_client_id,
-                client_secret=config.twitter.default_client_secret,
-                access_token=config.twitter.default_access_token,
-                access_secret=config.twitter.default_access_secret,
-                username=config.twitter.default_username,
-                bearer_token=config.twitter.default_bearer_token,
+                consumer_key=config.twitter.consumer_key,
+                consumer_secret=config.twitter.consumer_secret,
+                client_id=config.twitter.client_id,
+                client_secret=config.twitter.client_secret,
+                access_token=config.twitter.access_token,
+                access_secret=config.twitter.access_secret,
+                username=config.twitter.username,
+                bearer_token=config.twitter.bearer_token,
             )
 
             x_creds = self.db.create_x_creds(new_cred)
