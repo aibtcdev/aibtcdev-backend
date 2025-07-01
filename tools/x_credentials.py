@@ -62,7 +62,6 @@ class CollectXCredentialsTool(BaseTool):
 
             # Create XCreds object
             x_creds = XCredsCreate(
-                profile_id=self.profile_id,
                 consumer_key=consumer_key,
                 consumer_secret=consumer_secret,
                 access_token=access_token,
