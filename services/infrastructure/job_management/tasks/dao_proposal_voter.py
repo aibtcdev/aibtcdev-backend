@@ -22,7 +22,7 @@ from services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from services.infrastructure.job_management.decorators import JobPriority, job
-from tools.agent_account_action_proposals import AgentAccountVoteTool
+from tools.agent_account_action_proposals import AgentAccountVoteOnActionProposalTool
 
 logger = configure_logger(__name__)
 
@@ -239,7 +239,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 }
 
             # Initialize the voting tool
-            voting_tool = AgentAccountVoteTool(wallet_id=wallet_id)
+            voting_tool = AgentAccountVoteOnActionProposalTool(wallet_id=wallet_id)
 
             # Process each unvoted vote
             results = []
@@ -247,7 +247,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 # Submit the vote
                 vote_result = await voting_tool._arun(
                     agent_account_contract=agent.account_contract,
-                    voting_contract=proposal.contract_principal,
+                    dao_action_proposal_voting_contract=proposal.contract_principal,
                     proposal_id=proposal.proposal_id,
                     vote=vote.answer,
                 )

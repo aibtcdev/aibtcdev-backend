@@ -41,9 +41,7 @@ from services.ai.workflows.agents.evaluator import (
 )
 from tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,  # Added AgentAccountCreateActionProposalTool
-)
-from tools.dao_ext_action_proposals import (
-    VetoActionProposalTool,  # Added VetoActionProposalTool
+    AgentAccountVetoActionProposalTool,  # Added AgentAccountVetoActionProposalTool
 )
 from tools.faktory import (
     FaktoryExecuteBuyTool,  # Added import for Faktory tool
@@ -709,8 +707,9 @@ async def veto_dao_action_proposal(
                 detail=f"No proposal found for ID: {payload.proposal_id}",
             )
 
-        tool = VetoActionProposalTool(wallet_id=wallet.id)
+        tool = AgentAccountVetoActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
+            agent_account_contract=agent.account_contract,
             dao_action_proposal_voting_contract=payload.dao_action_proposal_voting_contract,
             proposal_id=proposal.proposal_id,
         )

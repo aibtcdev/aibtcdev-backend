@@ -27,14 +27,15 @@ from services.ai.workflows.agents import ProposalMetadataAgent
 class ActionProposalHandler(BaseProposalHandler):
     """Handler for capturing and processing new DAO action proposals.
 
-    This handler identifies contract calls related to proposing actions in DAO contracts,
-    creates proposal records in the database, and tracks their lifecycle.
+    This handler identifies contract calls related to proposing actions through agent account contracts,
+    creates proposal records in the database, and tracks their lifecycle including failed proposals.
     """
 
     def can_handle_transaction(self, transaction: TransactionWithReceipt) -> bool:
         """Check if this handler can handle the given transaction.
 
-        This handler can handle contract call transactions related to proposing actions.
+        This handler can handle contract call transactions related to proposing actions
+        through agent account contracts. It handles both successful and failed transactions.
 
         Args:
             transaction: The transaction to check
@@ -45,7 +46,6 @@ class ActionProposalHandler(BaseProposalHandler):
         tx_data = self.extract_transaction_data(transaction)
         tx_kind = tx_data["tx_kind"]
         tx_data_content = tx_data["tx_data"]
-        tx_metadata = tx_data["tx_metadata"]
 
         # Only handle ContractCall type transactions
         if not isinstance(tx_kind, dict):
@@ -64,15 +64,118 @@ class ActionProposalHandler(BaseProposalHandler):
         tx_method = tx_data_content.get("method", "")
         is_proposal_method = tx_method == "create-action-proposal"
 
-        # Access success from TransactionMetadata
-        tx_success = tx_metadata.success
+        # Check if this is an agent account contract (typically has pattern like "aibtc-acct-*")
+        contract_identifier = tx_data_content.get("contract_identifier", "")
+        is_agent_account = "aibtc-acct-" in contract_identifier
 
-        if is_proposal_method and tx_success:
-            self.logger.debug(f"Found action proposal method: {tx_method}")
+        if is_proposal_method and is_agent_account:
+            self.logger.debug(
+                f"Found action proposal method: {tx_method} in agent account: {contract_identifier}"
+            )
 
+        # Handle both successful and failed proposal creation attempts
         return (
-            tx_kind_type == "ContractCall" and is_proposal_method and tx_success is True
+            tx_kind_type == "ContractCall" and is_proposal_method and is_agent_account
         )
+
+    def _get_dao_from_args(self, args: List[str]) -> Optional[Dict]:
+        """Extract DAO information from transaction arguments.
+
+        Args:
+            args: Transaction arguments list
+
+        Returns:
+            Optional[Dict]: DAO data if found, None otherwise
+        """
+        if not args or len(args) < 1:
+            self.logger.warning("No arguments found in transaction")
+            return None
+
+        # First argument should be the DAO contract principal
+        dao_contract = args[0]
+        self.logger.debug(f"Looking for DAO with contract: {dao_contract}")
+
+        return self._find_dao_for_contract(dao_contract)
+
+    def _get_proposal_info_from_args(
+        self, args: List[str], tx_id: str, tx_success: bool
+    ) -> Optional[Dict]:
+        """Extract proposal information from transaction arguments.
+
+        Args:
+            args: Transaction arguments list
+            tx_id: Transaction ID
+            tx_success: Whether the transaction was successful
+
+        Returns:
+            Optional[Dict]: Dictionary containing proposal information if found, None otherwise
+        """
+        if not args or len(args) < 3:
+            self.logger.warning(
+                f"Insufficient arguments in transaction {tx_id}, got {len(args) if args else 0} args"
+            )
+            return None
+
+        dao_contract = args[0]
+        action_contract = args[1]
+        parameters_hex = args[2]
+        memo = args[3] if len(args) > 3 else None
+
+        # For failed transactions, we create a synthetic proposal info
+        if not tx_success:
+            return {
+                "proposal_id": None,  # No proposal ID for failed transactions
+                "action": action_contract,
+                "caller": None,
+                "creator": None,
+                "liquid_tokens": "0",
+                "parameters": parameters_hex,
+                "bond": "0",
+                "contract_caller": dao_contract,
+                "created_btc": None,
+                "created_stx": None,
+                "creator_user_id": None,
+                "exec_end": None,
+                "exec_start": None,
+                "memo": memo,
+                "tx_sender": None,
+                "vote_end": None,
+                "vote_start": None,
+                "voting_delay": None,
+                "voting_period": None,
+                "voting_quorum": None,
+                "voting_reward": None,
+                "voting_threshold": None,
+                "is_failed": True,  # Mark as failed
+            }
+
+        # For successful transactions, try to get info from events first
+        # but if no events, create from args
+        return {
+            "proposal_id": None,  # Will be populated from events if available
+            "action": action_contract,
+            "caller": None,
+            "creator": None,
+            "liquid_tokens": "0",
+            "parameters": parameters_hex,
+            "bond": "0",
+            "contract_caller": dao_contract,
+            "created_btc": None,
+            "created_stx": None,
+            "creator_user_id": None,
+            "exec_end": None,
+            "exec_start": None,
+            "memo": memo,
+            "tx_sender": None,
+            "vote_end": None,
+            "vote_start": None,
+            "voting_delay": None,
+            "voting_period": None,
+            "voting_quorum": None,
+            "voting_reward": None,
+            "voting_threshold": None,
+            "is_failed": False,
+        }
 
     def _get_proposal_info_from_events(self, events: list[Event]) -> Optional[Dict]:
         """Extract the action proposal information from transaction events.
@@ -140,9 +243,9 @@ class ActionProposalHandler(BaseProposalHandler):
                         else None
                     ),
                     "voting_threshold": payload.get("votingThreshold"),
+                    "is_failed": False,
                 }
 
-        self.logger.warning("Could not find proposal information in transaction events")
         return None
 
     def _sanitize_string(self, input_string: Optional[str]) -> Optional[str]:
@@ -323,7 +426,7 @@ class ActionProposalHandler(BaseProposalHandler):
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle action proposal transactions.
 
-        Processes new action proposal transactions and creates proposal records in the database.
+        Processes new action proposal transactions (both successful and failed) and creates proposal records in the database.
 
         Args:
             transaction: The transaction to handle
@@ -333,30 +436,45 @@ class ActionProposalHandler(BaseProposalHandler):
         tx_data_content = tx_data["tx_data"]
         tx_metadata = tx_data["tx_metadata"]
 
-        # Get contract identifier
-        contract_identifier = tx_data_content.get("contract_identifier")
-        if not contract_identifier:
-            self.logger.warning("No contract identifier found in transaction data")
+        # Get transaction arguments
+        args = tx_data_content.get("args", [])
+        if not args:
+            self.logger.warning(f"No arguments found in transaction {tx_id}")
             return
 
-        # Find the DAO for this contract
-        dao_data = self._find_dao_for_contract(contract_identifier)
+        # Find the DAO using the first argument (DAO contract)
+        dao_data = self._get_dao_from_args(args)
         if not dao_data:
-            self.logger.warning(f"No DAO found for contract {contract_identifier}")
+            dao_contract = args[0] if args else "unknown"
+            self.logger.warning(f"No DAO found for contract {dao_contract}")
             return
 
-        # Get the proposal info from the transaction events
-        events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
-        proposal_info = self._get_proposal_info_from_events(events)
+        # Get transaction success status
+        tx_success = tx_metadata.success
+
+        # Get the proposal info from the transaction arguments
+        proposal_info = self._get_proposal_info_from_args(args, tx_id, tx_success)
         if proposal_info is None:
             self.logger.warning(
-                "Could not determine proposal information from transaction"
+                f"Could not determine proposal information from transaction {tx_id}"
             )
             return
 
+        # If transaction was successful, try to get additional info from events
+        if tx_success:
+            events = (
+                tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
+            )
+            event_info = self._get_proposal_info_from_events(events)
+            if event_info:
+                # Merge event info with args info, preferring event info for populated fields
+                for key, value in event_info.items():
+                    if value is not None:
+                        proposal_info[key] = value
+
         self.logger.info(
-            f"Processing new action proposal {proposal_info['proposal_id']} for DAO {dao_data['name']} "
-            f"(contract: {contract_identifier})"
+            f"Processing {'successful' if tx_success else 'failed'} action proposal for DAO {dao_data['name']} "
+            f"(DAO contract: {args[0]}, tx_id: {tx_id})"
         )
 
         # Check if the proposal already exists in the database
@@ -382,9 +500,16 @@ class ActionProposalHandler(BaseProposalHandler):
                     self.logger.debug("Using original parameters (hex decoding failed)")
 
                 # Parse title/tags from content and generate summary using AI
+                proposal_id_str = str(proposal_info.get("proposal_id", "failed"))
                 metadata = await self._parse_and_generate_proposal_metadata(
-                    parameters, dao_data["name"], str(proposal_info["proposal_id"])
+                    parameters, dao_data["name"], proposal_id_str
                 )
+
+                # Determine contract status based on transaction success
+                contract_status = (
+                    ContractStatus.DEPLOYED if tx_success else ContractStatus.FAILED
+                )
+
                 # Create a new proposal record in the database
                 proposal = backend.create_proposal(
                     ProposalCreate(
@@ -392,10 +517,10 @@ class ActionProposalHandler(BaseProposalHandler):
                         title=metadata["title"],
                         content=parameters,
                         summary=metadata["summary"],
-                        contract_principal=contract_identifier,
+                        contract_principal=args[0],  # Use DAO contract as principal
                         tx_id=tx_id,
                         proposal_id=proposal_info["proposal_id"],
-                        status=ContractStatus.DEPLOYED,  # Since it's already on-chain
+                        status=contract_status,
                         type=ProposalType.ACTION,
                         # Add fields from payload
                         action=proposal_info["action"],
@@ -422,36 +547,41 @@ class ActionProposalHandler(BaseProposalHandler):
                     )
                 )
                 self.logger.info(
-                    f"Created new action proposal record in database: {proposal.id}"
+                    f"Created new {'successful' if tx_success else 'failed'} action proposal record in database: {proposal.id}"
                 )
 
-                # Queue evaluation messages for agents holding governance tokens
-                agents = self._get_agent_token_holders(dao_data["id"])
-                if agents:
-                    for agent in agents:
-                        # Create message with only the proposal ID
-                        message_data = {
-                            "proposal_id": proposal.id,  # Only pass the proposal UUID
-                        }
+                # Only queue evaluation messages for successful proposals with agents holding governance tokens
+                if tx_success:
+                    agents = self._get_agent_token_holders(dao_data["id"])
+                    if agents:
+                        for agent in agents:
+                            # Create message with only the proposal ID
+                            message_data = {
+                                "proposal_id": proposal.id,  # Only pass the proposal UUID
+                            }
 
-                        backend.create_queue_message(
-                            QueueMessageCreate(
-                                type=QueueMessageType.get_or_create(
-                                    "dao_proposal_evaluation"
-                                ),
-                                message=message_data,
-                                dao_id=dao_data["id"],
-                                wallet_id=agent["wallet_id"],
+                            backend.create_queue_message(
+                                QueueMessageCreate(
+                                    type=QueueMessageType.get_or_create(
+                                        "dao_proposal_evaluation"
+                                    ),
+                                    message=message_data,
+                                    dao_id=dao_data["id"],
+                                    wallet_id=agent["wallet_id"],
+                                )
                             )
-                        )
 
-                        self.logger.info(
-                            f"Created evaluation queue message for agent {agent['agent_id']} "
-                            f"to evaluate proposal {proposal.id}"
+                            self.logger.info(
+                                f"Created evaluation queue message for agent {agent['agent_id']} "
+                                f"to evaluate proposal {proposal.id}"
+                            )
+                    else:
+                        self.logger.warning(
+                            f"No agents found holding tokens for DAO {dao_data['id']}"
                         )
                 else:
-                    self.logger.warning(
-                        f"No agents found holding tokens for DAO {dao_data['id']}"
+                    self.logger.info(
+                        f"Skipping agent evaluation for failed proposal {proposal.id}"
                     )
             except Exception as e:
                 self.logger.error(f"Error creating proposal in database: {str(e)}")
@@ -478,8 +608,14 @@ class ActionProposalHandler(BaseProposalHandler):
                     self.logger.debug("Using original parameters (hex decoding failed)")
 
                 # Parse title/tags from content and generate summary using AI
+                proposal_id_str = str(proposal_info.get("proposal_id", "updated"))
                 metadata = await self._parse_and_generate_proposal_metadata(
-                    parameters, dao_data["name"], str(proposal_info["proposal_id"])
+                    parameters, dao_data["name"], proposal_id_str
+                )
+
+                # Determine contract status based on transaction success
+                contract_status = (
+                    ContractStatus.DEPLOYED if tx_success else ContractStatus.FAILED
                 )
 
                 # Prepare update data with new information from chainhook
@@ -487,7 +623,7 @@ class ActionProposalHandler(BaseProposalHandler):
                     title=metadata["title"],
                     content=parameters,
                     summary=metadata["summary"],
-                    status=ContractStatus.DEPLOYED,  # Ensure status reflects on-chain state
+                    status=contract_status,
                     # Update fields from payload
                     action=proposal_info["action"],
                     caller=proposal_info["caller"],
@@ -522,33 +658,38 @@ class ActionProposalHandler(BaseProposalHandler):
                     f"Successfully updated action proposal {updated_proposal.id} with chainhook data"
                 )
 
-                # Check if we need to queue evaluation messages for agents
-                agents = self._get_agent_token_holders(dao_data["id"])
-                if agents:
-                    for agent in agents:
-                        # Create message with only the proposal ID
-                        message_data = {
-                            "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
-                        }
+                # Only queue evaluation messages for successful proposals with agents
+                if tx_success:
+                    agents = self._get_agent_token_holders(dao_data["id"])
+                    if agents:
+                        for agent in agents:
+                            # Create message with only the proposal ID
+                            message_data = {
+                                "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
+                            }
 
-                        backend.create_queue_message(
-                            QueueMessageCreate(
-                                type=QueueMessageType.get_or_create(
-                                    "dao_proposal_evaluation"
-                                ),
-                                message=message_data,
-                                dao_id=dao_data["id"],
-                                wallet_id=agent["wallet_id"],
+                            backend.create_queue_message(
+                                QueueMessageCreate(
+                                    type=QueueMessageType.get_or_create(
+                                        "dao_proposal_evaluation"
+                                    ),
+                                    message=message_data,
+                                    dao_id=dao_data["id"],
+                                    wallet_id=agent["wallet_id"],
+                                )
                             )
-                        )
 
-                        self.logger.info(
-                            f"Created evaluation queue message for agent {agent['agent_id']} "
-                            f"to evaluate updated proposal {updated_proposal.id}"
+                            self.logger.info(
+                                f"Created evaluation queue message for agent {agent['agent_id']} "
+                                f"to evaluate updated proposal {updated_proposal.id}"
+                            )
+                    else:
+                        self.logger.warning(
+                            f"No agents found holding tokens for DAO {dao_data['id']}"
                         )
                 else:
-                    self.logger.warning(
-                        f"No agents found holding tokens for DAO {dao_data['id']}"
+                    self.logger.info(
+                        f"Skipping agent evaluation for failed proposal update {updated_proposal.id}"
                     )
 
             except Exception as e:
