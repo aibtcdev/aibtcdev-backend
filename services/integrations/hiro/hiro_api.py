@@ -1,7 +1,6 @@
 """Hiro API client for blockchain data queries and operations."""
 
 import httpx
-from cachetools import cached
 from typing import Any, Dict
 
 from config import config
@@ -38,7 +37,6 @@ class HiroApi(BaseHiroApi):
         """Initialize the Hiro API client."""
         super().__init__(config.api.hiro_api_url)
 
-    @cached(lambda self: self._cache)
     def get_token_holders(
         self, token: str, limit: int = 20, offset: int = 0
     ) -> Dict[str, Any]:
@@ -271,7 +269,6 @@ class HiroApi(BaseHiroApi):
                 results=response.get("results", []),
             )
 
-    @cached(lambda self: self._cache)
     def get_stx_price(self) -> float:
         """Get the current STX price with caching."""
         logger.debug("Retrieving current STX price")
@@ -381,13 +378,11 @@ class HiroApi(BaseHiroApi):
         """Get contract details."""
         return self._make_request("GET", f"/extended/v1/contract/{contract_id}")
 
-    @cached(lambda self: self._cache)
     def get_fee_rate(self) -> Dict[str, Any]:
         """Get current fee rate with caching."""
         logger.debug("Retrieving current fee rate")
         return self._make_request("GET", "/extended/v1/fee_rate")
 
-    @cached(lambda self: self._cache)
     def get_stx_supply(self) -> Dict[str, Any]:
         """Get STX supply with caching."""
         logger.debug("Retrieving STX supply")
