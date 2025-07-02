@@ -1,0 +1,134 @@
+{
+    "name": "SLOW10•AIBTC•DAO",
+    "mission": "INSERT_MISSION",
+    "contracts": [
+      {
+        "name": "slow10-faktory",
+        "type": "TOKEN",
+        "subtype": "DAO",
+        "tx_id": "f21e19b2f0ca72d92f2ca2502d00f00ecc7fc7d43d7178496376f0560b739274",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-faktory"
+      },
+      {
+        "name": "slow10-pre-faktory",
+        "type": "TOKEN",
+        "subtype": "PRELAUNCH",
+        "tx_id": "612d567f22f42f0985a696f5c81064866de1981d9dad5574d45938d15e7ab449",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-pre-faktory"
+      },
+      {
+        "name": "xyk-pool-sbtc-slow10-v-1-1",
+        "type": "TOKEN",
+        "subtype": "POOL",
+        "tx_id": "bac81e0695d70a20fa1574c24deca7104ca94b4bf6d2db130b8116127e78dac5",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.xyk-pool-sbtc-slow10-v-1-1"
+      },
+      {
+        "name": "slow10-faktory-dex",
+        "type": "TOKEN",
+        "subtype": "DEX",
+        "tx_id": "e00c92169cd6696d89bc9b05a4de61713a650d2b42147c68f69e7072b0c685fc",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-faktory-dex"
+      },
+      {
+        "name": "slow10-base-dao",
+        "type": "BASE",
+        "subtype": "DAO",
+        "tx_id": "b25a114759d2708f78c3fc30d1e50b5c7d7cd5cb7b9a32a9f3892c7f6690b820",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-base-dao"
+      },
+      {
+        "name": "slow10-dao-users",
+        "type": "EXTENSIONS",
+        "subtype": "DAO_USERS",
+        "tx_id": "a75d50b8b46ad71d96c2e9f5c159e87c41a4a24933fe3a0c90c9b27ec32a2c9a",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-dao-users"
+      },
+      {
+        "name": "slow10-treasury",
+        "type": "EXTENSIONS",
+        "subtype": "TREASURY",
+        "tx_id": "ac66d3c8b1373f446e237614beac16e6219cc3125e97b79f5305f0a3ff7b4ce0",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-treasury"
+      },
+      {
+        "name": "slow10-rewards-account",
+        "type": "EXTENSIONS",
+        "subtype": "REWARDS_ACCOUNT",
+        "tx_id": "96e905f9a5839157f88b6d4f7ba63b668a8607e8b7af9c3f706349302acd9ccb",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-rewards-account"
+      },
+      {
+        "name": "slow10-action-proposal-voting",
+        "type": "EXTENSIONS",
+        "subtype": "ACTION_PROPOSAL_VOTING",
+        "tx_id": "c047d46540e80b2a6bb2be3643ec4d8eba9c0f366e9a83fd488390711bc163ef",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-action-proposal-voting"
+      },
+      {
+        "name": "slow10-dao-charter",
+        "type": "EXTENSIONS",
+        "subtype": "DAO_CHARTER",
+        "tx_id": "835a37219cd6031f5eecf02ff4a1fc925cc5ebc1722f53f9546a06cb4947c9a4",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-dao-charter"
+      },
+      {
+        "name": "slow10-dao-epoch",
+        "type": "EXTENSIONS",
+        "subtype": "DAO_EPOCH",
+        "tx_id": "fee1bda12a610e719ed68f9269ac7fc6f3dd0a6fe04cee32aefdd55cd56c1c0a",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-dao-epoch"
+      },
+      {
+        "name": "slow10-onchain-messaging",
+        "type": "EXTENSIONS",
+        "subtype": "ONCHAIN_MESSAGING",
+        "tx_id": "5698851557362b47aacf7fce83b125aa9bf96748c4d6fdf2980fc9f75fca332c",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-onchain-messaging"
+      },
+      {
+        "name": "slow10-token-owner",
+        "type": "EXTENSIONS",
+        "subtype": "TOKEN_OWNER",
+        "tx_id": "704e28b1f7dee5684aa60c8bc3d1e8f12232d439c93fb1d2693a72609dda8562",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-token-owner"
+      },
+      {
+        "name": "slow10-action-send-message",
+        "type": "ACTIONS",
+        "subtype": "SEND_MESSAGE",
+        "tx_id": "cc5ab83335cddb5a0353835049242d7749e84db6b0de3647b2a50b8678b8b2a4",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-action-send-message"
+      },
+      {
+        "name": "slow10-base-initialize-dao",
+        "type": "PROPOSALS",
+        "subtype": "INITIALIZE_DAO",
+        "tx_id": "90ea52e4101c12f8dc42302460b198c38a8dd5efcdc4fee88f3940d98b7442fd",
+        "deployer": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18",
+        "contract_principal": "ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.slow10-base-initialize-dao"
+      }
+    ],
+    "token_info": {
+      "symbol": "SLOW10•AIBTC•DAO",
+      "decimals": 8,
+      "max_supply": "1000000000",
+      "uri": "https://mkkhfmcrbwyuutcvtier.supabase.co/storage/v1/object/public/tokens//251.json",
+      "image_url": "https://mkkhfmcrbwyuutcvtier.supabase.co/storage/v1/object/public/tokens//251.png",
+      "x_url": "https://x.com/1894855072556912681"
+    }
+  }

@@ -9,7 +9,7 @@ from backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
-    WalletFilter,
+    AgentFilter,
 )
 from services.integrations.hiro.hiro_api import HiroApi
 from lib.logger import configure_logger
@@ -156,28 +156,26 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             logger.warning(f"Could not determine token identifier for token {token.id}")
             return None
 
-    def _get_wallet_for_address(self, address: str):
-        """Get existing wallet for a given address. Returns None if no wallet exists."""
+    def _get_agent_for_contract(self, account_contract: str):
+        """Get existing agent for a given account_contract. Returns None if no agent exists."""
         try:
-            # Try to find existing wallet by address
-            mainnet_wallets = backend.list_wallets(
-                filters=WalletFilter(mainnet_address=address)
+            # Try to find existing agent by account_contract
+            agents = backend.list_agents(
+                filters=AgentFilter(account_contract=account_contract)
             )
-            if mainnet_wallets:
-                return mainnet_wallets[0]
+            if agents:
+                return agents[0]
 
-            testnet_wallets = backend.list_wallets(
-                filters=WalletFilter(testnet_address=address)
+            # If no agent found, return None
+            logger.debug(
+                f"No existing agent found for account_contract {account_contract}"
             )
-            if testnet_wallets:
-                return testnet_wallets[0]
-
-            # If no wallet found, return None (don't create new wallet)
-            logger.debug(f"No existing wallet found for address {address}")
             return None
 
         except Exception as e:
-            logger.error(f"Error getting wallet for address {address}: {str(e)}")
+            logger.error(
+                f"Error getting agent for account_contract {account_contract}: {str(e)}"
+            )
             return None
 
     async def _sync_token_holders(
@@ -234,8 +232,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             )
 
             # Create lookup maps
-            db_holders_by_wallet = {holder.wallet_id: holder for holder in db_holders}
-            api_holders_by_address = {}
+            db_holders_by_agent = {holder.agent_id: holder for holder in db_holders}
+            api_holders_by_contract = {}
 
             # Process API holders
             for api_holder in api_holders:
@@ -256,20 +254,20 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         )
                         balance = "0"
 
-                    api_holders_by_address[address] = balance
+                    api_holders_by_contract[address] = balance
 
-                    # Get existing wallet for this address
-                    wallet = self._get_wallet_for_address(address)
-                    if not wallet:
+                    # Get existing agent for this account_contract
+                    agent = self._get_agent_for_contract(address)
+                    if not agent:
                         logger.debug(
-                            f"No existing wallet found for address {address}, skipping holder record"
+                            f"No existing agent found for account_contract {address}, skipping holder record"
                         )
                         continue
 
                     # Check if we already have this holder in the database
-                    if wallet.id in db_holders_by_wallet:
+                    if agent.id in db_holders_by_agent:
                         # Update existing holder
-                        existing_holder = db_holders_by_wallet[wallet.id]
+                        existing_holder = db_holders_by_agent[agent.id]
                         if existing_holder.amount != str(balance):
                             logger.info(
                                 f"Updating holder {address}: {existing_holder.amount} -> {balance}"
@@ -287,7 +285,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             f"Creating new holder {address} with balance {balance}"
                         )
                         holder_create = HolderCreate(
-                            wallet_id=wallet.id,
+                            agent_id=agent.id,
                             token_id=token.id,
                             dao_id=token.dao_id,
                             amount=str(balance),
@@ -304,13 +302,12 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
             # Check for holders that are no longer in the API response (removed holders)
             for db_holder in db_holders:
-                wallet = backend.get_wallet(db_holder.wallet_id)
-                if wallet:
-                    address = wallet.mainnet_address or wallet.testnet_address
-                    if address and address not in api_holders_by_address:
+                agent = backend.get_agent(db_holder.agent_id)
+                if agent and agent.account_contract:
+                    if agent.account_contract not in api_holders_by_contract:
                         # This holder is no longer holding tokens, remove from database
                         logger.info(
-                            f"Removing holder {address} (no longer holds tokens)"
+                            f"Removing holder {agent.account_contract} (no longer holds tokens)"
                         )
                         backend.delete_holder(db_holder.id)
                         result.holders_removed += 1
