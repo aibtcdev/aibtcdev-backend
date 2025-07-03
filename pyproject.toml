@@ -1,7 +1,7 @@
 [project]
 name = "aibtcdev-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "FastAPI backend for AIBTC"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -22,7 +22,7 @@ dependencies = [
     "pydantic==2.11.7",
     "python-dotenv==1.1.1",
     "python-magic==0.4.27",
-        "python-telegram-bot==22.2",
+    "python-telegram-bot==22.2",
     "sqlalchemy==2.0.41",
     "starlette<=0.47.1",
     "supabase==2.16.0",

@@ -1,8 +1,0 @@
-"""
-Discord service package for sending messages to Discord channels via webhooks.
-"""
-
-from services.communication.discord.discord_factory import create_discord_service
-from services.communication.discord.discord_service import DiscordService
-
-__all__ = ["DiscordService", "create_discord_service"]

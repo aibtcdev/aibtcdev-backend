@@ -64,3 +64,5 @@ docs/
 *.sqlite3
 *.db
 *.pid
+
+.venv/
