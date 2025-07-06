@@ -30,7 +30,7 @@ async def get_profile_from_api_key(api_key: str) -> Optional[Profile]:
             return None
 
         # List all enabled keys that match this key ID
-        keys = backend.list_keys(KeyFilter(id=api_key, is_enabled=True))
+        keys = backend.list_keys(KeyFilter(id=uuid.UUID(api_key), is_enabled=True))
         if not keys:
             logger.error("No enabled API key found")
             return None

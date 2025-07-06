@@ -1221,6 +1221,8 @@ class SupabaseBackend(AbstractBackend):
     def list_keys(self, filters: Optional["KeyFilter"] = None) -> List["Key"]:
         query = self.client.table("keys").select("*")
         if filters:
+            if filters.id is not None:
+                query = query.eq("id", str(filters.id))
             if filters.profile_id is not None:
                 query = query.eq("profile_id", str(filters.profile_id))
             if filters.is_enabled is not None:

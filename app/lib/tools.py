@@ -83,7 +83,6 @@ def get_available_tools() -> List[Tool]:
     Raises:
         Exception: If there's an error initializing or fetching tools
     """
-    logger.debug("Fetching available tools")
     try:
         tools_map = initialize_tools(None, None)
         tools = []
@@ -93,7 +92,6 @@ def get_available_tools() -> List[Tool]:
             if tool:
                 tools.append(tool)
 
-        logger.info(f"Successfully fetched {len(tools)} tools")
         return tools
 
     except Exception as e:

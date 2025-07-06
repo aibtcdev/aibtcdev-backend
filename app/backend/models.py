@@ -380,6 +380,7 @@ class Key(KeyBase):
 
 
 class KeyFilter(CustomBaseModel):
+    id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
     is_enabled: Optional[bool] = None
 
