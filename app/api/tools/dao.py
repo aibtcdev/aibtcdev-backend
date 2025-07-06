@@ -150,6 +150,185 @@ async def _create_proposal_from_tool_result(
         return None
 
 
+def _validate_payload_fields(payload: ProposeSendMessageRequest) -> None:
+    """Validate required payload fields for DAO action proposal.
+
+    Args:
+        payload: The request payload to validate.
+
+    Raises:
+        HTTPException: If any required field is missing.
+    """
+    if not payload.agent_account_contract:
+        logger.error("Agent account contract is missing from payload")
+        raise HTTPException(
+            status_code=400,
+            detail="Agent account contract is required",
+        )
+
+    if not payload.action_proposals_voting_extension:
+        logger.error("Action proposals voting extension is missing from payload")
+        raise HTTPException(
+            status_code=400,
+            detail="Action proposals voting extension is required",
+        )
+
+    if not payload.action_proposal_contract_to_execute:
+        logger.error("Action proposal contract to execute is missing from payload")
+        raise HTTPException(
+            status_code=400,
+            detail="Action proposal contract to execute is required",
+        )
+
+    if not payload.dao_token_contract_address:
+        logger.error("DAO token contract address is missing from payload")
+        raise HTTPException(
+            status_code=400,
+            detail="DAO token contract address is required",
+        )
+
+
+async def _generate_metadata_for_message(message: str) -> tuple[str, str, list]:
+    """Generate metadata (title, summary, tags) for a message.
+
+    Args:
+        message: The message to generate metadata for.
+
+    Returns:
+        Tuple of (title, summary, tags).
+    """
+    title = ""
+    summary = ""
+    metadata_tags = []
+
+    try:
+        metadata_agent = ProposalMetadataAgent()
+        metadata_state = {
+            "proposal_content": message,
+            "dao_name": "",  # Could be enhanced to fetch DAO name if available
+            "proposal_type": "action_proposal",
+        }
+
+        metadata_result = await metadata_agent.process(metadata_state)
+        title = metadata_result.get("title", "")
+        summary = metadata_result.get("summary", "")
+        metadata_tags = metadata_result.get("tags", [])
+
+    except Exception as e:
+        logger.error(f"Failed to generate title and metadata: {str(e)}")
+        # Return empty values if enhancement fails
+
+    return title, summary, metadata_tags
+
+
+def _get_agent_and_wallet(profile: Profile) -> tuple:
+    """Get agent and wallet for a profile.
+
+    Args:
+        profile: The user profile.
+
+    Returns:
+        Tuple of (agent, wallet).
+
+    Raises:
+        HTTPException: If agent or wallet is not found.
+    """
+    agents = backend.list_agents(AgentFilter(profile_id=profile.id))
+    if not agents:
+        logger.error(f"No agent found for profile ID: {profile.id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No agent found for profile ID: {profile.id}",
+        )
+
+    agent = agents[0]
+    agent_id = agent.id
+
+    # get wallet id from agent
+    wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
+    if not wallets:
+        logger.error(f"No wallet found for agent ID: {agent_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No wallet found for agent ID: {agent_id}",
+        )
+
+    wallet = wallets[0]  # Get the first wallet for this agent
+    return agent, wallet
+
+
+async def _create_proposal_record_if_successful(
+    result: dict,
+    payload: ProposeSendMessageRequest,
+    enhanced_message: str,
+    title: str,
+    summary: str,
+    metadata_tags: list,
+    profile: Profile,
+    wallet,
+) -> None:
+    """Create proposal record if tool execution was successful.
+
+    Args:
+        result: The tool execution result.
+        payload: The original request payload.
+        enhanced_message: The enhanced message with metadata.
+        title: The generated title.
+        summary: The generated summary.
+        metadata_tags: The generated metadata tags.
+        profile: The user profile.
+        wallet: The wallet used for the proposal.
+    """
+    if result.get("success") and result.get("output"):
+        try:
+            await _create_proposal_from_tool_result(
+                result,
+                payload,
+                enhanced_message,
+                title,
+                summary,
+                metadata_tags,
+                profile,
+                wallet,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create proposal record: {str(e)}")
+            # Don't fail the entire request if proposal creation fails
+
+
+def _enhance_message_with_metadata(
+    message: str, title: str, metadata_tags: list
+) -> str:
+    """Enhance message with title and tags using structured format.
+
+    Args:
+        message: The original message.
+        title: The generated title.
+        metadata_tags: The generated tags.
+
+    Returns:
+        Enhanced message with metadata.
+    """
+    enhanced_message = message
+
+    # Add metadata section if we have title or tags
+    if title or metadata_tags:
+        enhanced_message = f"{message}\n\n--- Metadata ---"
+
+        if title:
+            enhanced_message += f"\nTitle: {title}"
+            logger.info(f"Enhanced message with title: {title}")
+
+        if metadata_tags:
+            tags_string = "|".join(metadata_tags)
+            enhanced_message += f"\nTags: {tags_string}"
+            logger.info(f"Enhanced message with tags: {metadata_tags}")
+    else:
+        logger.warning("No title or tags generated for the message")
+
+    return enhanced_message
+
+
 @router.post("/action_proposals/propose_send_message")
 async def propose_dao_action_send_message(
     request: Request,
@@ -177,102 +356,25 @@ async def propose_dao_action_send_message(
             f"DAO propose send message request received from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
         )
 
-        agents = backend.list_agents(AgentFilter(profile_id=profile.id))
-        if not agents:
-            logger.error(f"No agent found for profile ID: {profile.id}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"No agent found for profile ID: {profile.id}",
-            )
-
-        agent = agents[0]
-        agent_id = agent.id
-
-        # get wallet id from agent
-        wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
-        if not wallets:
-            logger.error(f"No wallet found for agent ID: {agent_id}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"No wallet found for agent ID: {agent_id}",
-            )
-
-        wallet = wallets[0]  # Get the first wallet for this agent
+        # Get agent and wallet for the profile
+        agent, wallet = _get_agent_and_wallet(profile)
 
         logger.info(
             f"Using wallet {wallet.id} for profile {profile.id} to propose DAO send message action."
         )
 
         # Validate required payload fields
-        if not payload.agent_account_contract:
-            logger.error("Agent account contract is missing from payload")
-            raise HTTPException(
-                status_code=400,
-                detail="Agent account contract is required",
-            )
+        _validate_payload_fields(payload)
 
-        if not payload.action_proposals_voting_extension:
-            logger.error("Action proposals voting extension is missing from payload")
-            raise HTTPException(
-                status_code=400,
-                detail="Action proposals voting extension is required",
-            )
+        # Generate metadata for the message
+        title, summary, metadata_tags = await _generate_metadata_for_message(
+            payload.message
+        )
 
-        if not payload.action_proposal_contract_to_execute:
-            logger.error("Action proposal contract to execute is missing from payload")
-            raise HTTPException(
-                status_code=400,
-                detail="Action proposal contract to execute is required",
-            )
-
-        if not payload.dao_token_contract_address:
-            logger.error("DAO token contract address is missing from payload")
-            raise HTTPException(
-                status_code=400,
-                detail="DAO token contract address is required",
-            )
-
-        # Initialize metadata variables with defaults
-        title = ""
-        summary = ""
-        metadata_tags = []
-
-        # Generate title, summary, and tags for the message before sending
-        try:
-            metadata_agent = ProposalMetadataAgent()
-            metadata_state = {
-                "proposal_content": payload.message,
-                "dao_name": "",  # Could be enhanced to fetch DAO name if available
-                "proposal_type": "action_proposal",
-            }
-
-            metadata_result = await metadata_agent.process(metadata_state)
-            title = metadata_result.get("title", "")
-            summary = metadata_result.get("summary", "")
-            metadata_tags = metadata_result.get("tags", [])
-
-            # Enhance message with title and tags using structured format
-            enhanced_message = payload.message
-
-            # Add metadata section if we have title or tags
-            if title or metadata_tags:
-                enhanced_message = f"{payload.message}\n\n--- Metadata ---"
-
-                if title:
-                    enhanced_message += f"\nTitle: {title}"
-                    logger.info(f"Enhanced message with title: {title}")
-
-                if metadata_tags:
-                    tags_string = "|".join(metadata_tags)
-                    enhanced_message += f"\nTags: {tags_string}"
-                    logger.info(f"Enhanced message with tags: {metadata_tags}")
-            else:
-                logger.warning("No title or tags generated for the message")
-
-        except Exception as e:
-            logger.error(f"Failed to generate title and metadata: {str(e)}")
-            # Continue with original message if enhancement fails
-            enhanced_message = payload.message
+        # Enhance message with metadata
+        enhanced_message = _enhance_message_with_metadata(
+            payload.message, title, metadata_tags
+        )
 
         tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
@@ -289,26 +391,21 @@ async def propose_dao_action_send_message(
         )
 
         # Create proposal record if tool execution was successful
-        if result.get("success") and result.get("output"):
-            try:
-                await _create_proposal_from_tool_result(
-                    result,
-                    payload,
-                    enhanced_message,
-                    title,
-                    summary,
-                    metadata_tags,
-                    profile,
-                    wallet,
-                )
-            except Exception as e:
-                logger.error(f"Failed to create proposal record: {str(e)}")
-                # Don't fail the entire request if proposal creation fails
+        await _create_proposal_record_if_successful(
+            result,
+            payload,
+            enhanced_message,
+            title,
+            summary,
+            metadata_tags,
+            profile,
+            wallet,
+        )
 
         return JSONResponse(content=result)
 
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Failed to propose DAO send message action for profile {profile.id}",
