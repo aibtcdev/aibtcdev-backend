@@ -223,7 +223,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Docker
-.dockerignore
 docker-compose.override.yml
 
 # Terraform

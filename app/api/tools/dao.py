@@ -31,6 +31,7 @@ from app.tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,
     AgentAccountVetoActionProposalTool,
 )
+import uuid
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -202,6 +203,40 @@ async def propose_dao_action_send_message(
             f"Using wallet {wallet.id} for profile {profile.id} to propose DAO send message action."
         )
 
+        # Validate required payload fields
+        if not payload.agent_account_contract:
+            logger.error("Agent account contract is missing from payload")
+            raise HTTPException(
+                status_code=400,
+                detail="Agent account contract is required",
+            )
+
+        if not payload.action_proposals_voting_extension:
+            logger.error("Action proposals voting extension is missing from payload")
+            raise HTTPException(
+                status_code=400,
+                detail="Action proposals voting extension is required",
+            )
+
+        if not payload.action_proposal_contract_to_execute:
+            logger.error("Action proposal contract to execute is missing from payload")
+            raise HTTPException(
+                status_code=400,
+                detail="Action proposal contract to execute is required",
+            )
+
+        if not payload.dao_token_contract_address:
+            logger.error("DAO token contract address is missing from payload")
+            raise HTTPException(
+                status_code=400,
+                detail="DAO token contract address is required",
+            )
+
+        # Initialize metadata variables with defaults
+        title = ""
+        summary = ""
+        metadata_tags = []
+
         # Generate title, summary, and tags for the message before sending
         try:
             metadata_agent = ProposalMetadataAgent()
@@ -260,9 +295,9 @@ async def propose_dao_action_send_message(
                     result,
                     payload,
                     enhanced_message,
-                    title if "title" in locals() else "",
-                    summary if "summary" in locals() else "",
-                    metadata_tags if "metadata_tags" in locals() else [],
+                    title,
+                    summary,
+                    metadata_tags,
                     profile,
                     wallet,
                 )
@@ -339,12 +374,34 @@ async def veto_dao_action_proposal(
         )
 
         # get proposal from id
-        proposal = backend.get_proposal(payload.proposal_id)
+        proposal = backend.get_proposal(uuid.UUID(payload.proposal_id))
         if not proposal:
             logger.error(f"No proposal found for ID: {payload.proposal_id}")
             raise HTTPException(
                 status_code=404,
                 detail=f"No proposal found for ID: {payload.proposal_id}",
+            )
+
+        # Validate required fields before calling _arun
+        if not agent.account_contract:
+            logger.error(f"Agent account contract is missing for agent ID: {agent_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="Agent account contract is not set",
+            )
+
+        if not proposal.proposal_id:
+            logger.error(f"Proposal ID is missing for proposal: {payload.proposal_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="Proposal ID is not set in the proposal record",
+            )
+
+        if not payload.dao_action_proposal_voting_contract:
+            logger.error("DAO action proposal voting contract is missing from payload")
+            raise HTTPException(
+                status_code=400,
+                detail="DAO action proposal voting contract is required",
             )
 
         tool = AgentAccountVetoActionProposalTool(wallet_id=wallet.id)

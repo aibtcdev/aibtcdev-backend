@@ -13,6 +13,7 @@ from app.services.ai.workflows.agents.evaluator import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
 )
+import uuid
 
 # Configure logger
 logger = configure_logger(__name__)
@@ -102,7 +103,7 @@ async def run_comprehensive_evaluation(
             agent_id = str(agents[0].id)
 
         # Look up the proposal to get its content
-        proposal = backend.get_proposal(payload.proposal_id)
+        proposal = backend.get_proposal(uuid.UUID(payload.proposal_id))
         if not proposal:
             logger.error(f"Proposal with ID {payload.proposal_id} not found")
             raise HTTPException(

@@ -1,4 +1,3 @@
-# Second stage: final image without uv
 FROM public.ecr.aws/docker/library/python:3.13-slim
 
 # Install libmagic1 for mime type detection
