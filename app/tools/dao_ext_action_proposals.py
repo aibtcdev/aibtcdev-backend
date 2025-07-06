@@ -141,10 +141,10 @@ class VoteOnActionProposalInput(BaseModel):
         ],
     )
     proposal_id: int = Field(
-        ..., description="ID of the proposal to vote on", example=13
+        ..., description="ID of the proposal to vote on", examples=[13]
     )
     vote_for: bool = Field(
-        ..., description="True for yes/for, False for no/against", example=True
+        ..., description="True for yes/for, False for no/against", examples=[True]
     )
 
 
@@ -223,7 +223,7 @@ class ConcludeActionProposalInput(BaseModel):
         ],
     )
     proposal_id: int = Field(
-        ..., description="ID of the proposal to conclude", example=13
+        ..., description="ID of the proposal to conclude", examples=[13]
     )
     action_proposal_contract_to_execute: str = Field(
         ...,
@@ -618,7 +618,9 @@ class VetoActionProposalInput(BaseModel):
             "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
         ],
     )
-    proposal_id: int = Field(..., description="ID of the proposal to veto", example=1)
+    proposal_id: int = Field(
+        ..., description="ID of the proposal to veto", examples=[1]
+    )
 
 
 class VetoActionProposalTool(BaseTool):

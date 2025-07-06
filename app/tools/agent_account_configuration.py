@@ -13,12 +13,14 @@ class AgentAccountApproveContractInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
     contract_to_approve: str = Field(
         ...,
         description="The contract principal to approve",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
 
 
@@ -88,12 +90,14 @@ class AgentAccountRevokeContractInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
     contract_to_revoke: str = Field(
         ...,
         description="The contract principal to revoke",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
 
 

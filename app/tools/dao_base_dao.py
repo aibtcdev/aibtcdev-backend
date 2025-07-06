@@ -13,12 +13,12 @@ class IsExtensionInput(BaseModel):
     base_dao_contract: str = Field(
         ...,
         description="Contract principal of the base DAO",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao"],
     )
     extension_contract: str = Field(
         ...,
         description="Contract principal of the extension to check",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter"],
     )
 
 
@@ -80,12 +80,12 @@ class ExecutedAtInput(BaseModel):
     base_dao_contract: str = Field(
         ...,
         description="Contract principal of the base DAO",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-base-dao"],
     )
     proposal_contract: str = Field(
         ...,
         description="Contract principal of the proposal to check",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-proposal",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-proposal"],
     )
 
 

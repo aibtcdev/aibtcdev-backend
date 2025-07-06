@@ -13,12 +13,12 @@ class AgentAccountDeployInput(BaseModel):
     owner_address: str = Field(
         ...,
         description="Stacks address of the wallet owner",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"],
     )
     agent_address: str = Field(
         ...,
         description="Stacks address of the agent",
-        example="ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
+        examples=["ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"],
     )
     save_to_file: bool = Field(
         False,

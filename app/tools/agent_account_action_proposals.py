@@ -13,32 +13,38 @@ class AgentAccountCreateActionProposalInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for creating proposal",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     dao_action_proposal_voting_contract: str = Field(
         ...,
         description="Contract principal of the voting contract",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
     action_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action to be executed",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"
+        ],
     )
     dao_token_contract: str = Field(
         ...,
         description="Contract principal of the DAO token",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token"],
     )
     message_to_send: str = Field(
         ...,
         description="The message to send for the action",
-        example="This is my message.",
+        examples=["This is my message."],
     )
     memo: Optional[str] = Field(
         None,
         description="Optional memo for the proposal",
-        example="This is my memo.",
+        examples=["This is my memo."],
     )
 
 
@@ -145,23 +151,27 @@ class AgentAccountVoteOnActionProposalInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for voting",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     dao_action_proposal_voting_contract: str = Field(
         ...,
         description="Contract principal of the voting contract",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
     proposal_id: int = Field(
         ...,
         description="ID of the proposal to vote on",
-        example=13,
+        examples=[13],
         gt=0,
     )
     vote: bool = Field(
         ...,
         description="Vote choice (true for yes, false for no)",
-        example=True,
+        examples=[True],
     )
 
 
@@ -254,17 +264,21 @@ class AgentAccountVetoActionProposalInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for vetoing",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     dao_action_proposal_voting_contract: str = Field(
         ...,
         description="Contract principal of the voting contract",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
     proposal_id: int = Field(
         ...,
         description="ID of the proposal to veto",
-        example=1,
+        examples=[1],
         gt=0,
     )
 
@@ -352,27 +366,33 @@ class AgentAccountConcludeActionProposalInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for concluding",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     dao_action_proposal_voting_contract: str = Field(
         ...,
         description="Contract principal of the voting contract",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
+        ],
     )
     action_contract_to_execute: str = Field(
         ...,
         description="Contract principal of the action to be executed",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message",
+        examples=[
+            "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-send-message"
+        ],
     )
     dao_token_contract: str = Field(
         ...,
         description="Contract principal of the DAO token",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token"],
     )
     proposal_id: int = Field(
         ...,
         description="ID of the proposal to conclude",
-        example=13,
+        examples=[13],
         gt=0,
     )
 

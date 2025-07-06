@@ -13,12 +13,12 @@ class GetAllowedAssetInput(BaseModel):
     treasury_contract: str = Field(
         ...,
         description="Contract principal of the treasury",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury"],
     )
     asset_contract: str = Field(
         ...,
         description="Contract principal of the asset to check",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset"],
     )
 
 
@@ -80,12 +80,12 @@ class IsAllowedAssetInput(BaseModel):
     treasury_contract: str = Field(
         ...,
         description="Contract principal of the treasury",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-treasury"],
     )
     asset_contract: str = Field(
         ...,
         description="Contract principal of the asset to check",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-asset"],
     )
 
 

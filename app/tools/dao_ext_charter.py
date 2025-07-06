@@ -13,7 +13,7 @@ class GetCurrentDaoCharterInput(BaseModel):
     dao_charter_contract: str = Field(
         ...,
         description="Contract principal of the DAO charter",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter"],
     )
 
 
@@ -72,7 +72,7 @@ class GetCurrentDaoCharterVersionInput(BaseModel):
     dao_charter_contract: str = Field(
         ...,
         description="Contract principal of the DAO charter",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter"],
     )
 
 
@@ -131,7 +131,7 @@ class GetDaoCharterInput(BaseModel):
     dao_charter_contract: str = Field(
         ...,
         description="Contract principal of the DAO charter",
-        example="ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter",
+        examples=["ST3YT0XW92E6T2FE59B2G5N2WNNFSBZ6MZKQS5D18.faces-dao-charter"],
     )
     version: int = Field(..., description="Version number of the charter to retrieve")
 

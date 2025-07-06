@@ -13,28 +13,30 @@ class AgentAccountFaktoryBuyAssetInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for buying",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     faktory_dex_contract: str = Field(
         ...,
         description="Contract principal of the Faktory DEX to buy from",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token-dex",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token-dex"],
     )
     asset_contract: str = Field(
         ...,
         description="Contract principal of the asset to buy",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token"],
     )
     amount_to_spend: float = Field(
         ...,
         description="Amount of sBTC to spend",
-        example=0.5,
+        examples=[0.5],
         gt=0,
     )
     slippage: Optional[int] = Field(
         1,
         description="Percentage of slippage tolerance (e.g., 1 for 1%)",
-        example=1,
+        examples=[1],
         ge=0,
         le=100,
     )
@@ -135,28 +137,30 @@ class AgentAccountFaktorySellAssetInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to use for selling",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA",
+        examples=[
+            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-acct-ST1PQ-PGZGM-ST35K-VM3QA"
+        ],
     )
     faktory_dex_contract: str = Field(
         ...,
         description="Contract principal of the Faktory DEX to sell on",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token-dex",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token-dex"],
     )
     asset_contract: str = Field(
         ...,
         description="Contract principal of the asset to sell",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-token"],
     )
     amount_to_sell: float = Field(
         ...,
         description="Amount of the asset to sell (in its base units)",
-        example=1000,
+        examples=[1000],
         gt=0,
     )
     slippage: Optional[int] = Field(
         1,
         description="Percentage of slippage tolerance (e.g., 1 for 1%)",
-        example=1,
+        examples=[1],
         ge=0,
         le=100,
     )

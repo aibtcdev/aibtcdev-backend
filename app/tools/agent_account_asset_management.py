@@ -13,12 +13,12 @@ class AgentAccountDepositStxInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to deposit into",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
     amount: int = Field(
         ...,
         description="Amount of STX to deposit in microSTX",
-        example=1000000,
+        examples=[1000000],
         gt=0,
     )
 
@@ -89,17 +89,17 @@ class AgentAccountDepositFtInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to deposit into",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
     ft_contract: str = Field(
         ...,
         description="Contract principal of the Fungible Token to deposit",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token"],
     )
     amount: int = Field(
         ...,
         description="Amount of the token to deposit in its base units",
-        example=1000,
+        examples=[1000],
         gt=0,
     )
 
@@ -173,7 +173,7 @@ class AgentAccountGetConfigurationInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to query",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
 
 
@@ -223,12 +223,12 @@ class AgentAccountIsApprovedContractInput(BaseModel):
     agent_account_contract: str = Field(
         ...,
         description="Contract principal of the agent account to query",
-        example="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test",
+        examples=["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.aibtc-agent-account-test"],
     )
     contract_principal: str = Field(
         ...,
         description="The contract principal to check for approval status",
-        example="ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token",
+        examples=["ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.aibtc-token"],
     )
 
 
