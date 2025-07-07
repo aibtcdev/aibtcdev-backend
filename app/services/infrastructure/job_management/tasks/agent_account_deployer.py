@@ -148,6 +148,19 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         ]
         return all(field in message_data for field in required_fields)
 
+    def _parse_deployment_output(self, output: str) -> Optional[Dict[str, Any]]:
+        """Parse deployment output JSON."""
+        try:
+            output_data = json.loads(output)
+            if output_data and output_data.get("success") and output_data.get("data"):
+                return output_data["data"]
+            else:
+                logger.warning("Output data missing success or data fields")
+                return None
+        except (json.JSONDecodeError, IndexError) as e:
+            logger.error(f"Failed to parse deployment output: {str(e)}")
+            return None
+
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
         message_id = message.id
@@ -256,34 +269,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             # Extract contract information from deployment result and update agent record
             if deployment_result.get("success") and deployment_result.get("output"):
-                # Parse the JSON output to get the actual response data
-                try:
-                    # Try to parse JSON from the output, handling multiple possible formats
-                    output_lines = deployment_result["output"].split("\n")
-                    output_data = None
-
-                    # Try to find a line that contains valid JSON
-                    for line in reversed(output_lines):  # Start from the end
-                        line = line.strip()
-                        if line and line.startswith("{") and line.endswith("}"):
-                            try:
-                                output_data = json.loads(line)
-                                break
-                            except json.JSONDecodeError:
-                                continue
-
-                    if (
-                        output_data
-                        and output_data.get("success")
-                        and output_data.get("data")
-                    ):
-                        data = output_data["data"]
-                    else:
-                        logger.warning("Output data missing success or data fields")
-                        data = None
-                except (json.JSONDecodeError, IndexError) as e:
-                    logger.error(f"Failed to parse deployment output: {str(e)}")
-                    data = None
+                data = self._parse_deployment_output(deployment_result["output"])
 
                 if data:
                     # Try to extract contract information from different possible fields
@@ -386,7 +372,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     else:
                         logger.warning("No contract name found in deployment result")
                 else:
-                    logger.warning("No contract name found in deployment result")
+                    logger.warning("No data found in deployment result")
             else:
                 logger.warning("Deployment result missing success or output fields")
 
