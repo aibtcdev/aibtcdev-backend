@@ -91,11 +91,41 @@ class ActionProposalHandler(BaseProposalHandler):
             self.logger.warning("No arguments found in transaction")
             return None
 
-        # First argument should be the DAO contract principal
-        dao_contract = args[0]
-        self.logger.debug(f"Looking for DAO with contract: {dao_contract}")
+        # First argument is the proposal contract (DAO extension)
+        proposal_contract = args[0]
+        self.logger.debug(
+            f"Looking for DAO with proposal contract: {proposal_contract}"
+        )
 
-        return self._find_dao_for_contract(dao_contract)
+        # Try to find DAO by the proposal contract (extension)
+        dao_data = self._find_dao_for_contract(proposal_contract)
+
+        if dao_data:
+            return dao_data
+
+        # If not found, try to find by base DAO contract
+        # Extract the base contract address from the proposal contract
+        if "." in proposal_contract:
+            base_address = proposal_contract.split(".")[0]
+            # Look for DAOs with this base address
+            self.logger.debug(f"Trying to find DAO with base address: {base_address}")
+
+            # This is a fallback - we may need to implement a more sophisticated lookup
+            # For now, try common DAO contract patterns
+            possible_dao_contracts = [
+                f"{base_address}.dao",
+                f"{base_address}.base-dao",
+                f"{base_address}.aibtc-dao",
+            ]
+
+            for dao_contract in possible_dao_contracts:
+                dao_data = self._find_dao_for_contract(dao_contract)
+                if dao_data:
+                    self.logger.debug(f"Found DAO using contract: {dao_contract}")
+                    return dao_data
+
+        self.logger.warning(f"No DAO found for proposal contract: {proposal_contract}")
+        return None
 
     def _get_proposal_info_from_args(
         self, args: List[str], tx_id: str, tx_success: bool
@@ -116,10 +146,15 @@ class ActionProposalHandler(BaseProposalHandler):
             )
             return None
 
-        dao_contract = args[0]
-        action_contract = args[1]
-        parameters_hex = args[2]
+        proposal_contract = args[0]  # DAO extension contract for proposals
+        action_contract = args[1]  # Action contract to execute
+        parameters_hex = args[2]  # Parameters for the action
         memo = args[3] if len(args) > 3 else None
+
+        # Clean up memo if it's in Clarity format
+        if memo and memo.startswith("(some "):
+            # Remove '(some "' prefix and '")' suffix
+            memo = memo[6:-2] if memo.endswith('")') else memo[6:]
 
         # For failed transactions, we create a synthetic proposal info
         if not tx_success:
@@ -131,7 +166,7 @@ class ActionProposalHandler(BaseProposalHandler):
                 "liquid_tokens": "0",
                 "parameters": parameters_hex,
                 "bond": "0",
-                "contract_caller": dao_contract,
+                "contract_caller": proposal_contract,  # Updated to use proposal contract
                 "created_btc": None,
                 "created_stx": None,
                 "creator_user_id": None,
@@ -159,7 +194,7 @@ class ActionProposalHandler(BaseProposalHandler):
             "liquid_tokens": "0",
             "parameters": parameters_hex,
             "bond": "0",
-            "contract_caller": dao_contract,
+            "contract_caller": proposal_contract,  # Updated to use proposal contract
             "created_btc": None,
             "created_stx": None,
             "creator_user_id": None,
@@ -186,6 +221,10 @@ class ActionProposalHandler(BaseProposalHandler):
         Returns:
             Optional[Dict]: Dictionary containing proposal information if found, None otherwise
         """
+        # First try to find the comprehensive proposal data from the DAO contract event
+        dao_proposal_info = None
+        agent_proposal_info = None
+
         for event in events:
             # Find SmartContractEvent events
             if event.type != "SmartContractEvent" or not hasattr(event, "data"):
@@ -205,46 +244,123 @@ class ActionProposalHandler(BaseProposalHandler):
                 self.logger.debug("Value is None in SmartContractEvent data")
                 continue
 
-            # Check if this is a proposal event - updated to handle new notification format
+            # Check notification type
             notification = value.get("notification", "")
-            if notification == "create-action-proposal" or notification.endswith(
+
+            # Look for DAO contract event (contains comprehensive proposal data)
+            if "action-proposal-voting/create-action-proposal" in notification:
+                payload = value.get("payload", {})
+                if payload:
+                    dao_proposal_info = {
+                        "proposal_id": payload.get("proposalId"),
+                        "action": payload.get("action"),
+                        "caller": payload.get("caller"),
+                        "creator": payload.get("creator"),
+                        "liquid_tokens": str(payload.get("liquidTokens", "0")),
+                        "parameters": payload.get("parameters"),
+                        "bond": str(payload.get("bond", "0")),
+                        # Fields from updated payload
+                        "contract_caller": payload.get("contractCaller"),
+                        "created_btc": payload.get("createdBtc"),
+                        "created_stx": payload.get("createdStx"),
+                        "creator_user_id": payload.get("creatorUserId"),
+                        "exec_end": payload.get("execEnd"),
+                        "exec_start": payload.get("execStart"),
+                        "memo": payload.get("memo"),
+                        "tx_sender": payload.get("txSender"),
+                        "vote_end": payload.get("voteEnd"),
+                        "vote_start": payload.get("voteStart"),
+                        "voting_delay": payload.get("votingDelay"),
+                        "voting_period": payload.get("votingPeriod"),
+                        "voting_quorum": payload.get("votingQuorum"),
+                        "voting_reward": (
+                            str(payload.get("votingReward"))
+                            if payload.get("votingReward") is not None
+                            else None
+                        ),
+                        "voting_threshold": payload.get("votingThreshold"),
+                        "is_failed": False,
+                    }
+
+            # Look for agent account event (fallback for basic info)
+            elif "aibtc-agent-account/create-action-proposal" in notification:
+                payload = value.get("payload", {})
+                if payload:
+                    agent_proposal_info = {
+                        "proposal_id": None,  # Agent event doesn't have proposal ID
+                        "action": payload.get("action"),
+                        "caller": payload.get("caller"),
+                        "creator": None,
+                        "liquid_tokens": "0",
+                        "parameters": payload.get("parameters"),
+                        "bond": "0",
+                        # Fields from agent payload
+                        "contract_caller": payload.get(
+                            "proposalContract"
+                        ),  # Different field name
+                        "created_btc": None,
+                        "created_stx": None,
+                        "creator_user_id": None,
+                        "exec_end": None,
+                        "exec_start": None,
+                        "memo": None,
+                        "tx_sender": payload.get("sender"),
+                        "vote_end": None,
+                        "vote_start": None,
+                        "voting_delay": None,
+                        "voting_period": None,
+                        "voting_quorum": None,
+                        "voting_reward": None,
+                        "voting_threshold": None,
+                        "is_failed": False,
+                    }
+
+            # Legacy format support
+            elif notification == "create-action-proposal" or notification.endswith(
                 "/create-action-proposal"
             ):
                 payload = value.get("payload", {})
-                if not payload:
-                    self.logger.warning("Empty payload in proposal event")
-                    return None
+                if payload:
+                    return {
+                        "proposal_id": payload.get("proposalId"),
+                        "action": payload.get("action"),
+                        "caller": payload.get("caller"),
+                        "creator": payload.get("creator"),
+                        "liquid_tokens": str(payload.get("liquidTokens", "0")),
+                        "parameters": payload.get("parameters"),
+                        "bond": str(payload.get("bond", "0")),
+                        # Fields from updated payload
+                        "contract_caller": payload.get("contractCaller"),
+                        "created_btc": payload.get("createdBtc"),
+                        "created_stx": payload.get("createdStx"),
+                        "creator_user_id": payload.get("creatorUserId"),
+                        "exec_end": payload.get("execEnd"),
+                        "exec_start": payload.get("execStart"),
+                        "memo": payload.get("memo"),
+                        "tx_sender": payload.get("txSender"),
+                        "vote_end": payload.get("voteEnd"),
+                        "vote_start": payload.get("voteStart"),
+                        "voting_delay": payload.get("votingDelay"),
+                        "voting_period": payload.get("votingPeriod"),
+                        "voting_quorum": payload.get("votingQuorum"),
+                        "voting_reward": (
+                            str(payload.get("votingReward"))
+                            if payload.get("votingReward") is not None
+                            else None
+                        ),
+                        "voting_threshold": payload.get("votingThreshold"),
+                        "is_failed": False,
+                    }
 
-                return {
-                    "proposal_id": payload.get("proposalId"),
-                    "action": payload.get("action"),
-                    "caller": payload.get("caller"),
-                    "creator": payload.get("creator"),
-                    "liquid_tokens": str(payload.get("liquidTokens")),
-                    "parameters": payload.get("parameters"),
-                    "bond": str(payload.get("bond")),
-                    # Fields from updated payload
-                    "contract_caller": payload.get("contractCaller"),
-                    "created_btc": payload.get("createdBtc"),
-                    "created_stx": payload.get("createdStx"),
-                    "creator_user_id": payload.get("creatorUserId"),
-                    "exec_end": payload.get("execEnd"),
-                    "exec_start": payload.get("execStart"),
-                    "memo": payload.get("memo"),
-                    "tx_sender": payload.get("txSender"),
-                    "vote_end": payload.get("voteEnd"),
-                    "vote_start": payload.get("voteStart"),
-                    "voting_delay": payload.get("votingDelay"),
-                    "voting_period": payload.get("votingPeriod"),
-                    "voting_quorum": payload.get("votingQuorum"),
-                    "voting_reward": (
-                        str(payload.get("votingReward"))
-                        if payload.get("votingReward") is not None
-                        else None
-                    ),
-                    "voting_threshold": payload.get("votingThreshold"),
-                    "is_failed": False,
-                }
+        # Prefer DAO contract info (comprehensive) over agent info (basic)
+        if dao_proposal_info:
+            self.logger.debug(
+                "Found comprehensive proposal info from DAO contract event"
+            )
+            return dao_proposal_info
+        elif agent_proposal_info:
+            self.logger.debug("Found basic proposal info from agent account event")
+            return agent_proposal_info
 
         return None
 
@@ -474,7 +590,7 @@ class ActionProposalHandler(BaseProposalHandler):
 
         self.logger.info(
             f"Processing {'successful' if tx_success else 'failed'} action proposal for DAO {dao_data['name']} "
-            f"(DAO contract: {args[0]}, tx_id: {tx_id})"
+            f"(Proposal contract: {args[0]}, tx_id: {tx_id})"
         )
 
         # Check if the proposal already exists in the database
@@ -517,7 +633,9 @@ class ActionProposalHandler(BaseProposalHandler):
                         title=metadata["title"],
                         content=parameters,
                         summary=metadata["summary"],
-                        contract_principal=args[0],  # Use DAO contract as principal
+                        contract_principal=args[
+                            0
+                        ],  # Use proposal contract as principal
                         tx_id=tx_id,
                         proposal_id=proposal_info["proposal_id"],
                         status=contract_status,
