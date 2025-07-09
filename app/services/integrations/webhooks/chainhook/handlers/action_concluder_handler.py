@@ -13,7 +13,9 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.utils import strip_metadata_section
-from app.services.integrations.webhooks.chainhook.handlers.base import ChainhookEventHandler
+from app.services.integrations.webhooks.chainhook.handlers.base import (
+    ChainhookEventHandler,
+)
 from app.services.integrations.webhooks.chainhook.models import (
     Event,
     TransactionWithReceipt,
@@ -327,16 +329,16 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Format the Discord message with new structured format for passed proposal
             formatted_message = f"✅ Approved: Contribution #{proposal.proposal_id}\n"
             formatted_message += f"💬 {proposal.title}\n"
-            formatted_message += f"⭐️ Reward: 1,000 $FACES\n\n"
-            
+            formatted_message += "⭐️ Reward: 1,000 $FACES\n\n"
+
             # Add URL section if x_url is available
             if proposal.x_url:
                 formatted_message += f"URL: {proposal.x_url}\n"
-            
+
             # Add details link
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
             formatted_message += f"Details: {proposal_url}\n\n"
-            
+
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
             formatted_message += f"Approval: {approval_pct:.1f}%"
 
@@ -373,15 +375,15 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Format the Discord message with new structured format for failed proposal
             formatted_message = f"🛑 Rejected: Contribution #{proposal.proposal_id}\n"
             formatted_message += f"💬 {proposal.title}\n\n"
-            
+
             # Add URL section if x_url is available
             if proposal.x_url:
                 formatted_message += f"URL: {proposal.x_url}\n"
-            
+
             # Add details link
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
             formatted_message += f"Details: {proposal_url}\n\n"
-            
+
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
             formatted_message += f"Approval: {approval_pct:.1f}%"
 
