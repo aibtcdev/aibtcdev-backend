@@ -1,4 +1,3 @@
-import json
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -107,36 +106,6 @@ from app.backend.models import (
 from app.lib.logger import configure_logger
 
 logger = configure_logger(__name__)
-
-
-def parse_jsonb_fields(
-    data: Dict[str, Any], tweet_id: str = "unknown"
-) -> Dict[str, Any]:
-    """Parse JSONB fields that come back as strings from Supabase.
-
-    Args:
-        data: The raw data from Supabase response
-        tweet_id: Tweet ID for logging purposes
-
-    Returns:
-        Data with parsed JSONB fields
-    """
-    # Handle JSONB fields that need parsing for X_TWEETS
-    jsonb_fields = ["public_metrics", "entities", "attachments"]
-
-    parsed_data = data.copy()
-    for field in jsonb_fields:
-        if field in parsed_data and parsed_data[field] is not None:
-            if isinstance(parsed_data[field], str):
-                try:
-                    parsed_data[field] = json.loads(parsed_data[field])
-                except (json.JSONDecodeError, TypeError) as e:
-                    logger.warning(
-                        f"Failed to parse JSONB field '{field}' for tweet {tweet_id}: {e}"
-                    )
-                    parsed_data[field] = None
-
-    return parsed_data
 
 
 Base = declarative_base()
@@ -1875,19 +1844,13 @@ class SupabaseBackend(AbstractBackend):
 
     def get_x_tweet(self, x_tweet_id: UUID) -> Optional["XTweet"]:
         response = (
-            self.client.table("x_tweets")
-            .select("*")
-            .eq("id", x_tweet_id)
-            .single()
-            .execute()
+            self.client.table("x_tweets").select("*").eq("id", x_tweet_id).execute()
         )
-        if not response.data:
+        data = response.data or []
+        if not data:
             return None
 
-        # Parse JSONB fields that come back as strings from Supabase
-        data = parse_jsonb_fields(response.data, str(x_tweet_id))
-
-        return XTweet(**data)
+        return XTweet(**data[0])
 
     def list_x_tweets(self, filters: Optional["XTweetFilter"] = None) -> List["XTweet"]:
         query = self.client.table("x_tweets").select("*")
@@ -1909,12 +1872,7 @@ class SupabaseBackend(AbstractBackend):
         response = query.execute()
         data = response.data or []
 
-        # Parse JSONB fields for all tweets
-        parsed_data = [
-            parse_jsonb_fields(row, str(row.get("id", "unknown"))) for row in data
-        ]
-
-        return [XTweet(**row) for row in parsed_data]
+        return [XTweet(**row) for row in data]
 
     def update_x_tweet(
         self, x_tweet_id: UUID, update_data: "XTweetBase"
@@ -1929,10 +1887,7 @@ class SupabaseBackend(AbstractBackend):
         if not updated:
             return None
 
-        # Parse JSONB fields that come back as strings from Supabase
-        data = parse_jsonb_fields(updated[0], str(x_tweet_id))
-
-        return XTweet(**data)
+        return XTweet(**updated[0])
 
     def delete_x_tweet(self, x_tweet_id: UUID) -> bool:
         response = self.client.table("x_tweets").delete().eq("id", x_tweet_id).execute()

@@ -14,11 +14,10 @@ Usage:
 import argparse
 import asyncio
 import json
-import os
 import sys
 from uuid import UUID
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ".")
 
 from app.services.ai.workflows.comprehensive_evaluation import (
     evaluate_proposal_comprehensive,
@@ -97,7 +96,7 @@ Examples:
     args = parser.parse_args()
 
     # If proposal_content is not provided, look it up from the database
-    proposal_content = args.proposal_content
+    proposal_content = args.proposal_data
     if not proposal_content:
         print("📋 No proposal data provided, looking up from database...")
         try:
@@ -175,57 +174,65 @@ Examples:
         print("=" * 60)
 
         # Pretty print the result
-        if "error" in result:
-            print(f"❌ Error: {result['error']}")
+        if hasattr(result, "error"):
+            print(f"❌ Error: {result.error}")
         else:
             print("📊 Comprehensive Evaluation Results:")
-            print(
-                f"   • Approval: {'✅ APPROVE' if result.get('approve') else '❌ REJECT'}"
-            )
-            print(f"   • Overall Score: {result.get('overall_score', 0)}")
-            print(f"   • Evaluation Type: {result.get('evaluation_type', 'unknown')}")
+            print(f"   • Approval: {'✅ APPROVE' if result.decision else '❌ REJECT'}")
+            print(f"   • Overall Score: {result.final_score}")
+            print("   • Evaluation Type: comprehensive")
 
             # Show reasoning (truncated for readability)
-            reasoning = result.get("reasoning", "N/A")
+            reasoning = result.explanation or "N/A"
             if len(reasoning) > 500:
                 reasoning = reasoning[:500] + "... (truncated)"
             print(f"   • Reasoning: {reasoning}")
 
-            scores = result.get("scores", {})
-            if scores:
-                print("   • Detailed Scores:")
-                for score_type, score_value in scores.items():
-                    print(f"     - {score_type.title()}: {score_value}")
+            # Show category scores
+            if result.categories:
+                print("   • Category Scores:")
+                for category in result.categories:
+                    print(
+                        f"     - {category.category}: {category.score} (weight: {category.weight})"
+                    )
 
-            flags = result.get("flags", [])
+            flags = result.flags or []
             if flags:
                 print(f"   • Flags: {', '.join(flags[:5])}")  # Show first 5 flags
                 if len(flags) > 5:
                     print(f"     ... and {len(flags) - 5} more flags")
 
-            token_usage = result.get("token_usage", {})
+            token_usage = result.token_usage or {}
             if token_usage:
                 print("   • Token Usage:")
                 print(f"     - Input: {token_usage.get('input_tokens', 0):,}")
                 print(f"     - Output: {token_usage.get('output_tokens', 0):,}")
                 print(f"     - Total: {token_usage.get('total_tokens', 0):,}")
 
-            images_processed = result.get("images_processed", 0)
+            images_processed = result.images_processed or 0
             if images_processed > 0:
                 print(f"   • Images Processed: {images_processed}")
 
-            summaries = result.get("summaries", {})
-            if summaries and args.debug_level >= 1:
-                print("   • Summaries:")
-                for summary_type, summary_text in summaries.items():
-                    truncated_summary = (
-                        summary_text[:200] + "..."
-                        if len(summary_text) > 200
-                        else summary_text
-                    )
-                    print(
-                        f"     - {summary_type.replace('_', ' ').title()}: {truncated_summary}"
-                    )
+            # Show summary
+            if result.summary and args.debug_level >= 1:
+                print("   • Summary:")
+                truncated_summary = (
+                    result.summary[:200] + "..."
+                    if len(result.summary) > 200
+                    else result.summary
+                )
+                print(f"     {truncated_summary}")
+
+            # Show detailed category reasoning if verbose
+            if result.categories and args.debug_level >= 2:
+                print("   • Detailed Category Reasoning:")
+                for category in result.categories:
+                    print(f"     - {category.category}:")
+                    for reason in category.reasoning:
+                        truncated_reason = (
+                            reason[:150] + "..." if len(reason) > 150 else reason
+                        )
+                        print(f"       * {truncated_reason}")
 
         print("\n📄 Full Result JSON:")
         print(json.dumps(result, indent=2, default=str))
