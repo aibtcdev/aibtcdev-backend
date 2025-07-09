@@ -129,6 +129,10 @@ class BaseVoteHandler(ChainhookEventHandler):
         vote_value = vote_info.get("vote_value")
         amount = vote_info.get("amount")
 
+        # Use the voting contract from the event if available, otherwise use the transaction contract
+        voting_contract = vote_info.get("voting_contract")
+        proposal_contract = voting_contract if voting_contract else contract_identifier
+
         # If vote_value is not in the event, try to extract it from the transaction args
         if vote_value is None:
             args = tx_data_content.get("args", [])
@@ -152,14 +156,14 @@ class BaseVoteHandler(ChainhookEventHandler):
 
         self.logger.info(
             f"Processing vote on proposal {proposal_identifier} by {voter_address} "
-            f"(contract: {contract_identifier}, tx_id: {tx_id}, vote: {vote_value}, amount: {amount})"
+            f"(tx contract: {contract_identifier}, proposal contract: {proposal_contract}, tx_id: {tx_id}, vote: {vote_value}, amount: {amount})"
         )
 
         # Find the proposal in the database
-        proposal = self._find_proposal(contract_identifier, proposal_identifier)
+        proposal = self._find_proposal(proposal_contract, proposal_identifier)
         if not proposal:
             self.logger.warning(
-                f"No proposal found for identifier {proposal_identifier} in contract {contract_identifier}"
+                f"No proposal found for identifier {proposal_identifier} in contract {proposal_contract}"
             )
             return
 

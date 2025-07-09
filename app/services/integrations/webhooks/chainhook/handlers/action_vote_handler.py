@@ -76,6 +76,9 @@ class ActionVoteHandler(BaseVoteHandler):
                         self.logger.warning("Empty payload in vote event")
                         return None
 
+                    # Extract the voting contract identifier from the event
+                    voting_contract = event_data.get("contract_identifier")
+
                     return {
                         "proposal_identifier": payload.get(
                             "proposalId"
@@ -88,6 +91,7 @@ class ActionVoteHandler(BaseVoteHandler):
                             "vote"
                         ),  # Vote value is now directly in payload
                         "voter_user_id": payload.get("voterUserId"),  # New field
+                        "voting_contract": voting_contract,  # Add the voting contract
                     }
 
         self.logger.warning("Could not find vote information in transaction events")

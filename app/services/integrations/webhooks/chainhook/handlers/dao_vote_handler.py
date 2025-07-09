@@ -136,23 +136,67 @@ class DAOVoteHandler(ChainhookEventHandler):
         """Handle vote transactions.
 
         Routes the transaction to either the core or action vote handler based on
-        the contract identifier.
+        the transaction method and events.
 
         Args:
             transaction: The transaction to handle
         """
         tx_data = self.extract_transaction_data(transaction)
         tx_data_content = tx_data["tx_data"]
+        tx_metadata = tx_data["tx_metadata"]
 
-        # Get contract identifier to determine which handler to use
+        # Get contract identifier and method
         contract_identifier = tx_data_content.get("contract_identifier", "")
+        method = tx_data_content.get("method", "")
 
-        # Check if this is a core or action proposal vote based on the contract name
-        if "core-proposal" in contract_identifier:
-            await self.core_handler.handle_transaction(transaction)
-        elif "action-proposal" in contract_identifier:
+        # Get events to check for notification types
+        events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
+
+        # Determine if this is a core or action proposal vote
+        is_action_proposal = False
+        is_core_proposal = False
+
+        # Check transaction method first
+        if "vote-on-action-proposal" in method:
+            is_action_proposal = True
+        elif "vote-on-core-proposal" in method or method == "vote-on-proposal":
+            is_core_proposal = True
+        else:
+            # Check events for notification types
+            for event in events:
+                if (
+                    event.type == "SmartContractEvent"
+                    and hasattr(event, "data")
+                    and event.data.get("topic") == "print"
+                ):
+                    value = event.data.get("value", {})
+                    notification = value.get("notification", "")
+
+                    if (
+                        "vote-on-action-proposal" in notification
+                        or "action-proposal-voting" in notification
+                    ):
+                        is_action_proposal = True
+                        break
+                    elif (
+                        "vote-on-core-proposal" in notification
+                        or notification == "vote-on-proposal"
+                    ):
+                        is_core_proposal = True
+                        break
+
+        # Route to appropriate handler
+        if is_action_proposal:
+            self.logger.info(
+                f"Routing action proposal vote to ActionVoteHandler (contract: {contract_identifier}, method: {method})"
+            )
             await self.action_handler.handle_transaction(transaction)
+        elif is_core_proposal:
+            self.logger.info(
+                f"Routing core proposal vote to CoreVoteHandler (contract: {contract_identifier}, method: {method})"
+            )
+            await self.core_handler.handle_transaction(transaction)
         else:
             self.logger.warning(
-                f"Unknown proposal contract type: {contract_identifier}"
+                f"Unknown proposal vote type: contract={contract_identifier}, method={method}"
             )
