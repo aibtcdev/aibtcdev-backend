@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Check Dependencies
+        run: uv lock --check
+
       - name: Run ruff format check
         run: uvx ruff format --check .
 
