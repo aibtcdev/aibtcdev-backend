@@ -66,7 +66,11 @@ class ActionVoteHandler(BaseVoteHandler):
 
                 # Check for the new notification format
                 notification = value.get("notification", "")
-                if "vote-on-action-proposal" in notification:
+                # Updated to handle both old and new notification formats
+                if (
+                    "vote-on-action-proposal" in notification
+                    or "action-proposal-voting" in notification
+                ):
                     payload = value.get("payload", {})
                     if not payload:
                         self.logger.warning("Empty payload in vote event")

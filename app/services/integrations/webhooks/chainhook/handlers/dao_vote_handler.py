@@ -66,7 +66,12 @@ class DAOVoteHandler(ChainhookEventHandler):
                 event_data = event.data
                 value = event_data.get("value", {})
 
-                if value.get("notification") == "vote-on-proposal":
+                # Updated to handle both old and new notification formats
+                notification = value.get("notification", "")
+                if (
+                    "vote-on-proposal" in notification
+                    or "proposal-voting" in notification
+                ):
                     payload = value.get("payload", {})
                     if not payload:
                         self.logger.warning("Empty payload in vote event")
