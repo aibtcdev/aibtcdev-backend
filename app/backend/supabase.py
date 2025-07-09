@@ -867,6 +867,11 @@ class SupabaseBackend(AbstractBackend):
 
         # Process each holder
         for holder in holders:
+            # Skip holders with no wallet_id
+            if not holder.wallet_id:
+                logger.warning(f"Holder {holder.id} has no wallet_id, skipping")
+                continue
+
             # Step 2: Get the wallet
             wallet = self.get_wallet(holder.wallet_id)
             if not wallet:
@@ -881,6 +886,11 @@ class SupabaseBackend(AbstractBackend):
             agent = self.get_agent(wallet.agent_id)
             if not agent:
                 logger.warning(f"Agent with ID {wallet.agent_id} not found")
+                continue
+
+            # Skip holders with no token_id
+            if not holder.token_id:
+                logger.warning(f"Holder {holder.id} has no token_id, skipping")
                 continue
 
             # Step 4: Get the token
