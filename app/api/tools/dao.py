@@ -115,14 +115,29 @@ async def _create_proposal_from_tool_result(
             else wallet.testnet_address
         )
 
-        # Extract Twitter/X URL from the message content
+        # Process Twitter URLs using TwitterDataService
+        from app.services.processing.twitter_data_service import twitter_data_service
+
+        tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
+            enhanced_message
+        )
         x_url = None
-        # Look for Twitter/X URLs in the enhanced message
-        twitter_url_pattern = r"https?://(?:twitter\.com|x\.com)/[^\s]+"
-        twitter_match = re.search(twitter_url_pattern, enhanced_message)
-        if twitter_match:
-            x_url = twitter_match.group(0)
-            logger.info(f"Extracted Twitter URL from proposal: {x_url}")
+        tweet_id = None
+
+        if tweet_db_ids:
+            # Get the first Twitter URL for x_url field (backward compatibility)
+            twitter_urls = twitter_data_service.extract_twitter_urls(enhanced_message)
+            if twitter_urls:
+                x_url = twitter_urls[0]
+                logger.info(f"Extracted Twitter URL from proposal: {x_url}")
+
+            # Use the first tweet database ID for the proposal
+            tweet_id = tweet_db_ids[0]
+            logger.info(
+                f"Processed {len(tweet_db_ids)} tweets, using first tweet ID: {tweet_id}"
+            )
+        else:
+            logger.info("No Twitter URLs found or processed in the message")
 
         # Create the proposal record
         proposal_content = ProposalCreate(
@@ -139,6 +154,7 @@ async def _create_proposal_from_tool_result(
             creator=creator_address or "Unknown",
             memo=payload.memo,
             x_url=x_url,  # Store the extracted Twitter URL
+            tweet_id=tweet_id,  # Store the linked tweet database ID
         )
 
         proposal = backend.create_proposal(proposal_content)

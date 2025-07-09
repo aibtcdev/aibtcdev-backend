@@ -70,9 +70,24 @@ async def evaluate_proposal_comprehensive(
         logger.debug(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Processing Twitter content"
         )
-        twitter_processor = TwitterProcessingNode(config=config)
 
-        # Process Twitter URLs and get tweet content
+        # First, use TwitterDataService to process URLs and store tweets
+        from app.services.processing.twitter_data_service import twitter_data_service
+
+        tweet_db_ids = []
+        if proposal_content:
+            tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
+                proposal_content
+            )
+            if tweet_db_ids:
+                logger.debug(
+                    f"[DEBUG:ComprehensiveEval:{proposal_id}] Stored {len(tweet_db_ids)} tweets in database"
+                )
+                # Add tweet_db_ids to the state for TwitterProcessingNode
+                initial_state["tweet_db_ids"] = tweet_db_ids
+
+        # Now use TwitterProcessingNode to retrieve stored tweet data and format content
+        twitter_processor = TwitterProcessingNode(config=config)
         tweet_content = await twitter_processor.process(initial_state)
 
         # Get tweet images from state (TwitterProcessingNode updates the state)

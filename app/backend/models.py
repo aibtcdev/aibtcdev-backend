@@ -453,6 +453,7 @@ class ProposalBase(CustomBaseModel):
         False  # Flag to track if proposal has been embedded in vector store
     )
     x_url: Optional[str] = None  # Twitter/X URL associated with the proposal
+    tweet_id: Optional[UUID] = None  # Reference to x_tweets table for linked tweet data
 
 
 class ProposalCreate(ProposalBase):
@@ -603,6 +604,14 @@ class XTweetBase(CustomBaseModel):
     tweet_type: Optional[TweetType] = TweetType.INVALID
     confidence_score: Optional[float] = None
     reason: Optional[str] = None
+    images: Optional[List[str]] = None  # Array of image URLs attached to the tweet
+    # Store additional tweet metadata
+    author_name: Optional[str] = None
+    author_username: Optional[str] = None
+    created_at_twitter: Optional[str] = None  # Original tweet creation date
+    public_metrics: Optional[Dict[str, Any]] = None  # Retweet count, like count, etc.
+    entities: Optional[Dict[str, Any]] = None  # URLs, hashtags, mentions
+    attachments: Optional[Dict[str, Any]] = None  # Media attachments info
 
 
 class XTweetCreate(XTweetBase):
