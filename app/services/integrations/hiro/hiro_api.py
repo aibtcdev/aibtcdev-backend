@@ -31,6 +31,7 @@ class HiroApi(BaseHiroApi):
         "search": "/extended/v1/search",
         "fee_rate": "/extended/v1/fee_rate",
         "stx_supply": "/extended/v1/stx_supply",
+        "metadata": "/metadata/v1",
     }
 
     def __init__(self):
@@ -190,6 +191,36 @@ class HiroApi(BaseHiroApi):
             "total": total_holders,
             "results": all_holders,
         }
+
+    def get_token_metadata(self, token: str) -> Dict[str, Any]:
+        """Get token metadata from the Hiro metadata API.
+
+        Args:
+            token: Token contract principal (e.g., "ST123...ABC.my-token")
+
+        Returns:
+            Dict containing token metadata including symbol, name, description, etc.
+        """
+        logger.debug("Getting token metadata for %s", token)
+        return self._make_request(
+            "GET",
+            f"{self.ENDPOINTS['metadata']}/ft/{token}",
+        )
+
+    async def aget_token_metadata(self, token: str) -> Dict[str, Any]:
+        """Async version of get_token_metadata.
+
+        Args:
+            token: Token contract principal (e.g., "ST123...ABC.my-token")
+
+        Returns:
+            Dict containing token metadata including symbol, name, description, etc.
+        """
+        logger.debug("Async getting token metadata for %s", token)
+        return await self._amake_request(
+            "GET",
+            f"{self.ENDPOINTS['metadata']}/ft/{token}",
+        )
 
     def get_address_balance(self, addr: str) -> Dict[str, Any]:
         """Retrieve wallet balance for an address."""

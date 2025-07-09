@@ -146,16 +146,43 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         logger.debug("DAO token holders monitor task cleanup completed")
 
     def _parse_token_identifier(self, token) -> Optional[str]:
-        """Parse token identifier for Hiro API call."""
-        if hasattr(token, "contract_principal") and token.contract_principal:
-            return token.contract_principal
-        elif hasattr(token, "symbol") and token.symbol:
-            return token.symbol
-        elif hasattr(token, "name") and token.name:
-            return token.name
-        else:
-            logger.warning(f"Could not determine token identifier for token {token.id}")
+        """Parse token identifier for Hiro API call.
+
+        Constructs the proper token identifier format: {contract_principal}::{symbol}
+        """
+        if not hasattr(token, "contract_principal") or not token.contract_principal:
+            logger.warning(f"Token {token.id} has no contract_principal")
             return None
+
+        contract_principal = token.contract_principal
+
+        try:
+            # Get token metadata to extract the symbol
+            logger.debug(f"Fetching metadata for token {contract_principal}")
+            metadata = self.hiro_api.get_token_metadata(contract_principal)
+
+            # Extract symbol from metadata
+            symbol = metadata.get("symbol")
+            if not symbol:
+                logger.warning(
+                    f"No symbol found in metadata for token {contract_principal}"
+                )
+                return None
+
+            # Construct the proper token identifier format
+            token_identifier = f"{contract_principal}::{symbol}"
+            logger.debug(f"Constructed token identifier: {token_identifier}")
+            return token_identifier
+
+        except Exception as e:
+            logger.error(
+                f"Error fetching metadata for token {contract_principal}: {str(e)}"
+            )
+            # Fallback to just the contract principal if metadata fails
+            logger.warning(
+                f"Using contract principal as fallback: {contract_principal}"
+            )
+            return contract_principal
 
     def _get_agent_for_contract(self, account_contract: str):
         """Get existing agent for a given account_contract. Returns (agent, wallet) tuple if found, None otherwise."""
@@ -236,8 +263,11 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 f"Found {len(db_holders)} existing holders in database for token {token.name}"
             )
 
-            # Create lookup maps
-            db_holders_by_agent = {holder.agent_id: holder for holder in db_holders}
+            # Create lookup maps by address+token_id (composite key for matching)
+            # This allows the same address to hold tokens for multiple DAOs
+            db_holders_by_address_token = {
+                (holder.address, holder.token_id): holder for holder in db_holders
+            }
             api_holders_by_contract = {}
 
             # Process API holders
@@ -263,16 +293,12 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
                     # Get existing agent and wallet for this account_contract
                     agent, wallet = self._get_agent_for_contract(address)
-                    if not agent:
-                        logger.debug(
-                            f"No existing agent found for account_contract {address}, skipping holder record"
-                        )
-                        continue
 
-                    # Check if we already have this holder in the database
-                    if agent.id in db_holders_by_agent:
+                    # Check if we already have this holder in the database (by address+token_id)
+                    holder_key = (address, token.id)
+                    if holder_key in db_holders_by_address_token:
                         # Update existing holder
-                        existing_holder = db_holders_by_agent[agent.id]
+                        existing_holder = db_holders_by_address_token[holder_key]
                         needs_update = False
                         update_data = HolderBase(
                             amount=str(balance),
@@ -280,9 +306,20 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             address=address,
                         )
 
+                        # Check if we need to update agent_id
+                        if agent and existing_holder.agent_id != agent.id:
+                            update_data.agent_id = agent.id
+                            needs_update = True
+                        elif not agent and existing_holder.agent_id is not None:
+                            update_data.agent_id = None
+                            needs_update = True
+
                         # Check if we need to update wallet_id
                         if wallet and existing_holder.wallet_id != wallet.id:
                             update_data.wallet_id = wallet.id
+                            needs_update = True
+                        elif not wallet and existing_holder.wallet_id is not None:
+                            update_data.wallet_id = None
                             needs_update = True
 
                         # Check if amount changed
@@ -295,19 +332,25 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
                         if needs_update:
                             logger.info(
-                                f"Updating holder {address}: amount={existing_holder.amount}->{balance}, "
+                                f"Updating holder {address} for token {token.name}: "
+                                f"amount={existing_holder.amount}->{balance}, "
+                                f"agent_id={existing_holder.agent_id}->{agent.id if agent else None}, "
                                 f"wallet_id={existing_holder.wallet_id}->{wallet.id if wallet else None}"
                             )
                             backend.update_holder(existing_holder.id, update_data)
                             result.holders_updated += 1
                     else:
-                        # Create new holder
+                        # Create new holder (with or without agent)
+                        agent_info = f"agent_id={agent.id}" if agent else "no agent"
+                        wallet_info = (
+                            f"wallet_id={wallet.id}" if wallet else "no wallet"
+                        )
                         logger.info(
-                            f"Creating new holder {address} with balance {balance}, "
-                            f"agent_id={agent.id}, wallet_id={wallet.id if wallet else None}"
+                            f"Creating new holder {address} for token {token.name} with balance {balance}, "
+                            f"{agent_info}, {wallet_info}"
                         )
                         holder_create = HolderCreate(
-                            agent_id=agent.id,
+                            agent_id=agent.id if agent else None,
                             wallet_id=wallet.id if wallet else None,
                             token_id=token.id,
                             dao_id=token.dao_id,
@@ -324,16 +367,29 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     result.errors.append(error_msg)
 
             # Check for holders that are no longer in the API response (removed holders)
+            # Only check holders for the current token being processed
             for db_holder in db_holders:
-                agent = backend.get_agent(db_holder.agent_id)
-                if agent and agent.account_contract:
-                    if agent.account_contract not in api_holders_by_contract:
-                        # This holder is no longer holding tokens, remove from database
+                try:
+                    # Only process holders for the current token
+                    if db_holder.token_id != token.id:
+                        continue
+
+                    # Use address for matching since that's what we get from the API
+                    if (
+                        db_holder.address
+                        and db_holder.address not in api_holders_by_contract
+                    ):
+                        # This holder is no longer holding tokens for this specific token, remove from database
                         logger.info(
-                            f"Removing holder {agent.account_contract} (no longer holds tokens)"
+                            f"Removing holder {db_holder.address} for token {token.name} (no longer holds tokens)"
                         )
                         backend.delete_holder(db_holder.id)
                         result.holders_removed += 1
+                except Exception as e:
+                    logger.error(
+                        f"Error processing holder {db_holder.id} with address {db_holder.address} for token {token.name}: {str(e)}"
+                    )
+                    continue
 
         except Exception as e:
             error_msg = f"Error syncing holders for token {token.id}: {str(e)}"
