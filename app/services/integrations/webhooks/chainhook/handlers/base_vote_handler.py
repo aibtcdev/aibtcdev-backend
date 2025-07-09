@@ -3,7 +3,7 @@
 from typing import Dict, List, Optional
 
 from app.backend.factory import backend
-from app.backend.models import VoteBase, VoteCreate, VoteFilter
+from app.backend.models import VoteBase, VoteCreate, VoteFilter, AgentFilter
 from app.lib.logger import configure_logger
 from app.services.integrations.webhooks.chainhook.handlers.base import (
     ChainhookEventHandler,
@@ -221,6 +221,29 @@ class BaseVoteHandler(ChainhookEventHandler):
             # Try to determine the DAO ID from the proposal
             dao_id = proposal.dao_id
 
+            # Check if the voter address is an agent account contract and find the corresponding agent
+            agent_id = None
+            if "aibtc-acct-" in voter_address:
+                # This appears to be an agent account contract address
+                # Try to find the agent by account_contract
+                try:
+                    agents = backend.list_agents(
+                        filters=AgentFilter(account_contract=voter_address)
+                    )
+                    if agents:
+                        agent_id = agents[0].id
+                        self.logger.info(
+                            f"Found agent {agent_id} for account contract {voter_address}"
+                        )
+                    else:
+                        self.logger.warning(
+                            f"No agent found for account contract {voter_address}"
+                        )
+                except Exception as e:
+                    self.logger.error(
+                        f"Error finding agent for account contract {voter_address}: {str(e)}"
+                    )
+
             # Create the vote record
             new_vote = VoteCreate(
                 proposal_id=proposal.id,
@@ -228,6 +251,7 @@ class BaseVoteHandler(ChainhookEventHandler):
                 tx_id=tx_id,
                 answer=vote_value,
                 dao_id=dao_id,
+                agent_id=agent_id,  # Only set if we found a valid agent
                 reasoning="Vote captured from blockchain transaction",
                 amount=amount,
             )
