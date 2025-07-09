@@ -71,20 +71,26 @@ async def evaluate_proposal_comprehensive(
             f"[DEBUG:ComprehensiveEval:{proposal_id}] Processing Twitter content"
         )
 
-        # First, use TwitterDataService to process URLs and store tweets
-        from app.services.processing.twitter_data_service import twitter_data_service
+        # Get the proposal from database to check for linked tweet
+        from app.backend.factory import backend
+        from uuid import UUID
 
         tweet_db_ids = []
-        if proposal_content:
-            tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
-                proposal_content
-            )
-            if tweet_db_ids:
+        try:
+            # Convert string proposal_id to UUID
+            proposal_uuid = UUID(proposal_id)
+            proposal = backend.get_proposal(proposal_uuid)
+            if proposal and proposal.tweet_id:
+                tweet_db_ids = [proposal.tweet_id]
                 logger.debug(
-                    f"[DEBUG:ComprehensiveEval:{proposal_id}] Stored {len(tweet_db_ids)} tweets in database"
+                    f"[DEBUG:ComprehensiveEval:{proposal_id}] Found linked tweet ID: {proposal.tweet_id}"
                 )
                 # Add tweet_db_ids to the state for TwitterProcessingNode
                 initial_state["tweet_db_ids"] = tweet_db_ids
+        except ValueError:
+            logger.warning(
+                f"[DEBUG:ComprehensiveEval:{proposal_id}] Invalid proposal_id format, skipping tweet processing"
+            )
 
         # Now use TwitterProcessingNode to retrieve stored tweet data and format content
         twitter_processor = TwitterProcessingNode(config=config)
