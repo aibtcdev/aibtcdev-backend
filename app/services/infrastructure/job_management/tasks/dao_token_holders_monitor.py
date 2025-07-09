@@ -10,6 +10,7 @@ from app.backend.models import (
     HolderCreate,
     HolderFilter,
     AgentFilter,
+    WalletFilter,
 )
 from app.services.integrations.hiro.hiro_api import HiroApi
 from app.lib.logger import configure_logger
@@ -157,26 +158,30 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             return None
 
     def _get_agent_for_contract(self, account_contract: str):
-        """Get existing agent for a given account_contract. Returns None if no agent exists."""
+        """Get existing agent for a given account_contract. Returns (agent, wallet) tuple if found, None otherwise."""
         try:
             # Try to find existing agent by account_contract
             agents = backend.list_agents(
                 filters=AgentFilter(account_contract=account_contract)
             )
             if agents:
-                return agents[0]
+                agent = agents[0]
+                # Get the wallet for this agent
+                wallets = backend.list_wallets(filters=WalletFilter(agent_id=agent.id))
+                wallet = wallets[0] if wallets else None
+                return agent, wallet
 
             # If no agent found, return None
             logger.debug(
                 f"No existing agent found for account_contract {account_contract}"
             )
-            return None
+            return None, None
 
         except Exception as e:
             logger.error(
                 f"Error getting agent for account_contract {account_contract}: {str(e)}"
             )
-            return None
+            return None, None
 
     async def _sync_token_holders(
         self, token, result: DaoTokenHoldersMonitorResult
@@ -256,8 +261,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
                     api_holders_by_contract[address] = balance
 
-                    # Get existing agent for this account_contract
-                    agent = self._get_agent_for_contract(address)
+                    # Get existing agent and wallet for this account_contract
+                    agent, wallet = self._get_agent_for_contract(address)
                     if not agent:
                         logger.debug(
                             f"No existing agent found for account_contract {address}, skipping holder record"
@@ -268,24 +273,42 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     if agent.id in db_holders_by_agent:
                         # Update existing holder
                         existing_holder = db_holders_by_agent[agent.id]
+                        needs_update = False
+                        update_data = HolderBase(
+                            amount=str(balance),
+                            updated_at=datetime.now(),
+                            address=address,
+                        )
+
+                        # Check if we need to update wallet_id
+                        if wallet and existing_holder.wallet_id != wallet.id:
+                            update_data.wallet_id = wallet.id
+                            needs_update = True
+
+                        # Check if amount changed
                         if existing_holder.amount != str(balance):
+                            needs_update = True
+
+                        # Check if address changed
+                        if existing_holder.address != address:
+                            needs_update = True
+
+                        if needs_update:
                             logger.info(
-                                f"Updating holder {address}: {existing_holder.amount} -> {balance}"
-                            )
-                            update_data = HolderBase(
-                                amount=str(balance),
-                                updated_at=datetime.now(),
-                                address=address,
+                                f"Updating holder {address}: amount={existing_holder.amount}->{balance}, "
+                                f"wallet_id={existing_holder.wallet_id}->{wallet.id if wallet else None}"
                             )
                             backend.update_holder(existing_holder.id, update_data)
                             result.holders_updated += 1
                     else:
                         # Create new holder
                         logger.info(
-                            f"Creating new holder {address} with balance {balance}"
+                            f"Creating new holder {address} with balance {balance}, "
+                            f"agent_id={agent.id}, wallet_id={wallet.id if wallet else None}"
                         )
                         holder_create = HolderCreate(
                             agent_id=agent.id,
+                            wallet_id=wallet.id if wallet else None,
                             token_id=token.id,
                             dao_id=token.dao_id,
                             amount=str(balance),
