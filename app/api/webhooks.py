@@ -1,6 +1,7 @@
 from typing import Any, Dict
+import asyncio
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
 
 from app.api.dependencies import verify_webhook_auth
 from app.lib.logger import configure_logger
@@ -15,33 +16,48 @@ logger = configure_logger(__name__)
 router = APIRouter(prefix="/webhooks")
 
 
+async def process_chainhook_async(data: Dict[str, Any]) -> None:
+    """Process chainhook webhook asynchronously with logging.
+
+    Args:
+        data: The webhook payload as JSON
+    """
+    service = ChainhookService()
+
+    try:
+        logger.info("Starting async chainhook processing")
+        result = await service.process(data)
+        logger.info(f"Chainhook processing completed successfully: {result}")
+    except Exception as e:
+        logger.error(f"Chainhook processing failed: {str(e)}", exc_info=True)
+
+
 @router.post("/chainhook")
 async def chainhook(
     data: Dict[str, Any] = Body(...),
     _: None = Depends(verify_webhook_auth),
-) -> WebhookResponse:
+) -> Response:
     """Handle a chainhook webhook.
 
     This endpoint requires Bearer token authentication via the Authorization header.
     The token must match the one configured in AIBTC_WEBHOOK_AUTH_TOKEN.
 
+    Returns 204 immediately and processes the webhook asynchronously.
+
     Args:
         data: The webhook payload as JSON
 
     Returns:
-        WebhookResponse: A JSON response with the result of the operation
+        Response: 204 No Content status
 
     Raises:
-        HTTPException: If authentication fails or the webhook cannot be processed
+        HTTPException: If authentication fails
     """
-    service = ChainhookService()
+    # Start async processing without awaiting
+    asyncio.create_task(process_chainhook_async(data))
 
-    try:
-        result = await service.process(data)
-        return WebhookResponse(**result)
-    except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error processing webhook")
+    # Return 204 immediately
+    return Response(status_code=204)
 
 
 @router.post("/dao")
