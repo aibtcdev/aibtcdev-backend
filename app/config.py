@@ -65,7 +65,7 @@ class DiscordConfig:
 class ChatLLMConfig:
     """Configuration for chat-based LLM models."""
 
-    default_model: str = os.getenv("AIBTC_CHAT_DEFAULT_MODEL", "gpt-4.1")
+    default_model: str = os.getenv("AIBTC_CHAT_DEFAULT_MODEL", "x-ai/grok-4")
     default_temperature: float = float(
         os.getenv("AIBTC_CHAT_DEFAULT_TEMPERATURE", "0.9")
     )

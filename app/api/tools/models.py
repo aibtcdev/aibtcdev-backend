@@ -102,7 +102,7 @@ class ProposalRecommendationRequest(BaseModel):
         description="Any specific needs or requirements to consider in the recommendation",
     )
     model_name: Optional[str] = Field(
-        default="gpt-4.1",
+        default="x-ai/grok-4",
         description="LLM model to use for generation (e.g., 'gpt-4.1', 'gpt-4o', 'gpt-3.5-turbo')",
     )
     temperature: Optional[float] = Field(

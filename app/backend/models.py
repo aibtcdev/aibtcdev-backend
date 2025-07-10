@@ -907,7 +907,7 @@ class PromptBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
     prompt_text: Optional[str] = None
     is_active: Optional[bool] = True
-    model: Optional[str] = "gpt-4.1"
+    model: Optional[str] = "x-ai/grok-4"
     temperature: Optional[float] = 0.9  # Add temperature field with default value
 
 
