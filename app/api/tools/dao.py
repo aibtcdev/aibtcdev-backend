@@ -586,7 +586,7 @@ async def generate_proposal_recommendation(
         config = {
             "model_name": "x-ai/grok-4",  # Use model from request or default
             "temperature": 1.0,  # Use temperature from request or default
-            "streaming": False,  # Enable streaming responses
+            "streaming": True,  # Enable streaming responses
             "callbacks": [],  # Optional callback handlers
         }
         agent = ProposalRecommendationAgent(config=config)

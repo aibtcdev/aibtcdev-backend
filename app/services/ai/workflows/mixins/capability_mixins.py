@@ -84,25 +84,11 @@ class BaseCapabilityMixin(CapabilityMixin):
         if kwargs:
             self.config.update(kwargs)
 
-        # Check if the model is a Grok model and disable streaming for structured output
-        model_name = self.config.get("model_name")
-        is_grok_model = model_name and (
-            "grok" in model_name.lower() or "x-ai" in model_name.lower()
-        )
-
-        # Disable streaming for Grok models when using structured output to avoid parsing issues
-        streaming = self.config.get("streaming", True)
-        if is_grok_model and streaming:
-            self.logger.warning(
-                f"Disabling streaming for Grok model {model_name} to prevent structured output parsing issues"
-            )
-            streaming = False
-
         # Create the LLM instance
         self.llm = create_chat_openai(
             model=self.config.get("model_name"),
             temperature=self.config.get("temperature"),
-            streaming=streaming,
+            streaming=self.config.get("streaming"),
             callbacks=self.config.get("callbacks"),
         )
 

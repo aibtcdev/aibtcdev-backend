@@ -5,7 +5,6 @@ easily overridden when needed.
 """
 
 from typing import Any, List, Optional
-
 from langchain_openai import ChatOpenAI
 
 from app.config import config
@@ -20,7 +19,7 @@ class ModelConfig:
     # Default model settings - change these to update all workflows
     DEFAULT_MODEL = "gpt-4.1"
     DEFAULT_TEMPERATURE = 0.9
-    DEFAULT_STREAMING = False
+    DEFAULT_STREAMING = True
     DEFAULT_STREAM_USAGE = True
 
     @classmethod
@@ -123,8 +122,13 @@ def create_chat_openai(
     Returns:
         Configured ChatOpenAI instance
     """
+    model_name = model or ModelConfig.get_default_model()
+    # is_grok_model = model_name and (
+    #     "grok" in model_name.lower() or "x-ai" in model_name.lower()
+    # )
+
     config_dict = {
-        "model": model or ModelConfig.get_default_model(),
+        "model": model_name,
         "temperature": temperature
         if temperature is not None
         else ModelConfig.get_default_temperature(),
@@ -135,6 +139,9 @@ def create_chat_openai(
         if stream_usage is not None
         else ModelConfig.DEFAULT_STREAM_USAGE,
         "callbacks": callbacks or [],
+        # Add timeout configurations to prevent hanging calls
+        "timeout": kwargs.get("timeout", 300),  # 5 minutes total timeout
+        "max_retries": kwargs.get("max_retries", 3),
         **kwargs,
     }
 

@@ -1,3 +1,5 @@
+import json
+import re
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -622,10 +624,52 @@ Recent Community Sentiment: {recent_sentiment}
                 prompt = ChatPromptTemplate.from_messages(messages_or_template)
                 formatted_prompt = prompt.format()
 
-            # Get structured output from the LLM
-            result = await self.llm.with_structured_output(
-                ComprehensiveEvaluationOutput
-            ).ainvoke(formatted_prompt)
+            # Get structured output from the LLM with streaming enabled
+            try:
+                result = await self.llm.with_structured_output(
+                    ComprehensiveEvaluationOutput
+                ).ainvoke(formatted_prompt)
+            except Exception as e:
+                # If we get a streaming/parsing error with Grok, try to handle it
+                error_msg = str(e)
+                if (
+                    "Expected list delta entry to have an `index` key" in error_msg
+                    or "reasoning.text" in error_msg
+                ):
+                    self.logger.warning(
+                        f"[DEBUG:ComprehensiveEvaluator:{proposal_id}] Grok reasoning token error, retrying with basic invocation: {error_msg}"
+                    )
+                    # Fallback to basic LLM call and parse response manually
+                    response = await self.llm.ainvoke(formatted_prompt)
+
+                    # Try to extract JSON from the response content
+
+                    response_content = (
+                        response.content
+                        if hasattr(response, "content")
+                        else str(response)
+                    )
+
+                    # Look for JSON in the response
+                    json_match = re.search(r"\{.*\}", response_content, re.DOTALL)
+                    if json_match:
+                        try:
+                            json_data = json.loads(json_match.group())
+                            # Convert to ComprehensiveEvaluationOutput
+                            result = ComprehensiveEvaluationOutput(**json_data)
+                        except (json.JSONDecodeError, ValueError) as parse_error:
+                            self.logger.error(
+                                f"[DEBUG:ComprehensiveEvaluator:{proposal_id}] Failed to parse JSON response: {parse_error}"
+                            )
+                            raise e
+                    else:
+                        self.logger.error(
+                            f"[DEBUG:ComprehensiveEvaluator:{proposal_id}] No JSON found in response"
+                        )
+                        raise e
+                else:
+                    # Re-raise non-Grok related errors
+                    raise e
 
             # Track token usage
             token_usage_data = self.track_token_usage(str(formatted_prompt), result)
