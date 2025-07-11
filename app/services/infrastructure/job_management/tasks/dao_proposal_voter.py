@@ -192,11 +192,15 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     f"No votes found for proposal {proposal_id} and wallet {wallet_id}"
                 )
                 logger.warning(error_msg)
-                return {
+                result = {
                     "success": True,
                     "message": "No votes to process",
                     "votes_processed": 0,
                 }
+                # Mark message as processed to avoid endless retries
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
 
             # Filter out already voted votes
             unvoted_votes = [vote for vote in votes if not vote.voted]
@@ -204,11 +208,15 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if not unvoted_votes:
                 error_msg = f"No unvoted votes found for proposal {proposal_id} and wallet {wallet_id}"
                 logger.warning(error_msg)
-                return {
+                result = {
                     "success": True,
                     "message": "No votes to process",
                     "votes_processed": 0,
                 }
+                # Mark message as processed to avoid endless retries
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                return result
 
             logger.info(
                 f"Found {len(unvoted_votes)} unvoted votes for proposal {proposal_id} and wallet {wallet_id}"
