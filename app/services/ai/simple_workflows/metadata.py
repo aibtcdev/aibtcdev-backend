@@ -63,6 +63,7 @@ async def generate_proposal_metadata(
         result = await invoke_structured(
             messages=prompt,
             output_schema=ProposalMetadataOutput,
+            model="x-ai/grok-3",
             callbacks=callbacks,
         )
 
