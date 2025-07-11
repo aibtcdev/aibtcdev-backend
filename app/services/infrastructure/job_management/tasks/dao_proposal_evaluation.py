@@ -201,48 +201,34 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             # Get proposal data
             proposal_content = proposal.content or "No content provided"
 
-            # Set up config for evaluation
-            config = {
-                "debug_level": 0,  # Normal debug level
-            }
-
             evaluation = await evaluate_proposal_comprehensive(
-                proposal_id=str(proposal.id),
                 proposal_content=proposal_content,
-                config=config,
-                dao_id=str(dao_id) if dao_id else None,
-                agent_id=None,  # No specific agent for job processing
-                profile_id=None,  # No specific profile for job processing
+                dao_id=dao_id,
+                proposal_id=str(proposal.id),
+                streaming=False,
             )
 
-            # Extract evaluation results from the Pydantic model
-            approval = evaluation.decision
-            overall_score = evaluation.final_score
-            reasoning = evaluation.explanation
+            # Extract evaluation results from the nested structure
+            evaluation_data = evaluation.get("evaluation", {})
+            approval = evaluation_data.get("decision", False)
+            overall_score = evaluation_data.get("final_score", 0)
+            reasoning = evaluation_data.get("explanation", "")
             formatted_prompt = ""  # Not available in the new model structure
-            total_cost = (
-                evaluation.token_usage.get("total_cost", 0.0)
-                if evaluation.token_usage
-                else 0.0
-            )
-            model = (
-                evaluation.token_usage.get("model", "Unknown")
-                if evaluation.token_usage
-                else "Unknown"
-            )
+            total_cost = evaluation_data.get("token_usage", {}).get("total_cost", 0.0)
+            model = evaluation_data.get("token_usage", {}).get("model", "Unknown")
             evaluation_scores = {
                 "categories": [
                     {
-                        "category": cat.category,
-                        "score": cat.score,
-                        "weight": cat.weight,
-                        "reasoning": cat.reasoning,
+                        "category": cat.get("category", ""),
+                        "score": cat.get("score", 0),
+                        "weight": cat.get("weight", 0),
+                        "reasoning": cat.get("reasoning", ""),
                     }
-                    for cat in evaluation.categories
+                    for cat in evaluation_data.get("categories", [])
                 ],
-                "final_score": evaluation.final_score,
+                "final_score": evaluation_data.get("final_score", 0),
             }  # Convert categories to scores format
-            evaluation_flags = evaluation.flags
+            evaluation_flags = evaluation_data.get("flags", [])
 
             logger.info(
                 f"Proposal {proposal.id} ({dao.name}): Evaluated with result "
@@ -269,7 +255,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 profile_id=wallet.profile_id if wallet else None,
                 evaluation_score=evaluation_scores,  # Store the complete evaluation scores
                 flags=evaluation_flags,  # Store the evaluation flags
-                evaluation=evaluation.model_dump(),  # Convert Pydantic model to dict for storage
+                evaluation=evaluation_data,  # Already a dictionary from the nested structure
             )
 
             # Create the vote record
