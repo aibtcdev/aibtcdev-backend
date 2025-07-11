@@ -24,6 +24,8 @@ The CLI script supports several commands:
 # List all tasks in table format
 python run_task.py list
 
+
+
 # List tasks in JSON format
 python run_task.py list --format json
 
