@@ -20,7 +20,7 @@ class ModelConfig:
     # Default model settings - change these to update all workflows
     DEFAULT_MODEL = "gpt-4.1"
     DEFAULT_TEMPERATURE = 0.9
-    DEFAULT_STREAMING = True
+    DEFAULT_STREAMING = False
     DEFAULT_STREAM_USAGE = True
 
     @classmethod
