@@ -1,3 +1,9 @@
+"""Models for simple workflows.
+
+This module contains the Pydantic models used by the simplified workflow system.
+These models were copied from the old workflows system to maintain compatibility.
+"""
+
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -126,3 +132,16 @@ class ComprehensiveEvaluatorAgentProcessOutput(BaseModel):
     images_processed: int = Field(
         default=0, description="Number of images processed during evaluation"
     )
+
+
+# Export all models
+__all__ = [
+    "AgentOutput",
+    "ComprehensiveEvaluationOutput",
+    "ComprehensiveEvaluatorAgentProcessOutput",
+    "EvaluationCategory",
+    "FinalOutput",
+    "ProposalEvaluationOutput",
+    "ProposalMetadataOutput",
+    "ProposalRecommendationOutput",
+]

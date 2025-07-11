@@ -33,10 +33,6 @@ from app.backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
-    Job,
-    JobBase,
-    JobCreate,
-    JobFilter,
     Key,
     KeyBase,
     KeyCreate,
@@ -61,10 +57,6 @@ from app.backend.models import (
     Secret,
     SecretCreate,
     SecretFilter,
-    Step,
-    StepBase,
-    StepCreate,
-    StepFilter,
     Task,
     TaskBase,
     TaskCreate,
@@ -73,10 +65,6 @@ from app.backend.models import (
     TelegramUserBase,
     TelegramUserCreate,
     TelegramUserFilter,
-    Thread,
-    ThreadBase,
-    ThreadCreate,
-    ThreadFilter,
     Token,
     TokenBase,
     TokenCreate,
@@ -1099,111 +1087,6 @@ class SupabaseBackend(AbstractBackend):
     # ----------------------------------------------------------------
     # 4. CONVERSATIONS
     # ----------------------------------------------------------------
-    def create_thread(self, new_thread: "ThreadCreate") -> "Thread":
-        payload = new_thread.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("threads").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from thread insert.")
-        return Thread(**data[0])
-
-    def get_thread(self, thread_id: UUID) -> Optional["Thread"]:
-        response = (
-            self.client.table("threads")
-            .select("*")
-            .eq("id", str(thread_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Thread(**response.data)
-
-    def list_threads(self, filters: Optional["ThreadFilter"] = None) -> List["Thread"]:
-        query = self.client.table("threads").select("*")
-        if filters:
-            if filters.profile_id is not None:
-                query = query.eq("profile_id", str(filters.profile_id))
-            if filters.name is not None:
-                query = query.eq("name", filters.name)
-        response = query.execute()
-        data = response.data or []
-        return [Thread(**row) for row in data]
-
-    def update_thread(
-        self, thread_id: UUID, update_data: "ThreadBase"
-    ) -> Optional["Thread"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_thread(thread_id)
-        response = (
-            self.client.table("threads")
-            .update(payload)
-            .eq("id", str(thread_id))
-            .execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Thread(**updated[0])
-
-    def delete_thread(self, thread_id: UUID) -> bool:
-        response = (
-            self.client.table("threads").delete().eq("id", str(thread_id)).execute()
-        )
-        deleted = response.data or []
-        return len(deleted) > 0
-
-    # ----------------------------------------------------------------
-    # 7. JOBS
-    # ----------------------------------------------------------------
-    def create_job(self, new_job: "JobCreate") -> "Job":
-        payload = new_job.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("jobs").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from job insert.")
-        return Job(**data[0])
-
-    def get_job(self, job_id: UUID) -> Optional["Job"]:
-        response = (
-            self.client.table("jobs")
-            .select("*")
-            .eq("id", str(job_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Job(**response.data)
-
-    def list_jobs(self, filters: Optional["JobFilter"] = None) -> List["Job"]:
-        query = self.client.table("jobs").select("*")
-        if filters:
-            if filters.thread_id is not None:
-                query = query.eq("thread_id", str(filters.thread_id))
-            if filters.profile_id is not None:
-                query = query.eq("profile_id", str(filters.profile_id))
-        response = query.execute()
-        data = response.data or []
-        return [Job(**row) for row in data]
-
-    def update_job(self, job_id: UUID, update_data: "JobBase") -> Optional["Job"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_job(job_id)
-        response = (
-            self.client.table("jobs").update(payload).eq("id", str(job_id)).execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Job(**updated[0])
-
-    def delete_job(self, job_id: UUID) -> bool:
-        response = self.client.table("jobs").delete().eq("id", str(job_id)).execute()
-        deleted = response.data or []
-        return len(deleted) > 0
 
     # ----------------------------------------------------------------
     # 7.5 KEYS
@@ -1395,57 +1278,6 @@ class SupabaseBackend(AbstractBackend):
         response = (
             self.client.table("proposals").delete().eq("id", str(proposal_id)).execute()
         )
-        deleted = response.data or []
-        return len(deleted) > 0
-
-    # ----------------------------------------------------------------
-    # 11. STEPS
-    # ----------------------------------------------------------------
-    def create_step(self, new_step: "StepCreate") -> "Step":
-        payload = new_step.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("steps").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from step insert.")
-        return Step(**data[0])
-
-    def get_step(self, step_id: UUID) -> Optional["Step"]:
-        response = (
-            self.client.table("steps")
-            .select("*")
-            .eq("id", str(step_id))
-            .single()
-            .execute()
-        )
-        if not response.data:
-            return None
-        return Step(**response.data)
-
-    def list_steps(self, filters: Optional["StepFilter"] = None) -> List["Step"]:
-        query = self.client.table("steps").select("*").order("created_at", desc=True)
-        if filters:
-            if filters.job_id is not None:
-                query = query.eq("job_id", str(filters.job_id))
-            if filters.role is not None:
-                query = query.eq("role", filters.role)
-        response = query.execute()
-        data = response.data or []
-        return [Step(**row) for row in data]
-
-    def update_step(self, step_id: UUID, update_data: "StepBase") -> Optional["Step"]:
-        payload = update_data.model_dump(exclude_unset=True, mode="json")
-        if not payload:
-            return self.get_step(step_id)
-        response = (
-            self.client.table("steps").update(payload).eq("id", str(step_id)).execute()
-        )
-        updated = response.data or []
-        if not updated:
-            return None
-        return Step(**updated[0])
-
-    def delete_step(self, step_id: UUID) -> bool:
-        response = self.client.table("steps").delete().eq("id", str(step_id)).execute()
         deleted = response.data or []
         return len(deleted) > 0
 

@@ -1,12 +1,9 @@
-import asyncio
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, tools, webhooks
+from app.api import tools, webhooks
 from app.config import config
 from app.lib.logger import configure_logger
-from app.services.communication.websocket_service import websocket_manager
 
 # Configure module logger
 logger = configure_logger(__name__)
@@ -39,7 +36,6 @@ async def health_check():
 
 # Load API routes
 app.include_router(tools.router)
-app.include_router(chat.router)
 app.include_router(webhooks.router)
 
 
@@ -47,9 +43,7 @@ app.include_router(webhooks.router)
 async def startup_event():
     """Run web server startup tasks."""
     logger.info("Starting FastAPI web server...")
-    # Only start WebSocket manager for web server connections
     # Background services (job runners, bot, etc.) are handled by worker.py
-    asyncio.create_task(websocket_manager.start_cleanup_task())
     logger.info("Web server startup complete")
 
 

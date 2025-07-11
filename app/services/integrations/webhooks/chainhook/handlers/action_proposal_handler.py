@@ -21,7 +21,7 @@ from app.services.integrations.webhooks.chainhook.models import (
     Event,
     TransactionWithReceipt,
 )
-from app.services.ai.workflows.agents import ProposalMetadataAgent
+from app.services.ai.simple_workflows import generate_proposal_metadata
 
 
 class ActionProposalHandler(BaseProposalHandler):
@@ -472,21 +472,17 @@ class ActionProposalHandler(BaseProposalHandler):
         # Clean base content for AI processing
         clean_content = base_content.strip()
 
-        # Use ProposalMetadataAgent to generate summary and fill missing components
+        # Use generate_proposal_metadata to generate summary and fill missing components
         try:
-            metadata_agent = ProposalMetadataAgent()
-
             # Use clean content for AI processing
             proposal_content = clean_content or f"Action proposal {proposal_id}"
 
-            state = {
-                "proposal_content": proposal_content,
-                "dao_name": dao_name,
-                "proposal_type": "action",
-            }
-
             # Generate metadata using AI
-            ai_result = await metadata_agent.process(state)
+            ai_result = await generate_proposal_metadata(
+                proposal_content=proposal_content,
+                dao_name=dao_name,
+                proposal_type="action",
+            )
 
             # Combine parsed and AI-generated results
             final_title = (

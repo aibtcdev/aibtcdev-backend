@@ -9,7 +9,7 @@ from app.backend.factory import backend
 from app.backend.models import Proposal, ProposalBase, ProposalFilter
 from app.config import config
 from app.lib.logger import configure_logger
-from app.services.ai.workflows.mixins.vector_mixin import create_embedding_model
+from app.services.ai.simple_workflows.evaluation import create_embedding_model
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,

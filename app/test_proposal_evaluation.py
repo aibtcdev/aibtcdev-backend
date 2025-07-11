@@ -20,7 +20,7 @@ from uuid import UUID
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.services.ai.workflows.proposal_evaluation import evaluate_proposal
+from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.backend.factory import get_backend
 
 

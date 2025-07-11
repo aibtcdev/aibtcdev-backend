@@ -19,9 +19,7 @@ from uuid import UUID
 
 sys.path.insert(0, ".")
 
-from app.services.ai.workflows.comprehensive_evaluation import (
-    evaluate_proposal_comprehensive,
-)
+from app.services.ai.simple_workflows import evaluate_proposal_comprehensive
 from app.backend.factory import get_backend
 
 
@@ -162,73 +160,74 @@ Examples:
         # Run comprehensive evaluation
         print("🔍 Running comprehensive evaluation...")
         result = await evaluate_proposal_comprehensive(
-            proposal_id=args.proposal_id,
             proposal_content=proposal_content,
-            config=config,
-            dao_id=args.dao_id,
-            agent_id=args.agent_id,
-            profile_id=args.profile_id,
+            dao_id=UUID(args.dao_id) if args.dao_id else None,
+            proposal_id=args.proposal_id,
+            streaming=False,
         )
 
         print("\n✅ Comprehensive Evaluation Complete!")
         print("=" * 60)
 
         # Pretty print the result
-        if hasattr(result, "error"):
-            print(f"❌ Error: {result.error}")
+        if "error" in result:
+            print(f"❌ Error: {result['error']}")
         else:
+            evaluation = result.get("evaluation", {})
             print("📊 Comprehensive Evaluation Results:")
-            print(f"   • Approval: {'✅ APPROVE' if result.decision else '❌ REJECT'}")
-            print(f"   • Overall Score: {result.final_score}")
+            print(
+                f"   • Approval: {'✅ APPROVE' if evaluation.get('decision') else '❌ REJECT'}"
+            )
+            print(f"   • Overall Score: {evaluation.get('final_score', 0)}")
             print("   • Evaluation Type: comprehensive")
 
             # Show reasoning (truncated for readability)
-            reasoning = result.explanation or "N/A"
+            reasoning = evaluation.get("explanation", "N/A")
             if len(reasoning) > 500:
                 reasoning = reasoning[:500] + "... (truncated)"
             print(f"   • Reasoning: {reasoning}")
 
             # Show category scores
-            if result.categories:
+            categories = evaluation.get("categories", [])
+            if categories:
                 print("   • Category Scores:")
-                for category in result.categories:
+                for category in categories:
                     print(
-                        f"     - {category.category}: {category.score} (weight: {category.weight})"
+                        f"     - {category.get('category', 'Unknown')}: {category.get('score', 0)} (weight: {category.get('weight', 0)})"
                     )
 
-            flags = result.flags or []
+            flags = evaluation.get("flags", [])
             if flags:
                 print(f"   • Flags: {', '.join(flags[:5])}")  # Show first 5 flags
                 if len(flags) > 5:
                     print(f"     ... and {len(flags) - 5} more flags")
 
-            token_usage = result.token_usage or {}
+            token_usage = evaluation.get("token_usage", {})
             if token_usage:
                 print("   • Token Usage:")
                 print(f"     - Input: {token_usage.get('input_tokens', 0):,}")
                 print(f"     - Output: {token_usage.get('output_tokens', 0):,}")
                 print(f"     - Total: {token_usage.get('total_tokens', 0):,}")
 
-            images_processed = result.images_processed or 0
+            images_processed = evaluation.get("images_processed", 0)
             if images_processed > 0:
                 print(f"   • Images Processed: {images_processed}")
 
             # Show summary
-            if result.summary and args.debug_level >= 1:
+            summary = evaluation.get("summary", "")
+            if summary and args.debug_level >= 1:
                 print("   • Summary:")
                 truncated_summary = (
-                    result.summary[:200] + "..."
-                    if len(result.summary) > 200
-                    else result.summary
+                    summary[:200] + "..." if len(summary) > 200 else summary
                 )
                 print(f"     {truncated_summary}")
 
             # Show detailed category reasoning if verbose
-            if result.categories and args.debug_level >= 2:
+            if categories and args.debug_level >= 2:
                 print("   • Detailed Category Reasoning:")
-                for category in result.categories:
-                    print(f"     - {category.category}:")
-                    for reason in category.reasoning:
+                for category in categories:
+                    print(f"     - {category.get('category', 'Unknown')}:")
+                    for reason in category.get("reasoning", []):
                         truncated_reason = (
                             reason[:150] + "..." if len(reason) > 150 else reason
                         )

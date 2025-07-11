@@ -18,7 +18,6 @@ from app.services.infrastructure.job_management.monitoring import (
     MetricsCollector,
     SystemMetrics,
 )
-from app.services.communication.websocket_service import websocket_manager
 
 logger = configure_logger(__name__)
 
@@ -71,15 +70,6 @@ class EnhancedStartupService:
             )
             return False
 
-    async def start_websocket_cleanup(self) -> None:
-        """Start the WebSocket cleanup task."""
-        try:
-            await websocket_manager.start_cleanup_task()
-            logger.info("WebSocket cleanup task started")
-        except Exception as e:
-            logger.error(f"Error starting WebSocket cleanup task: {str(e)}")
-            raise
-
     async def start_bot(self) -> Any:
         """Start the Telegram bot in the background."""
         if not config.telegram.enabled:
@@ -125,14 +115,12 @@ class EnhancedStartupService:
             # Start enhanced job system
             await self.start_enhanced_job_system()
 
-            # Start websocket cleanup task
-            self.cleanup_task = asyncio.create_task(self.start_websocket_cleanup())
-
             # Start bot if enabled
             await self.start_bot()
 
             logger.info("All enhanced background services started successfully")
-            return self.cleanup_task
+            # Return a completed task since we don't have a cleanup task anymore
+            return asyncio.create_task(asyncio.sleep(0))
 
         except Exception as e:
             logger.error(f"Failed to start background services: {e}", exc_info=True)
@@ -158,15 +146,6 @@ class EnhancedStartupService:
                 logger.info("Stopping enhanced job manager...")
                 await self.job_manager.stop_executor()
                 logger.info("Enhanced job manager stopped successfully")
-
-            # Stop websocket cleanup
-            if self.cleanup_task:
-                self.cleanup_task.cancel()
-                try:
-                    await self.cleanup_task
-                except asyncio.CancelledError:
-                    pass
-                logger.info("WebSocket cleanup task stopped")
 
             # Stop bot
             if self.bot_application:
@@ -213,8 +192,6 @@ class EnhancedStartupService:
             "last_updated": system_health.get("timestamp"),
             "version": "2.0-enhanced",
             "services": {
-                "websocket_cleanup": self.cleanup_task is not None
-                and not self.cleanup_task.done(),
                 "telegram_bot": self.bot_application is not None,
                 "job_manager": self.job_manager is not None
                 and self.job_manager.is_running,

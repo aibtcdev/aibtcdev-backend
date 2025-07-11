@@ -21,7 +21,7 @@ from app.services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
-from app.services.ai.workflows.comprehensive_evaluation import (
+from app.services.ai.simple_workflows.orchestrator import (
     evaluate_proposal_comprehensive,
 )
 

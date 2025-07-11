@@ -11,7 +11,7 @@ from app.backend.models import (
     QueueMessageType,
 )
 from app.lib.logger import configure_logger
-from app.services.ai.workflows import execute_workflow_stream
+from app.services.ai.simple_workflows import execute_workflow_stream
 from app.tools.tools_factory import filter_tools_by_names, initialize_tools
 
 from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult

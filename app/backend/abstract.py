@@ -23,10 +23,6 @@ from app.backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
-    Job,
-    JobBase,
-    JobCreate,
-    JobFilter,
     Key,
     KeyBase,
     KeyCreate,
@@ -50,10 +46,6 @@ from app.backend.models import (
     QueueMessageFilter,
     Secret,
     SecretFilter,
-    Step,
-    StepBase,
-    StepCreate,
-    StepFilter,
     Task,
     TaskBase,
     TaskCreate,
@@ -62,10 +54,6 @@ from app.backend.models import (
     TelegramUserBase,
     TelegramUserCreate,
     TelegramUserFilter,
-    Thread,
-    ThreadBase,
-    ThreadCreate,
-    ThreadFilter,
     Token,
     TokenBase,
     TokenCreate,
@@ -372,50 +360,6 @@ class AbstractBackend(ABC):
     def delete_dao(self, dao_id: UUID) -> bool:
         pass
 
-    # ----------- THREADS -----------
-    @abstractmethod
-    def create_thread(self, new_thread: ThreadCreate) -> Thread:
-        pass
-
-    @abstractmethod
-    def get_thread(self, thread_id: UUID) -> Optional[Thread]:
-        pass
-
-    @abstractmethod
-    def list_threads(self, filters: Optional[ThreadFilter] = None) -> List[Thread]:
-        pass
-
-    @abstractmethod
-    def update_thread(
-        self, thread_id: UUID, update_data: ThreadBase
-    ) -> Optional[Thread]:
-        pass
-
-    @abstractmethod
-    def delete_thread(self, thread_id: UUID) -> bool:
-        pass
-
-    # ----------- JOBS -----------
-    @abstractmethod
-    def create_job(self, new_job: JobCreate) -> Job:
-        pass
-
-    @abstractmethod
-    def get_job(self, job_id: UUID) -> Optional[Job]:
-        pass
-
-    @abstractmethod
-    def list_jobs(self, filters: Optional[JobFilter] = None) -> List[Job]:
-        pass
-
-    @abstractmethod
-    def update_job(self, job_id: UUID, update_data: JobBase) -> Optional[Job]:
-        pass
-
-    @abstractmethod
-    def delete_job(self, job_id: UUID) -> bool:
-        pass
-
     # ----------- KEYS -----------
     @abstractmethod
     def create_key(self, new_key: KeyCreate) -> Key:
@@ -490,27 +434,6 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_proposal(self, proposal_id: UUID) -> bool:
-        pass
-
-    # ----------- STEPS -----------
-    @abstractmethod
-    def create_step(self, new_step: StepCreate) -> Step:
-        pass
-
-    @abstractmethod
-    def get_step(self, step_id: UUID) -> Optional[Step]:
-        pass
-
-    @abstractmethod
-    def list_steps(self, filters: Optional[StepFilter] = None) -> List[Step]:
-        pass
-
-    @abstractmethod
-    def update_step(self, step_id: UUID, update_data: StepBase) -> Optional[Step]:
-        pass
-
-    @abstractmethod
-    def delete_step(self, step_id: UUID) -> bool:
         pass
 
     # ----------- TASKS -----------
