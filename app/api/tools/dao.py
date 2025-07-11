@@ -23,9 +23,9 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
-from app.services.ai.workflows.agents.proposal_metadata import ProposalMetadataAgent
-from app.services.ai.workflows.agents.proposal_recommendation import (
-    ProposalRecommendationAgent,
+from app.services.ai.simple_workflows import (
+    generate_proposal_metadata,
+    generate_proposal_recommendation,
 )
 from app.tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,
@@ -218,14 +218,11 @@ async def _generate_metadata_for_message(message: str) -> tuple[str, str, list]:
     metadata_tags = []
 
     try:
-        metadata_agent = ProposalMetadataAgent()
-        metadata_state = {
-            "proposal_content": message,
-            "dao_name": "",  # Could be enhanced to fetch DAO name if available
-            "proposal_type": "action_proposal",
-        }
-
-        metadata_result = await metadata_agent.process(metadata_state)
+        metadata_result = await generate_proposal_metadata(
+            proposal_content=message,
+            dao_name="",  # Could be enhanced to fetch DAO name if available
+            proposal_type="action_proposal",
+        )
         title = metadata_result.get("title", "")
         summary = metadata_result.get("summary", "")
         metadata_tags = metadata_result.get("tags", [])
@@ -543,7 +540,7 @@ async def veto_dao_action_proposal(
 
 
 @router.post("/proposal_recommendations/generate")
-async def generate_proposal_recommendation(
+async def generate_proposal_recommendation_api(
     request: Request,
     payload: ProposalRecommendationRequest,
     profile: Profile = Depends(verify_profile_from_token),
@@ -582,24 +579,12 @@ async def generate_proposal_recommendation(
             f"Generating proposal recommendation for DAO {dao.name} (ID: {payload.dao_id})"
         )
 
-        # Create the proposal recommendation agent with model configuration
-        config = {
-            "model_name": "x-ai/grok-4",  # Use model from request or default
-            "temperature": 1.0,  # Use temperature from request or default
-            "streaming": True,  # Enable streaming responses
-            "callbacks": [],  # Optional callback handlers
-        }
-        agent = ProposalRecommendationAgent(config=config)
-
-        # Prepare state for the agent
-        state = {
-            "dao_id": payload.dao_id,
-            "focus_area": payload.focus_area,
-            "specific_needs": payload.specific_needs,
-        }
-
         # Get the recommendation
-        result = await agent.process(state)
+        result = await generate_proposal_recommendation(
+            dao_id=payload.dao_id,
+            focus_area=payload.focus_area,
+            specific_needs=payload.specific_needs,
+        )
 
         logger.debug(
             f"Proposal recommendation result for DAO {payload.dao_id}: {result.get('title', 'Unknown')}"

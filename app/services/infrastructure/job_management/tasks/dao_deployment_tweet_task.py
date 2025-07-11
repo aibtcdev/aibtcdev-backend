@@ -11,7 +11,7 @@ from app.backend.models import (
     TokenFilter,
 )
 from app.lib.logger import configure_logger
-from app.services.ai.workflows import generate_dao_tweet
+from app.services.ai.simple_workflows import generate_dao_tweet
 
 from ..base import BaseTask, JobContext, RunnerConfig, RunnerResult
 from ..decorators import JobPriority, job

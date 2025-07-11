@@ -360,7 +360,7 @@ class TwitterDataService:
                 tweet_id=tweet_id,
                 conversation_id=tweet_data.get("conversation_id"),
                 is_worthy=False,  # Default value, can be updated later
-                tweet_type=TweetType.CONVERSATION,  # Default type
+                tweet_type=TweetType.INVALID,  # Default type - was previously CONVERSATION
                 confidence_score=None,
                 reason=None,
                 images=image_urls,

@@ -6,10 +6,8 @@ from app.api.tools.models import ComprehensiveEvaluationRequest
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, Profile
 from app.lib.logger import configure_logger
-from app.services.ai.workflows.comprehensive_evaluation import (
-    evaluate_proposal_comprehensive,
-)
-from app.services.ai.workflows.agents.evaluator import (
+from app.services.ai.simple_workflows import evaluate_proposal_comprehensive
+from app.services.ai.simple_workflows.evaluation import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
 )
@@ -119,20 +117,17 @@ async def run_comprehensive_evaluation(
 
         # Run the comprehensive evaluation
         result = await evaluate_proposal_comprehensive(
-            proposal_id=payload.proposal_id,
             proposal_content=proposal_content,
-            config=payload.config,
-            dao_id=str(payload.dao_id) if payload.dao_id else None,
-            agent_id=agent_id,
-            profile_id=str(profile.id),
-            custom_system_prompt=payload.custom_system_prompt,
-            custom_user_prompt=payload.custom_user_prompt,
+            dao_id=payload.dao_id,
+            proposal_id=payload.proposal_id,
+            streaming=False,
         )
 
+        evaluation = result.get("evaluation", {})
         logger.debug(
-            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {'Approved' if result.decision else 'Rejected'}"
+            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {'Approved' if evaluation.get('decision') else 'Rejected'}"
         )
-        return JSONResponse(content=result.model_dump())
+        return JSONResponse(content=result)
 
     except HTTPException as he:
         raise he

@@ -7,10 +7,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.backend.factory import backend
-from app.backend.models import JobBase, JobCreate, StepCreate, Task, TaskFilter
+from app.backend.models import Task, TaskFilter
 from app.lib.logger import configure_logger
 from app.lib.persona import generate_persona
-from app.services.ai.workflows import execute_workflow_stream
+from app.services.ai.simple_workflows import execute_workflow_stream
 from app.tools.tools_factory import exclude_tools_by_names, initialize_tools
 
 logger = configure_logger(__name__)
@@ -110,20 +110,9 @@ class SchedulerService:
     async def _create_job(
         self, task: Task, agent_id: str, profile_id: str
     ) -> Optional[Any]:
-        """Create a new job with error handling."""
-        try:
-            return backend.create_job(
-                new_job=JobCreate(
-                    thread_id=None,
-                    input=task.prompt,
-                    agent_id=agent_id,
-                    task_id=str(task.id),
-                    profile_id=profile_id,
-                )
-            )
-        except Exception as e:
-            logger.error(f"Error creating job: {str(e)}")
-            return None
+        """Job creation is no longer needed after removing chat functionality."""
+        # Return a dummy job-like object with an ID for backward compatibility
+        return type("Job", (), {"id": str(task.id)})()
 
     async def _process_job_stream(
         self, job: Any, task: Task, agent: Any, profile: Any
@@ -159,37 +148,10 @@ class SchedulerService:
     async def _handle_stream_event(
         self, event: Dict[str, Any], job: Any, agent_id: str, profile_id: str
     ) -> None:
-        """Handle individual stream events."""
-        try:
-            if event["type"] == "tool":
-                backend.create_step(
-                    new_step=StepCreate(
-                        job_id=job.id,
-                        agent_id=agent_id,
-                        role="assistant",
-                        tool=event["tool"],
-                        tool_input=event["input"],
-                        tool_output=event.get("output"),
-                        profile_id=profile_id,
-                    )
-                )
-            elif event["type"] == "result":
-                backend.create_step(
-                    new_step=StepCreate(
-                        job_id=job.id,
-                        content=event["content"],
-                        role="assistant",
-                        agent_id=agent_id,
-                        profile_id=profile_id,
-                    )
-                )
-                backend.update_job(
-                    job_id=job.id,
-                    update_data=JobBase(result=event["content"]),
-                )
-        except Exception as e:
-            logger.error(f"Error handling stream event: {str(e)}")
-            raise
+        """Handle individual stream events - step creation removed after chat functionality cleanup."""
+        # Step and job tracking removed since chat functionality is no longer needed
+        logger.debug(f"Processed stream event: {event.get('type', 'unknown')}")
+        pass
 
     async def _fetch_schedules(self) -> List[Task]:
         """Fetch all scheduled tasks."""

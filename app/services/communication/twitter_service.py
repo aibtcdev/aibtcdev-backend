@@ -1082,7 +1082,7 @@ class TweetAnalyzer:
 
         try:
             # Import here to avoid circular dependency
-            from app.services.ai.workflows import analyze_tweet
+            from app.services.ai.simple_workflows import analyze_tweet
 
             analysis_result = await analyze_tweet(
                 tweet_text=tweet_data.text,

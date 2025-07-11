@@ -49,7 +49,6 @@ class ChainStateFilter(CustomBaseModel):
 
 class TweetType(str, Enum):
     TOOL_REQUEST = "tool_request"
-    CONVERSATION = "thread"
     INVALID = "invalid"
 
     def __str__(self):
@@ -324,45 +323,6 @@ class DAO(DAOBase):
 
 
 #
-# CONVERSATIONS
-#
-class ThreadBase(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    name: Optional[str] = "New Thread"
-
-
-class ThreadCreate(ThreadBase):
-    pass
-
-
-class Thread(ThreadBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# JOBS
-#
-class JobBase(CustomBaseModel):
-    thread_id: Optional[UUID] = None
-    profile_id: Optional[UUID] = None
-    input: Optional[str] = None
-    result: Optional[str] = None
-    tokens: Optional[float] = None
-    task_id: Optional[UUID] = None
-    agent_id: Optional[UUID] = None
-
-
-class JobCreate(JobBase):
-    pass
-
-
-class Job(JobBase):
-    id: UUID
-    created_at: datetime
-
-
-#
 # KEYS
 #
 class KeyBase(CustomBaseModel):
@@ -461,33 +421,6 @@ class ProposalCreate(ProposalBase):
 
 
 class Proposal(ProposalBase):
-    id: UUID
-    created_at: datetime
-
-
-#
-# STEPS
-#
-class StepBase(CustomBaseModel):
-    job_id: Optional[UUID] = None
-    agent_id: Optional[UUID] = None
-    role: Optional[str] = None
-    content: Optional[str] = None
-    tool: Optional[str] = None
-    tool_input: Optional[str] = None
-    tool_output: Optional[str] = None
-    thought: Optional[str] = None
-    profile_id: Optional[UUID] = None
-    status: Optional[str] = (
-        None  # Add status field to track planning, processing, complete
-    )
-
-
-class StepCreate(StepBase):
-    pass
-
-
-class Step(StepBase):
     id: UUID
     created_at: datetime
 
@@ -682,16 +615,6 @@ class DAOFilter(CustomBaseModel):
     is_broadcasted: Optional[bool] = None
 
 
-class ThreadFilter(CustomBaseModel):
-    profile_id: Optional[UUID] = None
-    name: Optional[str] = None
-
-
-class JobFilter(CustomBaseModel):
-    thread_id: Optional[UUID] = None
-    profile_id: Optional[UUID] = None
-
-
 class ProfileFilter(CustomBaseModel):
     email: Optional[str] = None
     has_dao_agent: Optional[bool] = None
@@ -740,12 +663,6 @@ class ProposalFilterN(CustomBaseModel):
     # Text search (if supported by backend)
     title_contains: Optional[str] = None
     content_contains: Optional[str] = None
-
-
-class StepFilter(CustomBaseModel):
-    job_id: Optional[UUID] = None
-    role: Optional[str] = None
-    status: Optional[str] = None  # Add status filter
 
 
 class TaskFilter(CustomBaseModel):

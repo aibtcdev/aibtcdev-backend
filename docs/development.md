@@ -78,7 +78,6 @@ python -c "from app.config import config; print('Config loaded successfully')"
 aibtcdev-backend/
 ├── app/                          # Main application package
 │   ├── api/                      # API endpoints and routes
-│   │   ├── chat.py              # WebSocket chat endpoints
 │   │   ├── tools.py             # Tool execution endpoints
 │   │   ├── webhooks.py          # Webhook handlers
 │   │   └── dependencies.py      # Authentication dependencies
@@ -87,7 +86,7 @@ aibtcdev-backend/
 │   ├── lib/                      # Shared utilities and tools
 │   ├── services/                 # Business logic services
 │   │   ├── ai/                  # AI-related services
-│   │   ├── communication/       # WebSocket and messaging
+│   │   ├── communication/       # Bot and messaging services
 │   │   ├── core/                # Core business logic
 │   │   ├── infrastructure/      # System infrastructure
 │   │   ├── integrations/        # External service integrations
@@ -106,9 +105,9 @@ aibtcdev-backend/
 
 ### Key Components
 
-- **`main.py`**: FastAPI application with WebSocket support
+- **`main.py`**: FastAPI application with REST API
 - **`worker.py`**: Background services (jobs, bots, monitoring)
-- **`app/api/`**: REST and WebSocket API implementations
+- **`app/api/`**: REST API implementations
 - **`app/services/`**: Business logic organized by domain
 - **`app/tools/`**: Individual tool implementations
 - **`app/backend/`**: Data models and backend abstractions
@@ -121,7 +120,6 @@ The application operates in two distinct modes:
 
 **Web Server Mode (`main.py`)**:
 - FastAPI application with CORS
-- WebSocket endpoints for real-time chat
 - REST API for tool execution
 - Health checks and monitoring
 
@@ -136,7 +134,7 @@ The application operates in two distinct modes:
 ```
 ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │   Webhooks      │
-│   (WebSocket)   │    │   (External)    │
+│   (REST API)    │    │   (External)    │
 └─────────┬───────┘    └─────────┬───────┘
           │                      │
           ▼                      ▼
@@ -223,7 +221,7 @@ pytest --cov=app
 pytest tests/test_api.py
 
 # Run specific test
-pytest tests/test_api.py::test_websocket_connection
+pytest tests/test_api.py::test_tool_endpoint
 
 # Run with verbose output
 pytest -v
@@ -238,7 +236,6 @@ pytest -n auto
 tests/
 ├── conftest.py              # Test configuration and fixtures
 ├── test_api/                # API endpoint tests
-│   ├── test_chat.py         # WebSocket chat tests
 │   ├── test_tools.py        # Tool endpoint tests
 │   └── test_webhooks.py     # Webhook tests
 ├── test_services/           # Service layer tests
@@ -262,37 +259,24 @@ def test_health_check():
     assert response.json() == {"status": "healthy"}
 
 @pytest.mark.asyncio
-async def test_websocket_chat():
-    with client.websocket_connect("/chat/ws?token=test_token") as websocket:
-        # Send test message
-        websocket.send_json({
-            "type": "message",
-            "thread_id": "test-thread",
-            "content": "Hello"
-        })
-        
-        # Receive response
-        data = websocket.receive_json()
-        assert data["type"] in ["message", "error"]
+async def test_tool_endpoint():
+    response = client.post("/tools/execute", json={
+        "tool_name": "test_tool",
+        "input": "test input"
+    })
+    assert response.status_code == 200
 ```
 
 **Service Test Example**:
 ```python
 import pytest
-from app.services.core.chat_service import process_chat_message
+from app.services.core.dao_service import get_dao_by_name
 
 @pytest.mark.asyncio
-async def test_chat_service():
-    result = await process_chat_message(
-        job_id="test-job",
-        thread_id="test-thread",
-        profile=mock_profile,
-        agent_id=None,
-        input_str="Test message",
-        history=[],
-        output_queue=mock_queue
-    )
+async def test_dao_service():
+    result = await get_dao_by_name("test-dao")
     assert result is not None
+    assert result.name == "test-dao"
 ```
 
 ### Test Configuration
@@ -402,31 +386,29 @@ logger = configure_logger(__name__)
 logger.debug("Debug message")
 ```
 
-### Debugging WebSocket Connections
+### Debugging API Requests
 
 ```python
-# Add debug logging to WebSocket handler
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    logger.debug(f"WebSocket connection attempt from {websocket.client}")
+# Add debug logging to API endpoints
+@router.post("/tools/execute")
+async def execute_tool(request: ToolRequest):
+    logger.debug(f"Tool execution request: {request.tool_name}")
     
     try:
-        await websocket.accept()
-        logger.debug("WebSocket connection accepted")
+        result = await execute_tool_logic(request)
+        logger.debug(f"Tool execution result: {result}")
+        return result
         
-        while True:
-            data = await websocket.receive_json()
-            logger.debug(f"Received WebSocket message: {data}")
-            
     except Exception as e:
-        logger.error(f"WebSocket error: {e}", exc_info=True)
+        logger.error(f"Tool execution error: {e}", exc_info=True)
+        raise
 ```
 
 ### Debugging AI Responses
 
 ```python
 # Debug AI service calls
-from app.services.ai.workflows import evaluate_proposal_comprehensive
+from app.services.ai.simple_workflows import evaluate_proposal_comprehensive
 
 result = await evaluate_proposal_comprehensive(
     proposal_id="test",
@@ -460,7 +442,7 @@ LOG_LEVEL=DEBUG python -m app.worker
 # Debug specific service
 python -c "
 import asyncio
-from app.services.core.chat_service import process_chat_message
+from app.services.core.dao_service import get_dao_by_name
 # Add debug code here
 "
 ```
@@ -573,16 +555,14 @@ async def bad_example():
         result = await process_request(req)  # Sequential, not parallel
 ```
 
-### WebSocket Performance
+### API Performance
 
 ```python
-# Use connection pooling
-from app.services.communication.websocket_service import websocket_manager
-
-# Optimize message handling
-async def handle_message(message):
+# Use async processing for long-running tasks
+async def handle_tool_request(request):
     # Process quickly to avoid blocking
-    asyncio.create_task(process_in_background(message))
+    task = asyncio.create_task(process_tool_in_background(request))
+    return {"task_id": str(task), "status": "processing"}
 ```
 
 ### Database Performance
@@ -635,10 +615,10 @@ git checkout -b hotfix/critical-fix
 ### Commit Message Format
 
 ```
-feat: add WebSocket authentication support
+feat: add tool authentication support
 
-- Implement token-based auth for WebSocket connections
-- Add query parameter validation
+- Implement token-based auth for tool endpoints
+- Add request parameter validation
 - Update documentation
 
 Closes #123
@@ -762,21 +742,19 @@ echo $SUPABASE_KEY
 python -c "from app.backend.factory import backend; print(backend.list_profiles())"
 ```
 
-**WebSocket Connection Failures**:
+**API Connection Issues**:
 ```bash
 # Check server logs
 tail -f logs/app.log
 
 # Test with simple client
 python -c "
-import asyncio
-import websockets
+import httpx
 
 async def test():
-    async with websockets.connect('ws://localhost:8000/chat/ws?token=test') as ws:
-        print('Connected')
-
-asyncio.run(test())
+    async with httpx.AsyncClient() as client:
+        response = await client.get('http://localhost:8000/')
+        print(f'Status: {response.status_code}')
 "
 ```
 
@@ -803,10 +781,10 @@ curl -H "Authorization: Bearer $OPENAI_API_KEY" \
 2. Check for memory leaks in long-running processes
 3. Optimize data structures and caching
 
-**WebSocket Connection Limits**:
-1. Monitor active connections
-2. Implement connection pooling
-3. Add connection cleanup mechanisms
+**API Rate Limits**:
+1. Monitor request rates
+2. Implement rate limiting
+3. Add request throttling mechanisms
 
 ### Getting Help
 
