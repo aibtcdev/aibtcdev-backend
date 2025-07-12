@@ -2,9 +2,10 @@ name: Ruff Code Quality Checks
 
 on:
   push:
-    branches: ["main", "staging"]
+    branches: ["main"]
+    tags: ["v*"]
   pull_request:
-    branches: ["main", "staging"]
+    branches: ["main"]
 
 jobs:
   ruff-check:
