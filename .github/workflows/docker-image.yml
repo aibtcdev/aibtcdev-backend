@@ -44,7 +44,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
+            type=sha
 
       # Build the image and push it to GitHub Packages (only on push events)
       - name: Build and push Docker image
