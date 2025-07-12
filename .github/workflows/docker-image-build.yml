@@ -20,9 +20,4 @@ jobs:
         with:
           context: .
           push: false
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
 
