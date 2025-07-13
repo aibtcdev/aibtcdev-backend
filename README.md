@@ -30,12 +30,6 @@ The platform is designed with a dual-mode architecture:
 
 ## Features
 
-### 🤖 Real-Time AI Chat
-- **WebSocket Communication**: Live bidirectional chat with AI agents
-- **Thread Management**: Persistent conversation history with context
-- **Agent Integration**: Multiple specialized AI agents for different tasks
-- **Streaming Responses**: Real-time message processing and delivery
-
 ### 🏛️ DAO Management
 - **Proposal Creation**: Automated DAO action proposal generation with AI-enhanced metadata
 - **Voting Operations**: Create, vote on, and veto DAO proposals
@@ -83,28 +77,18 @@ The platform is designed with a dual-mode architecture:
 
 ### Service Layer Architecture
 
-```
-Frontend/External Services
-           │
-    ┌──────▼──────┐
-    │   FastAPI   │
-    │   Router    │
-    └──────┬──────┘
-           │
-    ┌──────▼──────┐
-    │    Auth     │
-    │   Layer     │
-    └──────┬──────┘
-           │
-    ┌──────▼──────┐
-    │  Service    │
-    │   Layer     │
-    └──────┬──────┘
-           │
-    ┌──────▼──────┐
-    │  Backend    │
-    │   Layer     │
-    └─────────────┘
+```mermaid
+graph TD
+    A["Frontend/External Services"] --> B["FastAPI Router"]
+    B --> C["Auth Layer"]
+    C --> D["Service Layer"]
+    D --> E["Backend Layer"]
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#fff3e0
+    style D fill:#e8f5e8
+    style E fill:#fce4ec
 ```
 
 ## Quick Start
@@ -162,16 +146,16 @@ Comprehensive documentation is available in the `docs/` directory:
 
 ### 📖 Core Documentation
 - **[API Overview](docs/api-overview.md)**: Complete API endpoint reference
-- **[WebSocket Chat](docs/websocket-chat.md)**: Real-time chat implementation guide
 - **[Authentication](docs/authentication.md)**: Authentication methods and security
 - **[Configuration](docs/configuration.md)**: Environment setup and configuration
 - **[Development](docs/development.md)**: Development setup and contribution guide
+- **[CLI Usage](docs/cli-usage.md)**: Command-line interface guide for task management
 
 ### 🔧 Quick References
 - **API Endpoints**: See [API Overview](docs/api-overview.md) for complete endpoint list
 - **Authentication**: See [Authentication](docs/authentication.md) for auth methods
-- **WebSocket Usage**: See [WebSocket Chat](docs/websocket-chat.md) for real-time features
 - **Environment Setup**: See [Configuration](docs/configuration.md) for all settings
+- **CLI Commands**: See [CLI Usage](docs/cli-usage.md) for task running instructions
 
 ## Usage Examples
 

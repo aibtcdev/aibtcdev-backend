@@ -1,4 +1,22 @@
-# Task CLI Usage Guide
+# CLI Usage Guide
+
+This document provides comprehensive information about using the command-line interface for task management in aibtcdev-backend.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Basic Usage](#basic-usage)
+- [Available Tasks](#available-tasks)
+- [Examples](#examples)
+- [Task Parameters](#task-parameters)
+- [Output Formats](#output-formats)
+- [Error Handling](#error-handling)
+- [Tips](#tips)
+- [Development Usage](#development-usage)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
 
 The `run_task.py` CLI script provides a command-line interface to interact with the job management system, allowing you to list available tasks, run specific tasks, and monitor their execution.
 
@@ -175,3 +193,13 @@ python run_task.py metrics chain_state_monitor --format json
 ```
 
 This CLI tool integrates with the existing job management system and provides a convenient way to manually trigger tasks, monitor their execution, and debug issues during development. 
+
+## Troubleshooting
+
+- **Task Not Found**: Ensure the task name matches exactly (case-sensitive). Use `list` to check available tasks.
+- **JSON Parse Errors**: Verify parameters are valid JSON. Escape quotes if needed.
+- **Timeout Issues**: Increase `--timeout` for long-running tasks.
+- **Permission Errors**: Run with appropriate privileges if accessing restricted resources.
+- **Dependency Issues**: Check logs for missing dependencies or configurations.
+
+If issues persist, check server logs or enable verbose mode with `--verbose`. 

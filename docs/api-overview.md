@@ -38,7 +38,7 @@ Base path: `/tools`
 ### Tool Discovery
 
 #### Get Available Tools
-- **Endpoint**: `GET /tools/available`
+- **Endpoint**: `GET /tools/`
 - **Query Parameters**:
   - `category` (optional): Filter tools by category
 - **Description**: Returns a list of all available tools with their descriptions
@@ -131,7 +131,7 @@ Base path: `/tools`
 ### Social Media Integration
 
 #### Get Twitter Embed Data
-- **Endpoint**: `GET /tools/twitter/oembed`
+- **Endpoint**: `GET /tools/social/twitter_embed`
 - **Query Parameters**:
   - `url` (required): Twitter/X.com URL to embed
   - `media_max_width` (optional): Maximum width for media (default: 560)
