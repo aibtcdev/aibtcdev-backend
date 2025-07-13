@@ -6,22 +6,23 @@ This script provides a command-line interface to interact with the job managemen
 allowing you to list available tasks, run specific tasks, and monitor their execution.
 
 Usage:
-    python run_task.py list                    # List all available tasks
-    python run_task.py run <task_name>         # Run a specific task
-    python run_task.py info <task_name>        # Show task information
-    python run_task.py status                  # Show system status
-    python run_task.py metrics [task_name]     # Show task metrics
+    python scripts/run_task.py list                    # List all available tasks
+    python scripts/run_task.py run <task_name>         # Run a specific task
+    python scripts/run_task.py info <task_name>        # Show task information
+    python scripts/run_task.py status                  # Show system status
+    python scripts/run_task.py metrics [task_name]     # Show task metrics
 """
 
 import argparse
 import asyncio
 import json
+import os
 import sys
 from datetime import datetime
 from typing import List
 
-# Add the current directory to the Python path
-sys.path.insert(0, ".")
+# Add the parent directory (project root) to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.infrastructure.job_management import (
     JobRegistry,
@@ -51,11 +52,11 @@ class TaskCLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-    python run_task.py list
-    python run_task.py run agent_account_deployer
-    python run_task.py info dao_deployment
-    python run_task.py status
-    python run_task.py metrics chain_state_monitor
+    python scripts/run_task.py list
+    python scripts/run_task.py run agent_account_deployer
+    python scripts/run_task.py info dao_deployment
+    python scripts/run_task.py status
+    python scripts/run_task.py metrics chain_state_monitor
             """,
         )
 
@@ -262,7 +263,7 @@ Examples:
 
             if not task_metadata:
                 print(f"Task '{args.task_name}' not found.")
-                print("Use 'python run_task.py list' to see available tasks.")
+                print("Use 'python scripts/run_task.py list' to see available tasks.")
                 return
 
             print(f"Running task: {task_metadata.name}")

@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from app.api.dependencies import verify_profile_from_token
-from app.api.tools.models import FundWalletFaucetRequest, FundSbtcFaucetRequest
+from app.api.tools.models import (
+    FundWalletFaucetRequest,
+    FundSbtcFaucetRequest,
+    ToolResponse,
+)
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, Profile, WalletFilter
 from app.lib.logger import configure_logger
@@ -16,27 +20,100 @@ logger = configure_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/fund_testnet_faucet")
+@router.post(
+    "/fund_testnet_faucet",
+    response_model=ToolResponse,
+    summary="Fund Wallet with Testnet STX",
+    description="Request testnet STX tokens from the Stacks testnet faucet for development and testing",
+    responses={
+        200: {
+            "description": "Testnet STX funding successful",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Testnet STX funding successful",
+                        "data": {
+                            "transaction_id": "0x1234567890abcdef",
+                            "amount_received": "1000000000",
+                            "currency": "STX",
+                            "network": "testnet",
+                            "wallet_address": "ST1234567890ABCDEF1234567890ABCDEF12345678",
+                            "block_height": 12345,
+                            "faucet_endpoint": "https://explorer.hiro.so/sandbox/faucet",
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Agent or wallet not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No agent found for profile ID: 12345678-1234-1234-1234-123456789abc"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Faucet request failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to fund wallet with testnet faucet: Faucet rate limit exceeded"
+                    }
+                }
+            },
+        },
+    },
+    tags=["wallet"],
+)
 async def fund_wallet_with_testnet_faucet(
     request: Request,
     payload: FundWalletFaucetRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Fund wallet with testnet STX tokens using the faucet.
+    """
+    Fund wallet with testnet STX tokens using the Stacks testnet faucet.
 
     This endpoint allows an authenticated user's agent to request testnet STX tokens
-    from the Stacks testnet faucet. This operation only works on testnet.
+    from the official Stacks testnet faucet. These tokens are used for development,
+    testing, and experimentation on the Stacks testnet.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body (empty as no parameters are needed).
-        profile: The authenticated user's profile.
+    **Testnet Only:** This operation only works on the Stacks testnet environment.
+    It will fail if executed on mainnet.
 
-    Returns:
-        JSONResponse: The result of the faucet funding operation.
+    **Process:**
+    1. Validates the user's authentication and retrieves their agent
+    2. Finds the agent's associated wallet address
+    3. Makes a request to the Stacks testnet faucet
+    4. Returns the funding transaction details
 
-    Raises:
-        HTTPException: If there's an error, or if the agent/wallet for the profile is not found.
+    **Faucet Details:**
+    - Provides free testnet STX tokens for development
+    - Standard amount: ~1,000 STX per request
+    - Rate limited to prevent abuse
+    - Tokens have no real-world value
+
+    **Use Cases:**
+    - Initial wallet funding for new developers
+    - Testing DAO governance mechanisms
+    - Experimenting with smart contract interactions
+    - Building and testing applications on Stacks testnet
+
+    **Rate Limiting:** The faucet implements rate limiting per wallet address
+    to prevent abuse. Wait between requests if you encounter rate limit errors.
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(
@@ -92,27 +169,103 @@ async def fund_wallet_with_testnet_faucet(
         )
 
 
-@router.post("/fund_testnet_sbtc")
+@router.post(
+    "/fund_testnet_sbtc",
+    response_model=ToolResponse,
+    summary="Fund Wallet with Testnet sBTC",
+    description="Request testnet sBTC tokens from the Faktory faucet for DeFi testing and development",
+    responses={
+        200: {
+            "description": "Testnet sBTC funding successful",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Testnet sBTC funding successful",
+                        "data": {
+                            "transaction_id": "0x1234567890abcdef",
+                            "amount_received": "100000000",
+                            "currency": "sBTC",
+                            "network": "testnet",
+                            "wallet_address": "ST1234567890ABCDEF1234567890ABCDEF12345678",
+                            "block_height": 12345,
+                            "faucet_source": "faktory",
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Agent or wallet not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No agent found for profile ID: 12345678-1234-1234-1234-123456789abc"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "sBTC faucet request failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to request testnet sBTC from Faktory faucet: Service unavailable"
+                    }
+                }
+            },
+        },
+    },
+    tags=["wallet"],
+)
 async def fund_with_testnet_sbtc_faucet(
     request: Request,
     payload: FundSbtcFaucetRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Request testnet sBTC from the Faktory faucet.
+    """
+    Request testnet sBTC tokens from the Faktory faucet.
 
     This endpoint allows an authenticated user's agent to request testnet sBTC tokens
-    from the Faktory faucet. This operation only works on testnet.
+    from the Faktory faucet. sBTC (Synthetic Bitcoin) is a wrapped Bitcoin token
+    on the Stacks blockchain that enables Bitcoin-backed DeFi applications.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body (empty as no parameters are needed).
-        profile: The authenticated user's profile.
+    **Testnet Only:** This operation only works on the Stacks testnet environment.
+    It will fail if executed on mainnet.
 
-    Returns:
-        JSONResponse: The result of the sBTC faucet request operation.
+    **Process:**
+    1. Validates the user's authentication and retrieves their agent
+    2. Finds the agent's associated wallet address
+    3. Makes a request to the Faktory sBTC faucet
+    4. Returns the funding transaction details
 
-    Raises:
-        HTTPException: If there's an error, or if the agent/wallet for the profile is not found.
+    **sBTC Details:**
+    - Synthetic Bitcoin token on Stacks blockchain
+    - Backed by real Bitcoin through a peg mechanism
+    - Enables Bitcoin-powered DeFi applications
+    - Testnet sBTC has no real-world value
+
+    **Use Cases:**
+    - Testing DEX trading functionality
+    - Experimenting with Bitcoin-backed DeFi protocols
+    - Building applications that use sBTC
+    - Testing liquidity provision and trading strategies
+
+    **Faktory Integration:** The Faktory faucet provides testnet sBTC specifically
+    for testing trading and DeFi functionality on their platform.
+
+    **Rate Limiting:** The faucet implements rate limiting per wallet address
+    to prevent abuse. Wait between requests if you encounter rate limit errors.
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(

@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from app.api.dependencies import verify_profile
-from app.api.tools.models import ComprehensiveEvaluationRequest
+from app.api.tools.models import (
+    ComprehensiveEvaluationRequest,
+    DefaultPromptsResponse,
+    ToolResponse,
+)
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, Profile
 from app.lib.logger import configure_logger
@@ -20,26 +24,65 @@ logger = configure_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/default_prompts")
+@router.get(
+    "/default_prompts",
+    response_model=DefaultPromptsResponse,
+    summary="Get Default Evaluation Prompts",
+    description="Retrieve the default system and user prompts used for comprehensive proposal evaluation",
+    responses={
+        200: {
+            "description": "Default prompts retrieved successfully",
+            "model": DefaultPromptsResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "system_prompt": "You are an expert DAO governance evaluator with deep knowledge of blockchain governance.",
+                        "user_prompt_template": "Please evaluate the following proposal: {proposal_content}",
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to retrieve default evaluation prompts"
+                    }
+                }
+            },
+        },
+    },
+    tags=["evaluation"],
+)
 async def get_default_evaluation_prompts(
     request: Request,
     profile: Profile = Depends(verify_profile),
 ) -> JSONResponse:
-    """Get the default system and user prompts for comprehensive evaluation.
+    """
+    Get the default system and user prompts for comprehensive evaluation.
 
     This endpoint returns the default prompts used by the comprehensive
-    evaluation system. These can be used as templates for custom evaluation
-    prompts in the frontend.
+    evaluation system. These prompts can be used as templates for building
+    custom evaluation workflows in frontend applications.
 
-    Args:
-        request: The FastAPI request object.
-        profile: The authenticated user's profile.
+    **Use Cases:**
+    - Template for creating custom evaluation prompts
+    - Understanding the default evaluation criteria
+    - Building evaluation interfaces with pre-configured prompts
+    - Customizing evaluation workflows for specific DAOs
 
-    Returns:
-        JSONResponse: The default system and user prompt templates.
+    **Prompt Structure:**
+    - **System Prompt:** Defines the AI's role and expertise level
+    - **User Prompt Template:** Provides the format for evaluation requests
 
-    Raises:
-        HTTPException: If there's an error retrieving the prompts.
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(
@@ -66,28 +109,119 @@ async def get_default_evaluation_prompts(
         )
 
 
-@router.post("/comprehensive")
+@router.post(
+    "/comprehensive",
+    response_model=ToolResponse,
+    summary="Run Comprehensive Proposal Evaluation",
+    description="Execute AI-powered comprehensive evaluation of a DAO proposal with detailed analysis and recommendations",
+    responses={
+        200: {
+            "description": "Evaluation completed successfully",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Comprehensive evaluation completed successfully",
+                        "data": {
+                            "evaluation": {
+                                "decision": True,
+                                "confidence": 0.85,
+                                "reasoning": "The proposal aligns well with the DAO's mission and demonstrates clear value proposition.",
+                                "strengths": [
+                                    "Clear implementation plan",
+                                    "Strong community support",
+                                    "Realistic timeline",
+                                ],
+                                "concerns": [
+                                    "Budget allocation needs clarification",
+                                    "Risk mitigation could be improved",
+                                ],
+                                "recommendations": [
+                                    "Consider adding milestone-based funding",
+                                    "Include performance metrics",
+                                ],
+                            },
+                            "proposal_id": "12345678-1234-1234-1234-123456789abc",
+                            "evaluation_timestamp": "2024-01-15T10:30:00Z",
+                            "model_used": "gpt-4",
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid proposal ID format"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Proposal not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Proposal with ID 12345678-1234-1234-1234-123456789abc not found"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Evaluation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to run comprehensive evaluation: AI service unavailable"
+                    }
+                }
+            },
+        },
+    },
+    tags=["evaluation"],
+)
 async def run_comprehensive_evaluation(
     request: Request,
     payload: ComprehensiveEvaluationRequest,
     profile: Profile = Depends(verify_profile),
 ) -> JSONResponse:
-    """Run comprehensive evaluation on a proposal with optional custom prompts.
+    """
+    Run comprehensive evaluation on a DAO proposal.
 
-    This endpoint allows an authenticated user to run the comprehensive
-    evaluation workflow on a proposal, with optional custom system and user
-    prompts to override the defaults.
+    This endpoint executes an AI-powered comprehensive evaluation of a DAO proposal,
+    providing detailed analysis, recommendations, and a decision on whether to
+    approve or reject the proposal.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body containing proposal data and optional custom prompts.
-        profile: The authenticated user's profile.
+    **Evaluation Process:**
+    1. Retrieves the proposal content from the database
+    2. Analyzes the proposal against DAO governance criteria
+    3. Generates detailed evaluation with strengths and concerns
+    4. Provides actionable recommendations for improvement
+    5. Returns a binary decision with confidence score
 
-    Returns:
-        JSONResponse: The comprehensive evaluation results.
+    **Evaluation Criteria:**
+    - Alignment with DAO mission and values
+    - Technical feasibility and implementation plan
+    - Resource allocation and budget justification
+    - Community impact and stakeholder benefit
+    - Risk assessment and mitigation strategies
+    - Timeline and milestone clarity
 
-    Raises:
-        HTTPException: If there's an error during evaluation.
+    **Customization Options:**
+    - Custom system prompts for specialized evaluation criteria
+    - Custom user prompts for specific analysis focus
+    - Configurable AI model parameters
+    - DAO-specific context integration
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(

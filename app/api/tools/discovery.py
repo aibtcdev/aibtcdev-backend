@@ -16,25 +16,75 @@ router = APIRouter()
 available_tools = get_available_tools()
 
 
-@router.get("/", response_model=List[Tool])
+@router.get(
+    "/",
+    response_model=List[Tool],
+    summary="Get Available Tools",
+    description="Retrieve a list of all available tools in the system with optional category filtering",
+    responses={
+        200: {
+            "description": "List of available tools",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "faktory_execute_buy",
+                            "name": "Execute Faktory Buy",
+                            "description": "Execute a buy order on Faktory DEX",
+                            "category": "trading",
+                            "parameters": {
+                                "btc_amount": "string",
+                                "dao_token_dex_contract_address": "string",
+                                "slippage": "string (optional)",
+                            },
+                        },
+                        {
+                            "id": "dao_create_proposal",
+                            "name": "Create DAO Proposal",
+                            "description": "Create a new DAO action proposal",
+                            "category": "dao",
+                            "parameters": {
+                                "message": "string",
+                                "agent_account_contract": "string",
+                            },
+                        },
+                    ]
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to serve available tools"}
+                }
+            },
+        },
+    },
+)
 async def get_tools(
     request: Request,
-    category: Optional[str] = Query(None, description="Filter tools by category"),
+    category: Optional[str] = Query(
+        None,
+        description="Filter tools by category (e.g., 'trading', 'dao', 'wallet')",
+        example="trading",
+    ),
 ) -> JSONResponse:
-    """Get a list of available tools and their descriptions.
+    """
+    Get a list of available tools and their descriptions.
 
     This endpoint returns all available tools in the system. Tools can be optionally
-    filtered by category.
+    filtered by category to narrow down the results.
 
-    Args:
-        request: The FastAPI request object
-        category: Optional category to filter tools by
+    **Categories include:**
+    - `trading`: Financial and DEX trading operations
+    - `dao`: DAO management and proposal operations
+    - `wallet`: Wallet management and funding operations
+    - `evaluation`: AI-powered analysis and evaluation
+    - `social`: Social media integrations
+    - `agent-account`: Agent account management
 
-    Returns:
-        JSONResponse: List of available tools matching the criteria
-
-    Raises:
-        HTTPException: If there's an error serving the tools
+    **Authentication Required:** Yes (Bearer token or API key)
     """
     try:
         # Log the request
@@ -64,15 +114,45 @@ async def get_tools(
         )
 
 
-@router.get("/categories", response_model=List[str])
+@router.get(
+    "/categories",
+    response_model=List[str],
+    summary="Get Tool Categories",
+    description="Retrieve a list of all available tool categories for filtering purposes",
+    responses={
+        200: {
+            "description": "List of unique tool categories",
+            "content": {
+                "application/json": {
+                    "example": [
+                        "trading",
+                        "dao",
+                        "wallet",
+                        "evaluation",
+                        "social",
+                        "agent-account",
+                    ]
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to serve tool categories"}
+                }
+            },
+        },
+    },
+)
 async def get_tool_categories() -> JSONResponse:
-    """Get a list of all available tool categories.
+    """
+    Get a list of all available tool categories.
 
-    Returns:
-        JSONResponse: List of unique tool categories
+    Returns a sorted list of unique categories that can be used to filter tools
+    in the `/tools/` endpoint. This is useful for building category-based UI filters.
 
-    Raises:
-        HTTPException: If there's an error serving the categories
+    **Authentication Required:** Yes (Bearer token or API key)
     """
     try:
         # Extract unique categories
@@ -86,25 +166,71 @@ async def get_tool_categories() -> JSONResponse:
         )
 
 
-@router.get("/search", response_model=List[Tool])
+@router.get(
+    "/search",
+    response_model=List[Tool],
+    summary="Search Tools",
+    description="Search for tools by name or description with optional category filtering",
+    responses={
+        200: {
+            "description": "List of tools matching the search criteria",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "faktory_execute_buy",
+                            "name": "Execute Faktory Buy",
+                            "description": "Execute a buy order on Faktory DEX",
+                            "category": "trading",
+                            "parameters": {
+                                "btc_amount": "string",
+                                "dao_token_dex_contract_address": "string",
+                            },
+                        }
+                    ]
+                }
+            },
+        },
+        400: {
+            "description": "Bad request - missing query parameter",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Query parameter is required"}
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {"example": {"detail": "Failed to search tools"}}
+            },
+        },
+    },
+)
 async def search_tools(
-    query: str = Query(..., description="Search query for tool name or description"),
-    category: Optional[str] = Query(None, description="Filter by category"),
+    query: str = Query(
+        ...,
+        description="Search query to match against tool names and descriptions",
+        example="faktory",
+        min_length=1,
+    ),
+    category: Optional[str] = Query(
+        None, description="Optional category to filter results by", example="trading"
+    ),
 ) -> JSONResponse:
-    """Search for tools by name or description.
+    """
+    Search for tools by name or description.
 
     This endpoint allows searching for tools based on a text query that matches
-    against tool names and descriptions. Results can be optionally filtered by category.
+    against tool names and descriptions. Results can be optionally filtered by category
+    for more targeted searches.
 
-    Args:
-        query: Search query to match against tool names and descriptions
-        category: Optional category to filter results by
+    **Search is case-insensitive** and matches partial strings in:
+    - Tool names
+    - Tool descriptions
+    - Tool IDs
 
-    Returns:
-        JSONResponse: List of tools matching the search criteria
-
-    Raises:
-        HTTPException: If there's an error processing the search
+    **Authentication Required:** Yes (Bearer token or API key)
     """
     try:
         # Convert query to lowercase for case-insensitive matching

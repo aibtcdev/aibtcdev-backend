@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import JSONResponse
 import httpx
 
+from app.api.tools.models import TwitterEmbedResponse
 from app.lib.logger import configure_logger
 
 # Configure logger
@@ -13,29 +14,119 @@ logger = configure_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/twitter_embed")
+@router.get(
+    "/twitter_embed",
+    response_model=TwitterEmbedResponse,
+    summary="Get Twitter Embed Data",
+    description="Retrieve Twitter oEmbed data for embedding tweets in web applications",
+    responses={
+        200: {
+            "description": "Twitter embed data retrieved successfully",
+            "model": TwitterEmbedResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "html": '<blockquote class="twitter-tweet"><p lang="en" dir="ltr">This is a sample tweet</p>&mdash; John Doe (@johndoe) <a href="https://twitter.com/johndoe/status/1234567890">January 1, 2024</a></blockquote>',
+                        "url": "https://twitter.com/johndoe/status/1234567890",
+                        "author_name": "John Doe",
+                        "author_url": "https://twitter.com/johndoe",
+                        "width": 550,
+                        "height": 400,
+                        "type": "rich",
+                        "version": "1.0",
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid Twitter URL",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid Twitter URL. URL must start with https://x.com/ or https://twitter.com/"
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Twitter post not found",
+            "content": {
+                "application/json": {"example": {"detail": "Twitter post not found"}}
+            },
+        },
+        408: {
+            "description": "Request timeout",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Request to Twitter API timed out"}
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to connect to Twitter API: Connection refused"
+                    }
+                }
+            },
+        },
+    },
+    tags=["social"],
+)
 async def get_twitter_embed(
     request: Request,
-    url: str = Query(..., description="Twitter/X.com URL to embed"),
-    media_max_width: Optional[int] = Query(560, description="Maximum width for media"),
-    hide_thread: Optional[bool] = Query(False, description="Hide thread"),
+    url: str = Query(
+        ...,
+        description="Twitter/X.com URL to embed",
+        example="https://x.com/johndoe/status/1234567890",
+    ),
+    media_max_width: Optional[int] = Query(
+        560,
+        description="Maximum width for embedded media in pixels",
+        example=560,
+        ge=250,
+        le=1200,
+    ),
+    hide_thread: Optional[bool] = Query(
+        False,
+        description="Whether to hide the thread context when embedding",
+        example=False,
+    ),
 ) -> JSONResponse:
-    """Proxy endpoint for Twitter oembed API.
+    """
+    Retrieve Twitter oEmbed data for embedding tweets in web applications.
 
-    This endpoint acts as a proxy to Twitter's oembed API to avoid CORS issues
-    when embedding tweets in web applications.
+    This endpoint acts as a proxy to Twitter's oEmbed API, avoiding CORS issues
+    when embedding tweets in web applications. It supports both twitter.com and
+    x.com URLs and provides customizable embed options.
 
-    Args:
-        request: The FastAPI request object.
-        url: The Twitter/X.com URL to embed.
-        media_max_width: Maximum width for embedded media (default: 560).
-        hide_thread: Whether to hide the thread (default: False).
+    **Supported URLs:**
+    - `https://twitter.com/user/status/1234567890`
+    - `https://x.com/user/status/1234567890`
 
-    Returns:
-        JSONResponse: The oembed data from Twitter or error details.
+    **Embed Customization:**
+    - **Media Max Width:** Controls the maximum width of embedded media
+    - **Hide Thread:** Option to hide the conversation thread context
+    - **Responsive Design:** Embeds automatically adapt to container width
 
-    Raises:
-        HTTPException: If there's an error with the request or Twitter API.
+    **Use Cases:**
+    - Embedding tweets in DAO proposals and discussions
+    - Creating social media feeds in web applications
+    - Displaying Twitter content without CORS restrictions
+    - Building news aggregators and social dashboards
+
+    **Twitter oEmbed Features:**
+    - Rich HTML markup for proper tweet display
+    - Author information and profile links
+    - Automatic Twitter branding and styling
+    - Click-through navigation to original tweet
+
+    **Rate Limiting:** This endpoint respects Twitter's rate limiting policies.
+    For high-volume applications, consider implementing caching strategies.
+
+    **Authentication:** No authentication required for this endpoint.
     """
     try:
         logger.info(

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from app.api.dependencies import verify_profile_from_token
-from app.api.tools.models import FaktoryBuyTokenRequest
+from app.api.tools.models import FaktoryBuyTokenRequest, ToolResponse
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, Profile, WalletFilter
 from app.lib.logger import configure_logger
@@ -15,29 +15,100 @@ logger = configure_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/execute_buy")
+@router.post(
+    "/execute_buy",
+    response_model=ToolResponse,
+    summary="Execute Faktory DEX Buy Order",
+    description="Execute a buy order on Faktory DEX to purchase DAO tokens using BTC",
+    responses={
+        200: {
+            "description": "Buy order executed successfully",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Buy order executed successfully",
+                        "data": {
+                            "transaction_id": "0x1234567890abcdef",
+                            "btc_amount": "0.0004",
+                            "tokens_received": "1000.000000",
+                            "effective_price": "0.0000004",
+                            "slippage_used": "15",
+                            "block_height": 12345,
+                            "dex_contract": "SP1234567890ABCDEF.dao-token-dex",
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid BTC amount format"}}
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Agent or wallet not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No agent found for profile ID: 12345678-1234-1234-1234-123456789abc"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Buy order execution failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to execute Faktory buy order: Insufficient liquidity"
+                    }
+                }
+            },
+        },
+    },
+    tags=["faktory"],
+)
 async def execute_faktory_buy(
     request: Request,
     payload: FaktoryBuyTokenRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Execute a buy order on Faktory DEX.
+    """
+    Execute a buy order on Faktory DEX.
 
     This endpoint allows an authenticated user's agent to execute a buy order
-    for a specified token using BTC on the Faktory DEX.
+    for DAO tokens using BTC on the Faktory decentralized exchange. The order
+    is executed with configurable slippage tolerance.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body containing btc_amount,
-                 dao_token_dex_contract_address, and optional slippage.
-        profile: The authenticated user's profile.
+    **Process:**
+    1. Validates the user's authentication and retrieves their agent
+    2. Finds the agent's associated wallet for transaction signing
+    3. Executes the buy order on the Faktory DEX with the specified parameters
+    4. Returns the transaction result with trade details
 
-    Returns:
-        JSONResponse: The result of the buy order execution.
+    **Trading Details:**
+    - Uses BTC as the base currency for purchases
+    - Supports configurable slippage tolerance (default: 15 basis points = 0.15%)
+    - Executes immediately at current market prices
+    - Returns actual tokens received and effective price
 
-    Raises:
-        HTTPException: If there's an error executing the buy order, or if the
-                       agent for the profile is not found.
+    **Risk Considerations:**
+    - Market volatility can affect the final trade price
+    - High slippage may result in unfavorable execution
+    - Ensure sufficient BTC balance in the agent's wallet
+    - Consider market liquidity before large orders
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(

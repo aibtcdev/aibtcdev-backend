@@ -5,18 +5,19 @@ Simple test script for XTweet retrieval from Supabase backend.
 This test demonstrates basic XTweet retrieval functionality using the backend factory.
 
 Usage:
-    python test_xtweet_retrieval.py --tweet-id "123e4567-e89b-12d3-a456-426614174000"
-    python test_xtweet_retrieval.py --tweet-id "123e4567-e89b-12d3-a456-426614174000" --verbose
+    python scripts/test_xtweet_retrieval.py --tweet-id "123e4567-e89b-12d3-a456-426614174000"
+    python scripts/test_xtweet_retrieval.py --tweet-id "123e4567-e89b-12d3-a456-426614174000" --verbose
 """
 
 import argparse
 import asyncio
 import json
+import os
 import sys
 from uuid import UUID
 
-# Add the current directory to the path so we can import from app
-sys.path.insert(0, ".")
+# Add the parent directory (project root) to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.backend.factory import get_backend
 from app.backend.models import XTweet
@@ -82,10 +83,10 @@ async def main():
         epilog="""
 Examples:
   # Basic tweet retrieval
-  python test_xtweet_retrieval.py --tweet-id "12345678-1234-5678-9012-123456789abc"
+  python scripts/test_xtweet_retrieval.py --tweet-id "12345678-1234-5678-9012-123456789abc"
   
   # Verbose output with all details
-  python test_xtweet_retrieval.py --tweet-id "12345678-1234-5678-9012-123456789abc" --verbose
+  python scripts/test_xtweet_retrieval.py --tweet-id "12345678-1234-5678-9012-123456789abc" --verbose
         """,
     )
 

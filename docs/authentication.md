@@ -8,7 +8,6 @@ This document provides comprehensive information about authentication methods an
 - [Authentication Methods](#authentication-methods)
 - [Bearer Token Authentication](#bearer-token-authentication)
 - [API Key Authentication](#api-key-authentication)
-- [WebSocket Authentication](#websocket-authentication)
 - [Webhook Authentication](#webhook-authentication)
 - [Security Best Practices](#security-best-practices)
 - [Token Management](#token-management)
@@ -20,7 +19,6 @@ aibtcdev-backend supports multiple authentication methods to provide flexibility
 
 - **Bearer Tokens**: Session-based authentication for web applications
 - **API Keys**: Long-lived keys for programmatic access
-- **Query Parameters**: Authentication for WebSocket connections
 - **Webhook Tokens**: Secure authentication for webhook endpoints
 
 All authenticated requests are associated with a user profile that determines access permissions and agent associations.
@@ -33,7 +31,6 @@ All authenticated requests are associated with a user profile that determines ac
 |--------|----------|--------|------------|
 | Bearer Token | Web apps, temporary access | `Authorization: Bearer <token>` | Session-based |
 | API Key | Programmatic access, bots | `X-API-Key: <key>` | Long-lived |
-| Query Params | WebSocket connections | `?token=<token>` or `?key=<key>` | Same as above |
 | Webhook Token | Webhook security | `Authorization: Bearer <webhook_token>` | Static |
 
 ## Bearer Token Authentication
@@ -50,12 +47,12 @@ Authorization: Bearer <your_session_token>
 **Example:**
 ```bash
 curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-     http://localhost:8000/tools/available
+     http://localhost:8000/tools/
 ```
 
 **JavaScript Example:**
 ```javascript
-const response = await fetch('http://localhost:8000/tools/available', {
+const response = await fetch('http://localhost:8000/tools/', {
   headers: {
     'Authorization': 'Bearer your_session_token'
   }
@@ -70,7 +67,7 @@ headers = {
     'Authorization': 'Bearer your_session_token'
 }
 
-response = requests.get('http://localhost:8000/tools/available', headers=headers)
+response = requests.get('http://localhost:8000/tools/', headers=headers)
 ```
 
 ### Token Verification Process
@@ -103,12 +100,12 @@ X-API-Key: <your_api_key>
 **Example:**
 ```bash
 curl -H "X-API-Key: 12345678-1234-1234-1234-123456789abc" \
-     http://localhost:8000/tools/available
+     http://localhost:8000/tools/
 ```
 
 **JavaScript Example:**
 ```javascript
-const response = await fetch('http://localhost:8000/tools/available', {
+const response = await fetch('http://localhost:8000/tools/', {
   headers: {
     'X-API-Key': 'your_api_key'
   }
@@ -123,7 +120,7 @@ headers = {
     'X-API-Key': 'your_api_key'
 }
 
-response = requests.get('http://localhost:8000/tools/available', headers=headers)
+response = requests.get('http://localhost:8000/tools/', headers=headers)
 ```
 
 ### API Key Verification Process
@@ -141,65 +138,6 @@ response = requests.get('http://localhost:8000/tools/available', headers=headers
 - **Expiration**: Long-lived (manually managed)
 - **Security**: Database-stored with enable/disable status
 - **Scope**: Full API access for the associated profile
-
-## WebSocket Authentication
-
-WebSocket connections require authentication via query parameters since headers cannot be easily set in browser WebSocket APIs.
-
-### Usage
-
-**Token-based:**
-```
-ws://localhost:8000/chat/ws?token=your_bearer_token
-```
-
-**API Key-based:**
-```
-ws://localhost:8000/chat/ws?key=your_api_key
-```
-
-### JavaScript Example
-
-```javascript
-// Using Bearer token
-const ws1 = new WebSocket('ws://localhost:8000/chat/ws?token=your_bearer_token');
-
-// Using API key
-const ws2 = new WebSocket('ws://localhost:8000/chat/ws?key=your_api_key');
-
-ws1.onopen = function(event) {
-    console.log('Connected with bearer token');
-};
-
-ws2.onopen = function(event) {
-    console.log('Connected with API key');
-};
-```
-
-### Python Example
-
-```python
-import asyncio
-import websockets
-
-async def connect_with_token():
-    uri = "ws://localhost:8000/chat/ws?token=your_bearer_token"
-    async with websockets.connect(uri) as websocket:
-        print("Connected with bearer token")
-
-async def connect_with_key():
-    uri = "ws://localhost:8000/chat/ws?key=your_api_key"
-    async with websockets.connect(uri) as websocket:
-        print("Connected with API key")
-```
-
-### Authentication Process
-
-1. Authentication parameters are extracted from query string
-2. Priority order: API key (`key`) is checked first, then bearer token (`token`)
-3. Same verification process as HTTP requests
-4. Profile context is established for the WebSocket session
-5. Connection proceeds with authenticated context
 
 ## Webhook Authentication
 
@@ -257,13 +195,21 @@ curl -X POST -H "Authorization: Bearer your_webhook_secret_token" \
 
 ### Network Security
 
-**Use HTTPS/WSS in Production:**
+**Use HTTPS in Production:**
 ```javascript
-// Production
-const ws = new WebSocket('wss://api.yourdomain.com/chat/ws?token=...');
+// Production - Always use HTTPS
+const response = await fetch('https://api.yourdomain.com/tools/', {
+  headers: {
+    'Authorization': 'Bearer your_token'
+  }
+});
 
-// Development only
-const ws = new WebSocket('ws://localhost:8000/chat/ws?token=...');
+// Development only - HTTP acceptable
+const response = await fetch('http://localhost:8000/tools/', {
+  headers: {
+    'Authorization': 'Bearer your_token'
+  }
+});
 ```
 
 **Implement Proper CORS:**
@@ -336,13 +282,10 @@ All tokens are validated for:
 **Solutions:**
 ```bash
 # Check token format
-curl -v -H "Authorization: Bearer your_token" http://localhost:8000/tools/available
+curl -v -H "Authorization: Bearer your_token" http://localhost:8000/tools/
 
 # Verify API key format (should be UUID)
-curl -v -H "X-API-Key: 12345678-1234-1234-1234-123456789abc" http://localhost:8000/tools/available
-
-# Check WebSocket authentication
-# Browser DevTools -> Network -> WS -> Check connection response
+curl -v -H "X-API-Key: 12345678-1234-1234-1234-123456789abc" http://localhost:8000/tools/
 ```
 
 #### 404 Profile Not Found
@@ -357,74 +300,89 @@ curl -v -H "X-API-Key: 12345678-1234-1234-1234-123456789abc" http://localhost:80
 - Check profile association with token/key
 - Ensure database is accessible
 
-#### WebSocket Connection Failures
-
-**Possible Causes:**
-- Incorrect query parameter format
-- Network connectivity issues
-- Invalid token in query string
-
-**Debug Steps:**
-```javascript
-const ws = new WebSocket('ws://localhost:8000/chat/ws?token=your_token');
-
-ws.onerror = function(error) {
-    console.error('WebSocket error:', error);
-    // Check browser network tab for detailed error
-};
-
-ws.onclose = function(event) {
-    console.log('Close code:', event.code);
-    console.log('Close reason:', event.reason);
-    // 1006 = abnormal closure (often auth issues)
-    // 1002 = protocol error
-    // 1003 = unsupported data
-};
-```
-
 ### Testing Authentication
 
 **Test Bearer Token:**
 ```bash
 # Should return 200 with tools list
-curl -H "Authorization: Bearer valid_token" http://localhost:8000/tools/available
+curl -H "Authorization: Bearer valid_token" http://localhost:8000/tools/
 
 # Should return 401
-curl -H "Authorization: Bearer invalid_token" http://localhost:8000/tools/available
+curl -H "Authorization: Bearer invalid_token" http://localhost:8000/tools/
 
 # Should return 401 (missing Bearer prefix)
-curl -H "Authorization: invalid_format" http://localhost:8000/tools/available
+curl -H "Authorization: invalid_format" http://localhost:8000/tools/
 ```
 
 **Test API Key:**
 ```bash
 # Should return 200 with tools list
-curl -H "X-API-Key: valid_uuid_key" http://localhost:8000/tools/available
+curl -H "X-API-Key: valid_uuid_key" http://localhost:8000/tools/
 
 # Should return 401
-curl -H "X-API-Key: invalid_key" http://localhost:8000/tools/available
-```
-
-**Test WebSocket:**
-```javascript
-// Test valid authentication
-const ws1 = new WebSocket('ws://localhost:8000/chat/ws?token=valid_token');
-
-// Test invalid authentication (should fail to connect)
-const ws2 = new WebSocket('ws://localhost:8000/chat/ws?token=invalid_token');
-
-// Monitor connection states
-[ws1, ws2].forEach((ws, index) => {
-    ws.onopen = () => console.log(`WS${index + 1}: Connected`);
-    ws.onerror = (error) => console.error(`WS${index + 1}: Error`, error);
-    ws.onclose = (event) => console.log(`WS${index + 1}: Closed`, event.code);
-});
+curl -H "X-API-Key: invalid_key" http://localhost:8000/tools/
 ```
 
 ### Debugging Tips
 
 1. **Enable Verbose Logging**: Use `-v` flag with curl to see headers
-2. **Check Browser DevTools**: Network tab shows WebSocket connection details
+2. **Check Browser DevTools**: Network tab shows request details
 3. **Monitor Server Logs**: Authentication errors are logged server-side
 4. **Validate Token Format**: Ensure tokens match expected format
 5. **Test with Known Good Tokens**: Use working tokens to isolate issues
+
+### Authentication Flow Testing
+
+**JavaScript/TypeScript Testing:**
+```javascript
+// Test different authentication methods
+const testAuthentication = async () => {
+  // Test Bearer token
+  try {
+    const response = await fetch('http://localhost:8000/tools/', {
+      headers: { 'Authorization': 'Bearer test_token' }
+    });
+    console.log('Bearer token status:', response.status);
+  } catch (error) {
+    console.error('Bearer token failed:', error);
+  }
+
+  // Test API key
+  try {
+    const response = await fetch('http://localhost:8000/tools/', {
+      headers: { 'X-API-Key': 'test_api_key' }
+    });
+    console.log('API key status:', response.status);
+  } catch (error) {
+    console.error('API key failed:', error);
+  }
+};
+```
+
+**Python Testing:**
+```python
+import requests
+
+def test_authentication():
+    base_url = 'http://localhost:8000/tools/'
+    
+    # Test Bearer token
+    try:
+        response = requests.get(base_url, headers={
+            'Authorization': 'Bearer test_token'
+        })
+        print(f'Bearer token status: {response.status_code}')
+    except Exception as e:
+        print(f'Bearer token failed: {e}')
+    
+    # Test API key
+    try:
+        response = requests.get(base_url, headers={
+            'X-API-Key': 'test_api_key'
+        })
+        print(f'API key status: {response.status_code}')
+    except Exception as e:
+        print(f'API key failed: {e}')
+
+test_authentication()
+```

@@ -9,6 +9,7 @@ from app.api.tools.models import (
     ProposeSendMessageRequest,
     VetoActionProposalRequest,
     ProposalRecommendationRequest,
+    ToolResponse,
 )
 from app.backend.factory import backend
 from app.backend.models import (
@@ -342,27 +343,111 @@ def _enhance_message_with_metadata(
     return enhanced_message
 
 
-@router.post("/action_proposals/propose_send_message")
+@router.post(
+    "/action_proposals/propose_send_message",
+    response_model=ToolResponse,
+    summary="Create DAO Action Proposal",
+    description="Submit a new action proposal to the DAO for member voting and governance",
+    responses={
+        200: {
+            "description": "Action proposal created successfully",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "DAO action proposal created successfully",
+                        "data": {
+                            "transaction_id": "0x1234567890abcdef",
+                            "proposal_id": "12345678-1234-1234-1234-123456789abc",
+                            "block_height": 12345,
+                            "voting_contract": "SP1234567890ABCDEF.dao-action-proposals-voting",
+                            "proposal_title": "Monthly Community Update",
+                            "enhanced_message": "This is a proposal message...\n\n--- Metadata ---\nTitle: Monthly Community Update\nTags: community|update|monthly",
+                            "metadata_generated": True,
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Agent account contract is required"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Agent or wallet not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No agent found for profile ID: 12345678-1234-1234-1234-123456789abc"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Proposal creation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to propose DAO send message action: Network error"
+                    }
+                }
+            },
+        },
+    },
+    tags=["dao"],
+)
 async def propose_dao_action_send_message(
     request: Request,
     payload: ProposeSendMessageRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Propose a DAO action to send a message.
+    """
+    Create a new DAO action proposal for sending a message.
 
     This endpoint allows an authenticated user's agent to create a proposal
-    for sending a message via the DAO's action proposal system.
+    for sending a message via the DAO's action proposal system. The proposal
+    will be submitted for member voting and governance approval.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body containing the proposal details.
-        profile: The authenticated user's profile.
+    **Process:**
+    1. Validates the user's authentication and retrieves their agent
+    2. Finds the agent's associated wallet for transaction signing
+    3. Generates AI-enhanced metadata (title, summary, tags) for the proposal
+    4. Creates the proposal transaction on the blockchain
+    5. Records the proposal in the database for tracking
+    6. Returns transaction details and proposal information
 
-    Returns:
-        JSONResponse: The result of the proposal creation.
+    **AI Enhancement Features:**
+    - Automatic title generation from proposal content
+    - Intelligent summary creation for easy understanding
+    - Tag generation for categorization and search
+    - Twitter URL extraction and processing
+    - Metadata formatting for improved readability
 
-    Raises:
-        HTTPException: If there's an error, or if the agent for the profile is not found.
+    **DAO Governance Integration:**
+    - Submits to the DAO's voting contract for member approval
+    - Follows the DAO's governance rules and procedures
+    - Tracks proposal status throughout the lifecycle
+    - Enables community participation in decision-making
+
+    **Use Cases:**
+    - Announcing important DAO updates and decisions
+    - Proposing new initiatives or changes
+    - Communicating with the broader community
+    - Documenting governance decisions and rationale
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(
@@ -430,27 +515,109 @@ async def propose_dao_action_send_message(
         )
 
 
-@router.post("/action_proposals/veto_proposal")
+@router.post(
+    "/action_proposals/veto_proposal",
+    response_model=ToolResponse,
+    summary="Veto DAO Action Proposal",
+    description="Veto an existing DAO action proposal to prevent its execution",
+    responses={
+        200: {
+            "description": "Proposal veto successful",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "DAO action proposal vetoed successfully",
+                        "data": {
+                            "transaction_id": "0x1234567890abcdef",
+                            "proposal_id": "12345678-1234-1234-1234-123456789abc",
+                            "block_height": 12345,
+                            "voting_contract": "SP1234567890ABCDEF.dao-action-proposals-voting",
+                            "veto_reason": "Proposal conflicts with DAO governance rules",
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "DAO action proposal voting contract is required"
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "Agent, wallet, or proposal not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No proposal found for ID: 12345678-1234-1234-1234-123456789abc"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Veto operation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to veto DAO action proposal: Transaction failed"
+                    }
+                }
+            },
+        },
+    },
+    tags=["dao"],
+)
 async def veto_dao_action_proposal(
     request: Request,
     payload: VetoActionProposalRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Veto a DAO action proposal.
+    """
+    Veto an existing DAO action proposal.
 
     This endpoint allows an authenticated user's agent to veto an existing
-    action proposal in the DAO's action proposal system.
+    action proposal in the DAO's action proposal system. Vetoing prevents
+    the proposal from being executed even if it has sufficient votes.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body containing the proposal details to veto.
-        profile: The authenticated user's profile.
+    **Process:**
+    1. Validates the user's authentication and retrieves their agent
+    2. Finds the agent's associated wallet for transaction signing
+    3. Looks up the proposal in the database to verify it exists
+    4. Executes the veto transaction on the blockchain
+    5. Returns transaction details and veto confirmation
 
-    Returns:
-        JSONResponse: The result of the veto operation.
+    **Veto Authority:**
+    - Only authorized agents can veto proposals
+    - Veto powers are defined by the DAO's governance rules
+    - Typically reserved for emergency situations or rule violations
+    - May require specific permissions or roles within the DAO
 
-    Raises:
-        HTTPException: If there's an error, or if the agent for the profile is not found.
+    **Use Cases:**
+    - Preventing execution of harmful or malicious proposals
+    - Stopping proposals that violate DAO governance rules
+    - Emergency intervention in time-sensitive situations
+    - Protecting DAO resources from misuse
+
+    **Governance Impact:**
+    - Immediately prevents proposal execution
+    - May trigger additional governance procedures
+    - Could require justification or community discussion
+    - Maintains DAO security and rule compliance
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(
@@ -539,27 +706,147 @@ async def veto_dao_action_proposal(
         )
 
 
-@router.post("/proposal_recommendations/generate")
+@router.post(
+    "/proposal_recommendations/generate",
+    response_model=ToolResponse,
+    summary="Generate AI Proposal Recommendation",
+    description="Generate AI-powered proposal recommendations tailored to a specific DAO's needs and mission",
+    responses={
+        200: {
+            "description": "Proposal recommendation generated successfully",
+            "model": ToolResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Proposal recommendation generated successfully",
+                        "data": {
+                            "recommendation": {
+                                "title": "Community Engagement Initiative",
+                                "description": "A comprehensive proposal to increase community participation through gamification and rewards",
+                                "category": "community growth",
+                                "priority": "high",
+                                "estimated_impact": "significant",
+                                "implementation_timeline": "3-6 months",
+                                "resource_requirements": [
+                                    "development team",
+                                    "marketing budget",
+                                    "community managers",
+                                ],
+                                "success_metrics": [
+                                    "active users",
+                                    "participation rates",
+                                    "community sentiment",
+                                ],
+                                "risks": [
+                                    "user adoption",
+                                    "technical complexity",
+                                    "resource availability",
+                                ],
+                                "next_steps": [
+                                    "conduct feasibility study",
+                                    "gather community feedback",
+                                    "prepare detailed proposal",
+                                ],
+                            },
+                            "dao_context": {
+                                "dao_name": "ExampleDAO",
+                                "focus_area": "community growth",
+                                "previous_proposals": 15,
+                                "active_members": 500,
+                            },
+                            "generation_metadata": {
+                                "model_used": "x-ai/grok-4",
+                                "temperature": 0.1,
+                                "generated_at": "2024-01-15T10:30:00Z",
+                            },
+                        },
+                        "error": None,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid DAO ID format"}}
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid bearer token"}}
+            },
+        },
+        404: {
+            "description": "DAO not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "DAO with ID 12345678-1234-1234-1234-123456789abc not found"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Recommendation generation failed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to generate proposal recommendation: AI service unavailable"
+                    }
+                }
+            },
+        },
+    },
+    tags=["dao"],
+)
 async def generate_proposal_recommendation_api(
     request: Request,
     payload: ProposalRecommendationRequest,
     profile: Profile = Depends(verify_profile_from_token),
 ) -> JSONResponse:
-    """Generate a proposal recommendation for a DAO.
+    """
+    Generate AI-powered proposal recommendations for a DAO.
 
-    This endpoint allows an authenticated user to get AI-generated proposal
-    recommendations based on the DAO's mission, description, and previous proposals.
+    This endpoint provides intelligent proposal suggestions based on the DAO's
+    mission, previous proposals, and current needs. It uses advanced AI to
+    analyze the DAO's context and generate actionable recommendations.
 
-    Args:
-        request: The FastAPI request object.
-        payload: The request body containing dao_id and optional parameters.
-        profile: The authenticated user's profile.
+    **AI Analysis Process:**
+    1. Analyzes the DAO's mission and governance structure
+    2. Reviews previous proposals and outcomes
+    3. Considers the specified focus area and needs
+    4. Generates tailored recommendations with implementation details
+    5. Provides risk assessment and success metrics
 
-    Returns:
-        JSONResponse: The generated proposal recommendation.
+    **Recommendation Categories:**
+    - **Community Growth:** Engagement, onboarding, retention strategies
+    - **Technical Development:** Platform improvements, new features
+    - **Partnerships:** Strategic alliances, collaboration opportunities
+    - **Financial Management:** Treasury optimization, funding strategies
+    - **Governance:** Process improvements, rule changes
 
-    Raises:
-        HTTPException: If there's an error, or if the DAO is not found.
+    **Generated Content:**
+    - Detailed proposal title and description
+    - Implementation timeline and resource requirements
+    - Success metrics and key performance indicators
+    - Risk assessment and mitigation strategies
+    - Next steps and action items
+
+    **Customization Options:**
+    - Focus area specification for targeted recommendations
+    - Specific needs input for context-aware suggestions
+    - Model selection for different AI capabilities
+    - Temperature control for creativity vs. precision
+
+    **Use Cases:**
+    - Discovering new opportunities for DAO improvement
+    - Overcoming proposal writer's block
+    - Ensuring comprehensive coverage of important topics
+    - Generating ideas for community engagement
+
+    **Authentication:** Requires Bearer token or API key authentication.
     """
     try:
         logger.info(
