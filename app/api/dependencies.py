@@ -196,3 +196,24 @@ async def verify_webhook_auth(authorization: Optional[str] = Header(None)) -> No
     if token != expected_token:
         logger.error("Invalid webhook authentication token")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+
+async def verify_agent_lookup_api_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+) -> None:
+    """
+    Verify the static API key for the agent lookup endpoint.
+
+    Args:
+        x_api_key: The X-API-Key header value
+
+    Raises:
+        HTTPException: If authentication fails
+    """
+    if not x_api_key:
+        logger.error("Missing X-API-Key header for agent lookup")
+        raise HTTPException(status_code=401, detail="Missing X-API-Key header")
+
+    if x_api_key != config.api.agent_lookup_api_key:
+        logger.error("Invalid agent lookup API key")
+        raise HTTPException(status_code=401, detail="Invalid API key")
