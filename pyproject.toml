@@ -13,7 +13,7 @@ dependencies = [
     "langchain==0.3.26",
     "langchain-community==0.3.27",
     "langchain-core>=0.3.56,<1.0.0",
-    "langchain-openai==0.3.27",
+    "langchain-openai==0.3.28",
     "langchain-text-splitters==0.3.8",
     "langgraph==0.5.2",
     "openai==1.93.0",
