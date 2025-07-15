@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build, Push and Deploy Docker Image
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push-image:
+  build-push-deploy:
     runs-on: ubuntu-latest
     # Sets the permissions granted to the GITHUB_TOKEN for the actions in this job
     permissions:
@@ -64,3 +64,13 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      # Deploy the app to DigitalOcean App Platform (only on push events)
+      - name: Deploy to DigitalOcean App Platform
+        if: ${{ github.event_name == 'push' }}
+        uses: digitalocean/app_action/deploy@v2
+        env:
+          SAMPLE_DIGEST: ${{ steps.push.outputs.digest }}
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
