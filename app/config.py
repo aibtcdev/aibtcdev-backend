@@ -195,6 +195,9 @@ class APIConfig:
     webhook_auth: str = os.getenv("AIBTC_WEBHOOK_AUTH_TOKEN", "Bearer 1234567890")
     lunarcrush_api_key: str = os.getenv("AIBTC_LUNARCRUSH_API_KEY", "")
     cmc_api_key: str = os.getenv("AIBTC_CMC_API_KEY", "")
+    agent_lookup_api_key: str = os.getenv(
+        "AIBTC_AGENT_LOOKUP_API_KEY", "agent-lookup-12345"
+    )
 
 
 @dataclass
