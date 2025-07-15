@@ -283,7 +283,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
         if proposal_passed:
             # Create the new post format for approved proposals
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
-            follow_up_message = f"View proposal details: {proposal_url}"
+            follow_up_message = f"View contribution details: {proposal_url}"
 
             # Create the first post with the approved contribution format
             first_post = f"✅ Approved: Contribution #{proposal.proposal_id}\n📝 {proposal.title}\n⭐️ Reward: 1,000 $FACES"
