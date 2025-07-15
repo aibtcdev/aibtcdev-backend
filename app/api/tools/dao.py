@@ -223,9 +223,12 @@ async def _generate_metadata_for_message(message: str) -> tuple[str, str, list]:
             dao_name="",  # Could be enhanced to fetch DAO name if available
             proposal_type="action_proposal",
         )
-        title = metadata_result.get("title", "")
-        summary = metadata_result.get("summary", "")
-        metadata_tags = metadata_result.get("tags", [])
+
+        # Extract the nested metadata from the orchestrator result
+        metadata = metadata_result.get("metadata", {})
+        title = metadata.get("title", "")
+        summary = metadata.get("summary", "")
+        metadata_tags = metadata.get("tags", [])
 
     except Exception as e:
         logger.error(f"Failed to generate title and metadata: {str(e)}")
