@@ -14,10 +14,12 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import sys
 from uuid import UUID
 
-sys.path.insert(0, ".")
+# Add the parent directory (root) to the path to import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.ai.simple_workflows import evaluate_proposal_comprehensive
 from app.backend.factory import get_backend

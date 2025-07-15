@@ -12,11 +12,12 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import sys
 from uuid import UUID
 
-# Add the current directory to the path so we can import from app
-sys.path.insert(0, ".")
+# Add the parent directory (root) to the path to import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.backend.factory import get_backend
 from app.backend.models import XTweet
