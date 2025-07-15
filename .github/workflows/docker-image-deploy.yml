@@ -65,12 +65,11 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      # Deploy the app to DigitalOcean App Platform (only on push events)
+      # Deploy the app to DigitalOcean App Platform (only on push events, excluding tags)
       - name: Deploy to DigitalOcean App Platform
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && github.ref_type != 'tag' }}
         uses: digitalocean/app_action/deploy@v2
-        env:
-          SAMPLE_DIGEST: ${{ steps.push.outputs.digest }}
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
+          app_name: ${{ secrets.DIGITALOCEAN_APP_NAME }}
