@@ -16,12 +16,13 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import sys
 from datetime import datetime
 from typing import List
 
-# Add the current directory to the Python path
-sys.path.insert(0, ".")
+# Add the parent directory (root) to the path to import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.infrastructure.job_management import (
     JobRegistry,
