@@ -1,9 +1,10 @@
 """Workflow utility functions."""
 
 import binascii
+import json
 import logging
 import re
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -336,6 +337,150 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
     except (binascii.Error, UnicodeDecodeError) as e:
         logger.warning(f"Failed to decode hex string: {str(e)}")
         return None  # Return None if decoding fails
+
+
+def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse agent tool _arun result into standardized format.
+
+    Agent tools (TypeScript) return results in ToolResponse<T> format:
+    {
+        "success": boolean,
+        "message": string,
+        "data": T,  // Contains tool-specific data like txid
+        "output": string | dict  // Raw output that may contain the ToolResponse
+    }
+
+    Args:
+        tool_result: The result dictionary from agent tool _arun method
+
+    Returns:
+        Parsed result dictionary with standardized structure
+
+    Raises:
+        ValueError: If result cannot be parsed or is invalid
+    """
+    if not tool_result or not isinstance(tool_result, dict):
+        raise ValueError("Tool result must be a non-empty dictionary")
+
+    # Extract the output field which contains the actual ToolResponse
+    output = tool_result.get("output")
+    if not output:
+        logger.warning("No output field in tool result, returning as-is")
+        return tool_result
+
+    try:
+        # Parse output if it's a JSON string
+        if isinstance(output, str):
+            try:
+                parsed_output = json.loads(output)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse output as JSON: {str(e)}")
+                # Return original tool_result if output can't be parsed
+                return tool_result
+        else:
+            parsed_output = output
+
+        # Check if parsed output has ToolResponse structure
+        if isinstance(parsed_output, dict) and "success" in parsed_output:
+            # This looks like a ToolResponse, extract data from it
+            result = {
+                "success": parsed_output.get("success", False),
+                "message": parsed_output.get("message", ""),
+                "data": parsed_output.get("data", {}),
+                "raw_output": output,  # Keep original for debugging
+            }
+
+            # Also include any additional fields from the original tool_result
+            for key, value in tool_result.items():
+                if key not in result and key != "output":
+                    result[key] = value
+
+            return result
+        else:
+            # Output doesn't have ToolResponse structure, return original
+            logger.warning("Output doesn't have expected ToolResponse structure")
+            return tool_result
+
+    except Exception as e:
+        logger.error(f"Error parsing agent tool result: {str(e)}")
+        # Return original tool_result if parsing fails
+        return tool_result
+
+
+def extract_transaction_id_from_tool_result(
+    tool_result: Dict[str, Any], fallback_regex_pattern: Optional[str] = None
+) -> Optional[str]:
+    """Extract transaction ID from agent tool result with proper formatting.
+
+    Args:
+        tool_result: The result dictionary from agent tool _arun method
+        fallback_regex_pattern: Optional regex pattern for fallback extraction
+
+    Returns:
+        Transaction ID with proper 0x prefix, or None if not found
+
+    Examples:
+        >>> result = {"output": '{"success": true, "data": {"txid": "abcd1234"}}'}
+        >>> extract_transaction_id_from_tool_result(result)
+        "0xabcd1234"
+
+        >>> result = {"output": "Transaction broadcasted successfully: 0xabcd1234"}
+        >>> extract_transaction_id_from_tool_result(
+        ...     result, r"successfully: (0x[a-fA-F0-9]+)"
+        ... )
+        "0xabcd1234"
+    """
+    try:
+        # First try to parse using standard ToolResponse format
+        parsed_result = parse_agent_tool_result(tool_result)
+
+        # Look for txid in the data field
+        if "data" in parsed_result and isinstance(parsed_result["data"], dict):
+            raw_tx_id = parsed_result["data"].get("txid")
+
+            if raw_tx_id:
+                # Ensure tx_id always has 0x prefix
+                tx_id = raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
+                logger.debug(f"Extracted transaction ID from data field: {tx_id}")
+                return tx_id
+
+        # If not found in data field, try to extract from raw output using regex
+        if fallback_regex_pattern:
+            output = tool_result.get("output", "")
+            if isinstance(output, str):
+                match = re.search(fallback_regex_pattern, output)
+                if match:
+                    raw_tx_id = match.group(1)
+                    # Ensure tx_id always has 0x prefix
+                    tx_id = (
+                        raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
+                    )
+                    logger.debug(
+                        f"Extracted transaction ID using regex fallback: {tx_id}"
+                    )
+                    return tx_id
+
+        logger.warning("No transaction ID found in tool result")
+        return None
+
+    except Exception as e:
+        logger.error(f"Error extracting transaction ID from tool result: {str(e)}")
+        return None
+
+
+def ensure_tx_id_prefix(tx_id: Optional[str]) -> Optional[str]:
+    """Ensure transaction ID has proper 0x prefix.
+
+    Args:
+        tx_id: The transaction ID string
+
+    Returns:
+        Transaction ID with 0x prefix, or None if input is None/empty
+    """
+    if not tx_id:
+        return None
+
+    return tx_id if tx_id.startswith("0x") else f"0x{tx_id}"
 
 
 # Model pricing data (move this to a config or constants file later if needed)
