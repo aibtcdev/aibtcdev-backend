@@ -1,6 +1,5 @@
 """DAO proposal voter task implementation."""
 
-import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -270,34 +269,19 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                try:
-                    # Parse the output JSON string
-                    output_data = (
-                        json.loads(vote_result["output"])
-                        if isinstance(vote_result["output"], str)
-                        else vote_result["output"]
+                # Extract transaction ID using shared utility function
+                from app.lib.utils import extract_transaction_id_from_tool_result
+
+                tx_id = extract_transaction_id_from_tool_result(vote_result)
+
+                if not tx_id:
+                    logger.warning(
+                        f"No transaction ID found in vote result: {vote_result}"
                     )
-                    # Get the transaction ID from the nested data structure
-                    tx_id = output_data.get("data", {}).get("txid")
-
-                    if not tx_id:
-                        logger.warning(f"No txid found in parsed output: {output_data}")
-                        results.append(
-                            {
-                                "success": False,
-                                "error": "No transaction ID found in response",
-                                "vote_id": vote.id,
-                                "vote_result": vote_result,
-                            }
-                        )
-                        continue
-
-                except (json.JSONDecodeError, KeyError) as e:
-                    logger.error(f"Error parsing vote result output: {str(e)}")
                     results.append(
                         {
                             "success": False,
-                            "error": f"Failed to parse vote result: {str(e)}",
+                            "error": "No transaction ID found in response",
                             "vote_id": vote.id,
                             "vote_result": vote_result,
                         }
