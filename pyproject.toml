@@ -15,7 +15,7 @@ dependencies = [
     "langchain-core>=0.3.56,<1.0.0",
     "langchain-openai==0.3.28",
     "langchain-text-splitters==0.3.8",
-    "langgraph==0.5.2",
+    "langgraph==0.5.3",
     "openai==1.93.0",
     "pgvector<=0.4.1",
     "psycopg2-binary==2.9.10",
@@ -35,7 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 testing = [
     "pytest==8.4.1",
-    "pytest-asyncio==1.0.0",
+    "pytest-asyncio==1.1.0",
     "pytest-mock==3.14.1",
     "responses==0.25.7",
 ]
