@@ -764,7 +764,6 @@ class VoteBase(CustomBaseModel):
     address: Optional[str] = None
     amount: Optional[str] = None  # String to handle large token amounts
     confidence: Optional[float] = None
-    prompt: Optional[str] = None
     voted: Optional[bool] = None
     cost: Optional[float] = None
     model: Optional[str] = None

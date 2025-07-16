@@ -1,5 +1,4 @@
 from typing import List, Optional
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -71,15 +70,17 @@ async def _create_proposal_from_tool_result(
             logger.warning("No output in tool result")
             return None
 
-        # Extract transaction ID from the output
-        tx_id_match = re.search(
-            r"Transaction broadcasted successfully: (0x[a-fA-F0-9]+)", output
+        # Extract transaction ID using shared utility function
+        from app.lib.utils import extract_transaction_id_from_tool_result
+
+        tx_id = extract_transaction_id_from_tool_result(
+            tool_result,
+            fallback_regex_pattern=r"Transaction broadcasted successfully: (0x[a-fA-F0-9]+)",
         )
-        if not tx_id_match:
+
+        if not tx_id:
             logger.warning("Could not extract transaction ID from tool output")
             return None
-
-        tx_id = tx_id_match.group(1)
 
         # Use the voting contract from the original payload since it's no longer in the output
         voting_contract = payload.action_proposals_voting_extension
