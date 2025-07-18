@@ -546,10 +546,18 @@ class XTweetBase(CustomBaseModel):
     entities: Optional[Dict[str, Any]] = None  # URLs, hashtags, mentions
     attachments: Optional[Dict[str, Any]] = None  # Media attachments info
     # New fields for Bitcoin face analysis
-    author_profile_data: Optional[Dict[str, Any]] = None  # Complete author profile information
-    author_pfp_analysis: Optional[Dict[str, Any]] = None  # Bitcoin face probabilities for profile picture
-    author_keywords: Optional[Dict[str, Any]] = None  # Keyword detection results from description
-    tweet_images_analysis: Optional[List[Dict[str, Any]]] = None  # Bitcoin face analysis for tweet images
+    author_profile_data: Optional[Dict[str, Any]] = (
+        None  # Complete author profile information
+    )
+    author_pfp_analysis: Optional[Dict[str, Any]] = (
+        None  # Bitcoin face probabilities for profile picture
+    )
+    author_keywords: Optional[Dict[str, Any]] = (
+        None  # Keyword detection results from description
+    )
+    tweet_images_analysis: Optional[List[Dict[str, Any]]] = (
+        None  # Bitcoin face analysis for tweet images
+    )
 
 
 class XTweetCreate(XTweetBase):
