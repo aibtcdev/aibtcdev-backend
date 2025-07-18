@@ -1,6 +1,13 @@
 import re
+import os
+import requests
+import json
+import base64
+import io
 from typing import Any, Dict, List, Optional
 from uuid import UUID
+from PIL import Image
+from dotenv import load_dotenv
 
 from app.backend.factory import backend
 from app.backend.models import (
@@ -15,7 +22,156 @@ from app.services.communication.twitter_service import (
     create_twitter_service_from_config,
 )
 
+# Load environment variables
+load_dotenv()
+
 logger = configure_logger(__name__)
+
+
+
+def analyze_bitcoin_face(image_url):
+    """
+    Analyze an image URL to detect if it's a Bitcoin face using HuggingFace API
+    
+    Args:
+        image_url (str): URL of the image to analyze
+        
+    Returns:
+        dict: Bitcoin face analysis results with probabilities
+    """
+    if not image_url:
+        return {"error": "No image URL provided"}
+    
+    try:
+        # HuggingFace API endpoint
+        api_url = "https://y6jjb2j690h8f960.us-east-1.aws.endpoints.huggingface.cloud"
+        token = os.getenv("HUGGING_FACE")
+        
+        if not token:
+            return {"error": "HUGGING_FACE token not found in environment"}
+        
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Fetch and encode image
+        response = requests.get(image_url, timeout=30)
+        response.raise_for_status()
+        
+        image = Image.open(io.BytesIO(response.content)).convert('RGB')
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        
+        # Call HuggingFace API
+        payload = {
+            "inputs": f"data:image/jpeg;base64,{img_str}",
+            "confidence_threshold": 0.7
+        }
+        
+        response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        # Extract probabilities from result
+        if isinstance(result, list) and len(result) > 0:
+            return result[0].get('probabilities', {})
+        
+        return {"error": "No analysis results returned"}
+        
+    except requests.exceptions.ConnectionError:
+        return {"error": "HuggingFace API not available"}
+    except Exception as e:
+        return {"error": f"Analysis failed: {str(e)}"}
+
+
+def fetch_user_profile(username):
+    """
+    Fetch user profile data by username
+    
+    Args:
+        username (str): Twitter/X username (without @)
+        
+    Returns:
+        dict: User profile data
+    """
+    token = os.getenv('DAOROUNDUP_BEARER_TOKEN')
+    if not token:
+        return {"error": "Missing API token", "details": "DAOROUNDUP_BEARER_TOKEN not found in environment"}
+    
+    url = f"https://api.twitter.com/2/users/by/username/{username}"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    
+    params = {
+        "user.fields": "name,username,verified,verified_type,public_metrics,description,profile_image_url,url,location,created_at,pinned_tweet_id"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            user_data = data.get('data', {})
+            
+            # Get full-size profile image
+            profile_image_url = user_data.get('profile_image_url')
+            if profile_image_url and '_normal.jpg' in profile_image_url:
+                profile_image_url = profile_image_url.replace('_normal.jpg', '.jpg')
+            elif profile_image_url and '_normal.png' in profile_image_url:
+                profile_image_url = profile_image_url.replace('_normal.png', '.png')
+            
+            return {
+                "profile_image_url": profile_image_url,
+                "description": user_data.get('description'),
+                "location": user_data.get('location'),
+                "url": user_data.get('url'),
+                "verified": user_data.get('verified', False),
+                "verified_type": user_data.get('verified_type'),
+                "created_at": user_data.get('created_at'),
+                "pinned_tweet_id": user_data.get('pinned_tweet_id')
+            }
+        else:
+            return {"error": f"API error: {response.status_code}", "details": response.text}
+            
+    except Exception as e:
+        return {"error": f"Request failed: {str(e)}"}
+
+
+def detect_keywords_in_description(description):
+    """
+    Detect specific keywords in user description
+    
+    Args:
+        description (str): User bio/description text
+        
+    Returns:
+        dict: Contains found keywords and detection results
+    """
+    if not description:
+        return {"keywords_found": [], "has_keywords": False}
+    
+    # Keywords to search for (case-insensitive)
+    target_keywords = ["FACES", "$FACES", "AIBTC"]
+    found_keywords = []
+    
+    # Convert description to uppercase for case-insensitive search
+    description_upper = description.upper()
+    
+    # Check for each keyword
+    for keyword in target_keywords:
+        if keyword.upper() in description_upper:
+            found_keywords.append(keyword)
+    
+    return {
+        "keywords_found": found_keywords,
+        "has_keywords": len(found_keywords) > 0,
+        "keyword_count": len(found_keywords)
+    }
 
 
 class TwitterDataService:
@@ -353,6 +509,46 @@ class TwitterDataService:
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
 
+            # Fetch author profile data and analyze Bitcoin face
+            author_profile_data = {}
+            author_pfp_analysis = {}
+            author_keywords = {}
+            
+            author_username = tweet_data.get("author_username")
+            if author_username:
+                try:
+                    profile_data = fetch_user_profile(author_username)
+                    if not profile_data.get("error"):
+                        author_profile_data = profile_data
+                        
+                        # Analyze profile image for Bitcoin face
+                        profile_image_url = profile_data.get("profile_image_url")
+                        if profile_image_url:
+                            pfp_analysis = analyze_bitcoin_face(profile_image_url)
+                            if not pfp_analysis.get("error"):
+                                author_pfp_analysis = pfp_analysis
+                        
+                        # Detect keywords in description
+                        description = profile_data.get("description")
+                        if description:
+                            author_keywords = detect_keywords_in_description(description)
+                            
+                except Exception as e:
+                    logger.warning(f"Error fetching author profile for {author_username}: {str(e)}")
+
+            # Analyze tweet images for Bitcoin faces
+            tweet_images_analysis = []
+            for image_url in image_urls:
+                try:
+                    image_analysis = analyze_bitcoin_face(image_url)
+                    if not image_analysis.get("error"):
+                        tweet_images_analysis.append({
+                            "image_url": image_url,
+                            "analysis": image_analysis
+                        })
+                except Exception as e:
+                    logger.warning(f"Error analyzing tweet image {image_url}: {str(e)}")
+
             # Create tweet record
             tweet_create_data = XTweetCreate(
                 message=tweet_data.get("text"),
@@ -370,6 +566,11 @@ class TwitterDataService:
                 public_metrics=tweet_data.get("public_metrics"),
                 entities=tweet_data.get("entities"),
                 attachments=tweet_data.get("attachments"),
+                # New fields for Bitcoin face analysis
+                author_profile_data=author_profile_data,
+                author_pfp_analysis=author_pfp_analysis,
+                author_keywords=author_keywords,
+                tweet_images_analysis=tweet_images_analysis,
             )
 
             tweet_record = backend.create_x_tweet(tweet_create_data)
