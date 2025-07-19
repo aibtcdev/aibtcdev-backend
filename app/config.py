@@ -95,8 +95,8 @@ class HuggingFaceConfig:
     """Configuration for HuggingFace API."""
 
     api_url: str = os.getenv(
-        "AIBTC_HUGGINGFACE_API_URL", 
-        "https://y6jjb2j690h8f960.us-east-1.aws.endpoints.huggingface.cloud"
+        "AIBTC_HUGGINGFACE_API_URL",
+        "https://y6jjb2j690h8f960.us-east-1.aws.endpoints.huggingface.cloud",
     )
     token: str = os.getenv("HUGGING_FACE", "")
 
