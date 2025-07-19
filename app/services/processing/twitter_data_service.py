@@ -21,6 +21,7 @@ from app.lib.logger import configure_logger
 from app.services.communication.twitter_service import (
     create_twitter_service_from_config,
 )
+from app.config import config
 
 # Load environment variables
 load_dotenv()
@@ -42,9 +43,9 @@ def analyze_bitcoin_face(image_url):
         return {"error": "No image URL provided"}
 
     try:
-        # HuggingFace API endpoint
-        api_url = "https://y6jjb2j690h8f960.us-east-1.aws.endpoints.huggingface.cloud"
-        token = os.getenv("HUGGING_FACE")
+        # HuggingFace API endpoint from config
+        api_url = config.huggingface.api_url
+        token = config.huggingface.token
 
         if not token:
             return {"error": "HUGGING_FACE token not found in environment"}
