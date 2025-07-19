@@ -450,13 +450,28 @@ def create_chat_messages(
 
     # Add tweet content as separate user message if available
     if tweet_content and tweet_content.strip():
+        # Safely escape tweet content to prevent JSON/format issues
+        escaped_tweet_content = str(tweet_content)
+        # Remove or replace control characters (keep common whitespace)
+        escaped_tweet_content = "".join(
+            char
+            for char in escaped_tweet_content
+            if ord(char) >= 32 or char in "\n\r\t"
+        )
+        # Escape curly braces to prevent f-string/format interpretation issues
+        escaped_tweet_content = escaped_tweet_content.replace("{", "{{").replace(
+            "}", "}}"
+        )
+
         messages.append(
             {
                 "role": "user",
-                "content": f"Referenced tweets in this proposal:\n\n{tweet_content}",
+                "content": f"Referenced tweets in this proposal:\n\n{escaped_tweet_content}",
             }
         )
-        logger.debug(f"Added tweet content to messages: {tweet_content}")
+        logger.debug(
+            f"Added escaped tweet content to messages: {escaped_tweet_content[:100]}..."
+        )
 
     # Create user message content - start with text
     user_message_content = [{"type": "text", "text": user_content}]
@@ -525,7 +540,7 @@ async def evaluate_proposal(
                     # Format tweet content using twitter processor
                     tweet_content = format_tweet(tweet_data)
                     logger.debug(
-                        f"[EvaluationProcessor:{proposal_id_str}] Retrieved and formatted tweet content: {tweet_content[:100]}..."
+                        f"[EvaluationProcessor:{proposal_id_str}] Retrieved and formatted tweet content: {tweet_content}"
                     )
 
                     # Also extract any images from the linked tweet
