@@ -40,6 +40,10 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "entities": tweet.entities or {},
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
+            "author_profile_data": tweet.author_profile_data or {},
+            "author_pfp_analysis": tweet.author_pfp_analysis or {},
+            "author_keywords": tweet.author_keywords or {},
+            "tweet_images_analysis": tweet.tweet_images_analysis or [],
         }
 
         logger.debug(f"Retrieved tweet data for ID {tweet_db_id}")
@@ -81,6 +85,10 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
   <author>{author_name} (@{author_username})</author>
   <created_at>{created_str}</created_at>
   <text>{text}</text>
+  <author_profile_data>{tweet_data.get("author_profile_data", "")}</author_profile_data>
+  <author_pfp_analysis>{tweet_data.get("author_pfp_analysis", "")}</author_pfp_analysis>
+  <author_keywords>{tweet_data.get("author_keywords", "")}</author_keywords>
+  <tweet_images_analysis>{tweet_data.get("tweet_images_analysis", "")}</tweet_images_analysis>
 </tweet>
 """
         return formatted_tweet.strip()
