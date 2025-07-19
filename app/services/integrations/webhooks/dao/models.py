@@ -16,6 +16,7 @@ class ContractType(str, Enum):
     EXTENSIONS = "EXTENSIONS"
     PROPOSALS = "PROPOSALS"
     TOKEN = "TOKEN"
+    TRADING = "TRADING"
 
 
 class ClarityVersion(int, Enum):
@@ -35,6 +36,7 @@ class ContractCategory(str, Enum):
     PROPOSALS = "PROPOSALS"
     EXTERNAL = "EXTERNAL"
     TOKEN = "TOKEN"
+    TRADING = "TRADING"
 
 
 # Contract subtypes for each type
