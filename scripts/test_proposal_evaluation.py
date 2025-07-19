@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple CLI test script for proposal evaluation workflow (multi-agent).
+Simple CLI test script for comprehensive proposal evaluation.
 
-This test uses the multi-agent ProposalEvaluationWorkflow that runs multiple
-specialized agents (core, financial, historical, social, reasoning) in sequence.
+This test uses the comprehensive proposal evaluation workflow that analyzes
+proposals using a single comprehensive agent with multiple evaluation criteria.
 
 Usage:
     python test_proposal_evaluation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
@@ -27,11 +27,11 @@ from app.backend.factory import get_backend
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Test proposal evaluation workflow (multi-agent)",
+        description="Test comprehensive proposal evaluation workflow",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic multi-agent evaluation with proposal data
+  # Basic comprehensive evaluation with proposal data
   python test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
     --proposal-data "Proposal to fund development of new feature"
   
@@ -62,21 +62,9 @@ Examples:
 
     # Optional arguments
     parser.add_argument(
-        "--agent-id",
-        type=str,
-        help="ID of the agent",
-    )
-
-    parser.add_argument(
         "--dao-id",
         type=str,
         help="ID of the DAO",
-    )
-
-    parser.add_argument(
-        "--profile-id",
-        type=str,
-        help="ID of the profile",
     )
 
     parser.add_argument(
@@ -87,16 +75,10 @@ Examples:
         help="Debug level: 0=normal, 1=verbose, 2=very verbose (default: 0)",
     )
 
-    parser.add_argument(
-        "--model-name",
-        type=str,
-        help="Override the default model name for evaluation",
-    )
-
     args = parser.parse_args()
 
     # If proposal_content is not provided, look it up from the database
-    proposal_content = args.proposal_content
+    proposal_content = args.proposal_data
     if not proposal_content:
         print("📋 No proposal data provided, looking up from database...")
         try:
@@ -129,119 +111,116 @@ Examples:
             print(f"❌ Error looking up proposal: {e}")
             sys.exit(1)
 
-    print("🚀 Starting Multi-Agent Proposal Evaluation Test")
+    print("🚀 Starting Comprehensive Proposal Evaluation Test")
     print("=" * 60)
     print(f"Proposal ID: {args.proposal_id}")
     print(
         f"Proposal Data: {proposal_content[:100]}{'...' if len(proposal_content) > 100 else ''}"
     )
-    print(f"Agent ID: {args.agent_id}")
     print(f"DAO ID: {args.dao_id}")
-    print(f"Profile ID: {args.profile_id}")
     print(f"Debug Level: {args.debug_level}")
-    print(f"Model Name: {args.model_name}")
     print("=" * 60)
-    print("🧠 Using Multi-Agent ProposalEvaluationWorkflow")
+    print("🧠 Using Comprehensive Proposal Evaluation")
     print("=" * 60)
 
     try:
-        # Set up config
-        config = {
-            "debug_level": args.debug_level,
-        }
+        # Convert dao_id to UUID if provided
+        dao_uuid = None
+        if args.dao_id:
+            try:
+                dao_uuid = UUID(args.dao_id)
+            except ValueError as e:
+                print(f"❌ Warning: Invalid DAO ID format: {e}")
 
-        if args.model_name:
-            config["model_name"] = args.model_name
-
-        if args.debug_level >= 1:
-            # For verbose debugging, customize agent settings
-            config["approval_threshold"] = 70
-            config["veto_threshold"] = 30
-            config["consensus_threshold"] = 10
-
-        # Run multi-agent evaluation
-        print("🔍 Running multi-agent evaluation...")
+        # Run comprehensive evaluation
+        print("🔍 Running comprehensive evaluation...")
         result = await evaluate_proposal(
-            proposal_id=args.proposal_id,
             proposal_content=proposal_content,
-            config=config,
-            dao_id=args.dao_id,
-            agent_id=args.agent_id,
-            profile_id=args.profile_id,
+            dao_id=dao_uuid,
+            proposal_id=args.proposal_id,
         )
 
-        print("\n✅ Multi-Agent Evaluation Complete!")
+        print("\n✅ Comprehensive Evaluation Complete!")
         print("=" * 60)
 
         # Pretty print the result
-        if "error" in result:
-            print(f"❌ Error: {result['error']}")
-        else:
-            print("📊 Multi-Agent Evaluation Results:")
-            print(
-                f"   • Approval: {'✅ APPROVE' if result.get('approve') else '❌ REJECT'}"
-            )
-            print(f"   • Overall Score: {result.get('overall_score', 0)}")
-            print(f"   • Evaluation Type: {result.get('evaluation_type', 'unknown')}")
+        print("📊 Comprehensive Evaluation Results:")
+        print(f"   • Decision: {'✅ APPROVE' if result.decision else '❌ REJECT'}")
+        print(f"   • Final Score: {result.final_score}")
 
-            # Show reasoning (truncated for readability)
-            reasoning = result.get("reasoning", "N/A")
-            if len(reasoning) > 500:
-                reasoning = reasoning[:500] + "... (truncated)"
-            print(f"   • Reasoning: {reasoning}")
+        # Show explanation (truncated for readability)
+        explanation = result.explanation or "N/A"
+        if len(explanation) > 500:
+            explanation = explanation[:500] + "... (truncated)"
+        print(f"   • Explanation: {explanation}")
 
-            scores = result.get("scores", {})
-            if scores:
-                print("   • Detailed Scores:")
-                for score_type, score_value in scores.items():
-                    print(f"     - {score_type.title()}: {score_value}")
+        # Show summary
+        summary = result.summary or "N/A"
+        if len(summary) > 300:
+            summary = summary[:300] + "... (truncated)"
+        print(f"   • Summary: {summary}")
 
-            flags = result.get("flags", [])
-            if flags:
-                print(f"   • Flags: {', '.join(flags[:5])}")  # Show first 5 flags
-                if len(flags) > 5:
-                    print(f"     ... and {len(flags) - 5} more flags")
+        # Show category scores
+        if result.categories:
+            print("   • Category Scores:")
+            for category in result.categories:
+                if hasattr(category, "category") and hasattr(category, "score"):
+                    print(f"     - {category.category}: {category.score}")
+                    if hasattr(category, "weight"):
+                        print(f"       Weight: {category.weight:.1%}")
+                    if hasattr(category, "reasoning") and category.reasoning:
+                        print(
+                            f"       Reasoning: {'; '.join(category.reasoning[:2])}"
+                        )  # Show first 2 points
 
-            token_usage = result.get("token_usage", {})
-            if token_usage:
-                print("   • Token Usage:")
-                print(f"     - Input: {token_usage.get('input_tokens', 0):,}")
-                print(f"     - Output: {token_usage.get('output_tokens', 0):,}")
-                print(f"     - Total: {token_usage.get('total_tokens', 0):,}")
+        # Show flags
+        if result.flags:
+            print(f"   • Flags: {', '.join(result.flags[:5])}")  # Show first 5 flags
+            if len(result.flags) > 5:
+                print(f"     ... and {len(result.flags) - 5} more flags")
 
-            workflow_step = result.get("workflow_step", "unknown")
-            completed_steps = result.get("completed_steps", [])
-            if workflow_step or completed_steps:
-                print("   • Workflow Progress:")
-                print(f"     - Current Step: {workflow_step}")
-                if completed_steps:
-                    print(f"     - Completed Steps: {', '.join(completed_steps)}")
+        # Show token usage
+        if result.token_usage:
+            print("   • Token Usage:")
+            print(f"     - Input: {result.token_usage.get('input_tokens', 0):,}")
+            print(f"     - Output: {result.token_usage.get('output_tokens', 0):,}")
+            print(f"     - Total: {result.token_usage.get('total_tokens', 0):,}")
 
-            summaries = result.get("summaries", {})
-            if summaries and args.debug_level >= 1:
-                print("   • Summaries:")
-                for summary_type, summary_text in summaries.items():
-                    truncated_summary = (
-                        summary_text[:200] + "..."
-                        if len(summary_text) > 200
-                        else summary_text
-                    )
-                    print(
-                        f"     - {summary_type.replace('_', ' ').title()}: {truncated_summary}"
-                    )
+        # Show images processed
+        if result.images_processed > 0:
+            print(f"   • Images Processed: {result.images_processed}")
 
         print("\n📄 Full Result JSON:")
-        print(json.dumps(result, indent=2, default=str))
+        # Convert result to dictionary for JSON serialization
+        result_dict = {
+            "decision": result.decision,
+            "final_score": result.final_score,
+            "explanation": result.explanation,
+            "summary": result.summary,
+            "categories": [
+                {
+                    "category": getattr(cat, "category", "Unknown"),
+                    "score": getattr(cat, "score", 0),
+                    "weight": getattr(cat, "weight", 0.0),
+                    "reasoning": getattr(cat, "reasoning", []),
+                }
+                for cat in (result.categories or [])
+            ],
+            "flags": result.flags or [],
+            "token_usage": result.token_usage or {},
+            "images_processed": result.images_processed,
+        }
+        print(json.dumps(result_dict, indent=2, default=str))
 
     except Exception as e:
-        print(f"\n❌ Error during multi-agent evaluation: {str(e)}")
+        print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
         if args.debug_level >= 1:
             import traceback
 
             traceback.print_exc()
         sys.exit(1)
 
-    print("\n🎉 Multi-agent evaluation test completed successfully!")
+    print("\n🎉 Comprehensive evaluation test completed successfully!")
 
 
 if __name__ == "__main__":

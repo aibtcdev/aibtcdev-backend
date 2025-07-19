@@ -24,7 +24,7 @@ logger = configure_logger(__name__)
 async def evaluate_proposal_comprehensive(
     proposal_content: str,
     dao_id: Optional[UUID] = None,
-    proposal_id: str = "unknown",
+    proposal_id: Optional[UUID] = None,
     tweet_db_ids: Optional[List[UUID]] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
@@ -35,8 +35,8 @@ async def evaluate_proposal_comprehensive(
     Args:
         proposal_content: The proposal content to evaluate
         dao_id: Optional DAO ID for context
-        proposal_id: Proposal ID for logging
-        tweet_db_ids: Optional list of tweet database IDs to process
+        proposal_id: Optional proposal UUID (will fetch linked tweet content automatically)
+        tweet_db_ids: Optional list of additional tweet database IDs to process
         custom_system_prompt: Optional custom system prompt
         custom_user_prompt: Optional custom user prompt
         streaming: Whether to enable streaming
@@ -44,8 +44,9 @@ async def evaluate_proposal_comprehensive(
     Returns:
         Dictionary containing comprehensive evaluation results
     """
+    proposal_id_str = str(proposal_id) if proposal_id else "unknown"
     logger.info(
-        f"[Orchestrator] Starting comprehensive evaluation for proposal {proposal_id}"
+        f"[Orchestrator] Starting comprehensive evaluation for proposal {proposal_id_str}"
     )
 
     try:
@@ -56,29 +57,31 @@ async def evaluate_proposal_comprehensive(
             callbacks = [callback_handler]
 
         # Step 1: Process images from proposal content
-        logger.debug(f"[Orchestrator:{proposal_id}] Processing images")
-        images = await process_images(proposal_content, proposal_id)
-        logger.debug(f"[Orchestrator:{proposal_id}] Found {len(images)} images")
+        logger.debug(f"[Orchestrator:{proposal_id_str}] Processing images")
+        images = await process_images(proposal_content, proposal_id_str)
+        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(images)} images")
 
-        # Step 2: Process tweets if provided
+        # Step 2: Process tweets if provided (additional tweets beyond proposal's linked tweet)
         tweet_content = ""
         tweet_images = []
         if tweet_db_ids:
             logger.debug(
-                f"[Orchestrator:{proposal_id}] Processing {len(tweet_db_ids)} tweets"
+                f"[Orchestrator:{proposal_id_str}] Processing {len(tweet_db_ids)} additional tweets"
             )
             tweet_content, tweet_images = await process_tweets(
-                tweet_db_ids, proposal_id
+                tweet_db_ids, proposal_id_str
             )
             logger.debug(
-                f"[Orchestrator:{proposal_id}] Processed tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
+                f"[Orchestrator:{proposal_id_str}] Processed additional tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
             )
 
         # Step 3: Combine all images
         all_images = images + tweet_images
 
         # Step 4: Run comprehensive evaluation
-        logger.debug(f"[Orchestrator:{proposal_id}] Running comprehensive evaluation")
+        logger.debug(
+            f"[Orchestrator:{proposal_id_str}] Running comprehensive evaluation"
+        )
         evaluation_result = await evaluate_proposal(
             proposal_content=proposal_content,
             dao_id=dao_id,
@@ -96,7 +99,7 @@ async def evaluate_proposal_comprehensive(
             if hasattr(evaluation_result, "model_dump")
             else evaluation_result,
             "processing_metadata": {
-                "proposal_id": proposal_id,
+                "proposal_id": proposal_id_str,
                 "dao_id": str(dao_id) if dao_id else None,
                 "images_processed": len(images),
                 "tweet_images_processed": len(tweet_images),
@@ -112,13 +115,13 @@ async def evaluate_proposal_comprehensive(
             result["streaming_queue"] = callbacks[0].queue
 
         logger.info(
-            f"[Orchestrator] Completed comprehensive evaluation for proposal {proposal_id}"
+            f"[Orchestrator] Completed comprehensive evaluation for proposal {proposal_id_str}"
         )
         return result
 
     except Exception as e:
         logger.error(
-            f"[Orchestrator] Error in comprehensive evaluation for proposal {proposal_id}: {str(e)}"
+            f"[Orchestrator] Error in comprehensive evaluation for proposal {proposal_id_str}: {str(e)}"
         )
         return {
             "error": str(e),
@@ -133,7 +136,7 @@ async def evaluate_proposal_comprehensive(
                 "images_processed": 0,
             },
             "processing_metadata": {
-                "proposal_id": proposal_id,
+                "proposal_id": proposal_id_str,
                 "dao_id": str(dao_id) if dao_id else None,
                 "images_processed": 0,
                 "tweet_images_processed": 0,
@@ -324,37 +327,38 @@ async def generate_proposal_recommendation(
 async def process_proposal_content(
     proposal_content: str,
     tweet_db_ids: Optional[List[UUID]] = None,
-    proposal_id: str = "unknown",
+    proposal_id: Optional[UUID] = None,
 ) -> Dict[str, Any]:
     """Process proposal content to extract images and tweets.
 
     Args:
         proposal_content: The proposal content to process
         tweet_db_ids: Optional list of tweet database IDs to process
-        proposal_id: Proposal ID for logging
+        proposal_id: Optional proposal UUID for logging
 
     Returns:
         Dictionary containing processed content
     """
-    logger.info(f"[Orchestrator] Processing content for proposal {proposal_id}")
+    proposal_id_str = str(proposal_id) if proposal_id else "unknown"
+    logger.info(f"[Orchestrator] Processing content for proposal {proposal_id_str}")
 
     try:
         # Step 1: Process images from proposal content
-        images = await process_images(proposal_content, proposal_id)
-        logger.debug(f"[Orchestrator:{proposal_id}] Found {len(images)} images")
+        images = await process_images(proposal_content, proposal_id_str)
+        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(images)} images")
 
         # Step 2: Process tweets if provided
         tweet_content = ""
         tweet_images = []
         if tweet_db_ids:
             logger.debug(
-                f"[Orchestrator:{proposal_id}] Processing {len(tweet_db_ids)} tweets"
+                f"[Orchestrator:{proposal_id_str}] Processing {len(tweet_db_ids)} tweets"
             )
             tweet_content, tweet_images = await process_tweets(
-                tweet_db_ids, proposal_id
+                tweet_db_ids, proposal_id_str
             )
             logger.debug(
-                f"[Orchestrator:{proposal_id}] Processed tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
+                f"[Orchestrator:{proposal_id_str}] Processed tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
             )
 
         # Step 3: Combine all images
@@ -366,7 +370,7 @@ async def process_proposal_content(
             "tweet_images": tweet_images,
             "all_images": all_images,
             "processing_metadata": {
-                "proposal_id": proposal_id,
+                "proposal_id": proposal_id_str,
                 "images_processed": len(images),
                 "tweet_images_processed": len(tweet_images),
                 "total_images": len(all_images),
@@ -376,13 +380,13 @@ async def process_proposal_content(
         }
 
         logger.info(
-            f"[Orchestrator] Completed content processing for proposal {proposal_id}"
+            f"[Orchestrator] Completed content processing for proposal {proposal_id_str}"
         )
         return result
 
     except Exception as e:
         logger.error(
-            f"[Orchestrator] Error processing content for proposal {proposal_id}: {str(e)}"
+            f"[Orchestrator] Error processing content for proposal {proposal_id_str}: {str(e)}"
         )
         return {
             "error": str(e),
@@ -391,7 +395,7 @@ async def process_proposal_content(
             "tweet_images": [],
             "all_images": [],
             "processing_metadata": {
-                "proposal_id": proposal_id,
+                "proposal_id": proposal_id_str,
                 "images_processed": 0,
                 "tweet_images_processed": 0,
                 "total_images": 0,
@@ -405,7 +409,7 @@ async def process_proposal_content(
 async def comprehensive_evaluation(
     proposal_content: str,
     dao_id: Optional[UUID] = None,
-    proposal_id: str = "unknown",
+    proposal_id: Optional[UUID] = None,
     tweet_db_ids: Optional[List[UUID]] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,

@@ -20,6 +20,11 @@ from app.services.ai.simple_workflows.models import (
     ComprehensiveEvaluatorAgentProcessOutput,
     ComprehensiveEvaluationOutput,
 )
+from app.services.ai.simple_workflows.processors.twitter import (
+    fetch_tweet,
+    format_tweet,
+    format_tweet_images,
+)
 
 logger = configure_logger(__name__)
 
@@ -445,11 +450,27 @@ def create_chat_messages(
 
     # Add tweet content as separate user message if available
     if tweet_content and tweet_content.strip():
+        # Safely escape tweet content to prevent JSON/format issues
+        escaped_tweet_content = str(tweet_content)
+        # Remove or replace control characters (keep common whitespace)
+        escaped_tweet_content = "".join(
+            char
+            for char in escaped_tweet_content
+            if ord(char) >= 32 or char in "\n\r\t"
+        )
+        # Escape curly braces to prevent f-string/format interpretation issues
+        escaped_tweet_content = escaped_tweet_content.replace("{", "{{").replace(
+            "}", "}}"
+        )
+
         messages.append(
             {
                 "role": "user",
-                "content": f"Referenced tweets in this proposal:\n\n{tweet_content}",
+                "content": f"Referenced tweets in this proposal:\n\n{escaped_tweet_content}",
             }
+        )
+        logger.debug(
+            f"Added escaped tweet content to messages: {escaped_tweet_content[:100]}..."
         )
 
     # Create user message content - start with text
@@ -474,7 +495,7 @@ def create_chat_messages(
 async def evaluate_proposal(
     proposal_content: str,
     dao_id: Optional[UUID] = None,
-    proposal_id: str = "unknown",
+    proposal_id: Optional[UUID] = None,
     images: Optional[List[Dict[str, Any]]] = None,
     tweet_content: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
@@ -486,9 +507,9 @@ async def evaluate_proposal(
     Args:
         proposal_content: The proposal content to evaluate
         dao_id: Optional DAO ID for context
-        proposal_id: Proposal ID for logging
+        proposal_id: Optional proposal UUID for fetching linked tweet content
         images: Optional list of processed images
-        tweet_content: Optional tweet content
+        tweet_content: Optional tweet content (will be fetched from DB if proposal_id provided)
         custom_system_prompt: Optional custom system prompt
         custom_user_prompt: Optional custom user prompt
         callbacks: Optional callback handlers for streaming
@@ -496,9 +517,52 @@ async def evaluate_proposal(
     Returns:
         Comprehensive evaluation output
     """
+    proposal_id_str = str(proposal_id) if proposal_id else "unknown"
     logger.info(
-        f"[EvaluationProcessor:{proposal_id}] Starting comprehensive evaluation"
+        f"[EvaluationProcessor:{proposal_id_str}] Starting comprehensive evaluation"
     )
+
+    # Fetch tweet content from the proposal's linked tweet if available
+    linked_tweet_images = []
+    if proposal_id and not tweet_content:
+        try:
+            logger.debug(
+                f"[EvaluationProcessor:{proposal_id_str}] Fetching proposal to get linked tweet content"
+            )
+            proposal = backend.get_proposal(proposal_id)
+            if proposal and proposal.tweet_id:
+                logger.debug(
+                    f"[EvaluationProcessor:{proposal_id_str}] Found linked tweet_id: {proposal.tweet_id}"
+                )
+                # Use twitter processor to fetch and format tweet content
+                tweet_data = await fetch_tweet(proposal.tweet_id)
+                if tweet_data:
+                    # Format tweet content using twitter processor
+                    tweet_content = format_tweet(tweet_data)
+                    logger.debug(
+                        f"[EvaluationProcessor:{proposal_id_str}] Retrieved and formatted tweet content: {tweet_content}"
+                    )
+
+                    # Also extract any images from the linked tweet
+                    linked_tweet_images = format_tweet_images(
+                        tweet_data, proposal.tweet_id
+                    )
+                    if linked_tweet_images:
+                        logger.debug(
+                            f"[EvaluationProcessor:{proposal_id_str}] Found {len(linked_tweet_images)} images in linked tweet"
+                        )
+                else:
+                    logger.warning(
+                        f"[EvaluationProcessor:{proposal_id_str}] Could not fetch tweet data for tweet_id: {proposal.tweet_id}"
+                    )
+            else:
+                logger.debug(
+                    f"[EvaluationProcessor:{proposal_id_str}] No linked tweet found for proposal"
+                )
+        except Exception as e:
+            logger.error(
+                f"[EvaluationProcessor:{proposal_id_str}] Error fetching linked tweet content: {str(e)}"
+            )
 
     # Ensure proposal content is safely handled as plain text
     if proposal_content:
@@ -513,21 +577,21 @@ async def evaluate_proposal(
     if dao_id:
         try:
             logger.debug(
-                f"[EvaluationProcessor:{proposal_id}] Retrieving DAO mission from database for dao_id: {dao_id}"
+                f"[EvaluationProcessor:{proposal_id_str}] Retrieving DAO mission from database for dao_id: {dao_id}"
             )
             dao = backend.get_dao(dao_id)
             if dao and dao.mission:
                 dao_mission_text = dao.mission
                 logger.debug(
-                    f"[EvaluationProcessor:{proposal_id}] Retrieved DAO mission: {dao_mission_text[:100]}..."
+                    f"[EvaluationProcessor:{proposal_id_str}] Retrieved DAO mission: {dao_mission_text[:100]}..."
                 )
             else:
                 logger.warning(
-                    f"[EvaluationProcessor:{proposal_id}] No DAO found or no mission field for dao_id: {dao_id}"
+                    f"[EvaluationProcessor:{proposal_id_str}] No DAO found or no mission field for dao_id: {dao_id}"
                 )
         except Exception as e:
             logger.error(
-                f"[EvaluationProcessor:{proposal_id}] Error retrieving DAO from database: {str(e)}"
+                f"[EvaluationProcessor:{proposal_id_str}] Error retrieving DAO from database: {str(e)}"
             )
 
     # Get community info (simplified version)
@@ -544,12 +608,12 @@ Recent Community Sentiment: Positive
     try:
         if dao_id:
             dao_proposals = await fetch_dao_proposals(
-                dao_id, exclude_proposal_id=proposal_id
+                dao_id, exclude_proposal_id=proposal_id_str
             )
             past_proposals_db_text = format_proposals_for_context(dao_proposals)
     except Exception as e:
         logger.error(
-            f"[EvaluationProcessor:{proposal_id}] Error fetching/formatting DAO proposals: {str(e)}"
+            f"[EvaluationProcessor:{proposal_id_str}] Error fetching/formatting DAO proposals: {str(e)}"
         )
         past_proposals_db_text = (
             "<no_proposals>No past proposals available due to error.</no_proposals>"
@@ -559,7 +623,7 @@ Recent Community Sentiment: Positive
     past_proposals_vector_text = ""
     try:
         logger.debug(
-            f"[EvaluationProcessor:{proposal_id}] Retrieving similar past proposals from vector store"
+            f"[EvaluationProcessor:{proposal_id_str}] Retrieving similar past proposals from vector store"
         )
         similar_proposals = await retrieve_from_vector_store(
             query=proposal_content[:1000],  # Use first 1000 chars of proposal as query
@@ -574,7 +638,7 @@ Recent Community Sentiment: Positive
         )
     except Exception as e:
         logger.error(
-            f"[EvaluationProcessor:{proposal_id}] Error retrieving similar proposals from vector store: {str(e)}"
+            f"[EvaluationProcessor:{proposal_id_str}] Error retrieving similar proposals from vector store: {str(e)}"
         )
         past_proposals_vector_text = "<no_similar_proposals>No similar past proposals available in vector store.</no_similar_proposals>"
 
@@ -588,6 +652,9 @@ Recent Community Sentiment: Positive
         )
 
     try:
+        # Combine all images (proposal images + linked tweet images)
+        all_proposal_images = (images or []) + linked_tweet_images
+
         # Create chat messages
         messages = create_chat_messages(
             proposal_content=proposal_content,
@@ -595,7 +662,7 @@ Recent Community Sentiment: Positive
             community_info=community_info,
             past_proposals=past_proposals_text
             or "<no_proposals>No past proposals available for comparison.</no_proposals>",
-            proposal_images=images or [],
+            proposal_images=all_proposal_images,
             tweet_content=tweet_content,
             custom_system_prompt=custom_system_prompt,
             custom_user_prompt=custom_user_prompt,
@@ -619,7 +686,7 @@ Recent Community Sentiment: Positive
                 or "reasoning.text" in error_msg
             ):
                 logger.warning(
-                    f"[EvaluationProcessor:{proposal_id}] Grok reasoning token error, retrying with basic invocation: {error_msg}"
+                    f"[EvaluationProcessor:{proposal_id_str}] Grok reasoning token error, retrying with basic invocation: {error_msg}"
                 )
                 # This would require a fallback implementation
                 raise e
@@ -628,10 +695,10 @@ Recent Community Sentiment: Positive
                 raise e
 
         logger.info(
-            f"[EvaluationProcessor:{proposal_id}] Successfully completed comprehensive evaluation"
+            f"[EvaluationProcessor:{proposal_id_str}] Successfully completed comprehensive evaluation"
         )
         logger.info(
-            f"[EvaluationProcessor:{proposal_id}] Decision: {'Approve' if result.decision else 'Reject'}, Final Score: {result.final_score}"
+            f"[EvaluationProcessor:{proposal_id_str}] Decision: {'Approve' if result.decision else 'Reject'}, Final Score: {result.final_score}"
         )
 
         # Return the typed model
@@ -643,12 +710,20 @@ Recent Community Sentiment: Positive
             flags=result.flags,
             summary=result.summary,
             token_usage={},  # Token usage tracking would need to be implemented
-            images_processed=len(images) if images else 0,
+            images_processed=len(all_proposal_images),
         )
     except Exception as e:
         logger.error(
-            f"[EvaluationProcessor:{proposal_id}] Error in comprehensive evaluation: {str(e)}"
+            f"[EvaluationProcessor:{proposal_id_str}] Error in comprehensive evaluation: {str(e)}"
         )
+        # Calculate total images processed (including any linked tweet images that were fetched)
+        total_images = len(images) if images else 0
+        try:
+            total_images += len(linked_tweet_images)
+        except NameError:
+            # linked_tweet_images might not be defined if error occurred early
+            pass
+
         return ComprehensiveEvaluatorAgentProcessOutput(
             categories=[],
             final_score=30,
@@ -657,5 +732,5 @@ Recent Community Sentiment: Positive
             flags=[f"Critical Error: {str(e)}"],
             summary="Evaluation failed due to error",
             token_usage={},
-            images_processed=len(images) if images else 0,
+            images_processed=total_images,
         )

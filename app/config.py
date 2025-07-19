@@ -91,6 +91,17 @@ class EmbeddingConfig:
 
 
 @dataclass
+class HuggingFaceConfig:
+    """Configuration for HuggingFace API."""
+
+    api_url: str = os.getenv(
+        "AIBTC_HUGGINGFACE_API_URL",
+        "https://y6jjb2j690h8f960.us-east-1.aws.endpoints.huggingface.cloud",
+    )
+    token: str = os.getenv("HUGGING_FACE", "")
+
+
+@dataclass
 class SchedulerConfig:
     sync_enabled: bool = (
         os.getenv("AIBTC_SCHEDULE_SYNC_ENABLED", "false").lower() == "true"
@@ -217,6 +228,7 @@ class Config:
     backend_wallet: BackendWalletConfig = field(default_factory=BackendWalletConfig)
     chat_llm: ChatLLMConfig = field(default_factory=ChatLLMConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
+    huggingface: HuggingFaceConfig = field(default_factory=HuggingFaceConfig)
 
     @classmethod
     def load(cls) -> "Config":
