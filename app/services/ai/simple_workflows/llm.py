@@ -211,10 +211,13 @@ async def invoke_llm(
 
     # Handle ChatPromptTemplate
     if isinstance(messages, ChatPromptTemplate):
+        logger.debug(f"Original ChatPromptTemplate: {messages}")
         formatted_messages = messages.format()
+        logger.debug(f"Formatted messages for LLM invocation: {formatted_messages}")
         return await llm.ainvoke(formatted_messages)
 
     # Handle list of BaseMessage
+    logger.debug(f"Messages for LLM invocation: {messages}")
     return await llm.ainvoke(messages)
 
 
@@ -250,10 +253,15 @@ async def invoke_structured(
 
     # Handle ChatPromptTemplate
     if isinstance(messages, ChatPromptTemplate):
+        logger.debug(f"Original ChatPromptTemplate for structured output: {messages}")
         formatted_messages = messages.format()
+        logger.debug(
+            f"Formatted messages for structured LLM invocation: {formatted_messages}"
+        )
         return await structured_llm.ainvoke(formatted_messages)
 
     # Handle list of BaseMessage
+    logger.debug(f"Messages for structured LLM invocation: {messages}")
     return await structured_llm.ainvoke(messages)
 
 
@@ -297,15 +305,27 @@ async def invoke_reasoning(
     if output_schema:
         structured_llm = llm.with_structured_output(output_schema)
         if isinstance(messages, ChatPromptTemplate):
+            logger.debug(
+                f"Original ChatPromptTemplate for reasoning with structured output: {messages}"
+            )
             formatted_messages = messages.format()
+            logger.debug(
+                f"Formatted messages for structured reasoning invocation: {formatted_messages}"
+            )
             return await structured_llm.ainvoke(formatted_messages)
+        logger.debug(f"Messages for structured reasoning invocation: {messages}")
         return await structured_llm.ainvoke(messages)
 
     # Handle regular output
     if isinstance(messages, ChatPromptTemplate):
+        logger.debug(f"Original ChatPromptTemplate for reasoning: {messages}")
         formatted_messages = messages.format()
+        logger.debug(
+            f"Formatted messages for reasoning invocation: {formatted_messages}"
+        )
         return await llm.ainvoke(formatted_messages)
 
+    logger.debug(f"Messages for reasoning invocation: {messages}")
     return await llm.ainvoke(messages)
 
 
