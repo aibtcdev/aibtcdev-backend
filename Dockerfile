@@ -1,7 +1,14 @@
 FROM public.ecr.aws/docker/library/python:3.13-slim
 
-# Install libmagic1 for mime type detection
-RUN apt-get update && apt-get install -y libmagic1
+# Install system dependencies for mime type detection and image processing
+RUN apt-get update && apt-get install -y \
+    libmagic1 \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    libwebp-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the application from the builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
