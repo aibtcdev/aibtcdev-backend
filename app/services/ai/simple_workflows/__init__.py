@@ -11,6 +11,7 @@ Key modules:
 - processors/: Image and Twitter content processing
 - llm: Simplified LLM wrapper utilities
 - streaming: Minimal streaming callback handler
+- prompts/: Centralized prompt management for all workflows
 """
 
 from .orchestrator import (
