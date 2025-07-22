@@ -22,6 +22,11 @@ class AgentAccountApproveContractInput(BaseModel):
             "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
         ],
     )
+    approval_type: str = Field(
+        ...,
+        description="Type of contract approval (e.g., 'VOTING', 'SWAP')",
+        examples=["VOTING", "SWAP", "1", "2"],
+    )
 
 
 class AgentAccountApproveContractTool(BaseTool):
@@ -46,6 +51,7 @@ class AgentAccountApproveContractTool(BaseTool):
         self,
         agent_account_contract: str,
         contract_to_approve: str,
+        approval_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to approve a contract."""
@@ -56,7 +62,7 @@ class AgentAccountApproveContractTool(BaseTool):
                 "data": None,
             }
 
-        args = [agent_account_contract, contract_to_approve]
+        args = [agent_account_contract, contract_to_approve, approval_type]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -69,19 +75,25 @@ class AgentAccountApproveContractTool(BaseTool):
         self,
         agent_account_contract: str,
         contract_to_approve: str,
+        approval_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(agent_account_contract, contract_to_approve, **kwargs)
+        return self._run_script(
+            agent_account_contract, contract_to_approve, approval_type, **kwargs
+        )
 
     async def _arun(
         self,
         agent_account_contract: str,
         contract_to_approve: str,
+        approval_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(agent_account_contract, contract_to_approve, **kwargs)
+        return self._run_script(
+            agent_account_contract, contract_to_approve, approval_type, **kwargs
+        )
 
 
 class AgentAccountRevokeContractInput(BaseModel):
@@ -98,6 +110,11 @@ class AgentAccountRevokeContractInput(BaseModel):
         examples=[
             "ST35K818S3K2GSNEBC3M35GA3W8Q7X72KF4RVM3QA.slow7-action-proposal-voting"
         ],
+    )
+    revocation_type: str = Field(
+        ...,
+        description="Type of contract revocation (e.g., 'VOTING', 'SWAP')",
+        examples=["VOTING", "SWAP", "1", "2"],
     )
 
 
@@ -123,6 +140,7 @@ class AgentAccountRevokeContractTool(BaseTool):
         self,
         agent_account_contract: str,
         contract_to_revoke: str,
+        revocation_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool to revoke a contract."""
@@ -133,7 +151,7 @@ class AgentAccountRevokeContractTool(BaseTool):
                 "data": None,
             }
 
-        args = [agent_account_contract, contract_to_revoke]
+        args = [agent_account_contract, contract_to_revoke, revocation_type]
 
         return BunScriptRunner.bun_run(
             self.wallet_id,
@@ -146,16 +164,22 @@ class AgentAccountRevokeContractTool(BaseTool):
         self,
         agent_account_contract: str,
         contract_to_revoke: str,
+        revocation_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Execute the tool."""
-        return self._run_script(agent_account_contract, contract_to_revoke, **kwargs)
+        return self._run_script(
+            agent_account_contract, contract_to_revoke, revocation_type, **kwargs
+        )
 
     async def _arun(
         self,
         agent_account_contract: str,
         contract_to_revoke: str,
+        revocation_type: str,
         **kwargs,
     ) -> Dict[str, Any]:
         """Async version of the tool."""
-        return self._run_script(agent_account_contract, contract_to_revoke, **kwargs)
+        return self._run_script(
+            agent_account_contract, contract_to_revoke, revocation_type, **kwargs
+        )
