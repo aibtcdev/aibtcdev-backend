@@ -66,7 +66,7 @@ async def approve_agent_account_contract(
         wallet = wallets[0]  # Get the first wallet for this agent
 
         logger.info(
-            f"Using wallet {wallet.id} for profile {profile.id} to approve contract {payload.contract_to_approve} for agent account {payload.agent_account_contract}."
+            f"Using wallet {wallet.id} for profile {profile.id} to approve contract {payload.contract_to_approve} for agent account {payload.agent_account_contract} of type {payload.approval_type}."
         )
 
         # Initialize and execute the agent account approve contract tool
@@ -74,6 +74,7 @@ async def approve_agent_account_contract(
         result = await tool._arun(
             agent_account_contract=payload.agent_account_contract,
             contract_to_approve=payload.contract_to_approve,
+            approval_type=payload.approval_type
         )
 
         logger.debug(
