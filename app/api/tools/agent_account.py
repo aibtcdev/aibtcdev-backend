@@ -74,7 +74,7 @@ async def approve_agent_account_contract(
         result = await tool._arun(
             agent_account_contract=payload.agent_account_contract,
             contract_to_approve=payload.contract_to_approve,
-            approval_type=payload.approval_type
+            approval_type=payload.approval_type,
         )
 
         logger.debug(

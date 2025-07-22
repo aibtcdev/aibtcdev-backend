@@ -73,8 +73,7 @@ class AgentAccountApproveContractRequest(BaseModel):
         description="The contract principal to approve",
     )
     approval_type: str = Field(
-        ...,
-        description="Type of contract approval (e.g., 'VOTING', 'SWAP', 'TOKEN')"
+        ..., description="Type of contract approval (e.g., 'VOTING', 'SWAP', 'TOKEN')"
     )
 
 
