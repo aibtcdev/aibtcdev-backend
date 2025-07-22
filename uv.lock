@@ -66,10 +66,10 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'testing'", specifier = "==3.14.1" },
     { name = "python-dotenv", specifier = "==1.1.1" },
     { name = "python-magic", specifier = "==0.4.27" },
-    { name = "python-telegram-bot", specifier = "==22.2" },
+    { name = "python-telegram-bot", specifier = "==22.3" },
     { name = "responses", marker = "extra == 'testing'", specifier = "==0.25.7" },
     { name = "sqlalchemy", specifier = "==2.0.41" },
-    { name = "starlette", specifier = "<=0.47.1" },
+    { name = "starlette", specifier = "<=0.47.2" },
     { name = "supabase", specifier = "==2.17.0" },
     { name = "tiktoken", specifier = "==0.9.0" },
     { name = "tweepy", specifier = "==4.16.0" },
@@ -1206,14 +1206,14 @@ wheels = [
 
 [[package]]
 name = "python-telegram-bot"
-version = "22.2"
+version = "22.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/a5/59e8d771e332105b7acbd48ff7b7f0415f9d50c32bac46963f487cc6cf94/python_telegram_bot-22.2.tar.gz", hash = "sha256:20dc096673961b849c041814d9618a3c7036dcca73015e576293600234457482", size = 1453202, upload-time = "2025-06-29T18:06:11.201Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/fc/0196e0d7ad247011a560788db204e0a28d76ab75b3d7c7131878f8fb5a06/python_telegram_bot-22.3.tar.gz", hash = "sha256:513d5ab9db96dcf25272dad0a726555e80edf60d09246a7d0d425b77115f5440", size = 1464513, upload-time = "2025-07-20T20:03:09.805Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/3e/3ea0241bccb204b740af5755e1b3a106ae2c36252b6f888872c45810e936/python_telegram_bot-22.2-py3-none-any.whl", hash = "sha256:234b933f960c534ffb2679f4d1e937bae24b4ac1c4767b6b03754bd38640cec0", size = 708737, upload-time = "2025-06-29T18:06:08.75Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/54/0955bd46a1e046169500e129c7883664b6675d580074d68823485e4d5de1/python_telegram_bot-22.3-py3-none-any.whl", hash = "sha256:88fab2d1652dbfd5379552e8b904d86173c524fdb9270d3a8685f599ffe0299f", size = 717115, upload-time = "2025-07-20T20:03:07.261Z" },
 ]
 
 [[package]]
@@ -1365,14 +1365,14 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "0.47.1"
+version = "0.47.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/69/662169fdb92fb96ec3eaee218cf540a629d629c86d7993d9651226a6789b/starlette-0.47.1.tar.gz", hash = "sha256:aef012dd2b6be325ffa16698f9dc533614fb1cebd593a906b90dc1025529a79b", size = 2583072, upload-time = "2025-06-21T04:03:17.337Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/57/d062573f391d062710d4088fa1369428c38d51460ab6fedff920efef932e/starlette-0.47.2.tar.gz", hash = "sha256:6ae9aa5db235e4846decc1e7b79c4f346adf41e9777aebeb49dfd09bbd7023d8", size = 2583948, upload-time = "2025-07-20T17:31:58.522Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/95/38ef0cd7fa11eaba6a99b3c4f5ac948d8bc6ff199aabd327a29cc000840c/starlette-0.47.1-py3-none-any.whl", hash = "sha256:5e11c9f5c7c3f24959edbf2dffdc01bba860228acf657129467d8a7468591527", size = 72747, upload-time = "2025-06-21T04:03:15.705Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/1f/b876b1f83aef204198a42dc101613fefccb32258e5428b5f9259677864b4/starlette-0.47.2-py3-none-any.whl", hash = "sha256:c5847e96134e5c5371ee9fac6fdf1a67336d5815e09eb2a01fdb57a351ef915b", size = 72984, upload-time = "2025-07-20T17:31:56.738Z" },
 ]
 
 [[package]]
