@@ -989,7 +989,7 @@ class TweetRepository:
             else:
                 logger.info(f"Creating new author record for {tweet_data.author_id}")
                 author = await backend.create_x_user(
-                    XUserCreate(user_id=tweet_data.author_id)
+                    XUserCreate(user_id=str(tweet_data.author_id))
                 )
 
             logger.debug(f"Creating tweet record for {tweet_data.tweet_id}")
