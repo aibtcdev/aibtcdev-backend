@@ -454,7 +454,9 @@ class TwitterDataService:
             user_data = XUserCreate(
                 name=tweet_data.get("author_name"),
                 username=author_username,
-                user_id=tweet_data.get("author_id"),  # Twitter user ID
+                user_id=str(tweet_data.get("author_id"))
+                if tweet_data.get("author_id")
+                else None,  # Twitter user ID
             )
 
             user = backend.create_x_user(user_data)
