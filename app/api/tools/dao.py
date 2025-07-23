@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -48,6 +48,7 @@ async def _create_proposal_from_tool_result(
     tags: List[str],
     profile: Profile,
     wallet: Wallet,
+    tweet_db_ids: List[UUID],
 ) -> Optional[Proposal]:
     """Create a proposal record from successful tool execution result.
 
@@ -60,6 +61,7 @@ async def _create_proposal_from_tool_result(
         tags: The generated tags for the proposal
         profile: The user's profile
         wallet: The agent's wallet
+        tweet_db_ids: List of tweet database IDs that were processed
 
     Returns:
         The created proposal or None if creation failed
@@ -116,29 +118,28 @@ async def _create_proposal_from_tool_result(
             else wallet.testnet_address
         )
 
-        # Process Twitter URLs using TwitterDataService
-        from app.services.processing.twitter_data_service import twitter_data_service
-
-        tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
-            enhanced_message
-        )
+        # Use the already processed Twitter data
         x_url = None
         tweet_id = None
 
         if tweet_db_ids:
             # Get the first Twitter URL for x_url field (backward compatibility)
+            from app.services.processing.twitter_data_service import (
+                twitter_data_service,
+            )
+
             twitter_urls = twitter_data_service.extract_twitter_urls(enhanced_message)
             if twitter_urls:
                 x_url = twitter_urls[0]
-                logger.info(f"Extracted Twitter URL from proposal: {x_url}")
+                logger.info(f"Using Twitter URL from proposal: {x_url}")
 
             # Use the first tweet database ID for the proposal
             tweet_id = tweet_db_ids[0]
             logger.info(
-                f"Processed {len(tweet_db_ids)} tweets, using first tweet ID: {tweet_id}"
+                f"Using {len(tweet_db_ids)} processed tweets, first tweet ID: {tweet_id}"
             )
         else:
-            logger.info("No Twitter URLs found or processed in the message")
+            logger.info("No tweet database IDs provided")
 
         # Create the proposal record
         proposal_content = ProposalCreate(
@@ -205,11 +206,14 @@ def _validate_payload_fields(payload: ProposeSendMessageRequest) -> None:
         )
 
 
-async def _generate_metadata_for_message(message: str) -> tuple[str, str, list]:
+async def _generate_metadata_for_message(
+    message: str, tweet_db_ids: Optional[List] = None
+) -> tuple[str, str, list]:
     """Generate metadata (title, summary, tags) for a message.
 
     Args:
         message: The message to generate metadata for.
+        tweet_db_ids: Optional list of tweet database IDs to include in metadata generation.
 
     Returns:
         Tuple of (title, summary, tags).
@@ -223,6 +227,7 @@ async def _generate_metadata_for_message(message: str) -> tuple[str, str, list]:
             proposal_content=message,
             dao_name="",  # Could be enhanced to fetch DAO name if available
             proposal_type="action_proposal",
+            tweet_db_ids=tweet_db_ids,
         )
 
         # Extract the nested metadata from the orchestrator result
@@ -283,6 +288,7 @@ async def _create_proposal_record_if_successful(
     metadata_tags: list,
     profile: Profile,
     wallet,
+    tweet_db_ids: List[UUID],
 ) -> None:
     """Create proposal record if tool execution was successful.
 
@@ -295,6 +301,7 @@ async def _create_proposal_record_if_successful(
         metadata_tags: The generated metadata tags.
         profile: The user profile.
         wallet: The wallet used for the proposal.
+        tweet_db_ids: List of tweet database IDs that were processed.
     """
     if result.get("success") and result.get("output"):
         try:
@@ -307,6 +314,7 @@ async def _create_proposal_record_if_successful(
                 metadata_tags,
                 profile,
                 wallet,
+                tweet_db_ids,
             )
         except Exception as e:
             logger.error(f"Failed to create proposal record: {str(e)}")
@@ -383,16 +391,31 @@ async def propose_dao_action_send_message(
         # Validate required payload fields
         _validate_payload_fields(payload)
 
-        # Generate metadata for the message
+        # Step 1: Extract Twitter information and save to tweet table
+        tweet_db_ids = []
+        if payload.message:
+            from app.services.processing.twitter_data_service import (
+                twitter_data_service,
+            )
+
+            tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
+                payload.message
+            )
+            logger.info(
+                f"Processed {len(tweet_db_ids)} Twitter URLs from message for profile {profile.id}"
+            )
+
+        # Step 2: Generate metadata given the message and the tweet_id information
         title, summary, metadata_tags = await _generate_metadata_for_message(
-            payload.message
+            payload.message, tweet_db_ids
         )
 
-        # Enhance message with metadata
+        # Step 3: Enhance message with metadata
         enhanced_message = _enhance_message_with_metadata(
             payload.message, title, metadata_tags
         )
 
+        # Step 4: Deploy the information on chain
         tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
         result = await tool._arun(
             agent_account_contract=payload.agent_account_contract,
@@ -407,7 +430,7 @@ async def propose_dao_action_send_message(
             f"DAO propose send message result for wallet {wallet.id} (profile {profile.id}): {result}"
         )
 
-        # Create proposal record if tool execution was successful
+        # Step 5: Create proposal record if tool execution was successful
         await _create_proposal_record_if_successful(
             result,
             payload,
@@ -417,6 +440,7 @@ async def propose_dao_action_send_message(
             metadata_tags,
             profile,
             wallet,
+            tweet_db_ids,
         )
 
         return JSONResponse(content=result)

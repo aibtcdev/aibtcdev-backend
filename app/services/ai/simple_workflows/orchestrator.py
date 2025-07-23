@@ -185,29 +185,42 @@ async def generate_proposal_metadata(
         )
 
         # Step 2: Process tweets if provided
+        tweet_content = ""
         tweet_images = []
         if tweet_db_ids:
             logger.debug(
                 f"[Orchestrator] Processing {len(tweet_db_ids)} tweets for metadata"
             )
-            _, tweet_images = await process_tweets(tweet_db_ids, "metadata_generation")
+            tweet_content, tweet_images = await process_tweets(
+                tweet_db_ids, "metadata_generation"
+            )
             logger.debug(
-                f"[Orchestrator] Found {len(tweet_images)} tweet images for metadata"
+                f"[Orchestrator] Found {len(tweet_images)} tweet images for metadata and {len(tweet_content)} chars of tweet content"
             )
 
         # Step 3: Combine all images
         all_images = images + tweet_images
 
-        # Step 4: Generate metadata
+        # Step 4: Combine proposal content with tweet content
+        combined_content = proposal_content
+        if tweet_content:
+            combined_content = (
+                f"{proposal_content}\n\n--- Referenced Tweets ---\n{tweet_content}"
+            )
+            logger.debug(
+                f"[Orchestrator] Combined proposal content with {len(tweet_content)} chars of tweet content"
+            )
+
+        # Step 5: Generate metadata
         metadata_result = await _generate_metadata(
-            proposal_content=proposal_content,
+            proposal_content=combined_content,
             dao_name=dao_name,
             proposal_type=proposal_type,
             images=all_images,
             callbacks=callbacks,
         )
 
-        # Step 5: Add processing metadata
+        # Step 6: Add processing metadata
         result = {
             "metadata": metadata_result,
             "processing_metadata": {
@@ -215,6 +228,7 @@ async def generate_proposal_metadata(
                 "tweet_images_processed": len(tweet_images),
                 "total_images": len(all_images),
                 "tweets_processed": len(tweet_db_ids) if tweet_db_ids else 0,
+                "tweet_content_length": len(tweet_content),
                 "streaming_enabled": streaming,
             },
         }
@@ -241,6 +255,7 @@ async def generate_proposal_metadata(
                 "tweet_images_processed": 0,
                 "total_images": 0,
                 "tweets_processed": 0,
+                "tweet_content_length": 0,
                 "streaming_enabled": streaming,
             },
         }
