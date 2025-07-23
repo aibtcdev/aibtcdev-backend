@@ -39,6 +39,7 @@ def analyze_bitcoin_face(image_url):
         dict: Bitcoin face analysis results with probabilities
     """
     if not image_url:
+        logger.warning("analyze_bitcoin_face: No image URL provided")
         return {"error": "No image URL provided"}
 
     try:
@@ -46,8 +47,18 @@ def analyze_bitcoin_face(image_url):
         api_url = config.huggingface.api_url
         token = config.huggingface.token
 
+        logger.debug(f"analyze_bitcoin_face: API URL: {api_url}")
+        logger.debug(f"analyze_bitcoin_face: Token present: {bool(token)}")
+
         if not token:
+            logger.error(
+                "analyze_bitcoin_face: HUGGING_FACE token not found in environment"
+            )
             return {"error": "HUGGING_FACE token not found in environment"}
+
+        if not api_url:
+            logger.error("analyze_bitcoin_face: HuggingFace API URL not configured")
+            return {"error": "HuggingFace API URL not configured"}
 
         headers = {
             "Accept": "application/json",
@@ -56,13 +67,22 @@ def analyze_bitcoin_face(image_url):
         }
 
         # Fetch and encode image
+        logger.debug(f"analyze_bitcoin_face: Fetching image from: {image_url}")
         response = requests.get(image_url, timeout=30)
         response.raise_for_status()
+
+        logger.debug(
+            f"analyze_bitcoin_face: Image fetched successfully, size: {len(response.content)} bytes"
+        )
 
         image = Image.open(io.BytesIO(response.content)).convert("RGB")
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
+
+        logger.debug(
+            f"analyze_bitcoin_face: Image encoded to base64, length: {len(img_str)}"
+        )
 
         # Call HuggingFace API
         payload = {
@@ -70,20 +90,51 @@ def analyze_bitcoin_face(image_url):
             "confidence_threshold": 0.7,
         }
 
+        logger.debug(f"analyze_bitcoin_face: Calling HuggingFace API at {api_url}")
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+
+        logger.debug(
+            f"analyze_bitcoin_face: API response status: {response.status_code}"
+        )
+        logger.debug(
+            f"analyze_bitcoin_face: API response headers: {dict(response.headers)}"
+        )
+
+        if response.status_code != 200:
+            logger.error(
+                f"analyze_bitcoin_face: API returned status {response.status_code}: {response.text}"
+            )
+            return {
+                "error": f"API returned status {response.status_code}: {response.text}"
+            }
+
         response.raise_for_status()
 
         result = response.json()
+        logger.debug(f"analyze_bitcoin_face: API response: {result}")
 
         # Extract probabilities from result
         if isinstance(result, list) and len(result) > 0:
-            return result[0].get("probabilities", {})
+            probabilities = result[0].get("probabilities", {})
+            logger.info(
+                f"analyze_bitcoin_face: Analysis successful, probabilities: {probabilities}"
+            )
+            return probabilities
 
-        return {"error": "No analysis results returned"}
+        logger.warning(f"analyze_bitcoin_face: Unexpected result format: {result}")
+        return {"error": "No analysis results returned", "raw_response": result}
 
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"analyze_bitcoin_face: Connection error: {str(e)}")
         return {"error": "HuggingFace API not available"}
+    except requests.exceptions.Timeout as e:
+        logger.error(f"analyze_bitcoin_face: Timeout error: {str(e)}")
+        return {"error": "HuggingFace API timeout"}
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"analyze_bitcoin_face: HTTP error: {str(e)}")
+        return {"error": f"HTTP error: {str(e)}"}
     except Exception as e:
+        logger.error(f"analyze_bitcoin_face: Unexpected error: {str(e)}", exc_info=True)
         return {"error": f"Analysis failed: {str(e)}"}
 
 
@@ -429,11 +480,14 @@ class TwitterDataService:
 
         return image_urls
 
-    async def _store_user_if_needed(self, tweet_data: Dict[str, Any]) -> Optional[UUID]:
+    async def _store_user_if_needed(
+        self, tweet_data: Dict[str, Any], profile_data: Optional[Dict[str, Any]] = None
+    ) -> Optional[UUID]:
         """Store user data if not already exists.
 
         Args:
             tweet_data: Tweet data containing user information
+            profile_data: Optional profile data from fetch_user_profile
 
         Returns:
             User ID if stored/found, None otherwise
@@ -447,20 +501,79 @@ class TwitterDataService:
             # Check if user already exists
             existing_users = backend.list_x_users(XUserFilter(username=author_username))
             if existing_users:
+                existing_user = existing_users[0]
+
+                # Update existing user with profile data if provided and missing
+                if profile_data and not profile_data.get("error"):
+                    needs_update = False
+                    update_data = {}
+
+                    # Check if profile_image_url needs updating
+                    if (
+                        profile_data.get("profile_image_url")
+                        and not existing_user.profile_image_url
+                    ):
+                        update_data["profile_image_url"] = profile_data[
+                            "profile_image_url"
+                        ]
+                        needs_update = True
+
+                    # Check other fields that might need updating
+                    for field in [
+                        "description",
+                        "location",
+                        "url",
+                        "verified",
+                        "verified_type",
+                    ]:
+                        if (
+                            profile_data.get(field) is not None
+                            and getattr(existing_user, field, None) is None
+                        ):
+                            update_data[field] = profile_data[field]
+                            needs_update = True
+
+                    if needs_update:
+                        # Note: This would require an update method in the backend
+                        # For now, just log that an update would be beneficial
+                        logger.info(
+                            f"User {author_username} exists but could be updated with profile data: {list(update_data.keys())}"
+                        )
+
                 logger.debug(f"User {author_username} already exists in database")
-                return existing_users[0].id
+                return existing_user.id
 
-            # Create new user record
-            user_data = XUserCreate(
-                name=tweet_data.get("author_name"),
-                username=author_username,
-                user_id=str(tweet_data.get("author_id"))
+            # Create new user record with profile data if available
+            user_create_data = {
+                "name": tweet_data.get("author_name"),
+                "username": author_username,
+                "user_id": str(tweet_data.get("author_id"))
                 if tweet_data.get("author_id")
-                else None,  # Twitter user ID
-            )
+                else None,
+            }
 
+            # Add profile data fields if available
+            if profile_data and not profile_data.get("error"):
+                if profile_data.get("profile_image_url"):
+                    user_create_data["profile_image_url"] = profile_data[
+                        "profile_image_url"
+                    ]
+                if profile_data.get("description"):
+                    user_create_data["description"] = profile_data["description"]
+                if profile_data.get("location"):
+                    user_create_data["location"] = profile_data["location"]
+                if profile_data.get("url"):
+                    user_create_data["url"] = profile_data["url"]
+                if profile_data.get("verified") is not None:
+                    user_create_data["verified"] = profile_data["verified"]
+                if profile_data.get("verified_type"):
+                    user_create_data["verified_type"] = profile_data["verified_type"]
+
+            user_data = XUserCreate(**user_create_data)
             user = backend.create_x_user(user_data)
-            logger.info(f"Created new user record for {author_username}")
+            logger.info(
+                f"Created new user record for {author_username} with profile data"
+            )
             return user.id
 
         except Exception as e:
@@ -498,8 +611,20 @@ class TwitterDataService:
             # Extract images from tweet
             image_urls = self._extract_images_from_tweet_data(tweet_data)
 
-            # Store user data if needed
-            author_id = await self._store_user_if_needed(tweet_data)
+            # Fetch author profile data first (used for both user creation and analysis)
+            author_username = tweet_data.get("author_username")
+            profile_data = {}
+            if author_username:
+                try:
+                    profile_data = fetch_user_profile(author_username)
+                except Exception as e:
+                    logger.warning(
+                        f"Error fetching author profile for {author_username}: {str(e)}"
+                    )
+                    profile_data = {"error": str(e)}
+
+            # Store user data if needed (now with profile data)
+            author_id = await self._store_user_if_needed(tweet_data, profile_data)
 
             # Prepare created_at_twitter field
             created_at_twitter = None
@@ -514,36 +639,31 @@ class TwitterDataService:
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
 
-            # Fetch author profile data and analyze Bitcoin face
+            # Process profile data for Bitcoin face analysis and keywords
             author_profile_data = {}
             author_pfp_analysis = {}
             author_keywords = {}
 
-            author_username = tweet_data.get("author_username")
-            if author_username:
-                try:
-                    profile_data = fetch_user_profile(author_username)
-                    if not profile_data.get("error"):
-                        author_profile_data = profile_data
+            if profile_data and not profile_data.get("error"):
+                author_profile_data = profile_data
 
-                        # Analyze profile image for Bitcoin face
-                        profile_image_url = profile_data.get("profile_image_url")
-                        if profile_image_url:
-                            pfp_analysis = analyze_bitcoin_face(profile_image_url)
-                            if not pfp_analysis.get("error"):
-                                author_pfp_analysis = pfp_analysis
+                # Analyze profile image for Bitcoin face
+                profile_image_url = profile_data.get("profile_image_url")
+                if profile_image_url:
+                    try:
+                        pfp_analysis = analyze_bitcoin_face(profile_image_url)
+                        if not pfp_analysis.get("error"):
+                            author_pfp_analysis = pfp_analysis
+                    except Exception as e:
+                        logger.warning(f"Error analyzing profile image: {str(e)}")
 
-                        # Detect keywords in description
-                        description = profile_data.get("description")
-                        if description:
-                            author_keywords = detect_keywords_in_description(
-                                description
-                            )
-
-                except Exception as e:
-                    logger.warning(
-                        f"Error fetching author profile for {author_username}: {str(e)}"
-                    )
+                # Detect keywords in description
+                description = profile_data.get("description")
+                if description:
+                    try:
+                        author_keywords = detect_keywords_in_description(description)
+                    except Exception as e:
+                        logger.warning(f"Error detecting keywords: {str(e)}")
 
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
