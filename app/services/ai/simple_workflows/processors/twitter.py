@@ -65,6 +65,9 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
     """
     try:
         text = tweet_data.get("text", "")
+        # Escape curly braces in tweet text to prevent template parsing issues
+        text = text.replace("{", "{{").replace("}", "}}")
+
         author_name = tweet_data.get("author_name", "")
         author_username = tweet_data.get("author_username", "")
         created_at = tweet_data.get("created_at", "")
@@ -89,10 +92,10 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
   <author>{author_name} (@{author_username})</author>
   <created_at>{created_str}</created_at>
   <text>{text}</text>
-  <author_profile_data>{author_profile_data}</author_profile_data>
-  <author_pfp_analysis>{author_pfp_analysis}</author_pfp_analysis>
-  <author_keywords>{author_keywords}</author_keywords>
-  <tweet_images_analysis>{tweet_images_analysis}</tweet_images_analysis>
+  <author_profile_data>{str(author_profile_data) if author_profile_data else "None"}</author_profile_data>
+  <author_pfp_analysis>{str(author_pfp_analysis) if author_pfp_analysis else "None"}</author_pfp_analysis>
+  <author_keywords>{str(author_keywords) if author_keywords else "None"}</author_keywords>
+  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>
 </tweet>
 """
         return formatted_tweet.strip()
