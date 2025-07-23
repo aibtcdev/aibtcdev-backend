@@ -202,14 +202,14 @@ async def generate_proposal_metadata(
         all_images = images + tweet_images
 
         # Step 4: Combine proposal content with tweet content
-        combined_content = proposal_content
+        # Escape curly braces in proposal content to prevent template parsing issues
+        escaped_proposal_content = proposal_content.replace("{", "{{").replace(
+            "}", "}}"
+        )
+
+        combined_content = escaped_proposal_content
         if tweet_content:
-            combined_content = (
-                f"{proposal_content}\n\n--- Referenced Tweets ---\n{tweet_content}"
-            )
-            logger.debug(
-                f"[Orchestrator] Combined proposal content with {len(tweet_content)} chars of tweet content"
-            )
+            combined_content = f"{escaped_proposal_content}\n\n--- Referenced Tweets ---\n{tweet_content}"
 
         # Step 5: Generate metadata
         metadata_result = await _generate_metadata(
