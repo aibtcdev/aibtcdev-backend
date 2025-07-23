@@ -209,7 +209,9 @@ async def generate_proposal_metadata(
 
         combined_content = escaped_proposal_content
         if tweet_content:
-            combined_content = f"{escaped_proposal_content}\n\n--- Referenced Tweets ---\n{tweet_content}"
+            # Also escape curly braces in tweet content to prevent template parsing issues
+            escaped_tweet_content = tweet_content.replace("{", "{{").replace("}", "}}")
+            combined_content = f"{escaped_proposal_content}\n\n--- Referenced Tweets ---\n{escaped_tweet_content}"
 
         # Step 5: Generate metadata
         metadata_result = await _generate_metadata(
