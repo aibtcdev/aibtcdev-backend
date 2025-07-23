@@ -1,4 +1,5 @@
-from typing import List, Optional, UUID
+from typing import List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
