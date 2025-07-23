@@ -357,11 +357,18 @@ def create_chat_messages(
     if proposal_images:
         for image in proposal_images:
             if image.get("type") == "image_url":
-                # Add detail parameter if not present
-                image_with_detail = image.copy()
-                if "detail" not in image_with_detail.get("image_url", {}):
-                    image_with_detail["image_url"]["detail"] = "auto"
-                user_message_content.append(image_with_detail)
+                # Clean the image data to only include what OpenAI vision API expects
+                # Remove extra metadata fields that confuse LangChain's template parser
+                cleaned_image = {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image.get("image_url", {}).get("url"),
+                        "detail": image.get("image_url", {}).get("detail", "auto"),
+                    },
+                }
+                # Only add if we have a valid URL
+                if cleaned_image["image_url"]["url"]:
+                    user_message_content.append(cleaned_image)
 
     # Add the user message
     messages.append({"role": "user", "content": user_message_content})
