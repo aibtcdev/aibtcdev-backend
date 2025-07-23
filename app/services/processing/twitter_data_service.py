@@ -1,5 +1,4 @@
 import re
-import os
 import requests
 import base64
 import io
@@ -148,7 +147,7 @@ def fetch_user_profile(username):
     Returns:
         dict: User profile data
     """
-    token = os.getenv("DAOROUNDUP_BEARER_TOKEN")
+    token = config.twitter.bearer_token
     if not token:
         return {
             "error": "Missing API token",
