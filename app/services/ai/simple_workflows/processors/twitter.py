@@ -30,8 +30,9 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
 
         # Convert to dictionary format
         tweet_data = {
-            "id": tweet.tweet_id,
             "text": tweet.message,
+            "tweet_id": tweet.tweet_id,
+            "conversation_id": tweet.conversation_id,
             "author_id": tweet.author_id,
             "author_name": tweet.author_name,
             "author_username": tweet.author_username,
@@ -40,9 +41,6 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "entities": tweet.entities or {},
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
-            "author_profile_data": tweet.author_profile_data or {},
-            "author_pfp_analysis": tweet.author_pfp_analysis or {},
-            "author_keywords": tweet.author_keywords or {},
             "tweet_images_analysis": tweet.tweet_images_analysis or [],
         }
 
@@ -71,10 +69,6 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
         author_name = tweet_data.get("author_name", "")
         author_username = tweet_data.get("author_username", "")
         created_at = tweet_data.get("created_at", "")
-        author_profile_data = tweet_data.get("author_profile_data", {})
-        author_pfp_analysis = tweet_data.get("author_pfp_analysis", {})
-        author_keywords = tweet_data.get("author_keywords", {})
-        tweet_images_analysis = tweet_data.get("tweet_images_analysis", [])
 
         # Format creation date
         created_str = ""
@@ -92,10 +86,6 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
   <author>{author_name} (@{author_username})</author>
   <created_at>{created_str}</created_at>
   <text>{text}</text>
-  <author_profile_data>{str(author_profile_data) if author_profile_data else "None"}</author_profile_data>
-  <author_pfp_analysis>{str(author_pfp_analysis) if author_pfp_analysis else "None"}</author_pfp_analysis>
-  <author_keywords>{str(author_keywords) if author_keywords else "None"}</author_keywords>
-  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>
 </tweet>
 """
         return formatted_tweet.strip()

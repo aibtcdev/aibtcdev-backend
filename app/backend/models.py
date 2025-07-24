@@ -513,6 +513,13 @@ class XUserBase(CustomBaseModel):
     verified: Optional[bool] = None
     verified_type: Optional[str] = None
     subscription_type: Optional[str] = None
+    pinned_tweet_id: Optional[str] = None
+    pfp_analysis: Optional[Dict[str, Any]] = (
+        None  # Bitcoin face probabilities for profile picture
+    )
+    keywords: Optional[Dict[str, Any]] = (
+        None  # Keyword detection results from description
+    )
 
 
 class XUserCreate(XUserBase):
@@ -545,16 +552,7 @@ class XTweetBase(CustomBaseModel):
     public_metrics: Optional[Dict[str, Any]] = None  # Retweet count, like count, etc.
     entities: Optional[Dict[str, Any]] = None  # URLs, hashtags, mentions
     attachments: Optional[Dict[str, Any]] = None  # Media attachments info
-    # New fields for Bitcoin face analysis
-    author_profile_data: Optional[Dict[str, Any]] = (
-        None  # Complete author profile information
-    )
-    author_pfp_analysis: Optional[Dict[str, Any]] = (
-        None  # Bitcoin face probabilities for profile picture
-    )
-    author_keywords: Optional[Dict[str, Any]] = (
-        None  # Keyword detection results from description
-    )
+    # Tweet-specific analysis
     tweet_images_analysis: Optional[List[Dict[str, Any]]] = (
         None  # Bitcoin face analysis for tweet images
     )
@@ -721,6 +719,7 @@ class XUserFilter(CustomBaseModel):
     verified: Optional[bool] = None
     verified_type: Optional[str] = None
     subscription_type: Optional[str] = None
+    pinned_tweet_id: Optional[str] = None
 
 
 class XTweetFilter(CustomBaseModel):

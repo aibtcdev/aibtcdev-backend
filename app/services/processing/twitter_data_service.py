@@ -195,6 +195,57 @@ def fetch_user_profile(username):
         return {"error": f"Request failed: {str(e)}"}
 
 
+def fetch_pinned_tweet(pinned_tweet_id):
+    """
+    Fetch details of a pinned tweet by its ID
+
+    Args:
+        pinned_tweet_id (str): The ID of the pinned tweet
+
+    Returns:
+        dict: Pinned tweet data or error
+    """
+    if not pinned_tweet_id:
+        return None
+
+    # Check if token exists
+    token = config.twitter.bearer_token
+    if not token:
+        return {"error": "Missing API token"}
+
+    # X API v2 endpoint for single tweet
+    url = f"https://api.twitter.com/2/tweets/{pinned_tweet_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Minimal parameters - only get what's not already collected elsewhere
+    params = {"tweet.fields": "created_at,text"}
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+
+        if response.status_code == 200:
+            data = response.json()
+            tweet_data = data.get("data", {})
+
+            return {
+                "id": tweet_data.get("id"),
+                "text": tweet_data.get("text"),
+                "created_at": tweet_data.get("created_at"),
+            }
+
+        elif response.status_code == 401:
+            return {"error": "401 Unauthorized - Need Tweet read access"}
+        elif response.status_code == 429:
+            return {"error": "429 Rate limit exceeded"}
+        elif response.status_code == 404:
+            return {"error": "404 Pinned tweet not found"}
+        else:
+            return {"error": f"API error: {response.status_code}"}
+
+    except Exception as e:
+        return {"error": f"Request failed: {str(e)}"}
+
+
 def detect_keywords_in_description(description):
     """
     Detect specific keywords in user description
@@ -524,6 +575,7 @@ class TwitterDataService:
                         "url",
                         "verified",
                         "verified_type",
+                        "pinned_tweet_id",
                     ]:
                         if (
                             profile_data.get(field) is not None
@@ -531,6 +583,35 @@ class TwitterDataService:
                         ):
                             update_data[field] = profile_data[field]
                             needs_update = True
+
+                    # Check if pfp_analysis needs updating
+                    if not existing_user.pfp_analysis and profile_data.get(
+                        "profile_image_url"
+                    ):
+                        try:
+                            pfp_analysis = analyze_bitcoin_face(
+                                profile_data["profile_image_url"]
+                            )
+                            if not pfp_analysis.get("error"):
+                                update_data["pfp_analysis"] = pfp_analysis
+                                needs_update = True
+                        except Exception as e:
+                            logger.warning(
+                                f"Error analyzing profile image during update: {str(e)}"
+                            )
+
+                    # Check if keywords need updating
+                    if not existing_user.keywords and profile_data.get("description"):
+                        try:
+                            keywords = detect_keywords_in_description(
+                                profile_data["description"]
+                            )
+                            update_data["keywords"] = keywords
+                            needs_update = True
+                        except Exception as e:
+                            logger.warning(
+                                f"Error detecting keywords during update: {str(e)}"
+                            )
 
                     if needs_update:
                         # Note: This would require an update method in the backend
@@ -567,6 +648,31 @@ class TwitterDataService:
                     user_create_data["verified"] = profile_data["verified"]
                 if profile_data.get("verified_type"):
                     user_create_data["verified_type"] = profile_data["verified_type"]
+                if profile_data.get("pinned_tweet_id"):
+                    user_create_data["pinned_tweet_id"] = profile_data[
+                        "pinned_tweet_id"
+                    ]
+
+                # Analyze profile image for Bitcoin face
+                if profile_data.get("profile_image_url"):
+                    try:
+                        pfp_analysis = analyze_bitcoin_face(
+                            profile_data["profile_image_url"]
+                        )
+                        if not pfp_analysis.get("error"):
+                            user_create_data["pfp_analysis"] = pfp_analysis
+                    except Exception as e:
+                        logger.warning(f"Error analyzing profile image: {str(e)}")
+
+                # Detect keywords in description
+                if profile_data.get("description"):
+                    try:
+                        keywords = detect_keywords_in_description(
+                            profile_data["description"]
+                        )
+                        user_create_data["keywords"] = keywords
+                    except Exception as e:
+                        logger.warning(f"Error detecting keywords: {str(e)}")
 
             user_data = XUserCreate(**user_create_data)
             user = backend.create_x_user(user_data)
@@ -638,32 +744,6 @@ class TwitterDataService:
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
 
-            # Process profile data for Bitcoin face analysis and keywords
-            author_profile_data = {}
-            author_pfp_analysis = {}
-            author_keywords = {}
-
-            if profile_data and not profile_data.get("error"):
-                author_profile_data = profile_data
-
-                # Analyze profile image for Bitcoin face
-                profile_image_url = profile_data.get("profile_image_url")
-                if profile_image_url:
-                    try:
-                        pfp_analysis = analyze_bitcoin_face(profile_image_url)
-                        if not pfp_analysis.get("error"):
-                            author_pfp_analysis = pfp_analysis
-                    except Exception as e:
-                        logger.warning(f"Error analyzing profile image: {str(e)}")
-
-                # Detect keywords in description
-                description = profile_data.get("description")
-                if description:
-                    try:
-                        author_keywords = detect_keywords_in_description(description)
-                    except Exception as e:
-                        logger.warning(f"Error detecting keywords: {str(e)}")
-
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
             for image_url in image_urls:
@@ -693,10 +773,7 @@ class TwitterDataService:
                 public_metrics=tweet_data.get("public_metrics"),
                 entities=tweet_data.get("entities"),
                 attachments=tweet_data.get("attachments"),
-                # New fields for Bitcoin face analysis
-                author_profile_data=author_profile_data,
-                author_pfp_analysis=author_pfp_analysis,
-                author_keywords=author_keywords,
+                # Tweet-specific analysis
                 tweet_images_analysis=tweet_images_analysis,
             )
 
