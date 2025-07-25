@@ -2,9 +2,13 @@
 
 from app.backend.factory import backend
 from app.backend.models import (
+    ContractStatus,
+    ExtensionFilter,
     HolderBase,
     HolderCreate,
     HolderFilter,
+    QueueMessageCreate,
+    QueueMessageType,
     TokenFilter,
     WalletFilter,
 )
@@ -139,6 +143,9 @@ class BuyEventHandler(ChainhookEventHandler):
                         )
                     )
 
+                    # Check if this should trigger proposal approval
+                    should_trigger_approval = False
+
                     if existing_records:
                         # Update existing record - increase the amount
                         record = existing_records[0]
@@ -161,6 +168,13 @@ class BuyEventHandler(ChainhookEventHandler):
                             f"Updated token balance after buy for wallet {wallet.id}: "
                             f"token {token.id} (DAO {dao_id}), new amount: {new_amount_str}"
                         )
+
+                        # Check if this was a first meaningful purchase (balance was 0)
+                        if current_amount == 0 and bought_amount > 0:
+                            should_trigger_approval = True
+                            self.logger.info(
+                                f"First meaningful token purchase detected for wallet {wallet.id} - will trigger proposal approval"
+                            )
                     else:
                         # Create new record
                         new_record = HolderCreate(
@@ -174,9 +188,83 @@ class BuyEventHandler(ChainhookEventHandler):
                             f"Created new token balance record for wallet {wallet.id}: "
                             f"token {token.id} (DAO {dao_id}), amount: {amount}"
                         )
+
+                        # First token purchase should trigger approval
+                        should_trigger_approval = True
+                        self.logger.info(
+                            f"First token purchase detected for wallet {wallet.id} - will trigger proposal approval"
+                        )
+
+                    # Queue proposal approval if this is a first-time purchase
+                    if should_trigger_approval:
+                        await self._queue_proposal_approval(wallet, dao_id, token)
             else:
                 self.logger.info(
                     f"No FTTransferEvent events found in transaction {tx_id}"
                 )
         else:
             self.logger.warning(f"No events found in transaction {tx_id}")
+
+    async def _queue_proposal_approval(self, wallet, dao_id, token) -> None:
+        """Queue a proposal approval message for the agent account.
+
+        Args:
+            wallet: The wallet that purchased tokens
+            dao_id: UUID of the DAO
+            token: The token that was purchased
+        """
+        try:
+            # Find the DAO's ACTION_PROPOSAL_VOTING extension
+            extensions = backend.list_extensions(
+                ExtensionFilter(
+                    dao_id=dao_id,
+                    subtype="ACTION_PROPOSAL_VOTING",
+                    status=ContractStatus.DEPLOYED,
+                )
+            )
+
+            if not extensions:
+                self.logger.warning(
+                    f"No ACTION_PROPOSAL_VOTING extension found for DAO {dao_id}"
+                )
+                return
+
+            voting_extension = extensions[0]
+
+            # Get the agent account contract from the wallet
+            if not wallet.agent_id:
+                self.logger.warning(f"No agent associated with wallet {wallet.id}")
+                return
+
+            agent = backend.get_agent(wallet.agent_id)
+            if not agent or not agent.account_contract:
+                self.logger.warning(
+                    f"No agent account contract found for agent {wallet.agent_id}"
+                )
+                return
+
+            # Create queue message for proposal approval
+            approval_message = QueueMessageCreate(
+                type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
+                wallet_id=wallet.id,
+                dao_id=dao_id,
+                message={
+                    "agent_account_contract": agent.account_contract,
+                    "contract_to_approve": voting_extension.contract_principal,
+                    "approval_type": "VOTING",
+                    "token_contract": token.contract_principal,
+                    "reason": "First token purchase - enabling proposal voting",
+                },
+            )
+
+            backend.create_queue_message(approval_message)
+            self.logger.info(
+                f"Queued proposal approval for agent {agent.account_contract} "
+                f"to approve {voting_extension.contract_principal}"
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Failed to queue proposal approval for wallet {wallet.id}: {str(e)}",
+                exc_info=True,
+            )
