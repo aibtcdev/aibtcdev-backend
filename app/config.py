@@ -47,6 +47,12 @@ class BackendWalletConfig:
     """Configuration for backend wallet operations."""
 
     seed_phrase: str = os.getenv("AIBTC_BACKEND_WALLET_SEED_PHRASE", "")
+    min_balance_threshold: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "1000000"
+    )  # 1 STX in microSTX
+    funding_amount: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "5000000"
+    )  # 5 STX in microSTX
 
 
 @dataclass
