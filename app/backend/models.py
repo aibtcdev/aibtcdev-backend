@@ -227,6 +227,8 @@ class WalletBase(CustomBaseModel):
     mainnet_address: Optional[str] = None
     testnet_address: Optional[str] = None
     secret_id: Optional[UUID] = None
+    stx_balance: Optional[str] = None  # String to handle large numbers precisely
+    balance_updated_at: Optional[datetime] = None  # When balance was last checked
 
 
 class WalletCreate(WalletBase):
@@ -516,6 +518,9 @@ class XUserBase(CustomBaseModel):
     verified: Optional[bool] = None
     verified_type: Optional[str] = None
     subscription_type: Optional[str] = None
+    bitcoin_face_score: Optional[float] = (
+        None  # Score from HuggingFace bitcoin face analysis
+    )
 
 
 class XUserCreate(XUserBase):
@@ -548,16 +553,6 @@ class XTweetBase(CustomBaseModel):
     public_metrics: Optional[Dict[str, Any]] = None  # Retweet count, like count, etc.
     entities: Optional[Dict[str, Any]] = None  # URLs, hashtags, mentions
     attachments: Optional[Dict[str, Any]] = None  # Media attachments info
-    # New fields for Bitcoin face analysis
-    author_profile_data: Optional[Dict[str, Any]] = (
-        None  # Complete author profile information
-    )
-    author_pfp_analysis: Optional[Dict[str, Any]] = (
-        None  # Bitcoin face probabilities for profile picture
-    )
-    author_keywords: Optional[Dict[str, Any]] = (
-        None  # Keyword detection results from description
-    )
     tweet_images_analysis: Optional[List[Dict[str, Any]]] = (
         None  # Bitcoin face analysis for tweet images
     )
@@ -586,6 +581,8 @@ class WalletFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
     mainnet_address: Optional[str] = None
     testnet_address: Optional[str] = None
+    stx_balance: Optional[str] = None  # Filter by exact balance
+    balance_updated_at: Optional[datetime] = None  # Filter by balance update time
 
 
 class WalletFilterN(CustomBaseModel):
@@ -596,6 +593,8 @@ class WalletFilterN(CustomBaseModel):
     profile_id: Optional[UUID] = None
     mainnet_address: Optional[str] = None
     testnet_address: Optional[str] = None
+    stx_balance: Optional[str] = None  # Filter by exact balance
+    balance_updated_at: Optional[datetime] = None  # Filter by balance update time
 
     # Batch filters using 'in_' operations
     ids: Optional[List[UUID]] = None
@@ -603,6 +602,12 @@ class WalletFilterN(CustomBaseModel):
     profile_ids: Optional[List[UUID]] = None
     mainnet_addresses: Optional[List[str]] = None
     testnet_addresses: Optional[List[str]] = None
+
+    # Balance range filters
+    stx_balance_gte: Optional[str] = None  # Balance greater than or equal
+    stx_balance_lte: Optional[str] = None  # Balance less than or equal
+    balance_updated_before: Optional[datetime] = None  # Balance updated before datetime
+    balance_updated_after: Optional[datetime] = None  # Balance updated after datetime
 
 
 class QueueMessageFilter(CustomBaseModel):
@@ -724,6 +729,7 @@ class XUserFilter(CustomBaseModel):
     verified: Optional[bool] = None
     verified_type: Optional[str] = None
     subscription_type: Optional[str] = None
+    bitcoin_face_score: Optional[float] = None
 
 
 class XTweetFilter(CustomBaseModel):

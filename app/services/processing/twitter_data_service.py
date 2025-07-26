@@ -195,38 +195,6 @@ def fetch_user_profile(username):
         return {"error": f"Request failed: {str(e)}"}
 
 
-def detect_keywords_in_description(description):
-    """
-    Detect specific keywords in user description
-
-    Args:
-        description (str): User bio/description text
-
-    Returns:
-        dict: Contains found keywords and detection results
-    """
-    if not description:
-        return {"keywords_found": [], "has_keywords": False}
-
-    # Keywords to search for (case-insensitive)
-    target_keywords = ["FACES", "$FACES", "AIBTC"]
-    found_keywords = []
-
-    # Convert description to uppercase for case-insensitive search
-    description_upper = description.upper()
-
-    # Check for each keyword
-    for keyword in target_keywords:
-        if keyword.upper() in description_upper:
-            found_keywords.append(keyword)
-
-    return {
-        "keywords_found": found_keywords,
-        "has_keywords": len(found_keywords) > 0,
-        "keyword_count": len(found_keywords),
-    }
-
-
 class TwitterDataService:
     """Service to handle Twitter data fetching and persistence."""
 
@@ -517,6 +485,26 @@ class TwitterDataService:
                         ]
                         needs_update = True
 
+                    # Check if bitcoin_face_score needs analyzing
+                    if existing_user.bitcoin_face_score is None and profile_data.get(
+                        "profile_image_url"
+                    ):
+                        try:
+                            pfp_analysis = analyze_bitcoin_face(
+                                profile_data["profile_image_url"]
+                            )
+                            if not pfp_analysis.get("error"):
+                                bitcoin_face_score = pfp_analysis.get("bitcoin_face")
+                                if bitcoin_face_score is not None:
+                                    update_data["bitcoin_face_score"] = (
+                                        bitcoin_face_score
+                                    )
+                                    needs_update = True
+                        except Exception as e:
+                            logger.warning(
+                                f"Error analyzing profile image for existing user {author_username}: {str(e)}"
+                            )
+
                     # Check other fields that might need updating
                     for field in [
                         "description",
@@ -557,6 +545,26 @@ class TwitterDataService:
                     user_create_data["profile_image_url"] = profile_data[
                         "profile_image_url"
                     ]
+
+                    # Analyze profile image for bitcoin face
+                    try:
+                        pfp_analysis = analyze_bitcoin_face(
+                            profile_data["profile_image_url"]
+                        )
+                        if not pfp_analysis.get("error"):
+                            bitcoin_face_score = pfp_analysis.get("bitcoin_face")
+                            if bitcoin_face_score is not None:
+                                user_create_data["bitcoin_face_score"] = (
+                                    bitcoin_face_score
+                                )
+                                logger.info(
+                                    f"Analyzed profile image for {author_username}, bitcoin_face_score: {bitcoin_face_score}"
+                                )
+                    except Exception as e:
+                        logger.warning(
+                            f"Error analyzing profile image for new user {author_username}: {str(e)}"
+                        )
+
                 if profile_data.get("description"):
                     user_create_data["description"] = profile_data["description"]
                 if profile_data.get("location"):
@@ -610,7 +618,7 @@ class TwitterDataService:
             # Extract images from tweet
             image_urls = self._extract_images_from_tweet_data(tweet_data)
 
-            # Fetch author profile data first (used for both user creation and analysis)
+            # Fetch author profile data first (used for user creation)
             author_username = tweet_data.get("author_username")
             profile_data = {}
             if author_username:
@@ -622,7 +630,7 @@ class TwitterDataService:
                     )
                     profile_data = {"error": str(e)}
 
-            # Store user data if needed (now with profile data)
+            # Store user data if needed (now with profile data and bitcoin face analysis)
             author_id = await self._store_user_if_needed(tweet_data, profile_data)
 
             # Prepare created_at_twitter field
@@ -637,32 +645,6 @@ class TwitterDataService:
                         created_at_twitter = str(tweet_data["created_at"])
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
-
-            # Process profile data for Bitcoin face analysis and keywords
-            author_profile_data = {}
-            author_pfp_analysis = {}
-            author_keywords = {}
-
-            if profile_data and not profile_data.get("error"):
-                author_profile_data = profile_data
-
-                # Analyze profile image for Bitcoin face
-                profile_image_url = profile_data.get("profile_image_url")
-                if profile_image_url:
-                    try:
-                        pfp_analysis = analyze_bitcoin_face(profile_image_url)
-                        if not pfp_analysis.get("error"):
-                            author_pfp_analysis = pfp_analysis
-                    except Exception as e:
-                        logger.warning(f"Error analyzing profile image: {str(e)}")
-
-                # Detect keywords in description
-                description = profile_data.get("description")
-                if description:
-                    try:
-                        author_keywords = detect_keywords_in_description(description)
-                    except Exception as e:
-                        logger.warning(f"Error detecting keywords: {str(e)}")
 
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
@@ -693,10 +675,6 @@ class TwitterDataService:
                 public_metrics=tweet_data.get("public_metrics"),
                 entities=tweet_data.get("entities"),
                 attachments=tweet_data.get("attachments"),
-                # New fields for Bitcoin face analysis
-                author_profile_data=author_profile_data,
-                author_pfp_analysis=author_pfp_analysis,
-                author_keywords=author_keywords,
                 tweet_images_analysis=tweet_images_analysis,
             )
 

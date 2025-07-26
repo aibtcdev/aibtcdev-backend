@@ -47,6 +47,12 @@ class BackendWalletConfig:
     """Configuration for backend wallet operations."""
 
     seed_phrase: str = os.getenv("AIBTC_BACKEND_WALLET_SEED_PHRASE", "")
+    min_balance_threshold: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "1000000"
+    )  # 1 STX in microSTX
+    funding_amount: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "5000000"
+    )  # 5 STX in microSTX
 
 
 @dataclass
@@ -127,6 +133,15 @@ class SchedulerConfig:
     )
     agent_account_proposal_approval_interval_seconds: int = int(
         os.getenv("AIBTC_AGENT_ACCOUNT_PROPOSAL_APPROVAL_INTERVAL_SECONDS", "30")
+    )
+
+    # agent_wallet_balance_monitor job
+    agent_wallet_balance_monitor_enabled: bool = (
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_ENABLED", "true").lower()
+        == "true"
+    )
+    agent_wallet_balance_monitor_interval_seconds: int = int(
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "120")
     )
 
     # chain_state_monitor job
