@@ -191,8 +191,8 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
 
     def _get_wallet_address(self, wallet) -> Optional[str]:
         """Get the appropriate wallet address based on network configuration."""
-        # Use mainnet address by default, fallback to testnet if configured
-        network = getattr(config, "network", "mainnet")
+        # Get network from config
+        network = config.network.network
 
         if network == "testnet" and wallet.testnet_address:
             return wallet.testnet_address
