@@ -135,6 +135,15 @@ class SchedulerConfig:
         os.getenv("AIBTC_AGENT_ACCOUNT_PROPOSAL_APPROVAL_INTERVAL_SECONDS", "30")
     )
 
+    # agent_wallet_balance_monitor job
+    agent_wallet_balance_monitor_enabled: bool = (
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_ENABLED", "true").lower()
+        == "true"
+    )
+    agent_wallet_balance_monitor_interval_seconds: int = int(
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "120")
+    )
+
     # chain_state_monitor job
     chain_state_monitor_enabled: bool = (
         os.getenv("AIBTC_CHAIN_STATE_MONITOR_ENABLED", "true").lower() == "true"
