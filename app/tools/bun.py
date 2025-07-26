@@ -83,9 +83,12 @@ class BunScriptRunner:
         Returns:
             Dict containing script execution results
         """
+        from app.config import config
+
         env = os.environ.copy()
         env["ACCOUNT_INDEX"] = "0"
         env["MNEMONIC"] = mnemonic
+        env["NETWORK"] = config.network.network
 
         # Build script path and command
         full_script_path = f"{BunScriptRunner.SCRIPT_DIR}/{script_path}/{script_name}"
