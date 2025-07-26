@@ -28,6 +28,29 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             logger.warning(f"Tweet with ID {tweet_db_id} not found in database")
             return None
 
+        # Fetch author information if available
+        author_info = {}
+        if tweet.author_id:
+            try:
+                author = backend.get_x_user(tweet.author_id)
+                if author:
+                    author_info = {
+                        "author_description": author.description,
+                        "author_location": author.location,
+                        "author_url": author.url,
+                        "author_verified": author.verified,
+                        "author_verified_type": author.verified_type,
+                        "author_bitcoin_face_score": author.bitcoin_face_score,
+                        "author_profile_image_url": author.profile_image_url,
+                    }
+                    logger.debug(
+                        f"Retrieved author info for user {author.username}, bitcoin_face_score: {author.bitcoin_face_score}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Error fetching author info for tweet {tweet_db_id}: {str(e)}"
+                )
+
         # Convert to dictionary format
         tweet_data = {
             "id": tweet.tweet_id,
@@ -40,10 +63,8 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "entities": tweet.entities or {},
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
-            "author_profile_data": tweet.author_profile_data or {},
-            "author_pfp_analysis": tweet.author_pfp_analysis or {},
-            "author_keywords": tweet.author_keywords or {},
             "tweet_images_analysis": tweet.tweet_images_analysis or [],
+            **author_info,  # Include author information
         }
 
         logger.debug(f"Retrieved tweet data for ID {tweet_db_id}")
@@ -71,10 +92,15 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
         author_name = tweet_data.get("author_name", "")
         author_username = tweet_data.get("author_username", "")
         created_at = tweet_data.get("created_at", "")
-        author_profile_data = tweet_data.get("author_profile_data", {})
-        author_pfp_analysis = tweet_data.get("author_pfp_analysis", {})
-        author_keywords = tweet_data.get("author_keywords", {})
         tweet_images_analysis = tweet_data.get("tweet_images_analysis", [])
+
+        # Extract author information
+        author_description = tweet_data.get("author_description", "")
+        author_location = tweet_data.get("author_location", "")
+        author_url = tweet_data.get("author_url", "")
+        author_verified = tweet_data.get("author_verified", False)
+        author_verified_type = tweet_data.get("author_verified_type", "")
+        author_bitcoin_face_score = tweet_data.get("author_bitcoin_face_score")
 
         # Format creation date
         created_str = ""
@@ -87,14 +113,26 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
             except (AttributeError, ValueError, TypeError):
                 created_str = str(created_at)
 
+        # Format bitcoin face score
+        bitcoin_face_str = (
+            f"{author_bitcoin_face_score:.4f}"
+            if author_bitcoin_face_score is not None
+            else "None"
+        )
+
         formatted_tweet = f"""
 <tweet>
   <author>{author_name} (@{author_username})</author>
   <created_at>{created_str}</created_at>
   <text>{text}</text>
-  <author_profile_data>{str(author_profile_data) if author_profile_data else "None"}</author_profile_data>
-  <author_pfp_analysis>{str(author_pfp_analysis) if author_pfp_analysis else "None"}</author_pfp_analysis>
-  <author_keywords>{str(author_keywords) if author_keywords else "None"}</author_keywords>
+  <author_info>
+    <description>{author_description or "None"}</description>
+    <location>{author_location or "None"}</location>
+    <url>{author_url or "None"}</url>
+    <verified>{author_verified}</verified>
+    <verified_type>{author_verified_type or "None"}</verified_type>
+    <bitcoin_face_score>{bitcoin_face_str}</bitcoin_face_score>
+  </author_info>
   <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>
 </tweet>
 """
