@@ -11,6 +11,10 @@ from app.backend.models import (
     HolderFilter,
     AgentFilter,
     WalletFilter,
+    ContractStatus,
+    ExtensionFilter,
+    QueueMessageCreate,
+    QueueMessageType,
 )
 from app.services.integrations.hiro.hiro_api import HiroApi
 from app.lib.logger import configure_logger
@@ -33,6 +37,7 @@ class DaoTokenHoldersMonitorResult(RunnerResult):
     holders_created: int = 0
     holders_updated: int = 0
     holders_removed: int = 0
+    approvals_queued: int = 0
     errors: List[str] = None
 
     def __post_init__(self):
@@ -210,6 +215,62 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             )
             return None, None
 
+    async def _queue_proposal_approval_for_agent(
+        self,
+        agent,
+        dao_id,
+        token,
+        reason: str = "Token holder sync - enabling proposal voting",
+    ) -> bool:
+        """Queue a proposal approval message for the agent account.
+
+        Returns True if approval was queued successfully, False otherwise.
+        """
+        try:
+            # Find the DAO's ACTION_PROPOSAL_VOTING extension
+            extensions = backend.list_extensions(
+                ExtensionFilter(
+                    dao_id=dao_id,
+                    subtype="ACTION_PROPOSAL_VOTING",
+                    status=ContractStatus.DEPLOYED,
+                )
+            )
+
+            if not extensions:
+                logger.warning(
+                    f"No ACTION_PROPOSAL_VOTING extension found for DAO {dao_id}"
+                )
+                return False
+
+            voting_extension = extensions[0]
+
+            # Create queue message for proposal approval
+            approval_message = QueueMessageCreate(
+                type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
+                dao_id=dao_id,
+                message={
+                    "agent_account_contract": agent.account_contract,
+                    "contract_to_approve": voting_extension.contract_principal,
+                    "approval_type": "VOTING",
+                    "token_contract": token.contract_principal,
+                    "reason": reason,
+                },
+            )
+
+            backend.create_queue_message(approval_message)
+            logger.info(
+                f"Queued proposal approval for agent {agent.account_contract} "
+                f"to approve {voting_extension.contract_principal}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to queue proposal approval for agent {agent.id}: {str(e)}",
+                exc_info=True,
+            )
+            return False
+
     async def _sync_token_holders(
         self, token, result: DaoTokenHoldersMonitorResult
     ) -> None:
@@ -300,6 +361,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         # Update existing holder
                         existing_holder = db_holders_by_address_token[holder_key]
                         needs_update = False
+                        should_trigger_approval = False
+
                         update_data = HolderBase(
                             amount=str(balance),
                             updated_at=datetime.now(),
@@ -322,9 +385,19 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             update_data.wallet_id = None
                             needs_update = True
 
-                        # Check if amount changed
+                        # Check if amount changed and if this triggers first meaningful balance
+                        old_balance = float(existing_holder.amount or "0")
+                        new_balance = float(balance)
+
                         if existing_holder.amount != str(balance):
                             needs_update = True
+
+                            # Check if this is a first meaningful token receipt for an agent
+                            if agent and old_balance == 0 and new_balance > 0:
+                                should_trigger_approval = True
+                                logger.info(
+                                    f"First meaningful token receipt detected for agent {agent.id} during sync - will trigger proposal approval"
+                                )
 
                         # Check if address changed
                         if existing_holder.address != address:
@@ -339,6 +412,16 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             )
                             backend.update_holder(existing_holder.id, update_data)
                             result.holders_updated += 1
+
+                            # Queue proposal approval if this is a first-time meaningful receipt
+                            if should_trigger_approval:
+                                approval_queued = (
+                                    await self._queue_proposal_approval_for_agent(
+                                        agent, token.dao_id, token
+                                    )
+                                )
+                                if approval_queued:
+                                    result.approvals_queued += 1
                     else:
                         # Create new holder (with or without agent)
                         agent_info = f"agent_id={agent.id}" if agent else "no agent"
@@ -360,6 +443,19 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         )
                         backend.create_holder(holder_create)
                         result.holders_created += 1
+
+                        # Queue proposal approval for new agent holders with positive balance
+                        if agent and float(balance) > 0:
+                            logger.info(
+                                f"First token receipt detected for agent {agent.id} during sync - will trigger proposal approval"
+                            )
+                            approval_queued = (
+                                await self._queue_proposal_approval_for_agent(
+                                    agent, token.dao_id, token
+                                )
+                            )
+                            if approval_queued:
+                                result.approvals_queued += 1
 
                 except Exception as e:
                     error_msg = f"Error processing API holder {api_holder}: {str(e)}"
@@ -432,7 +528,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             summary = (
                 f"Processed {result.tokens_processed} tokens. "
                 f"Created {result.holders_created}, updated {result.holders_updated}, "
-                f"removed {result.holders_removed} holders."
+                f"removed {result.holders_removed} holders. "
+                f"Queued {result.approvals_queued} proposal approvals."
             )
 
             if result.errors:

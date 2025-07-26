@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from app.backend.factory import backend
 from app.backend.models import (
+    AgentBase,
+    AgentFilter,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
@@ -129,18 +131,61 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             field in message_data and message_data[field] for field in required_fields
         )
 
+    async def _get_agent_by_contract(self, agent_account_contract: str):
+        """Get agent by account contract address."""
+        try:
+            agents = backend.list_agents(
+                filters=AgentFilter(account_contract=agent_account_contract)
+            )
+            return agents[0] if agents else None
+        except Exception as e:
+            logger.error(
+                f"Error getting agent for contract {agent_account_contract}: {str(e)}"
+            )
+            return None
+
+    async def _is_already_approved_in_database(
+        self, agent_account_contract: str, contract_to_approve: str
+    ) -> bool:
+        """Check if the contract is already approved by looking at the agent's approved_contracts array."""
+        try:
+            agent = await self._get_agent_by_contract(agent_account_contract)
+            if not agent:
+                logger.warning(f"Agent not found for contract {agent_account_contract}")
+                return False
+
+            # Check if the contract is in the approved_contracts array
+            if (
+                agent.approved_contracts
+                and contract_to_approve in agent.approved_contracts
+            ):
+                logger.info(
+                    f"Contract {contract_to_approve} already approved for agent {agent_account_contract} (found in database)"
+                )
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.warning(f"Could not check database approval status: {str(e)}")
+            return False
+
     async def _is_already_approved(
         self, message_data: Dict[str, Any], wallet_id: str
     ) -> bool:
-        """Check if the contract is already approved to avoid duplicate approvals."""
+        """Check if the contract is already approved both in database and on-chain."""
         try:
             agent_account_contract = message_data["agent_account_contract"]
             contract_to_approve = message_data["contract_to_approve"]
 
-            # Initialize the check tool
-            check_tool = AgentAccountIsApprovedContractTool(wallet_id=wallet_id)
+            # First check our database records
+            if await self._is_already_approved_in_database(
+                agent_account_contract, contract_to_approve
+            ):
+                return True
 
-            # Check if already approved
+            # If not in database, check on-chain as backup
+            check_tool = AgentAccountIsApprovedContractTool(wallet_id=wallet_id)
             result = await check_tool._arun(
                 agent_account_contract=agent_account_contract,
                 contract_principal=contract_to_approve,
@@ -151,7 +196,11 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 is_approved = result["data"].get("approved", False)
                 if is_approved:
                     logger.info(
-                        f"Contract {contract_to_approve} already approved for agent {agent_account_contract}"
+                        f"Contract {contract_to_approve} already approved on-chain for agent {agent_account_contract}"
+                    )
+                    # Update our database to reflect the on-chain state
+                    await self._update_agent_approved_contracts(
+                        agent_account_contract, contract_to_approve
                     )
                     return True
 
@@ -160,6 +209,45 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         except Exception as e:
             logger.warning(f"Could not check approval status: {str(e)}")
             # If we can't check, proceed with approval attempt
+            return False
+
+    async def _update_agent_approved_contracts(
+        self, agent_account_contract: str, contract_to_approve: str
+    ) -> bool:
+        """Update the agent's approved_contracts array with the newly approved contract."""
+        try:
+            agent = await self._get_agent_by_contract(agent_account_contract)
+            if not agent:
+                logger.error(f"Agent not found for contract {agent_account_contract}")
+                return False
+
+            # Get current approved contracts or initialize empty list
+            current_approved = agent.approved_contracts or []
+
+            # Add the new contract if not already present
+            if contract_to_approve not in current_approved:
+                updated_approved = current_approved + [contract_to_approve]
+
+                # Create update data
+                update_data = AgentBase(approved_contracts=updated_approved)
+
+                # Update the agent
+                backend.update_agent(agent.id, update_data)
+                logger.info(
+                    f"Updated agent {agent_account_contract} approved_contracts: added {contract_to_approve}"
+                )
+                return True
+            else:
+                logger.debug(
+                    f"Contract {contract_to_approve} already in approved_contracts for agent {agent_account_contract}"
+                )
+                return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to update agent approved_contracts for {agent_account_contract}: {str(e)}",
+                exc_info=True,
+            )
             return False
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
@@ -217,6 +305,16 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 "skipped": False,
                 "result": approval_result,
             }
+
+            # If approval was successful, update the agent's approved_contracts array
+            if result["success"]:
+                update_success = await self._update_agent_approved_contracts(
+                    agent_account_contract, contract_to_approve
+                )
+                if not update_success:
+                    logger.warning(
+                        f"Approval succeeded but failed to update agent database record for {agent_account_contract}"
+                    )
 
             # Store result and mark as processed
             update_data = QueueMessageBase(is_processed=True, result=result)

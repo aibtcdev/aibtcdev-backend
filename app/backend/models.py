@@ -269,6 +269,9 @@ class XCreds(XCredsBase):
 class AgentBase(CustomBaseModel):
     profile_id: Optional[UUID] = None
     account_contract: Optional[str] = None
+    approved_contracts: Optional[List[str]] = (
+        None  # Array of approved contract principals
+    )
 
 
 class AgentCreate(AgentBase):
