@@ -218,7 +218,7 @@ class STXTransferTask(BaseTask[STXTransferResult]):
 
             # Execute the transfer
             logger.debug("Executing STX transfer...")
-            transfer_result = await send_tool._arun(
+            transfer_result = send_tool._arun(
                 recipient=recipient,
                 amount=amount,
                 fee=fee,
