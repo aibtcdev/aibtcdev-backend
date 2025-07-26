@@ -218,6 +218,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
     async def _queue_proposal_approval_for_agent(
         self,
         agent,
+        wallet,
         dao_id,
         token,
         reason: str = "Token holder sync - enabling proposal voting",
@@ -227,6 +228,13 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         Returns True if approval was queued successfully, False otherwise.
         """
         try:
+            # Check if we have a wallet for this agent
+            if not wallet:
+                logger.warning(
+                    f"No wallet found for agent {agent.id} - cannot queue approval"
+                )
+                return False
+
             # Find the DAO's ACTION_PROPOSAL_VOTING extension
             extensions = backend.list_extensions(
                 ExtensionFilter(
@@ -248,6 +256,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             approval_message = QueueMessageCreate(
                 type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
                 dao_id=dao_id,
+                wallet_id=wallet.id,  # Include the wallet_id
                 message={
                     "agent_account_contract": agent.account_contract,
                     "contract_to_approve": voting_extension.contract_principal,
@@ -260,7 +269,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             backend.create_queue_message(approval_message)
             logger.info(
                 f"Queued proposal approval for agent {agent.account_contract} "
-                f"to approve {voting_extension.contract_principal}"
+                f"to approve {voting_extension.contract_principal} using wallet {wallet.id}"
             )
             return True
 
@@ -417,7 +426,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             if should_trigger_approval:
                                 approval_queued = (
                                     await self._queue_proposal_approval_for_agent(
-                                        agent, token.dao_id, token
+                                        agent, wallet, token.dao_id, token
                                     )
                                 )
                                 if approval_queued:
@@ -451,7 +460,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             )
                             approval_queued = (
                                 await self._queue_proposal_approval_for_agent(
-                                    agent, token.dao_id, token
+                                    agent, wallet, token.dao_id, token
                                 )
                             )
                             if approval_queued:

@@ -382,10 +382,21 @@ class BuyEventHandler(ChainhookEventHandler):
 
             voting_extension = extensions[0]
 
+            # Get the wallet associated with this agent
+            wallets = backend.list_wallets(WalletFilter(agent_id=agent.id))
+            if not wallets:
+                self.logger.warning(
+                    f"No wallet found for agent {agent.id} - cannot queue approval"
+                )
+                return
+
+            wallet = wallets[0]
+
             # Create queue message for proposal approval
             approval_message = QueueMessageCreate(
                 type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
                 dao_id=dao_id,
+                wallet_id=wallet.id,  # Include the wallet_id
                 message={
                     "agent_account_contract": agent.account_contract,
                     "contract_to_approve": voting_extension.contract_principal,
@@ -398,7 +409,7 @@ class BuyEventHandler(ChainhookEventHandler):
             backend.create_queue_message(approval_message)
             self.logger.info(
                 f"Queued proposal approval for agent {agent.account_contract} "
-                f"to approve {voting_extension.contract_principal}"
+                f"to approve {voting_extension.contract_principal} using wallet {wallet.id}"
             )
 
         except Exception as e:
