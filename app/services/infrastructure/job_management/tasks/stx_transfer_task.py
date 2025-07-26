@@ -168,6 +168,17 @@ class STXTransferTask(BaseTask[STXTransferResult]):
             amount = message_data["amount"]
             fee = message_data.get("fee", 200)  # Default fee
             memo = message_data.get("memo", "")  # Default empty memo
+
+            # Validate and truncate memo to ensure it doesn't exceed 34 bytes
+            if memo:
+                memo_bytes = memo.encode("utf-8")
+                if len(memo_bytes) > 34:
+                    # Truncate to fit within 34 bytes, preserving as much as possible
+                    memo = memo_bytes[:31].decode("utf-8", errors="ignore") + "..."
+                    logger.warning(
+                        f"Memo truncated from {len(memo_bytes)} bytes to fit 34-byte limit: '{memo}'"
+                    )
+
             wallet_id = message.wallet_id
 
             # If wallet_id is None, use backend wallet with seed phrase
