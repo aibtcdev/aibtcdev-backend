@@ -181,6 +181,9 @@ class STXTransferTask(BaseTask[STXTransferResult]):
 
             wallet_id = message.wallet_id
 
+            # Execute the transfer
+            logger.debug("Executing STX transfer...")
+
             # If wallet_id is None, use backend wallet with seed phrase
             if wallet_id is None:
                 if not config.backend_wallet.seed_phrase:
@@ -196,45 +199,32 @@ class STXTransferTask(BaseTask[STXTransferResult]):
                     f"Fee: {fee} microSTX, Using backend wallet (seed phrase)"
                 )
 
-                # Initialize the WalletSendSTX tool with seed phrase instead of wallet_id
+                # Use BunScriptRunner directly for backend wallet transfers
                 from app.tools.bun import BunScriptRunner
 
-                send_tool = type(
-                    "WalletSendSTXBackend",
-                    (),
-                    {
-                        "_arun": lambda self,
-                        recipient,
-                        amount,
-                        fee,
-                        memo: BunScriptRunner.bun_run_with_seed_phrase(
-                            config.backend_wallet.seed_phrase,
-                            "stacks-wallet",
-                            "transfer-my-stx.ts",
-                            recipient,
-                            str(amount),
-                            str(fee),
-                            memo or "",
-                        )
-                    },
-                )()
+                transfer_result = BunScriptRunner.bun_run_with_seed_phrase(
+                    config.backend_wallet.seed_phrase,
+                    "stacks-wallet",
+                    "transfer-my-stx.ts",
+                    recipient,
+                    str(amount),
+                    str(fee),
+                    memo or "",
+                )
             else:
                 logger.debug(
                     f"Transfer parameters - Recipient: {recipient}, Amount: {amount} STX, "
                     f"Fee: {fee} microSTX, Wallet: {wallet_id}"
                 )
 
-                # Initialize the WalletSendSTX tool with the wallet_id
+                # Use WalletSendSTX tool for regular wallet transfers
                 send_tool = WalletSendSTX(wallet_id=wallet_id)
-
-            # Execute the transfer
-            logger.debug("Executing STX transfer...")
-            transfer_result = send_tool._arun(
-                recipient=recipient,
-                amount=amount,
-                fee=fee,
-                memo=memo,
-            )
+                transfer_result = send_tool._arun(
+                    recipient=recipient,
+                    amount=amount,
+                    fee=fee,
+                    memo=memo,
+                )
             logger.debug(f"Transfer result: {transfer_result}")
 
             # Check if transfer was successful
