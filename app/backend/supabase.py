@@ -1001,6 +1001,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("type", filters.type)
             if filters.status is not None:
                 query = query.eq("status", str(filters.status))
+            if filters.subtype is not None:
+                query = query.eq("subtype", filters.subtype)
             if filters.contract_principal is not None:
                 query = query.eq("contract_principal", filters.contract_principal)
         response = query.execute()
