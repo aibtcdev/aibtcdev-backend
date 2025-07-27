@@ -648,15 +648,16 @@ class TwitterDataService:
 
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
-            for image_url in image_urls:
-                try:
-                    image_analysis = analyze_bitcoin_face(image_url)
-                    if not image_analysis.get("error"):
-                        tweet_images_analysis.append(
-                            {"image_url": image_url, "analysis": image_analysis}
-                        )
-                except Exception as e:
-                    logger.warning(f"Error analyzing tweet image {image_url}: {str(e)}")
+            # TODO: Uncomment this when we have a way to analyze images thats faster than the current implementation
+            # for image_url in image_urls:
+            #     try:
+            #         image_analysis = analyze_bitcoin_face(image_url)
+            #         if not image_analysis.get("error"):
+            #             tweet_images_analysis.append(
+            #                 {"image_url": image_url, "analysis": image_analysis}
+            #             )
+            #     except Exception as e:
+            #         logger.warning(f"Error analyzing tweet image {image_url}: {str(e)}")
 
             # Create tweet record
             tweet_create_data = XTweetCreate(
