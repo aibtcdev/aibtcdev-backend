@@ -36,19 +36,55 @@ You must fail all proposals that are missing a valid URL or that only describe h
 STEP 1 — EVALUATE EACH CRITERION
 ------------------------
 
-(Only proceed if both conditions above are satisfied.)
+CONTEXT — KEYWORD SIGNAL CHECK
 
-Evaluate the proposal across 8 criteria.  
+Check the tweets author description field for alignment signals.  
+If the description contains any of the following terms:
+
+<Tweet Author Description>
+- `faces`  
+- `$faces`  
+- `aibtc`  
+- `dao`
+- `machines`
+</Tweet Author Description>
+
+Consider these positive indicators of alignment with DAO culture or active community participation. These signals may support your reasoning under **Brand Alignment** or **Mission Alignment**, but do **not** directly affect scoring or trigger rejection. Treat them as helpful context only.
+
+
+PFP Analysis
+
+Analyze the tweet author's profile picture for alignment signals.  
+If the PFP contains any of the following terms:
+
+<Tweet Author PFP>
+Is the PFP a Bitcoin Faces?
+If it's greater then .70 then it's a Bitcoin Faces.
+</Tweet Author PFP>
+
+Consider these positive indicators of alignment with DAO culture or active community participation. These signals may support your reasoning under **Brand Alignment** or **Mission Alignment**, but do **not** directly affect scoring or trigger rejection. Treat them as helpful context only.
+
+X Verification
+
+Check the tweets author's X verification status for alignment signals.  
+If the author is verified, consider this positive indicator of alignment with DAO culture or active community participation. These signals may support your reasoning under **Brand Alignment** or **Mission Alignment**, but do **not** directly affect scoring or trigger rejection. Treat them as helpful context only.
+
+---
+
+Evaluate the proposal across 11 criteria.  
 Each score must be justified with a 150–200 word explanation (no bullet points):
 
-1. Brand Alignment (15%)  
+1. Brand Alignment (10%)  
 2. Contribution Value (15%)  
 3. Engagement Potential (15%)  
 4. Clarity (10%)  
 5. Timeliness (10%)  
 6. Credibility (10%)  
 7. Risk Assessment (10%)  
-8. Mission Alignment (15%)
+8. Mission Alignment (10%)
+9. Tweet Author Description Alignment (2.5%)
+10. PFP Analysis for Bitcoin Faces (5%)
+11. X Verification (2.5%)
 
 Scoring scale:
 - 0–20: Critically flawed or harmful  
@@ -114,7 +150,8 @@ QUALITY STANDARD
 
 All reasoning must be specific, detailed, and grounded in the actual proposal content.  
 Never use vague, templated, or generic responses.  
-Strictly enforce all rejection criteria. Do not attempt to score or justify speculative or incomplete proposals."""
+Strictly enforce all rejection criteria. Do not attempt to score or justify speculative or incomplete proposals.
+"""
 
 EVALUATION_USER_PROMPT_TEMPLATE = """Evaluate this proposal:
 
@@ -129,5 +166,6 @@ EVALUATION_USER_PROMPT_TEMPLATE = """Evaluate this proposal:
 
 **PAST PROPOSALS:**
 {past_proposals}
+
 
 Provide detailed reasoning for your evaluation and final decision."""
