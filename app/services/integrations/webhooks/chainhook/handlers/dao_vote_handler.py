@@ -93,9 +93,9 @@ class DAOVoteHandler(ChainhookEventHandler):
                     # Get token amount - ensure it's converted to string
                     amount = None
                     if "amount" in payload:
-                        amount = str(payload.get("amount"))
+                        amount = self._extract_amount(payload.get("amount"))
                     elif "liquidTokens" in payload:
-                        amount = str(payload.get("liquidTokens"))
+                        amount = self._extract_amount(payload.get("liquidTokens"))
 
                     # Get contract caller
                     contract_caller = payload.get("contractCaller")
@@ -200,3 +200,22 @@ class DAOVoteHandler(ChainhookEventHandler):
             self.logger.warning(
                 f"Unknown proposal vote type: contract={contract_identifier}, method={method}"
             )
+
+    def _extract_amount(self, amount) -> str:
+        """Extract and convert the amount from Clarity format to a string.
+
+        Args:
+            amount: The amount value which could be a string with 'u' prefix, integer, or None
+
+        Returns:
+            str: The amount as a string, or "0" if None
+        """
+        if amount is None:
+            return "0"
+
+        amount_str = str(amount)
+        if amount_str.startswith("u"):
+            # Remove the 'u' prefix and return as string
+            return amount_str[1:]
+        else:
+            return amount_str
