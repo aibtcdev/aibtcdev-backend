@@ -54,6 +54,9 @@ class ActionVoteHandler(BaseVoteHandler):
         Returns:
             Optional[Dict]: Dictionary containing vote information if found, None otherwise
         """
+        # Collect all potential vote events
+        vote_events = []
+
         for event in events:
             # Find print events with vote information
             if (
@@ -74,25 +77,67 @@ class ActionVoteHandler(BaseVoteHandler):
                     payload = value.get("payload", {})
                     if not payload:
                         self.logger.warning("Empty payload in vote event")
-                        return None
+                        continue
 
                     # Extract the voting contract identifier from the event
                     voting_contract = event_data.get("contract_identifier")
 
-                    return {
+                    vote_info = {
                         "proposal_identifier": payload.get(
                             "proposalId"
                         ),  # Numeric ID for action proposals
                         "voter": payload.get("voter"),
                         "caller": payload.get("contractCaller"),  # Updated field name
                         "tx_sender": payload.get("txSender"),  # New field
-                        "amount": str(payload.get("amount")),
+                        "amount": self._extract_amount(payload.get("amount")),
                         "vote_value": payload.get(
                             "vote"
                         ),  # Vote value is now directly in payload
                         "voter_user_id": payload.get("voterUserId"),  # New field
                         "voting_contract": voting_contract,  # Add the voting contract
+                        "notification": notification,  # Keep track of notification type
                     }
+                    vote_events.append(vote_info)
 
-        self.logger.warning("Could not find vote information in transaction events")
-        return None
+        if not vote_events:
+            self.logger.warning("Could not find vote information in transaction events")
+            return None
+
+        # Prioritize events from voting contracts (they have complete information)
+        # Look for events with "action-proposal-voting" in notification or with voter info
+        voting_contract_events = [
+            event
+            for event in vote_events
+            if "action-proposal-voting" in event.get("notification", "")
+            or event.get("voter")
+        ]
+
+        if voting_contract_events:
+            # Use the first voting contract event (has complete info)
+            selected_event = voting_contract_events[0]
+        else:
+            # Fallback to the first event found
+            selected_event = vote_events[0]
+
+        # Remove the notification field before returning
+        selected_event.pop("notification", None)
+        return selected_event
+
+    def _extract_amount(self, amount) -> str:
+        """Extract and convert the amount from Clarity format to a string.
+
+        Args:
+            amount: The amount value which could be a string with 'u' prefix, integer, or None
+
+        Returns:
+            str: The amount as a string, or "0" if None
+        """
+        if amount is None:
+            return "0"
+
+        amount_str = str(amount)
+        if amount_str.startswith("u"):
+            # Remove the 'u' prefix and return as string
+            return amount_str[1:]
+        else:
+            return amount_str
