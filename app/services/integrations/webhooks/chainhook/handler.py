@@ -7,6 +7,9 @@ from app.services.integrations.webhooks.base import WebhookHandler
 from app.services.integrations.webhooks.chainhook.handlers.action_concluder_handler import (
     ActionConcluderHandler,
 )
+from app.services.integrations.webhooks.chainhook.handlers.action_veto_handler import (
+    ActionVetoHandler,
+)
 from app.services.integrations.webhooks.chainhook.handlers.block_state_handler import (
     BlockStateHandler,
 )
@@ -51,6 +54,7 @@ class ChainhookHandler(WebhookHandler):
         self.block_state_handler = BlockStateHandler()
         self.handlers = [
             ActionConcluderHandler(),
+            ActionVetoHandler(),
             BuyEventHandler(),
             SellEventHandler(),
             DAOProposalHandler(),

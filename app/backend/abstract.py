@@ -79,6 +79,10 @@ from app.backend.models import (
     XUserBase,
     XUserCreate,
     XUserFilter,
+    Veto,
+    VetoBase,
+    VetoCreate,
+    VetoFilter,
 )
 
 
@@ -522,6 +526,27 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_vote(self, vote_id: UUID) -> bool:
+        pass
+
+    # ----------- VETOS -----------
+    @abstractmethod
+    def create_veto(self, new_veto: VetoCreate) -> Veto:
+        pass
+
+    @abstractmethod
+    def get_veto(self, veto_id: UUID) -> Optional[Veto]:
+        pass
+
+    @abstractmethod
+    def list_vetos(self, filters: Optional[VetoFilter] = None) -> List[Veto]:
+        pass
+
+    @abstractmethod
+    def update_veto(self, veto_id: UUID, update_data: VetoBase) -> Optional[Veto]:
+        pass
+
+    @abstractmethod
+    def delete_veto(self, veto_id: UUID) -> bool:
         pass
 
     # ----------- X_CREDS -----------
