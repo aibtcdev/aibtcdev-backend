@@ -90,6 +90,10 @@ from app.backend.models import (
     XUserBase,
     XUserCreate,
     XUserFilter,
+    Veto,
+    VetoBase,
+    VetoCreate,
+    VetoFilter,
 )
 from app.lib.logger import configure_logger
 
@@ -1537,7 +1541,74 @@ class SupabaseBackend(AbstractBackend):
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
-    # 15. X_CREDS
+    # 15. VETOS
+    # ----------------------------------------------------------------
+    def create_veto(self, new_veto: "VetoCreate") -> "Veto":
+        payload = new_veto.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("vetos").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from vetos insert.")
+        return Veto(**data[0])
+
+    def get_veto(self, veto_id: UUID) -> Optional["Veto"]:
+        response = (
+            self.client.table("vetos")
+            .select("*")
+            .eq("id", str(veto_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Veto(**response.data)
+
+    def list_vetos(self, filters: Optional["VetoFilter"] = None) -> List["Veto"]:
+        query = self.client.table("vetos").select("*")
+        if filters:
+            if filters.wallet_id is not None:
+                query = query.eq("wallet_id", str(filters.wallet_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.agent_id is not None:
+                query = query.eq("agent_id", str(filters.agent_id))
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", str(filters.proposal_id))
+            if filters.address is not None:
+                query = query.eq("address", filters.address)
+            if filters.tx_id is not None:
+                query = query.eq("tx_id", filters.tx_id)
+            if filters.contract_caller is not None:
+                query = query.eq("contract_caller", filters.contract_caller)
+            if filters.tx_sender is not None:
+                query = query.eq("tx_sender", filters.tx_sender)
+            if filters.vetoer_user_id is not None:
+                query = query.eq("vetoer_user_id", filters.vetoer_user_id)
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+        response = query.execute()
+        data = response.data or []
+        return [Veto(**row) for row in data]
+
+    def update_veto(self, veto_id: UUID, update_data: "VetoBase") -> Optional["Veto"]:
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_veto(veto_id)
+        response = (
+            self.client.table("vetos").update(payload).eq("id", str(veto_id)).execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Veto(**updated[0])
+
+    def delete_veto(self, veto_id: UUID) -> bool:
+        response = self.client.table("vetos").delete().eq("id", str(veto_id)).execute()
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 16. X_CREDS
     # ----------------------------------------------------------------
     def create_x_creds(self, new_xc: "XCredsCreate") -> "XCreds":
         payload = new_xc.model_dump(exclude_unset=True, mode="json")
@@ -1595,7 +1666,7 @@ class SupabaseBackend(AbstractBackend):
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
-    # 15. X_USERS
+    # 16. X_USERS
     # ----------------------------------------------------------------
     def create_x_user(self, new_xu: "XUserCreate") -> "XUser":
         payload = new_xu.model_dump(exclude_unset=True, mode="json")

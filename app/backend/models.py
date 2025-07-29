@@ -823,6 +823,50 @@ class VoteFilter(CustomBaseModel):
     flags: Optional[List[str]] = None  # Filter by flags
 
 
+#
+# VETOS
+#
+class VetoBase(CustomBaseModel):
+    """Base model for proposal vetos."""
+
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    tx_id: Optional[str] = None
+    address: Optional[str] = None  # Vetoer address
+    amount: Optional[str] = None  # String to handle large token amounts
+    contract_caller: Optional[str] = None  # Contract that called the veto
+    tx_sender: Optional[str] = None  # Transaction sender
+    vetoer_user_id: Optional[int] = None  # User ID of the vetoer
+    reasoning: Optional[str] = None  # Optional reasoning for the veto
+    profile_id: Optional[UUID] = None
+
+
+class VetoCreate(VetoBase):
+    pass
+
+
+class Veto(VetoBase):
+    id: UUID
+    created_at: datetime
+
+
+class VetoFilter(CustomBaseModel):
+    """Filter model for vetos."""
+
+    wallet_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    address: Optional[str] = None
+    tx_id: Optional[str] = None
+    contract_caller: Optional[str] = None
+    tx_sender: Optional[str] = None
+    vetoer_user_id: Optional[int] = None
+    profile_id: Optional[UUID] = None
+
+
 # Add this to your backend interface class to get agents by tokens
 class AgentWithWalletTokenDTO(CustomBaseModel):
     agent_id: UUID
