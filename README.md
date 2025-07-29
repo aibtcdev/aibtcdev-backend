@@ -150,6 +150,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Configuration](docs/configuration.md)**: Environment setup and configuration
 - **[Development](docs/development.md)**: Development setup and contribution guide
 - **[CLI Usage](docs/cli-usage.md)**: Command-line interface guide for task management
+- **[Supabase Deployments](docs/supabase-deployments.md)**: Automated database migration deployment setup
 
 ### 🔧 Quick References
 - **API Endpoints**: See [API Overview](docs/api-overview.md) for complete endpoint list
