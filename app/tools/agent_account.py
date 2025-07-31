@@ -4,6 +4,7 @@ from uuid import UUID
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from app.config import config
 from app.tools.bun import BunScriptRunner
 
 
@@ -19,6 +20,11 @@ class AgentAccountDeployInput(BaseModel):
         ...,
         description="Stacks address of the agent",
         examples=["ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"],
+    )
+    network: Optional[str] = Field(
+        None,
+        description="Stacks network (mainnet or testnet). Defaults to configured network if not specified.",
+        examples=["testnet", "mainnet"],
     )
     save_to_file: bool = Field(
         False,
@@ -51,6 +57,7 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
+        network: Optional[str] = None,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -62,9 +69,14 @@ class AgentAccountDeployTool(BaseTool):
                 "data": None,
             }
 
+        # Use configured network if not specified
+        if network is None:
+            network = config.network.network
+
         args = [
             owner_address,
             agent_address,
+            network,
             str(save_to_file).lower(),
         ]
 
@@ -88,6 +100,7 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
+        network: Optional[str] = None,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -95,6 +108,7 @@ class AgentAccountDeployTool(BaseTool):
         return self._run_script(
             owner_address,
             agent_address,
+            network,
             save_to_file,
             **kwargs,
         )
@@ -103,6 +117,7 @@ class AgentAccountDeployTool(BaseTool):
         self,
         owner_address: str,
         agent_address: str,
+        network: Optional[str] = None,
         save_to_file: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -110,6 +125,7 @@ class AgentAccountDeployTool(BaseTool):
         return self._run_script(
             owner_address,
             agent_address,
+            network,
             save_to_file,
             **kwargs,
         )

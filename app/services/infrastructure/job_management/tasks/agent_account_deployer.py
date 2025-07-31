@@ -303,6 +303,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             deployment_result = await deploy_tool._arun(
                 owner_address=owner_address,
                 agent_address=agent_address,
+                network=config.network.network,
             )
             logger.debug(f"Deployment result: {deployment_result}")
 
