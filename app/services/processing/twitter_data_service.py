@@ -683,6 +683,23 @@ class TwitterDataService:
             logger.info(
                 f"Successfully stored tweet {tweet_id} with {len(image_urls)} images"
             )
+
+            # Fetch and store the author's last 5 tweets
+            if tweet_data.get("author_id") and tweet_data.get("author_username"):
+                try:
+                    author_tweet_ids = await self.fetch_and_store_author_tweets(
+                        author_id=str(tweet_data["author_id"]),
+                        author_username=tweet_data["author_username"],
+                    )
+                    if author_tweet_ids:
+                        logger.info(
+                            f"Stored {len(author_tweet_ids)} additional tweets from author {tweet_data['author_username']}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to fetch author tweets for {tweet_data.get('author_username')}: {str(e)}"
+                    )
+
             return tweet_record.id
 
         except Exception as e:
@@ -717,6 +734,157 @@ class TwitterDataService:
 
         except Exception as e:
             logger.error(f"Error processing Twitter URLs from text: {str(e)}")
+            return []
+
+    async def fetch_and_store_author_tweets(
+        self, author_id: str, author_username: str = None
+    ) -> List[UUID]:
+        """Fetch and store the last 5 tweets from the specified author.
+
+        Args:
+            author_id: Twitter user ID of the author
+            author_username: Optional username for logging purposes
+
+        Returns:
+            List of tweet database IDs that were stored
+        """
+        try:
+            if not self.twitter_service:
+                await self._initialize_twitter_service()
+                if not self.twitter_service:
+                    logger.error(
+                        "Twitter service not available for fetching author tweets"
+                    )
+                    return []
+
+            # Fetch the author's timeline (last 5 tweets)
+            logger.info(
+                f"Fetching last 5 tweets for author {author_username or author_id}"
+            )
+            timeline_response = await self.twitter_service.get_user_timeline(
+                user_id=author_id, count=5, exclude_replies=True, include_rts=False
+            )
+
+            if not timeline_response:
+                logger.warning(f"No timeline data returned for author {author_id}")
+                return []
+
+            stored_tweet_ids = []
+
+            # Process each tweet in the timeline
+            for tweet in timeline_response:
+                try:
+                    # Extract tweet data similar to _fetch_tweet_from_api
+                    tweet_data = None
+
+                    # Handle different response formats (API v1.1 vs v2)
+                    if hasattr(tweet, "id_str"):
+                        # API v1.1 format
+                        tweet_data = {
+                            "id": tweet.id_str,
+                            "text": getattr(tweet, "full_text", tweet.text),
+                            "author_id": tweet.user.id_str,
+                            "author_username": tweet.user.screen_name,
+                            "author_name": tweet.user.name,
+                            "created_at": tweet.created_at,
+                            "retweet_count": tweet.retweet_count,
+                            "favorite_count": tweet.favorite_count,
+                            "entities": getattr(tweet, "entities", None),
+                            "extended_entities": getattr(
+                                tweet, "extended_entities", None
+                            ),
+                        }
+                    elif hasattr(tweet, "id"):
+                        # API v2 format
+                        tweet_data = {
+                            "id": str(tweet.id),
+                            "text": tweet.text,
+                            "author_id": str(tweet.author_id),
+                            "created_at": getattr(tweet, "created_at", None),
+                            "public_metrics": getattr(tweet, "public_metrics", {}),
+                            "entities": getattr(tweet, "entities", {}),
+                            "attachments": getattr(tweet, "attachments", {}),
+                        }
+
+                        # Add author info if available
+                        if author_username:
+                            tweet_data["author_username"] = author_username
+
+                    if not tweet_data:
+                        logger.warning(
+                            "Could not extract tweet data from timeline response"
+                        )
+                        continue
+
+                    # Check if tweet already exists
+                    existing_tweets = backend.list_x_tweets(
+                        XTweetFilter(tweet_id=tweet_data["id"])
+                    )
+                    if existing_tweets:
+                        logger.debug(
+                            f"Timeline tweet {tweet_data['id']} already exists in database"
+                        )
+                        stored_tweet_ids.append(existing_tweets[0].id)
+                        continue
+
+                    # Extract images from tweet
+                    image_urls = self._extract_images_from_tweet_data(tweet_data)
+
+                    # Store user data if needed (reuse existing logic)
+                    author_db_id = await self._store_user_if_needed(tweet_data)
+
+                    # Prepare created_at_twitter field
+                    created_at_twitter = None
+                    if tweet_data.get("created_at"):
+                        try:
+                            if hasattr(tweet_data["created_at"], "strftime"):
+                                created_at_twitter = tweet_data["created_at"].strftime(
+                                    "%Y-%m-%d %H:%M:%S"
+                                )
+                            else:
+                                created_at_twitter = str(tweet_data["created_at"])
+                        except (AttributeError, ValueError, TypeError):
+                            created_at_twitter = str(tweet_data["created_at"])
+
+                    # Create tweet record with consistent structure
+                    tweet_create_data = XTweetCreate(
+                        message=tweet_data.get("text"),
+                        author_id=author_db_id,
+                        tweet_id=tweet_data["id"],
+                        conversation_id=tweet_data.get("conversation_id"),
+                        is_worthy=False,
+                        tweet_type=TweetType.INVALID,
+                        confidence_score=None,
+                        reason=None,
+                        images=image_urls,
+                        author_name=tweet_data.get("author_name"),
+                        author_username=tweet_data.get("author_username"),
+                        created_at_twitter=created_at_twitter,
+                        public_metrics=tweet_data.get("public_metrics"),
+                        entities=tweet_data.get("entities"),
+                        attachments=tweet_data.get("attachments"),
+                        tweet_images_analysis=[],  # Skip image analysis for author tweets for performance
+                    )
+
+                    tweet_record = backend.create_x_tweet(tweet_create_data)
+                    stored_tweet_ids.append(tweet_record.id)
+                    logger.debug(
+                        f"Stored author tweet {tweet_data['id']} with {len(image_urls)} images"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error processing author timeline tweet: {str(e)}")
+                    continue
+
+            logger.info(
+                f"Successfully stored {len(stored_tweet_ids)} tweets from author {author_username or author_id}"
+            )
+            return stored_tweet_ids
+
+        except Exception as e:
+            logger.error(
+                f"Error fetching and storing author tweets for {author_id}: {str(e)}"
+            )
             return []
 
 
