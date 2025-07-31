@@ -12,6 +12,7 @@ This directory contains utility scripts for the aibtcdev-backend project.
 ### Utility Scripts
 - **`check_updates.py`** - Check for available updates to dependencies in pyproject.toml
 - **`run_task.py`** - CLI tool for running tasks on demand from the job management system
+- **`queue_missing_agent_deployments.py`** - Queue agent account deployments for wallets missing account contracts
 
 ## Usage
 
@@ -42,6 +43,12 @@ uv run python scripts/run_task.py run agent_account_deployer
 
 # Test proposal evaluation
 uv run python scripts/test_proposal_evaluation.py --proposal-id "12345678-1234-5678-9012-123456789abc" --proposal-data "Test proposal content"
+
+# Queue missing agent deployments (dry run)
+uv run python scripts/queue_missing_agent_deployments.py --dry-run
+
+# Queue missing agent deployments (actual execution)
+uv run python scripts/queue_missing_agent_deployments.py
 ```
 
 ## Requirements
