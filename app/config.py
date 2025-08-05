@@ -51,8 +51,8 @@ class BackendWalletConfig:
         "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "1"
     )  # 1 STX in STX
     funding_amount: str = os.getenv(
-        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "5"
-    )  # 5 STX in STX
+        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "1"
+    )  # 1 STX in STX
 
 
 @dataclass
