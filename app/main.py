@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import tools, webhooks, agent_lookup, profiles
+from app.api import tools, webhooks, agent_lookup, profiles, dao
 from app.config import config
 from app.lib.logger import configure_logger
 
@@ -39,6 +39,8 @@ app.include_router(tools.router)
 app.include_router(webhooks.router)
 app.include_router(agent_lookup.router, prefix="/api")
 app.include_router(profiles.router, prefix="/api/profiles")
+app.include_router(dao.router, prefix="/api/dao")
+
 
 
 @app.on_event("startup")
