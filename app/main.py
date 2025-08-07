@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import tools, webhooks, agent_lookup
+from app.api import tools, webhooks, agent_lookup, profiles
 from app.config import config
 from app.lib.logger import configure_logger
 
@@ -38,6 +38,7 @@ async def health_check():
 app.include_router(tools.router)
 app.include_router(webhooks.router)
 app.include_router(agent_lookup.router, prefix="/api")
+app.include_router(profiles.router, prefix="/api/profiles")
 
 
 @app.on_event("startup")
