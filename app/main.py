@@ -42,7 +42,6 @@ app.include_router(profiles.router, prefix="/api/profiles")
 app.include_router(dao.router, prefix="/api/dao")
 
 
-
 @app.on_event("startup")
 async def startup_event():
     """Run web server startup tasks."""
