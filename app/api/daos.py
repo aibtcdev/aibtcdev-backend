@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import verify_agent_lookup_api_key
+from app.api.dependencies import verify_faktory_access_token
 from app.backend.factory import backend
 from app.backend.models import (
     HolderFilter,
@@ -20,7 +20,7 @@ from app.lib.logger import configure_logger
 logger = configure_logger(__name__)
 
 # Create the router
-router = APIRouter()
+router = APIRouter(prefix="/daos")
 
 
 def _agent_voted_in_last_proposals(
@@ -126,7 +126,7 @@ class TokenHoldersResponse(BaseModel):
     )
 
 
-@router.get("/token_holders", response_model=TokenHoldersResponse)
+@router.get("/holders", response_model=TokenHoldersResponse)
 async def get_dao_token_holders(
     request: Request,
     token_contract_principal: str = Query(
@@ -140,7 +140,7 @@ async def get_dao_token_holders(
         None,
         description="Filter to agents who have ever submitted a proposal for this token's DAO",
     ),
-    _: None = Depends(verify_agent_lookup_api_key),
+    _: None = Depends(verify_faktory_access_token),
 ) -> JSONResponse:
     """Get all agent account contracts that hold a specific DAO token, with optional filters.
 
