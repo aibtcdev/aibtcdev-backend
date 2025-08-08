@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import verify_agent_lookup_api_key
+from app.api.dependencies import verify_faktory_access_token
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, ProfileFilter, WalletFilter
 from app.config import config
@@ -14,7 +14,7 @@ from app.lib.logger import configure_logger
 logger = configure_logger(__name__)
 
 # Create the router
-router = APIRouter()
+router = APIRouter(prefix="/profiles")
 
 
 class ProfileAddresses(BaseModel):
@@ -34,7 +34,7 @@ class ProfileAddresses(BaseModel):
 @router.get("/addresses", response_model=List[ProfileAddresses])
 async def get_all_profile_addresses(
     request: Request,
-    _: None = Depends(verify_agent_lookup_api_key),
+    _: None = Depends(verify_faktory_access_token),
 ) -> JSONResponse:
     """Get all profile addresses with their associated agent and wallet information.
 

@@ -198,7 +198,7 @@ async def verify_webhook_auth(authorization: Optional[str] = Header(None)) -> No
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 
-async def verify_agent_lookup_api_key(
+async def verify_faktory_access_token(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ) -> None:
     """
@@ -214,6 +214,6 @@ async def verify_agent_lookup_api_key(
         logger.error("Missing X-API-Key header for agent lookup")
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
-    if x_api_key != config.api.agent_lookup_api_key:
+    if x_api_key != config.api.faktory_access_token:
         logger.error("Invalid agent lookup API key")
         raise HTTPException(status_code=401, detail="Invalid API key")

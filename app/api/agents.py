@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.responses import JSONResponse
 
-from app.api.dependencies import verify_agent_lookup_api_key
+from app.api.dependencies import verify_faktory_access_token
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, ProfileFilter
 from app.lib.logger import configure_logger
@@ -10,14 +10,14 @@ from app.lib.logger import configure_logger
 logger = configure_logger(__name__)
 
 # Create the router
-router = APIRouter()
+router = APIRouter(prefix="/agents")
 
 
-@router.get("/agent_account_contract")
+@router.get("/account")
 async def get_agent_account_contract(
     request: Request,
     stacks_address: str = Query(..., description="Stacks address (mainnet or testnet)"),
-    _: None = Depends(verify_agent_lookup_api_key),
+    _: None = Depends(verify_faktory_access_token),
 ) -> JSONResponse:
     """Get agent account contract by Stacks address.
 
