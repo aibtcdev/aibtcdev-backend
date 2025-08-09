@@ -18,6 +18,10 @@ from app.backend.models import (
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
+    Airdrop,
+    AirdropBase,
+    AirdropCreate,
+    AirdropFilter,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
@@ -1989,3 +1993,101 @@ class SupabaseBackend(AbstractBackend):
                 return self.list_proposals(basic_filter)
             else:
                 return self.list_proposals()
+
+    # ----------------------------------------------------------------
+    # AIRDROPS
+    # ----------------------------------------------------------------
+
+    def create_airdrop(self, new_airdrop: "AirdropCreate") -> "Airdrop":
+        """Create a new airdrop record."""
+        payload = new_airdrop.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("airdrops").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from airdrop insert.")
+        return Airdrop(**data[0])
+
+    def get_airdrop(self, airdrop_id: UUID) -> Optional["Airdrop"]:
+        """Get an airdrop by ID."""
+        response = (
+            self.client.table("airdrops")
+            .select("*")
+            .eq("id", str(airdrop_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Airdrop(**response.data)
+
+    def get_airdrop_by_tx_hash(self, tx_hash: str) -> Optional["Airdrop"]:
+        """Get an airdrop by transaction hash."""
+        response = (
+            self.client.table("airdrops")
+            .select("*")
+            .eq("tx_hash", tx_hash)
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Airdrop(**response.data)
+
+    def list_airdrops(
+        self, filters: Optional["AirdropFilter"] = None
+    ) -> List["Airdrop"]:
+        """List airdrops with optional filtering."""
+        query = self.client.table("airdrops").select("*")
+        if filters:
+            if filters.tx_hash is not None:
+                query = query.eq("tx_hash", filters.tx_hash)
+            if filters.block_height is not None:
+                query = query.eq("block_height", filters.block_height)
+            if filters.sender is not None:
+                query = query.eq("sender", filters.sender)
+            if filters.contract_identifier is not None:
+                query = query.eq("contract_identifier", filters.contract_identifier)
+            if filters.token_identifier is not None:
+                query = query.eq("token_identifier", filters.token_identifier)
+            if filters.success is not None:
+                query = query.eq("success", filters.success)
+            if filters.proposal_tx_id is not None:
+                query = query.eq("proposal_tx_id", filters.proposal_tx_id)
+            # Range filters
+            if filters.block_height_gte is not None:
+                query = query.gte("block_height", filters.block_height_gte)
+            if filters.block_height_lte is not None:
+                query = query.lte("block_height", filters.block_height_lte)
+            if filters.timestamp_after is not None:
+                query = query.gte("timestamp", filters.timestamp_after.isoformat())
+            if filters.timestamp_before is not None:
+                query = query.lte("timestamp", filters.timestamp_before.isoformat())
+        response = query.execute()
+        data = response.data or []
+        return [Airdrop(**row) for row in data]
+
+    def update_airdrop(
+        self, airdrop_id: UUID, update_data: "AirdropBase"
+    ) -> Optional["Airdrop"]:
+        """Update an airdrop record."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_airdrop(airdrop_id)
+        response = (
+            self.client.table("airdrops")
+            .update(payload)
+            .eq("id", str(airdrop_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Airdrop(**updated[0])
+
+    def delete_airdrop(self, airdrop_id: UUID) -> bool:
+        """Delete an airdrop record."""
+        response = (
+            self.client.table("airdrops").delete().eq("id", str(airdrop_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
