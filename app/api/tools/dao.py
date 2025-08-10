@@ -142,6 +142,27 @@ async def _create_proposal_from_tool_result(
         else:
             logger.info("No tweet database IDs provided")
 
+        # Lookup airdrop data if airdrop_txid is provided
+        airdrop_id = None
+        if payload.airdrop_txid:
+            try:
+                airdrop = backend.get_airdrop_by_tx_hash(payload.airdrop_txid)
+                if airdrop:
+                    airdrop_id = airdrop.id
+                    logger.info(
+                        f"Found airdrop record {airdrop_id} for tx {payload.airdrop_txid}"
+                    )
+                else:
+                    logger.warning(
+                        f"No airdrop found for transaction hash: {payload.airdrop_txid}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error looking up airdrop for tx {payload.airdrop_txid}: {str(e)}"
+                )
+        else:
+            logger.info("No airdrop transaction ID provided")
+
         # Create the proposal record
         proposal_content = ProposalCreate(
             dao_id=dao_id,
@@ -158,6 +179,7 @@ async def _create_proposal_from_tool_result(
             memo=payload.memo,
             x_url=x_url,  # Store the extracted Twitter URL
             tweet_id=tweet_id,  # Store the linked tweet database ID
+            airdrop_id=airdrop_id,  # Store the linked airdrop database ID
         )
 
         proposal = backend.create_proposal(proposal_content)

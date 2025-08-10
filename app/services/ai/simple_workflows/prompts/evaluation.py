@@ -69,9 +69,14 @@ X Verification
 Check the tweets author's X verification status for alignment signals.  
 If the author is verified, consider this positive indicator of alignment with DAO culture or active community participation. These signals may support your reasoning under **Brand Alignment** or **Mission Alignment**, but do **not** directly affect scoring or trigger rejection. Treat them as helpful context only.
 
+Airdrop Transaction ID
+
+Check the proposal for an airdrop transaction ID.
+If the proposal includes an airdrop transaction ID, consider this positive indicator of alignment with DAO culture or active community participation. These signals may support your reasoning under **Brand Alignment** or **Mission Alignment**, but do **not** directly affect scoring or trigger rejection. Treat them as helpful context only.
+
 ---
 
-Evaluate the proposal across 11 criteria.  
+Evaluate the proposal across 12 criteria.  
 Each score must be justified with a 150–200 word explanation (no bullet points):
 
 1. Brand Alignment (10%)  
@@ -83,8 +88,9 @@ Each score must be justified with a 150–200 word explanation (no bullet points
 7. Risk Assessment (10%)  
 8. Mission Alignment (10%)
 9. Tweet Author Description Alignment (2.5%)
-10. PFP Analysis for Bitcoin Faces (5%)
+10. PFP Analysis for Bitcoin Faces (2.5%)
 11. X Verification (2.5%)
+12. Airdrop Transaction ID (2.5%)
 
 Scoring scale:
 - 0–20: Critically flawed or harmful  

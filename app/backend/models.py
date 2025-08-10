@@ -419,6 +419,9 @@ class ProposalBase(CustomBaseModel):
     )
     x_url: Optional[str] = None  # Twitter/X URL associated with the proposal
     tweet_id: Optional[UUID] = None  # Reference to x_tweets table for linked tweet data
+    airdrop_id: Optional[UUID] = (
+        None  # Reference to airdrops table for linked airdrop data
+    )
 
 
 class ProposalCreate(ProposalBase):
