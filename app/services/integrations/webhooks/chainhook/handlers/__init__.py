@@ -6,6 +6,9 @@ This module contains specialized handlers for different types of chainhook event
 from app.services.integrations.webhooks.chainhook.handlers.action_concluder_handler import (
     ActionConcluderHandler,
 )
+from app.services.integrations.webhooks.chainhook.handlers.airdrop_handler import (
+    AirdropHandler,
+)
 from app.services.integrations.webhooks.chainhook.handlers.base import (
     ChainhookEventHandler,
 )
@@ -34,6 +37,7 @@ from app.services.integrations.webhooks.chainhook.handlers.sell_event_handler im
 __all__ = [
     "ChainhookEventHandler",
     "ActionConcluderHandler",
+    "AirdropHandler",
     "BuyEventHandler",
     "SellEventHandler",
     "DAOProposalHandler",
