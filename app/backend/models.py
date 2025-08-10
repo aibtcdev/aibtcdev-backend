@@ -908,3 +908,48 @@ class PromptFilter(CustomBaseModel):
     agent_id: Optional[UUID] = None
     profile_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+
+
+#
+# AIRDROPS
+#
+class AirdropBase(CustomBaseModel):
+    """Base model for airdrops."""
+
+    tx_hash: Optional[str] = None
+    block_height: Optional[int] = None
+    timestamp: Optional[datetime] = None
+    sender: Optional[str] = None
+    contract_identifier: Optional[str] = None
+    token_identifier: Optional[str] = None
+    success: Optional[bool] = None
+    total_amount_airdropped: Optional[str] = (
+        None  # Using string to handle large numbers
+    )
+    recipients: Optional[List[str]] = None
+    proposal_tx_id: Optional[str] = None
+
+
+class AirdropCreate(AirdropBase):
+    pass
+
+
+class Airdrop(AirdropBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class AirdropFilter(CustomBaseModel):
+    tx_hash: Optional[str] = None
+    block_height: Optional[int] = None
+    sender: Optional[str] = None
+    contract_identifier: Optional[str] = None
+    token_identifier: Optional[str] = None
+    success: Optional[bool] = None
+    proposal_tx_id: Optional[str] = None
+    # Range filters
+    block_height_gte: Optional[int] = None
+    block_height_lte: Optional[int] = None
+    timestamp_after: Optional[datetime] = None
+    timestamp_before: Optional[datetime] = None

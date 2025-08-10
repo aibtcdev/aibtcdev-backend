@@ -8,6 +8,10 @@ from app.backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    Airdrop,
+    AirdropBase,
+    AirdropCreate,
+    AirdropFilter,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
@@ -217,6 +221,39 @@ class AbstractBackend(ABC):
     @abstractmethod
     def get_latest_chain_state(self, network: str = "mainnet") -> Optional[ChainState]:
         """Get the latest chain state for a given network."""
+        pass
+
+    # ----------- AIRDROPS -----------
+    @abstractmethod
+    def create_airdrop(self, new_airdrop: AirdropCreate) -> Airdrop:
+        """Create a new airdrop record."""
+        pass
+
+    @abstractmethod
+    def get_airdrop(self, airdrop_id: UUID) -> Optional[Airdrop]:
+        """Get an airdrop record by ID."""
+        pass
+
+    @abstractmethod
+    def get_airdrop_by_tx_hash(self, tx_hash: str) -> Optional[Airdrop]:
+        """Get an airdrop record by transaction hash."""
+        pass
+
+    @abstractmethod
+    def list_airdrops(self, filters: Optional[AirdropFilter] = None) -> List[Airdrop]:
+        """List airdrop records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_airdrop(
+        self, airdrop_id: UUID, update_data: AirdropBase
+    ) -> Optional[Airdrop]:
+        """Update an airdrop record."""
+        pass
+
+    @abstractmethod
+    def delete_airdrop(self, airdrop_id: UUID) -> bool:
+        """Delete an airdrop record."""
         pass
 
     # ----------- SECRETS -----------
