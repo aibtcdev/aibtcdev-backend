@@ -46,6 +46,10 @@ class ProposeSendMessageRequest(BaseModel):
         None,
         description="Optional memo to include with the proposal.",
     )
+    airdrop_txid: Optional[str] = Field(
+        None,
+        description="Optional transaction ID of an associated airdrop to include in the proposal metadata.",
+    )
 
 
 class VetoActionProposalRequest(BaseModel):

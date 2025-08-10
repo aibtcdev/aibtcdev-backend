@@ -25,6 +25,9 @@ from app.services.ai.simple_workflows.processors.twitter import (
     format_tweet,
     format_tweet_images,
 )
+from app.services.ai.simple_workflows.processors.airdrop import (
+    process_airdrop,
+)
 
 logger = configure_logger(__name__)
 
@@ -282,6 +285,7 @@ def create_chat_messages(
     past_proposals: str,
     proposal_images: List[Dict[str, Any]] = None,
     tweet_content: Optional[str] = None,
+    airdrop_content: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
 ) -> List:
@@ -294,6 +298,7 @@ def create_chat_messages(
         past_proposals: Formatted past proposals text
         proposal_images: List of processed images
         tweet_content: Optional tweet content from linked tweets
+        airdrop_content: Optional airdrop content from linked airdrop
         custom_system_prompt: Optional custom system prompt to override default
         custom_user_prompt: Optional custom user prompt to override default
 
@@ -350,6 +355,31 @@ def create_chat_messages(
             f"Added escaped tweet content to messages: {escaped_tweet_content[:100]}..."
         )
 
+    # Add airdrop content as separate user message if available
+    if airdrop_content and airdrop_content.strip():
+        # Safely escape airdrop content to prevent JSON/format issues
+        escaped_airdrop_content = str(airdrop_content)
+        # Remove or replace control characters (keep common whitespace)
+        escaped_airdrop_content = "".join(
+            char
+            for char in escaped_airdrop_content
+            if ord(char) >= 32 or char in "\n\r\t"
+        )
+        # Escape curly braces to prevent f-string/format interpretation issues
+        escaped_airdrop_content = escaped_airdrop_content.replace("{", "{{").replace(
+            "}", "}}"
+        )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Associated airdrop data for this proposal:\n\n{escaped_airdrop_content}",
+            }
+        )
+        logger.debug(
+            f"Added escaped airdrop content to messages: {escaped_airdrop_content[:100]}..."
+        )
+
     # Create user message content - start with text
     user_message_content = [{"type": "text", "text": user_content}]
 
@@ -375,6 +405,7 @@ async def evaluate_proposal(
     proposal_id: Optional[UUID] = None,
     images: Optional[List[Dict[str, Any]]] = None,
     tweet_content: Optional[str] = None,
+    airdrop_content: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
     callbacks: Optional[List[Any]] = None,
@@ -387,6 +418,7 @@ async def evaluate_proposal(
         proposal_id: Optional proposal UUID for fetching linked tweet content
         images: Optional list of processed images
         tweet_content: Optional tweet content (will be fetched from DB if proposal_id provided)
+        airdrop_content: Optional airdrop content (will be fetched from DB if proposal_id provided)
         custom_system_prompt: Optional custom system prompt
         custom_user_prompt: Optional custom user prompt
         callbacks: Optional callback handlers for streaming
@@ -439,6 +471,41 @@ async def evaluate_proposal(
         except Exception as e:
             logger.error(
                 f"[EvaluationProcessor:{proposal_id_str}] Error fetching linked tweet content: {str(e)}"
+            )
+
+    # Fetch airdrop content from the proposal's linked airdrop if available and not provided
+    if proposal_id and not airdrop_content:
+        try:
+            logger.debug(
+                f"[EvaluationProcessor:{proposal_id_str}] Fetching proposal to get linked airdrop content"
+            )
+            # Check if we already have the proposal from above
+            if "proposal" not in locals() or not proposal:
+                proposal = backend.get_proposal(proposal_id)
+
+            if proposal and proposal.airdrop_id:
+                logger.debug(
+                    f"[EvaluationProcessor:{proposal_id_str}] Found linked airdrop_id: {proposal.airdrop_id}"
+                )
+                # Use airdrop processor to fetch and format airdrop content
+                airdrop_content = await process_airdrop(
+                    proposal.airdrop_id, proposal_id_str
+                )
+                if airdrop_content:
+                    logger.info(
+                        f"[EvaluationProcessor:{proposal_id_str}] Retrieved and formatted airdrop content"
+                    )
+                else:
+                    logger.warning(
+                        f"[EvaluationProcessor:{proposal_id_str}] Could not fetch airdrop data for airdrop_id: {proposal.airdrop_id}"
+                    )
+            else:
+                logger.debug(
+                    f"[EvaluationProcessor:{proposal_id_str}] No linked airdrop found for proposal"
+                )
+        except Exception as e:
+            logger.error(
+                f"[EvaluationProcessor:{proposal_id_str}] Error fetching linked airdrop content: {str(e)}"
             )
 
     # Ensure proposal content is safely handled as plain text
@@ -541,6 +608,7 @@ Recent Community Sentiment: Positive
             or "<no_proposals>No past proposals available for comparison.</no_proposals>",
             proposal_images=all_proposal_images,
             tweet_content=tweet_content,
+            airdrop_content=airdrop_content,
             custom_system_prompt=custom_system_prompt,
             custom_user_prompt=custom_user_prompt,
         )

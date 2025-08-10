@@ -88,6 +88,7 @@ async def evaluate_proposal_comprehensive(
             proposal_id=proposal_id,
             images=all_images,
             tweet_content=tweet_content,
+            airdrop_content=None,  # Let evaluate_proposal fetch it automatically if needed
             custom_system_prompt=custom_system_prompt,
             custom_user_prompt=custom_user_prompt,
             callbacks=callbacks,
