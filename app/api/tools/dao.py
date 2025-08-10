@@ -323,22 +323,23 @@ async def _create_proposal_record_if_successful(
 
 
 def _enhance_message_with_metadata(
-    message: str, title: str, metadata_tags: list
+    message: str, title: str, metadata_tags: list, airdrop_txid: Optional[str] = None
 ) -> str:
-    """Enhance message with title and tags using structured format.
+    """Enhance message with title, tags, and optional airdrop transaction ID using structured format.
 
     Args:
         message: The original message.
         title: The generated title.
         metadata_tags: The generated tags.
+        airdrop_txid: Optional transaction ID of an associated airdrop.
 
     Returns:
         Enhanced message with metadata.
     """
     enhanced_message = message
 
-    # Add metadata section if we have title or tags
-    if title or metadata_tags:
+    # Add metadata section if we have title, tags, or airdrop_txid
+    if title or metadata_tags or airdrop_txid:
         enhanced_message = f"{message}\n\n--- Metadata ---"
 
         if title:
@@ -349,8 +350,14 @@ def _enhance_message_with_metadata(
             tags_string = "|".join(metadata_tags)
             enhanced_message += f"\nTags: {tags_string}"
             logger.info(f"Enhanced message with tags: {metadata_tags}")
+
+        if airdrop_txid:
+            enhanced_message += f"\nAirdrop Transaction ID: {airdrop_txid}"
+            logger.info(f"Enhanced message with airdrop transaction ID: {airdrop_txid}")
     else:
-        logger.warning("No title or tags generated for the message")
+        logger.warning(
+            "No title, tags, or airdrop transaction ID generated for the message"
+        )
 
     return enhanced_message
 
@@ -413,7 +420,7 @@ async def propose_dao_action_send_message(
 
         # Step 3: Enhance message with metadata
         enhanced_message = _enhance_message_with_metadata(
-            payload.message, title, metadata_tags
+            payload.message, title, metadata_tags, payload.airdrop_txid
         )
 
         # Step 4: Deploy the information on chain
