@@ -31,6 +31,7 @@ class ChainStateBase(CustomBaseModel):
     block_hash: Optional[str] = None
     network: Optional[str] = "mainnet"  # mainnet or testnet
     bitcoin_block_height: Optional[int] = None
+    chainhook_uuid: Optional[str] = None
 
 
 class ChainStateCreate(ChainStateBase):

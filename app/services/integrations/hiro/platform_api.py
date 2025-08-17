@@ -1,8 +1,9 @@
 """Platform API client for Hiro chainhook management."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from app.config import config
+from app.backend.factory import backend
 
 from .base import BaseHiroApi
 from .utils import ChainHookBuilder, ChainHookPredicate, WebhookConfig
@@ -31,7 +32,7 @@ class PlatformApi(BaseHiroApi):
             "POST",
             f"/v1/ext/{self.api_key}/chainhooks",
             headers={"Content-Type": "application/json"},
-            json=predicate,
+            json=cast(Dict[str, Any], predicate),
         )
 
     async def acreate_chainhook(self, predicate: ChainHookPredicate) -> Dict[str, Any]:
@@ -40,7 +41,7 @@ class PlatformApi(BaseHiroApi):
             "POST",
             f"/v1/ext/{self.api_key}/chainhooks",
             headers={"Content-Type": "application/json"},
-            json=predicate,
+            json=cast(Dict[str, Any], predicate),
         )
 
     def create_transaction_hook(
@@ -271,3 +272,163 @@ class PlatformApi(BaseHiroApi):
             .build()
         )
         return await self.acreate_chainhook(predicate)
+
+    def create_block_height_hook(
+        self,
+        name: str = "mainnet",
+        network: str = "mainnet",
+        webhook: Optional[WebhookConfig] = None,
+        end_block: Optional[int] = None,
+        expire_after_occurrence: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Create a chainhook that monitors blocks starting from the latest recorded block height.
+
+        This function retrieves the latest block height from the chain_states table
+        and creates a chainhook that monitors blocks higher than that height.
+
+        Args:
+            name: Name for the chainhook (default: "mainnet")
+            network: Network to monitor (default: "mainnet")
+            webhook: Webhook configuration (uses default if not provided)
+            end_block: Optional end block for monitoring
+            expire_after_occurrence: Optional expiration after number of occurrences
+
+        Returns:
+            Dict containing the response from the API
+        """
+        latest_chain_state = backend.get_latest_chain_state(network)
+
+        if latest_chain_state is None or latest_chain_state.block_height is None:
+            raise ValueError(f"No chain state found for network {network}")
+
+        start_block = latest_chain_state.block_height
+
+        builder = (
+            ChainHookBuilder(name, network=network)
+            .with_block_height_filter(start_block)
+            .with_blocks(start_block, end_block)
+            .with_webhook(webhook or self.default_webhook)
+        )
+
+        if expire_after_occurrence is not None:
+            builder.with_expiration(expire_after_occurrence)
+
+        return self.create_chainhook(builder.build())
+
+    async def acreate_block_height_hook(
+        self,
+        name: str = "mainnet",
+        network: str = "mainnet",
+        webhook: Optional[WebhookConfig] = None,
+        end_block: Optional[int] = None,
+        expire_after_occurrence: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Async version of create_block_height_hook."""
+        latest_chain_state = backend.get_latest_chain_state(network)
+
+        if latest_chain_state is None or latest_chain_state.block_height is None:
+            raise ValueError(f"No chain state found for network {network}")
+
+        start_block = latest_chain_state.block_height
+
+        builder = (
+            ChainHookBuilder(name, network=network)
+            .with_block_height_filter(start_block)
+            .with_blocks(start_block, end_block)
+            .with_webhook(webhook or self.default_webhook)
+        )
+
+        if expire_after_occurrence is not None:
+            builder.with_expiration(expire_after_occurrence)
+
+        return await self.acreate_chainhook(builder.build())
+
+    def get_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Get a specific chainhook by UUID.
+
+        Args:
+            chainhook_uuid: The UUID of the chainhook to retrieve
+
+        Returns:
+            Dict containing the chainhook details
+        """
+        return self._make_request(
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
+        )
+
+    async def aget_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Async version of get_chainhook."""
+        return await self._amake_request(
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
+        )
+
+    def list_chainhooks(self) -> List[Dict[str, Any]]:
+        """Get all chainhooks for this API key.
+
+        Returns:
+            List of chainhook dictionaries
+        """
+        result = self._make_request("GET", f"/v1/ext/{self.api_key}/chainhooks")
+        # The API returns a list, but _make_request has Dict return type
+        # Cast to list since we know this endpoint returns an array
+        if isinstance(result, list):
+            return result
+        return []
+
+    async def alist_chainhooks(self) -> List[Dict[str, Any]]:
+        """Async version of list_chainhooks."""
+        result = await self._amake_request("GET", f"/v1/ext/{self.api_key}/chainhooks")
+        # The API returns a list, but _amake_request has Dict return type
+        # Cast to list since we know this endpoint returns an array
+        if isinstance(result, list):
+            return result
+        return []
+
+    def update_chainhook(
+        self, chainhook_uuid: str, predicate: ChainHookPredicate
+    ) -> Dict[str, Any]:
+        """Update an existing chainhook.
+
+        Args:
+            chainhook_uuid: The UUID of the chainhook to update
+            predicate: The new chainhook predicate configuration
+
+        Returns:
+            Dict containing the response from the API
+        """
+        return self._make_request(
+            "PUT",
+            f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}",
+            headers={"Content-Type": "application/json"},
+            json=cast(Dict[str, Any], predicate),
+        )
+
+    async def aupdate_chainhook(
+        self, chainhook_uuid: str, predicate: ChainHookPredicate
+    ) -> Dict[str, Any]:
+        """Async version of update_chainhook."""
+        return await self._amake_request(
+            "PUT",
+            f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}",
+            headers={"Content-Type": "application/json"},
+            json=cast(Dict[str, Any], predicate),
+        )
+
+    def delete_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Delete a chainhook.
+
+        Args:
+            chainhook_uuid: The UUID of the chainhook to delete
+
+        Returns:
+            Dict containing the response from the API
+        """
+        return self._make_request(
+            "DELETE", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
+        )
+
+    async def adelete_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Async version of delete_chainhook."""
+        return await self._amake_request(
+            "DELETE", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
+        )
