@@ -39,6 +39,7 @@ class EventScope(str, Enum):
     FT_EVENT = "ft_event"
     NFT_EVENT = "nft_event"
     STX_EVENT = "stx_event"
+    BLOCK_HEIGHT = "block_height"
 
 
 @dataclass
@@ -165,6 +166,14 @@ class ChainHookBuilder:
         self.conditions = {
             "scope": EventScope.STX_EVENT,
             "actions": actions,
+        }
+        return self
+
+    def with_block_height_filter(self, higher_than: int) -> "ChainHookBuilder":
+        """Add block height filter for monitoring blocks higher than specified height."""
+        self.conditions = {
+            "scope": EventScope.BLOCK_HEIGHT,
+            "higher_than": higher_than,
         }
         return self
 

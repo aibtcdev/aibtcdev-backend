@@ -1,0 +1,21 @@
+{
+  "description": "Claude Code hooks for ruff Python linting and formatting",
+  "hooks": {
+    "on-file-edit": {
+      "description": "Auto-fix and format Python files when edited",
+      "command": "ruff check {file} --fix && ruff format {file}",
+      "file_patterns": ["*.py"],
+      "enabled": true
+    },
+    "on-prompt-submit": {
+      "description": "Check all Python files for issues",
+      "command": "ruff check app/ && echo 'Ruff linting passed ✅'",
+      "enabled": true
+    },
+    "pre-commit": {
+      "description": "Comprehensive ruff check before commits",
+      "command": "ruff check . && ruff format . --check",
+      "enabled": true
+    }
+  }
+}

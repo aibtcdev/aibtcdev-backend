@@ -2,7 +2,7 @@
 
 import time
 from functools import wraps
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional
 
 import aiohttp
 import httpx
@@ -48,7 +48,7 @@ class BaseHiroApi:
         self._session: Optional[aiohttp.ClientSession] = None
         logger.debug("Initialized API client with base URL: %s", self.base_url)
 
-    def _update_rate_limits(self, headers: Dict[str, str]) -> None:
+    def _update_rate_limits(self, headers: Mapping[str, str]) -> None:
         """Update rate limit settings from response headers.
 
         Args:
@@ -180,7 +180,8 @@ class BaseHiroApi:
             self.__class__._minute_limit,
         )
 
-    def _retry_on_error(func):
+    @staticmethod
+    def _retry_on_error(func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to retry API calls on transient errors."""
 
         @wraps(func)

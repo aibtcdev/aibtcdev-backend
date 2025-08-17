@@ -1,0 +1,30 @@
+{
+  "user-prompt-submit-hook": {
+    "description": "Run comprehensive Python checks when user submits prompts",
+    "command": "bash -c 'echo \"🔍 Running Python code quality checks...\"; PYTHON_FILES=$(find app -name \"*.py\" -type f | head -20); if [ -n \"$PYTHON_FILES\" ]; then echo \"📁 Checking Python files in app/ directory...\"; if ruff check app/ --quiet; then echo \"✅ Ruff linting passed\"; else echo \"❌ Ruff linting found issues\"; fi; if command -v typos >/dev/null 2>&1; then if typos app/ --quiet; then echo \"✅ Typos check passed\"; else echo \"❌ Typos found\"; fi; else echo \"ℹ️ Typos checker not available\"; fi; else echo \"ℹ️ No Python files found to check\"; fi'",
+    "enabled": true,
+    "timeout": 15000,
+    "working_directory": "."
+  },
+  "file-edit-hook": {
+    "description": "Run ruff check and format on edited Python files",
+    "command": "bash -c 'if [[ \"$CLAUDE_FILE_PATH\" == *.py ]]; then echo \"🔍 Running ruff on $CLAUDE_FILE_PATH...\"; if ruff check \"$CLAUDE_FILE_PATH\" --fix --quiet; then echo \"✅ Ruff check passed for $CLAUDE_FILE_PATH\"; else echo \"❌ Ruff check failed for $CLAUDE_FILE_PATH\"; fi; if ruff format \"$CLAUDE_FILE_PATH\" --quiet; then echo \"✅ Ruff format completed for $CLAUDE_FILE_PATH\"; else echo \"❌ Ruff format failed for $CLAUDE_FILE_PATH\"; fi; else echo \"ℹ️ Skipping ruff for non-Python file: $CLAUDE_FILE_PATH\"; fi'",
+    "enabled": true,
+    "timeout": 10000,
+    "working_directory": "."
+  },
+  "tool-use-hook": {
+    "description": "Run ruff linting and formatting when Python files are modified",
+    "command": "bash -c 'if [[ \"$CLAUDE_TOOL_NAME\" == \"Write\" || \"$CLAUDE_TOOL_NAME\" == \"Edit\" || \"$CLAUDE_TOOL_NAME\" == \"MultiEdit\" ]]; then if [[ \"$CLAUDE_FILE_PATH\" == *.py ]]; then echo \"🔍 Running ruff after $CLAUDE_TOOL_NAME on $CLAUDE_FILE_PATH...\"; if ruff check \"$CLAUDE_FILE_PATH\" --fix --quiet; then echo \"✅ Ruff check and auto-fix completed\"; else echo \"❌ Ruff check failed\"; fi; if ruff format \"$CLAUDE_FILE_PATH\" --quiet; then echo \"✅ Ruff format completed\"; else echo \"❌ Ruff format failed\"; fi; else echo \"ℹ️ Skipping ruff for non-Python file: $CLAUDE_FILE_PATH\"; fi; fi'",
+    "enabled": true,
+    "timeout": 10000,
+    "working_directory": "."
+  },
+  "pre-commit-hook": {
+    "description": "Run full ruff check before any git commits",
+    "command": "bash -c 'echo \"🔍 Pre-commit: Running full ruff check...\"; if ruff check . --quiet && ruff format . --check --quiet; then echo \"✅ Pre-commit ruff checks passed\"; else echo \"❌ Pre-commit ruff checks failed - please fix issues before committing\"; exit 1; fi'",
+    "enabled": true,
+    "timeout": 20000,
+    "working_directory": "."
+  }
+}

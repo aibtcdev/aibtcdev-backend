@@ -152,6 +152,14 @@ class SchedulerConfig:
         os.getenv("AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300")
     )
 
+    # chainhook_monitor job
+    chainhook_monitor_enabled: bool = (
+        os.getenv("AIBTC_CHAINHOOK_MONITOR_ENABLED", "true").lower() == "true"
+    )
+    chainhook_monitor_interval_seconds: int = int(
+        os.getenv("AIBTC_CHAINHOOK_MONITOR_INTERVAL_SECONDS", "300")
+    )
+
     # dao_deployment job
     dao_deployment_enabled: bool = (
         os.getenv("AIBTC_DAO_DEPLOYMENT_ENABLED", "true").lower() == "true"
