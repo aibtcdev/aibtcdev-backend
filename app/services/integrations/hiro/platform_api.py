@@ -432,3 +432,22 @@ class PlatformApi(BaseHiroApi):
         return await self._amake_request(
             "DELETE", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
         )
+
+    def get_chainhook_status(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Get the status of a specific chainhook.
+
+        Args:
+            chainhook_uuid: The UUID of the chainhook to get status for
+
+        Returns:
+            Dict containing the chainhook status information
+        """
+        return self._make_request(
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}/status"
+        )
+
+    async def aget_chainhook_status(self, chainhook_uuid: str) -> Dict[str, Any]:
+        """Async version of get_chainhook_status."""
+        return await self._amake_request(
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}/status"
+        )

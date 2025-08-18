@@ -1,7 +1,7 @@
 """Chainhook monitoring task implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from app.backend.factory import backend
 from app.config import config
@@ -140,40 +140,50 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
         """Cleanup after task execution."""
         logger.debug("Chainhook monitor task cleanup completed")
 
-    def _is_chainhook_healthy(self, chainhook: Dict[str, Any]) -> bool:
-        """Check if a chainhook is in a healthy state.
+    def _is_chainhook_healthy(self, chainhook_uuid: str) -> bool:
+        """Check if a chainhook is in a healthy state by checking its status directly.
 
         Args:
-            chainhook: Chainhook data from the Platform API
+            chainhook_uuid: UUID of the chainhook to check
 
         Returns:
             bool: True if chainhook is healthy, False otherwise
         """
         try:
-            # Check if chainhook has required fields
-            if not chainhook.get("uuid"):
-                logger.warning("Chainhook missing UUID")
+            # Get the specific chainhook status
+            status_response = self.platform_api.get_chainhook_status(chainhook_uuid)
+
+            # Check if chainhook is enabled
+            if not status_response.get("enabled", False):
+                logger.warning(f"Chainhook {chainhook_uuid} is not enabled")
                 return False
 
-            # Check status field if available
-            status = chainhook.get("status", "").lower()
-            if status in ["failed", "error", "disabled", "terminated"]:
+            # Check status type for any failure indicators
+            status_info = status_response.get("status", {})
+            status_type = status_info.get("type", "").lower()
+
+            if status_type in ["failed", "error", "disabled", "terminated", "expired"]:
                 logger.warning(
-                    f"Chainhook {chainhook.get('uuid')} has status: {status}"
+                    f"Chainhook {chainhook_uuid} has status type: {status_type}"
                 )
                 return False
 
-            # Check if chainhook is streaming (active)
-            is_streaming = chainhook.get("is_streaming_blocks", False)
-            if not is_streaming:
-                logger.warning(
-                    f"Chainhook {chainhook.get('uuid')} is not streaming blocks"
-                )
-                return False
+            # Additional checks on status info if available
+            info = status_info.get("info", {})
+            if info:
+                # Check if chainhook has expired
+                expired_at = info.get("expired_at_block_height")
+                last_evaluated = info.get("last_evaluated_block_height")
+
+                if expired_at and last_evaluated and last_evaluated >= expired_at:
+                    logger.warning(
+                        f"Chainhook {chainhook_uuid} has expired (expired_at: {expired_at}, last_evaluated: {last_evaluated})"
+                    )
+                    return False
 
             return True
         except Exception as e:
-            logger.error(f"Error checking chainhook health: {str(e)}")
+            logger.error(f"Error checking chainhook {chainhook_uuid} health: {str(e)}")
             return False
 
     def _recreate_chainhook_for_chain_state(self, chain_state) -> Optional[str]:
@@ -301,30 +311,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 )
                 return results
 
-            # Get all chainhooks from Platform API
-            try:
-                all_chainhooks = self.platform_api.list_chainhooks()
-                logger.info(
-                    f"Retrieved {len(all_chainhooks)} chainhooks from Platform API"
-                )
-            except Exception as e:
-                logger.error(f"Error retrieving chainhooks from Platform API: {str(e)}")
-                results.append(
-                    ChainhookMonitorResult(
-                        success=False,
-                        message=f"Error retrieving chainhooks from Platform API: {str(e)}",
-                        network=network,
-                        error=e,
-                    )
-                )
-                return results
-
-            # Create a mapping of UUID to chainhook data
-            chainhook_map = {
-                ch.get("uuid"): ch for ch in all_chainhooks if ch.get("uuid")
-            }
-
-            # Check each chain state's chainhook
+            # Check each chain state's chainhook status directly
             for chain_state in chain_states_with_chainhooks:
                 chainhook_uuid = chain_state.chainhook_uuid
                 # Since we filtered for non-None chainhook_uuid, this should never be None
@@ -338,35 +325,14 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 chainhooks_checked += 1
 
                 logger.debug(
-                    f"Checking chainhook {chainhook_uuid} for chain state {chain_state.id}"
+                    f"Checking chainhook {chainhook_uuid} status for chain state {chain_state.id}"
                 )
 
-                # Check if chainhook exists in Platform API
-                if chainhook_uuid not in chainhook_map:
+                # Check if chainhook is healthy using direct status check
+                if not self._is_chainhook_healthy(chainhook_uuid):
                     logger.warning(
-                        f"Chainhook {chainhook_uuid} not found in Platform API"
+                        f"Chainhook {chainhook_uuid} is unhealthy or not found"
                     )
-                    chainhooks_failed += 1
-                    failed_chainhook_ids.append(chainhook_uuid)
-
-                    # Try to recreate the chainhook
-                    new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
-                    if new_uuid:
-                        chainhooks_recreated += 1
-                        recreated_chainhook_ids.append(new_uuid)
-                        logger.info(
-                            f"Successfully recreated chainhook {new_uuid} to replace missing {chainhook_uuid}"
-                        )
-                    else:
-                        logger.error(
-                            f"Failed to recreate chainhook for chain state {chain_state.id}"
-                        )
-                    continue
-
-                # Check if chainhook is healthy
-                chainhook_data = chainhook_map[chainhook_uuid]
-                if not self._is_chainhook_healthy(chainhook_data):
-                    logger.warning(f"Chainhook {chainhook_uuid} is unhealthy")
                     chainhooks_failed += 1
                     failed_chainhook_ids.append(chainhook_uuid)
 
@@ -379,7 +345,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                             f"Successfully recreated chainhook {new_uuid} to replace unhealthy {chainhook_uuid}"
                         )
 
-                        # Delete the old chainhook
+                        # Delete the old chainhook if it exists
                         try:
                             self.platform_api.delete_chainhook(chainhook_uuid)
                             logger.info(f"Deleted old chainhook {chainhook_uuid}")
