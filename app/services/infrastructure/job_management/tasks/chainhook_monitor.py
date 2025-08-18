@@ -199,7 +199,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 expire_after_occurrence=None,  # Don't expire
             )
 
-            new_chainhook_uuid = response.get("uuid")
+            new_chainhook_uuid = response.get("chainhookUuid")
             if not new_chainhook_uuid:
                 logger.error("No UUID returned from chainhook creation")
                 return None
