@@ -62,6 +62,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if (
                 not config.discord.webhook_url_passed
                 and not config.discord.webhook_url_failed
+                and not config.discord.webhook_url_veto
             ):
                 logger.error("No Discord webhook URLs configured")
                 return False
@@ -180,8 +181,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         elif proposal_status == "failed":
             return config.discord.webhook_url_failed
         elif proposal_status in ["veto_window_open", "veto_window_closed"]:
-            # Veto window notifications go to passed webhook (info/updates channel)
-            return config.discord.webhook_url_passed
+            return config.discord.webhook_url_veto
         else:
             # Default to passed webhook for backwards compatibility
             return config.discord.webhook_url_passed

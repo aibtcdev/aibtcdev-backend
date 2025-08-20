@@ -65,6 +65,7 @@ class TelegramConfig:
 class DiscordConfig:
     webhook_url_passed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_PASSED", "")
     webhook_url_failed: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_FAILED", "")
+    webhook_url_veto: str = os.getenv("AIBTC_DISCORD_WEBHOOK_URL_VETO", "")
 
 
 @dataclass
