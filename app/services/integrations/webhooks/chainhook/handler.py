@@ -10,6 +10,9 @@ from app.services.integrations.webhooks.chainhook.handlers.action_concluder_hand
 from app.services.integrations.webhooks.chainhook.handlers.action_veto_handler import (
     ActionVetoHandler,
 )
+from app.services.integrations.webhooks.chainhook.handlers.agent_account_funding_handler import (
+    AgentAccountFundingHandler,
+)
 from app.services.integrations.webhooks.chainhook.handlers.airdrop_handler import (
     AirdropHandler,
 )
@@ -58,6 +61,7 @@ class ChainhookHandler(WebhookHandler):
         self.handlers = [
             ActionConcluderHandler(),
             ActionVetoHandler(),
+            AgentAccountFundingHandler(),
             AirdropHandler(),
             BuyEventHandler(),
             SellEventHandler(),
