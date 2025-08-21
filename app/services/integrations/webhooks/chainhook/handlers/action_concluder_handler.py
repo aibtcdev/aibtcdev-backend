@@ -327,7 +327,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 approval_pct = (votes_for / total_votes) * 100
 
             # Format the Discord message with new structured format for passed proposal
-            formatted_message = f"✅ Approved: Contribution #{proposal.proposal_id}\n"
+            formatted_message = "\n=======================================\n\n"
+            formatted_message += f"✅ Approved: Contribution #{proposal.proposal_id}\n"
             formatted_message += f"💬 {proposal.title}\n"
             formatted_message += "⭐️ Reward: 1,000 $FACES\n\n"
 
@@ -340,7 +341,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
             formatted_message += f"Details: {proposal_url}\n\n"
 
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
-            formatted_message += f"Approval: {approval_pct:.1f}%"
+            formatted_message += f"Approval: {approval_pct:.1f}%\n\n"
+            formatted_message += "======================================="
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
@@ -373,7 +375,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 approval_pct = (votes_for / total_votes) * 100
 
             # Format the Discord message with new structured format for failed proposal
-            formatted_message = f"🛑 Rejected: Contribution #{proposal.proposal_id}\n"
+            formatted_message = "\n=======================================\n\n"
+            formatted_message += f"🛑 Rejected: Contribution #{proposal.proposal_id}\n"
             formatted_message += f"💬 {proposal.title}\n\n"
 
             # Add URL section if x_url is available
@@ -385,7 +388,8 @@ class ActionConcluderHandler(ChainhookEventHandler):
             formatted_message += f"Details: {proposal_url}\n\n"
 
             formatted_message += f"Participation: {participation_pct:.1f}%\n"
-            formatted_message += f"Approval: {approval_pct:.1f}%"
+            formatted_message += f"Approval: {approval_pct:.1f}%\n\n"
+            formatted_message += "======================================="
 
             discord_message = backend.create_queue_message(
                 QueueMessageCreate(
