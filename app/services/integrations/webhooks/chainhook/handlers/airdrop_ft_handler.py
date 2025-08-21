@@ -1,4 +1,4 @@
-"""Handler for capturing airdrop transactions (send-many operations)."""
+"""Handler for capturing FT airdrop transactions (send-many operations)."""
 
 from datetime import datetime
 from typing import Dict, List
@@ -14,8 +14,8 @@ from app.services.integrations.webhooks.chainhook.models import (
 )
 
 
-class AirdropHandler(ChainhookEventHandler):
-    """Handler for capturing and processing airdrop transactions.
+class AirdropFTHandler(ChainhookEventHandler):
+    """Handler for capturing and processing FT airdrop transactions.
 
     This handler identifies contract calls with send-many method on faktory contracts,
     parses the FT transfer events to extract airdrop details, and creates airdrop records
