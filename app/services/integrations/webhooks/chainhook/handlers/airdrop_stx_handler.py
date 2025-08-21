@@ -1,4 +1,4 @@
-"""Handler for capturing STX funding transactions to agent accounts."""
+"""Handler for capturing STX airdrop transactions."""
 
 import re
 from datetime import datetime
@@ -15,12 +15,12 @@ from app.services.integrations.webhooks.chainhook.models import (
 )
 
 
-class AgentAccountFundingHandler(ChainhookEventHandler):
-    """Handler for capturing and processing STX funding transactions to agent accounts.
+class AirdropSTXHandler(ChainhookEventHandler):
+    """Handler for capturing and processing STX airdrop transactions.
 
     This handler identifies contract calls with send-many method on the specific
     SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.send-many contract,
-    parses STX transfer events to extract funding details for agent accounts,
+    parses STX transfer events to extract airdrop details for agent accounts,
     and creates airdrop records in the database.
     """
 
@@ -112,13 +112,13 @@ class AgentAccountFundingHandler(ChainhookEventHandler):
         return False
 
     def _parse_stx_transfer_events(self, events: List[Event]) -> Dict[str, any]:
-        """Parse STX transfer events to extract agent account funding information.
+        """Parse STX transfer events to extract STX airdrop information.
 
         Args:
             events: List of events from the transaction
 
         Returns:
-            Dict containing parsed funding data
+            Dict containing parsed airdrop data
         """
         recipients = []
         total_amount = 0
@@ -155,7 +155,7 @@ class AgentAccountFundingHandler(ChainhookEventHandler):
         }
 
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
-        """Handle agent account STX funding transactions.
+        """Handle STX airdrop transactions.
 
         Processes send-many contract call transactions that send STX to agent accounts
         and creates airdrop records in the database.
@@ -187,20 +187,20 @@ class AgentAccountFundingHandler(ChainhookEventHandler):
         # Get the events from the transaction
         events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
 
-        # Parse STX transfer events to get funding details
-        funding_data = self._parse_stx_transfer_events(events)
+        # Parse STX transfer events to get airdrop details
+        airdrop_data = self._parse_stx_transfer_events(events)
 
-        if not funding_data["recipients"]:
+        if not airdrop_data["recipients"]:
             self.logger.warning(
-                f"No agent account recipients found in STX funding transaction {tx_id}"
+                f"No agent account recipients found in STX airdrop transaction {tx_id}"
             )
             return
 
-        sender = funding_data["sender"]
+        sender = airdrop_data["sender"]
 
         self.logger.info(
-            f"Processing agent account STX funding transaction {tx_id}: "
-            f"{funding_data['total_amount']} STX to {len(funding_data['recipients'])} agent accounts"
+            f"Processing STX airdrop transaction {tx_id}: "
+            f"{airdrop_data['total_amount']} STX to {len(airdrop_data['recipients'])} agent accounts"
         )
 
         # Check if airdrop already exists
@@ -208,7 +208,7 @@ class AgentAccountFundingHandler(ChainhookEventHandler):
 
         if existing_airdrops:
             self.logger.info(
-                f"STX funding record already exists for transaction {tx_id}"
+                f"STX airdrop record already exists for transaction {tx_id}"
             )
             return
 
@@ -223,19 +223,19 @@ class AgentAccountFundingHandler(ChainhookEventHandler):
                     contract_identifier=contract_identifier,
                     token_identifier="STX",
                     success=True,
-                    total_amount_airdropped=funding_data["total_amount"],
-                    recipients=funding_data["recipients"],
-                    proposal_tx_id=None,  # Agent account funding, not proposal-related
+                    total_amount_airdropped=airdrop_data["total_amount"],
+                    recipients=airdrop_data["recipients"],
+                    proposal_tx_id=None,  # STX airdrop, not proposal-related
                 )
             )
 
             self.logger.info(
-                f"Created agent account STX funding record {airdrop.id} for transaction {tx_id}: "
-                f"{funding_data['total_amount']} STX sent to {len(funding_data['recipients'])} agent accounts"
+                f"Created STX airdrop record {airdrop.id} for transaction {tx_id}: "
+                f"{airdrop_data['total_amount']} STX airdropped to {len(airdrop_data['recipients'])} agent accounts"
             )
 
         except Exception as e:
             self.logger.error(
-                f"Error creating agent account funding record for transaction {tx_id}: {str(e)}"
+                f"Error creating STX airdrop record for transaction {tx_id}: {str(e)}"
             )
             raise
