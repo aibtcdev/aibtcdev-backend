@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import agents, daos, tools, webhooks, profiles
 from app.config import config
-from app.lib.logger import configure_logger
+from app.lib.logger import configure_logger, setup_uvicorn_logging
+from app.middleware.logging import LoggingMiddleware
 
 # Configure module logger
 logger = configure_logger(__name__)
@@ -16,6 +17,9 @@ app = FastAPI(
     description="Backend API for AI BTC Dev services",
     version="0.1.0",
 )
+
+# Add logging middleware first
+app.add_middleware(LoggingMiddleware)
 
 # Configure CORS
 app.add_middleware(
@@ -45,6 +49,9 @@ app.include_router(daos.router)
 @app.on_event("startup")
 async def startup_event():
     """Run web server startup tasks."""
+    # Configure JSON logging after uvicorn is fully initialized
+    setup_uvicorn_logging()
+
     logger.info("Starting FastAPI web server...")
     # Background services (job runners, bot, etc.) are handled by worker.py
     logger.info("Web server startup complete")
