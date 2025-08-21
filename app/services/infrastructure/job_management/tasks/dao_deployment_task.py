@@ -60,11 +60,11 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         """Validate DAO deployment task configuration."""
         try:
             if not self.tools_map:
-                logger.error("No DAO deployment tools available")
+                logger.debug("No DAO deployment tools available")
                 return False
 
             if not self.tools_map_all:
-                logger.error("Tools not properly initialized")
+                logger.debug("Tools not properly initialized")
                 return False
 
             # Configuration validation passed
