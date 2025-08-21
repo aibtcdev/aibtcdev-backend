@@ -1523,9 +1523,57 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("evaluation_score", filters.evaluation_score)
             if filters.flags is not None:
                 query = query.eq("flags", filters.flags)
+
+            # Batch filters for efficient querying
+            if filters.wallet_ids is not None and len(filters.wallet_ids) > 0:
+                wallet_id_strings = [str(wallet_id) for wallet_id in filters.wallet_ids]
+                query = query.in_("wallet_id", wallet_id_strings)
+            if filters.proposal_ids is not None and len(filters.proposal_ids) > 0:
+                proposal_id_strings = [
+                    str(proposal_id) for proposal_id in filters.proposal_ids
+                ]
+                query = query.in_("proposal_id", proposal_id_strings)
+
         response = query.execute()
         data = response.data or []
         return [Vote(**row) for row in data]
+
+    def check_proposals_evaluated_batch(
+        self, proposal_wallet_pairs: List[tuple[UUID, UUID]]
+    ) -> Dict[tuple[UUID, UUID], bool]:
+        """Check which proposal-wallet pairs have already been evaluated in a single query.
+
+        Args:
+            proposal_wallet_pairs: List of (proposal_id, wallet_id) tuples to check
+
+        Returns:
+            Dict mapping (proposal_id, wallet_id) tuples to True if evaluated, False otherwise
+        """
+        if not proposal_wallet_pairs:
+            return {}
+
+        # Extract unique proposal and wallet IDs
+        proposal_ids = list(set([pair[0] for pair in proposal_wallet_pairs]))
+        wallet_ids = list(set([pair[1] for pair in proposal_wallet_pairs]))
+
+        # Query for existing votes with evaluation data
+        vote_filter = VoteFilter(proposal_ids=proposal_ids, wallet_ids=wallet_ids)
+        existing_votes = self.list_votes(filters=vote_filter)
+
+        # Build lookup set of evaluated pairs
+        evaluated_pairs = set()
+        for vote in existing_votes:
+            # Check if vote has evaluation data (indicating evaluation was performed)
+            if (
+                vote.evaluation_score
+                or vote.evaluation
+                or vote.reasoning
+                or vote.confidence is not None
+            ):
+                evaluated_pairs.add((vote.proposal_id, vote.wallet_id))
+
+        # Return result mapping for all requested pairs
+        return {pair: pair in evaluated_pairs for pair in proposal_wallet_pairs}
 
     def update_vote(self, vote_id: UUID, update_data: "VoteBase") -> Optional["Vote"]:
         payload = update_data.model_dump(exclude_unset=True, mode="json")
