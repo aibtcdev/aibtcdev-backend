@@ -4,6 +4,7 @@ import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
+from uuid import UUID
 
 from app.backend.factory import backend
 from app.backend.models import (
@@ -116,6 +117,9 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     ) -> bool:
         """Check if a proposal has already been evaluated by looking at the votes table.
 
+        Note: This method is deprecated in favor of batch evaluation checking.
+        Use _filter_unevaluated_messages for better performance.
+
         Args:
             proposal_id: The UUID of the proposal to check
             wallet_id: Optional wallet ID to check for specific wallet evaluation
@@ -155,6 +159,86 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             )
             return False
 
+    def _filter_unevaluated_messages(
+        self, messages: List[QueueMessage]
+    ) -> List[QueueMessage]:
+        """Filter out messages for proposals that have already been evaluated.
+
+        This method performs a single batch query to check all proposal-wallet pairs,
+        significantly reducing database load compared to individual checks.
+
+        Args:
+            messages: List of queue messages to filter
+
+        Returns:
+            List of messages for proposals that haven't been evaluated yet
+        """
+        if not messages:
+            return []
+
+        # Extract proposal-wallet pairs from messages
+        proposal_wallet_pairs = []
+        message_lookup = {}  # Map pairs to original messages
+
+        for message in messages:
+            message_data = message.message or {}
+            proposal_id = message_data.get("proposal_id")
+            wallet_id = message.wallet_id
+
+            if proposal_id and wallet_id:
+                try:
+                    # Convert to UUID objects for consistency
+                    proposal_uuid = (
+                        UUID(proposal_id)
+                        if isinstance(proposal_id, str)
+                        else proposal_id
+                    )
+                    wallet_uuid = (
+                        UUID(wallet_id) if isinstance(wallet_id, str) else wallet_id
+                    )
+
+                    pair = (proposal_uuid, wallet_uuid)
+                    proposal_wallet_pairs.append(pair)
+                    message_lookup[pair] = message
+                except ValueError as e:
+                    logger.warning(f"Invalid UUID in message {message.id}: {e}")
+                    continue
+
+        if not proposal_wallet_pairs:
+            logger.debug("No valid proposal-wallet pairs found in messages")
+            return []
+
+        # Batch check which proposals have been evaluated
+        try:
+            evaluation_status = backend.check_proposals_evaluated_batch(
+                proposal_wallet_pairs
+            )
+
+            # Filter out already evaluated proposals
+            unevaluated_messages = []
+            skipped_count = 0
+
+            for pair, is_evaluated in evaluation_status.items():
+                if not is_evaluated and pair in message_lookup:
+                    unevaluated_messages.append(message_lookup[pair])
+                elif is_evaluated:
+                    skipped_count += 1
+
+            # Log summary instead of individual skipped proposals
+            if skipped_count > 0:
+                logger.info(f"Skipped {skipped_count} already-evaluated proposals")
+
+            logger.info(
+                f"Filtered to {len(unevaluated_messages)} unevaluated proposals from {len(messages)} total messages"
+            )
+            return unevaluated_messages
+
+        except Exception as e:
+            logger.error(f"Error in batch evaluation check: {str(e)}")
+            # Fallback to original behavior if batch check fails
+            logger.warning("Falling back to individual evaluation checks")
+            return messages
+
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single DAO proposal evaluation message."""
         message_id = message.id
@@ -181,12 +265,9 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(error_msg)
                 return {"success": False, "error": error_msg}
 
-            # Check if this proposal has already been evaluated by this wallet
-            if self._has_proposal_been_evaluated(proposal_id, wallet_id):
-                logger.info(
-                    f"Proposal {proposal_id} already evaluated by wallet {wallet_id}, skipping..."
-                )
-                return {"success": True, "skipped": True, "reason": "Already evaluated"}
+            # Note: Individual evaluation check removed here as it's now handled
+            # in batch during the pre-filtering phase in _execute_impl
+            # This significantly reduces database queries and log spam
 
             # Get the DAO information
             dao = backend.get_dao(dao_id) if dao_id else None
@@ -348,12 +429,10 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     async def _execute_impl(
         self, context: JobContext
     ) -> List[DAOProposalEvaluationResult]:
-        """Run the DAO proposal evaluation task with concurrent processing.
+        """Run the DAO proposal evaluation task with optimized batch processing.
 
-        This method processes multiple proposal evaluation messages concurrently
-        instead of sequentially, which significantly improves performance when
-        dealing with multiple proposals. The concurrency is controlled by a
-        semaphore to avoid overwhelming the system or hitting rate limits.
+        This method now includes pre-filtering to remove already-evaluated proposals
+        before concurrent processing, significantly reducing database load and log spam.
         """
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
@@ -369,20 +448,37 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
             ]
 
-        # Process messages concurrently with semaphore to limit concurrent operations
+        # Pre-filter messages to remove already-evaluated proposals
+        # This single batch operation replaces many individual database queries
+        unevaluated_messages = self._filter_unevaluated_messages(pending_messages)
+        skipped_count = len(pending_messages) - len(unevaluated_messages)
+
+        if not unevaluated_messages:
+            return [
+                DAOProposalEvaluationResult(
+                    success=True,
+                    message=f"All {message_count} proposals already evaluated",
+                    proposals_processed=message_count,
+                    proposals_evaluated=0,
+                )
+            ]
+
+        # Process only unevaluated messages concurrently
         max_concurrent = min(
-            self.get_max_concurrent_evaluations(context), len(pending_messages)
+            self.get_max_concurrent_evaluations(context), len(unevaluated_messages)
         )
         semaphore = asyncio.Semaphore(max_concurrent)
 
         logger.info(
-            f"Processing {len(pending_messages)} messages with max {max_concurrent} concurrent evaluations"
+            f"Processing {len(unevaluated_messages)} unevaluated messages "
+            f"(skipped {skipped_count} already evaluated) "
+            f"with max {max_concurrent} concurrent evaluations"
         )
 
-        # Create tasks for concurrent processing
+        # Create tasks for concurrent processing (using only unevaluated messages)
         tasks = [
             self.process_message_with_semaphore(semaphore, message)
-            for message in pending_messages
+            for message in unevaluated_messages
         ]
 
         # Execute all tasks concurrently and collect results
@@ -391,7 +487,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         execution_time = time.time() - start_time
 
         logger.info(
-            f"Completed concurrent processing of {len(pending_messages)} messages in {execution_time:.2f} seconds"
+            f"Completed concurrent processing of {len(unevaluated_messages)} messages in {execution_time:.2f} seconds"
         )
 
         # Process results
@@ -401,19 +497,17 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                error_msg = f"Exception processing message {pending_messages[i].id}: {str(result)}"
+                error_msg = f"Exception processing message {unevaluated_messages[i].id}: {str(result)}"
                 logger.error(error_msg, exc_info=True)
                 errors.append(error_msg)
             elif isinstance(result, dict):
                 if result.get("success"):
-                    if not result.get(
-                        "skipped", False
-                    ):  # Don't count skipped as evaluated
-                        evaluated_count += 1
+                    # All processed messages should be evaluations (no skipped since pre-filtered)
+                    evaluated_count += 1
                 else:
                     errors.append(result.get("error", "Unknown error"))
             else:
-                error_msg = f"Unexpected result type for message {pending_messages[i].id}: {type(result)}"
+                error_msg = f"Unexpected result type for message {unevaluated_messages[i].id}: {type(result)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
 
@@ -425,8 +519,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         return [
             DAOProposalEvaluationResult(
                 success=True,
-                message=f"Processed {processed_count} proposal(s), evaluated {evaluated_count} proposal(s)",
-                proposals_processed=processed_count,
+                message=f"Processed {processed_count} proposal(s), evaluated {evaluated_count} proposal(s), skipped {skipped_count} already evaluated",
+                proposals_processed=message_count,  # Total messages including skipped
                 proposals_evaluated=evaluated_count,
                 errors=errors,
             )

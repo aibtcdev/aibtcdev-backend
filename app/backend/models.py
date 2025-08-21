@@ -826,6 +826,13 @@ class VoteFilter(CustomBaseModel):
     evaluation_score: Optional[Dict[str, Any]] = None  # Filter by evaluation score
     flags: Optional[List[str]] = None  # Filter by flags
 
+    # Batch filters for efficient querying
+    wallet_ids: Optional[List[UUID]] = None
+    proposal_ids: Optional[List[UUID]] = None
+    proposal_wallet_pairs: Optional[List[tuple[UUID, UUID]]] = (
+        None  # (proposal_id, wallet_id) pairs
+    )
+
 
 #
 # VETOS
