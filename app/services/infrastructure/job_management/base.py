@@ -219,9 +219,7 @@ class BaseTask(ABC, Generic[T]):
         try:
             # Validate before execution
             if not await self.validate(context):
-                logger.warning(
-                    f"{self.task_name}: Validation failed, skipping execution"
-                )
+                logger.debug(f"{self.task_name}: Validation failed, skipping execution")
                 result_class = self.get_result_class()
                 return [result_class(success=False, message="Validation failed")]
 
