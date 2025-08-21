@@ -39,11 +39,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # Log the request/response
         logger.info(
-            "HTTP Request",
-            extra={
-                "req": request_info,
-                "res": response_info,
-            },
+            f"{request_info['method']} {request_info['path']} - {response_info['status_code']} - {response_info['process_time_ms']}ms"
         )
 
         return response
