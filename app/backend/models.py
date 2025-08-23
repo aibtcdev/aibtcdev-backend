@@ -890,6 +890,41 @@ class AgentWithWalletTokenDTO(CustomBaseModel):
 
 
 #
+# FEEDBACK
+#
+class FeedbackBase(CustomBaseModel):
+    """Base model for proposal feedback."""
+
+    profile_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    is_like: Optional[bool] = None  # True for like, False for dislike
+    reasoning: Optional[str] = None  # Optional text explaining the feedback
+
+
+class FeedbackCreate(FeedbackBase):
+    pass
+
+
+class Feedback(FeedbackBase):
+    id: UUID
+    created_at: datetime
+
+
+class FeedbackFilter(CustomBaseModel):
+    """Filter model for feedback."""
+
+    profile_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    proposal_id: Optional[UUID] = None
+    is_like: Optional[bool] = None
+
+    # Batch filters for efficient querying
+    profile_ids: Optional[List[UUID]] = None
+    proposal_ids: Optional[List[UUID]] = None
+
+
+#
 # AGENT PROMPTS
 #
 class PromptBase(CustomBaseModel):

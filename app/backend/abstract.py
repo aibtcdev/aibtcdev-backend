@@ -23,6 +23,10 @@ from app.backend.models import (
     ExtensionBase,
     ExtensionCreate,
     ExtensionFilter,
+    Feedback,
+    FeedbackBase,
+    FeedbackCreate,
+    FeedbackFilter,
     Holder,
     HolderBase,
     HolderCreate,
@@ -706,4 +710,32 @@ class AbstractBackend(ABC):
     @abstractmethod
     def delete_holder(self, holder_id: UUID) -> bool:
         """Delete a holder record."""
+        pass
+
+    # ----------- FEEDBACK -----------
+    @abstractmethod
+    def create_feedback(self, new_feedback: FeedbackCreate) -> Feedback:
+        """Create a new feedback record."""
+        pass
+
+    @abstractmethod
+    def get_feedback(self, feedback_id: UUID) -> Optional[Feedback]:
+        """Get a feedback record by ID."""
+        pass
+
+    @abstractmethod
+    def list_feedback(self, filters: Optional[FeedbackFilter] = None) -> List[Feedback]:
+        """List feedback records with optional filters."""
+        pass
+
+    @abstractmethod
+    def update_feedback(
+        self, feedback_id: UUID, update_data: FeedbackBase
+    ) -> Optional[Feedback]:
+        """Update a feedback record."""
+        pass
+
+    @abstractmethod
+    def delete_feedback(self, feedback_id: UUID) -> bool:
+        """Delete a feedback record."""
         pass

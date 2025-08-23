@@ -33,6 +33,10 @@ from app.backend.models import (
     ExtensionBase,
     ExtensionCreate,
     ExtensionFilter,
+    Feedback,
+    FeedbackBase,
+    FeedbackCreate,
+    FeedbackFilter,
     Holder,
     HolderBase,
     HolderCreate,
@@ -1959,7 +1963,88 @@ class SupabaseBackend(AbstractBackend):
         return len(deleted) > 0
 
     # ----------------------------------------------------------------
-    # 18. PROPOSALS_N
+    # 18. FEEDBACK
+    # ----------------------------------------------------------------
+    def create_feedback(self, new_feedback: "FeedbackCreate") -> "Feedback":
+        """Create a new feedback record."""
+        payload = new_feedback.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("feedback").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from feedback insert.")
+        return Feedback(**data[0])
+
+    def get_feedback(self, feedback_id: UUID) -> Optional["Feedback"]:
+        """Get a feedback record by ID."""
+        response = (
+            self.client.table("feedback")
+            .select("*")
+            .eq("id", str(feedback_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return Feedback(**response.data)
+
+    def list_feedback(
+        self, filters: Optional["FeedbackFilter"] = None
+    ) -> List["Feedback"]:
+        """List feedback records with optional filters."""
+        query = self.client.table("feedback").select("*")
+
+        if filters:
+            if filters.profile_id is not None:
+                query = query.eq("profile_id", str(filters.profile_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", str(filters.proposal_id))
+            if filters.is_like is not None:
+                query = query.eq("is_like", filters.is_like)
+
+            # Batch filters
+            if filters.profile_ids is not None:
+                query = query.in_(
+                    "profile_id", [str(pid) for pid in filters.profile_ids]
+                )
+            if filters.proposal_ids is not None:
+                query = query.in_(
+                    "proposal_id", [str(pid) for pid in filters.proposal_ids]
+                )
+
+        response = query.execute()
+        data = response.data or []
+        return [Feedback(**item) for item in data]
+
+    def update_feedback(
+        self, feedback_id: UUID, update_data: "FeedbackBase"
+    ) -> Optional["Feedback"]:
+        """Update a feedback record."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_feedback(feedback_id)
+        response = (
+            self.client.table("feedback")
+            .update(payload)
+            .eq("id", str(feedback_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return Feedback(**updated[0])
+
+    def delete_feedback(self, feedback_id: UUID) -> bool:
+        """Delete a feedback record."""
+        response = (
+            self.client.table("feedback").delete().eq("id", str(feedback_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # 19. PROPOSALS_N
     # ----------------------------------------------------------------
     def list_proposals_n(
         self, filters: Optional["ProposalFilterN"] = None
