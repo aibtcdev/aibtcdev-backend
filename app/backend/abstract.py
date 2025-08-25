@@ -8,6 +8,7 @@ from app.backend.models import (
     AgentBase,
     AgentCreate,
     AgentFilter,
+    AgentWithWalletTokenDTO,
     Airdrop,
     AirdropBase,
     AirdropCreate,
@@ -35,6 +36,10 @@ from app.backend.models import (
     KeyBase,
     KeyCreate,
     KeyFilter,
+    LotteryResult,
+    LotteryResultBase,
+    LotteryResultCreate,
+    LotteryResultFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -336,6 +341,11 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete_wallet(self, wallet_id: UUID) -> bool:
+        pass
+
+    @abstractmethod
+    def get_agents_with_dao_tokens(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
+        """Get all agents with wallets that hold tokens for a specific DAO."""
         pass
 
     # ----------- AGENTS -----------
@@ -738,4 +748,43 @@ class AbstractBackend(ABC):
     @abstractmethod
     def delete_feedback(self, feedback_id: UUID) -> bool:
         """Delete a feedback record."""
+        pass
+
+    # ----------- LOTTERY RESULTS -----------
+    @abstractmethod
+    def create_lottery_result(
+        self, new_lottery_result: LotteryResultCreate
+    ) -> LotteryResult:
+        """Create a new lottery result record."""
+        pass
+
+    @abstractmethod
+    def get_lottery_result(self, lottery_result_id: UUID) -> Optional[LotteryResult]:
+        """Get a lottery result by ID."""
+        pass
+
+    @abstractmethod
+    def get_lottery_result_by_proposal(
+        self, proposal_id: UUID
+    ) -> Optional[LotteryResult]:
+        """Get a lottery result by proposal ID."""
+        pass
+
+    @abstractmethod
+    def list_lottery_results(
+        self, filters: Optional[LotteryResultFilter] = None
+    ) -> List[LotteryResult]:
+        """List lottery results with optional filtering."""
+        pass
+
+    @abstractmethod
+    def update_lottery_result(
+        self, lottery_result_id: UUID, update_data: LotteryResultBase
+    ) -> Optional[LotteryResult]:
+        """Update a lottery result record."""
+        pass
+
+    @abstractmethod
+    def delete_lottery_result(self, lottery_result_id: UUID) -> bool:
+        """Delete a lottery result record."""
         pass

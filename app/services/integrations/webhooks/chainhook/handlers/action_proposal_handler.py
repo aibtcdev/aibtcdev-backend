@@ -1,11 +1,14 @@
 """Handler for capturing new DAO action proposals."""
 
+import hashlib
+import random
 from typing import Dict, List, Optional
 from uuid import UUID
 
 from app.backend.factory import backend
 from app.backend.models import (
     ContractStatus,
+    LotteryResultCreate,
     ProposalBase,
     ProposalCreate,
     ProposalFilter,
@@ -393,7 +396,7 @@ class ActionProposalHandler(BaseProposalHandler):
             dao_id: The ID of the DAO
 
         Returns:
-            List[Dict]: List of agents with their wallet IDs
+            List[Dict]: List of agents with their wallet IDs and token amounts
         """
         # Use the specialized backend method for getting agents with DAO tokens
         agents_with_tokens_dto = backend.get_agents_with_dao_tokens(dao_id)
@@ -402,9 +405,15 @@ class ActionProposalHandler(BaseProposalHandler):
             self.logger.error(f"No agents found with tokens for DAO {dao_id}")
             return []
 
-        # Convert DTOs to the expected format
+        # Convert DTOs to the expected format with token amounts for weighted lottery
         agents_with_tokens = [
-            {"agent_id": dto.agent_id, "wallet_id": dto.wallet_id}
+            {
+                "agent_id": dto.agent_id,
+                "wallet_id": dto.wallet_id,
+                "token_amount": float(
+                    dto.token_amount
+                ),  # Convert to float for weight calculation
+            }
             for dto in agents_with_tokens_dto
         ]
 
@@ -413,6 +422,90 @@ class ActionProposalHandler(BaseProposalHandler):
         )
 
         return agents_with_tokens
+
+    def _conduct_lottery(
+        self,
+        agents_with_tokens: List[Dict],
+        bitcoin_block_hash: str,
+        bitcoin_block_height: int,
+        max_selections: int = 25,
+    ) -> List[UUID]:
+        """Conduct a fair, weighted lottery to select agents for voting.
+
+        Args:
+            agents_with_tokens: List of agents with their token amounts
+            bitcoin_block_hash: Bitcoin block hash to use as seed
+            bitcoin_block_height: Bitcoin block height for transparency
+            max_selections: Maximum number of agents to select (default 25)
+
+        Returns:
+            List[UUID]: List of selected wallet IDs
+        """
+        if not agents_with_tokens:
+            return []
+
+        # Create deterministic seed from Bitcoin block hash
+        seed = hashlib.sha256(bitcoin_block_hash.encode()).hexdigest()
+        random.seed(seed)
+
+        # Calculate total token weight
+        total_weight = sum(agent["token_amount"] for agent in agents_with_tokens)
+
+        if total_weight == 0:
+            self.logger.warning("Total token weight is zero, using equal weights")
+            # Fall back to equal weights if all token amounts are zero
+            weights = [1.0] * len(agents_with_tokens)
+            total_weight = len(agents_with_tokens)
+        else:
+            weights = [agent["token_amount"] for agent in agents_with_tokens]
+
+        # Don't select more agents than we have
+        max_selections = min(max_selections, len(agents_with_tokens))
+
+        selected_wallets = []
+        remaining_agents = list(enumerate(agents_with_tokens))
+        remaining_weights = weights.copy()
+
+        self.logger.info(
+            f"Starting lottery selection: {len(agents_with_tokens)} eligible agents, "
+            f"max {max_selections} selections, seed: {seed[:8]}..."
+        )
+
+        for i in range(max_selections):
+            if not remaining_agents:
+                break
+
+            # Calculate cumulative weights for current remaining agents
+            current_total = sum(remaining_weights)
+            if current_total == 0:
+                break
+
+            # Select based on weighted probability
+            rand_num = random.uniform(0, current_total)
+            cumulative = 0
+            selected_idx = 0
+
+            for idx, weight in enumerate(remaining_weights):
+                cumulative += weight
+                if rand_num <= cumulative:
+                    selected_idx = idx
+                    break
+
+            # Get the selected agent and add to results
+            agent_idx, selected_agent = remaining_agents[selected_idx]
+            selected_wallets.append(selected_agent["wallet_id"])
+
+            self.logger.debug(
+                f"Selected agent {selected_agent['agent_id']} with wallet {selected_agent['wallet_id']} "
+                f"(weight: {remaining_weights[selected_idx]}, selection {i + 1}/{max_selections})"
+            )
+
+            # Remove the selected agent from remaining pool
+            remaining_agents.pop(selected_idx)
+            remaining_weights.pop(selected_idx)
+
+        self.logger.info(f"Lottery completed: selected {len(selected_wallets)} agents")
+        return selected_wallets
 
     async def _parse_and_generate_proposal_metadata(
         self, parameters: str, dao_name: str, proposal_id: str
@@ -564,6 +657,28 @@ class ActionProposalHandler(BaseProposalHandler):
         # Get transaction success status
         tx_success = tx_metadata.success
 
+        # Get Bitcoin block information for lottery seeding
+        bitcoin_block_height = (
+            tx_metadata.bitcoin_block_height
+            if hasattr(tx_metadata, "bitcoin_block_height")
+            else None
+        )
+        bitcoin_block_hash = (
+            tx_metadata.bitcoin_block_hash
+            if hasattr(tx_metadata, "bitcoin_block_hash")
+            else None
+        )
+
+        # If we don't have Bitcoin block info from tx metadata, try to get latest chain state
+        if not bitcoin_block_hash:
+            latest_chain_state = backend.get_latest_chain_state("mainnet")
+            if latest_chain_state:
+                bitcoin_block_height = latest_chain_state.bitcoin_block_height
+                bitcoin_block_hash = latest_chain_state.block_hash
+                self.logger.debug(
+                    f"Using latest chain state Bitcoin block: {bitcoin_block_height}"
+                )
+
         # Get the proposal info from the transaction arguments
         proposal_info = self._get_proposal_info_from_args(args, tx_id, tx_success)
         if proposal_info is None:
@@ -668,8 +783,47 @@ class ActionProposalHandler(BaseProposalHandler):
                 if tx_success:
                     agents = self._get_agent_token_holders(dao_data["id"])
                     if agents:
-                        for agent in agents:
-                            # Create message with only the proposal ID
+                        # Conduct lottery to select up to 25 agents
+                        selected_wallet_ids = []
+                        if bitcoin_block_hash:
+                            selected_wallet_ids = self._conduct_lottery(
+                                agents,
+                                bitcoin_block_hash,
+                                bitcoin_block_height or 0,
+                                max_selections=25,
+                            )
+
+                            # Record the lottery results
+                            backend.create_lottery_result(
+                                LotteryResultCreate(
+                                    proposal_id=proposal.id,
+                                    dao_id=dao_data["id"],
+                                    bitcoin_block_height=bitcoin_block_height,
+                                    bitcoin_block_hash=bitcoin_block_hash,
+                                    lottery_seed=hashlib.sha256(
+                                        bitcoin_block_hash.encode()
+                                    ).hexdigest(),
+                                    selected_wallet_ids=selected_wallet_ids,
+                                    total_eligible_wallets=len(agents),
+                                    max_selections=25,
+                                )
+                            )
+
+                            self.logger.info(
+                                f"Lottery completed for proposal {proposal.id}: "
+                                f"selected {len(selected_wallet_ids)} out of {len(agents)} eligible agents"
+                            )
+                        else:
+                            # Fallback: select all agents if no Bitcoin block hash available
+                            selected_wallet_ids = [
+                                agent["wallet_id"] for agent in agents[:25]
+                            ]
+                            self.logger.warning(
+                                f"No Bitcoin block hash available, selecting first {len(selected_wallet_ids)} agents"
+                            )
+
+                        # Create evaluation queue messages for selected agents only
+                        for wallet_id in selected_wallet_ids:
                             message_data = {
                                 "proposal_id": proposal.id,  # Only pass the proposal UUID
                             }
@@ -681,14 +835,13 @@ class ActionProposalHandler(BaseProposalHandler):
                                     ),
                                     message=message_data,
                                     dao_id=dao_data["id"],
-                                    wallet_id=agent["wallet_id"],
+                                    wallet_id=wallet_id,
                                 )
                             )
 
-                            self.logger.info(
-                                f"Created evaluation queue message for agent {agent['agent_id']} "
-                                f"to evaluate proposal {proposal.id}"
-                            )
+                        self.logger.info(
+                            f"Created {len(selected_wallet_ids)} evaluation queue messages for proposal {proposal.id}"
+                        )
                     else:
                         self.logger.warning(
                             f"No agents found holding tokens for DAO {dao_data['id']}"
@@ -774,32 +927,80 @@ class ActionProposalHandler(BaseProposalHandler):
 
                 # Only queue evaluation messages for successful proposals with agents
                 if tx_success:
-                    agents = self._get_agent_token_holders(dao_data["id"])
-                    if agents:
-                        for agent in agents:
-                            # Create message with only the proposal ID
-                            message_data = {
-                                "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
-                            }
+                    # Check if lottery has already been conducted for this proposal
+                    existing_lottery = backend.get_lottery_result_by_proposal(
+                        updated_proposal.id
+                    )
 
-                            backend.create_queue_message(
-                                QueueMessageCreate(
-                                    type=QueueMessageType.get_or_create(
-                                        "dao_proposal_evaluation"
-                                    ),
-                                    message=message_data,
-                                    dao_id=dao_data["id"],
-                                    wallet_id=agent["wallet_id"],
+                    if not existing_lottery:
+                        # Conduct new lottery if none exists
+                        agents = self._get_agent_token_holders(dao_data["id"])
+                        if agents:
+                            selected_wallet_ids = []
+                            if bitcoin_block_hash:
+                                selected_wallet_ids = self._conduct_lottery(
+                                    agents,
+                                    bitcoin_block_hash,
+                                    bitcoin_block_height or 0,
+                                    max_selections=25,
                                 )
-                            )
+
+                                # Record the lottery results
+                                backend.create_lottery_result(
+                                    LotteryResultCreate(
+                                        proposal_id=updated_proposal.id,
+                                        dao_id=dao_data["id"],
+                                        bitcoin_block_height=bitcoin_block_height,
+                                        bitcoin_block_hash=bitcoin_block_hash,
+                                        lottery_seed=hashlib.sha256(
+                                            bitcoin_block_hash.encode()
+                                        ).hexdigest(),
+                                        selected_wallet_ids=selected_wallet_ids,
+                                        total_eligible_wallets=len(agents),
+                                        max_selections=25,
+                                    )
+                                )
+
+                                self.logger.info(
+                                    f"Lottery completed for updated proposal {updated_proposal.id}: "
+                                    f"selected {len(selected_wallet_ids)} out of {len(agents)} eligible agents"
+                                )
+                            else:
+                                # Fallback: select all agents if no Bitcoin block hash available
+                                selected_wallet_ids = [
+                                    agent["wallet_id"] for agent in agents[:25]
+                                ]
+                                self.logger.warning(
+                                    f"No Bitcoin block hash available, selecting first {len(selected_wallet_ids)} agents"
+                                )
+
+                            # Create evaluation queue messages for selected agents only
+                            for wallet_id in selected_wallet_ids:
+                                message_data = {
+                                    "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
+                                }
+
+                                backend.create_queue_message(
+                                    QueueMessageCreate(
+                                        type=QueueMessageType.get_or_create(
+                                            "dao_proposal_evaluation"
+                                        ),
+                                        message=message_data,
+                                        dao_id=dao_data["id"],
+                                        wallet_id=wallet_id,
+                                    )
+                                )
 
                             self.logger.info(
-                                f"Created evaluation queue message for agent {agent['agent_id']} "
-                                f"to evaluate updated proposal {updated_proposal.id}"
+                                f"Created {len(selected_wallet_ids)} evaluation queue messages for updated proposal {updated_proposal.id}"
+                            )
+                        else:
+                            self.logger.warning(
+                                f"No agents found holding tokens for DAO {dao_data['id']}"
                             )
                     else:
-                        self.logger.warning(
-                            f"No agents found holding tokens for DAO {dao_data['id']}"
+                        self.logger.info(
+                            f"Lottery already exists for proposal {updated_proposal.id}, skipping lottery selection"
                         )
                 else:
                     self.logger.info(

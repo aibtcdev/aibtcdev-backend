@@ -45,6 +45,10 @@ from app.backend.models import (
     KeyBase,
     KeyCreate,
     KeyFilter,
+    LotteryResult,
+    LotteryResultBase,
+    LotteryResultCreate,
+    LotteryResultFilter,
     Profile,
     ProfileBase,
     ProfileCreate,
@@ -2221,6 +2225,96 @@ class SupabaseBackend(AbstractBackend):
         """Delete an airdrop record."""
         response = (
             self.client.table("airdrops").delete().eq("id", str(airdrop_id)).execute()
+        )
+        deleted = response.data or []
+        return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # LOTTERY RESULTS
+    # ----------------------------------------------------------------
+
+    def create_lottery_result(
+        self, new_lottery_result: "LotteryResultCreate"
+    ) -> "LotteryResult":
+        """Create a new lottery result record."""
+        payload = new_lottery_result.model_dump(exclude_unset=True, mode="json")
+        response = self.client.table("lottery_results").insert(payload).execute()
+        data = response.data or []
+        if not data:
+            raise ValueError("No data returned from lottery_results insert.")
+        return LotteryResult(**data[0])
+
+    def get_lottery_result(self, lottery_result_id: UUID) -> Optional["LotteryResult"]:
+        """Get a lottery result by ID."""
+        response = (
+            self.client.table("lottery_results")
+            .select("*")
+            .eq("id", str(lottery_result_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return LotteryResult(**response.data)
+
+    def get_lottery_result_by_proposal(
+        self, proposal_id: UUID
+    ) -> Optional["LotteryResult"]:
+        """Get a lottery result by proposal ID."""
+        response = (
+            self.client.table("lottery_results")
+            .select("*")
+            .eq("proposal_id", str(proposal_id))
+            .single()
+            .execute()
+        )
+        if not response.data:
+            return None
+        return LotteryResult(**response.data)
+
+    def list_lottery_results(
+        self, filters: Optional["LotteryResultFilter"] = None
+    ) -> List["LotteryResult"]:
+        """List lottery results with optional filtering."""
+        query = self.client.table("lottery_results").select("*")
+        if filters:
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", str(filters.proposal_id))
+            if filters.dao_id is not None:
+                query = query.eq("dao_id", str(filters.dao_id))
+            if filters.bitcoin_block_height is not None:
+                query = query.eq("bitcoin_block_height", filters.bitcoin_block_height)
+            if filters.bitcoin_block_hash is not None:
+                query = query.eq("bitcoin_block_hash", filters.bitcoin_block_hash)
+        response = query.execute()
+        data = response.data or []
+        return [LotteryResult(**row) for row in data]
+
+    def update_lottery_result(
+        self, lottery_result_id: UUID, update_data: "LotteryResultBase"
+    ) -> Optional["LotteryResult"]:
+        """Update a lottery result record."""
+        payload = update_data.model_dump(exclude_unset=True, mode="json")
+        if not payload:
+            return self.get_lottery_result(lottery_result_id)
+        response = (
+            self.client.table("lottery_results")
+            .update(payload)
+            .eq("id", str(lottery_result_id))
+            .execute()
+        )
+        updated = response.data or []
+        if not updated:
+            return None
+        return LotteryResult(**updated[0])
+
+    def delete_lottery_result(self, lottery_result_id: UUID) -> bool:
+        """Delete a lottery result record."""
+        response = (
+            self.client.table("lottery_results")
+            .delete()
+            .eq("id", str(lottery_result_id))
+            .execute()
         )
         deleted = response.data or []
         return len(deleted) > 0
