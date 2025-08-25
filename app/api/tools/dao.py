@@ -148,6 +148,13 @@ async def _create_proposal_from_tool_result(
             try:
                 airdrop = backend.get_airdrop_by_tx_hash(payload.airdrop_txid)
                 if airdrop:
+                    # Check if this airdrop has already been used in a proposal
+                    if airdrop.proposal_tx_id:
+                        logger.warning(
+                            f"Airdrop {airdrop.id} (tx: {payload.airdrop_txid}) has already been used in proposal with tx_id: {airdrop.proposal_tx_id}"
+                        )
+                        return None
+
                     airdrop_id = airdrop.id
                     logger.info(
                         f"Found airdrop record {airdrop_id} for tx {payload.airdrop_txid}"
@@ -184,6 +191,27 @@ async def _create_proposal_from_tool_result(
 
         proposal = backend.create_proposal(proposal_content)
         logger.info(f"Created proposal record {proposal.id} for transaction {tx_id}")
+
+        # Update airdrop record with proposal transaction ID if applicable
+        if airdrop_id and tx_id:
+            try:
+                from app.backend.models import AirdropBase
+
+                update_data = AirdropBase(proposal_tx_id=tx_id)
+                updated_airdrop = backend.update_airdrop(airdrop_id, update_data)
+                if updated_airdrop:
+                    logger.info(
+                        f"Updated airdrop {airdrop_id} with proposal_tx_id {tx_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to update airdrop {airdrop_id} with proposal_tx_id {tx_id}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error updating airdrop {airdrop_id} with proposal_tx_id: {str(e)}"
+                )
+
         return proposal
 
     except Exception as e:
@@ -420,6 +448,37 @@ async def propose_dao_action_send_message(
 
         # Validate required payload fields
         _validate_payload_fields(payload)
+
+        # Validate airdrop if provided - check if it's already been used
+        if payload.airdrop_txid:
+            try:
+                airdrop = backend.get_airdrop_by_tx_hash(payload.airdrop_txid)
+                if airdrop and airdrop.proposal_tx_id:
+                    logger.warning(
+                        f"Airdrop transaction {payload.airdrop_txid} has already been used in proposal with tx_id: {airdrop.proposal_tx_id}"
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Airdrop transaction {payload.airdrop_txid} has already been used in another proposal",
+                    )
+                elif not airdrop:
+                    logger.warning(
+                        f"Airdrop transaction {payload.airdrop_txid} not found"
+                    )
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Airdrop transaction {payload.airdrop_txid} not found",
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Error validating airdrop {payload.airdrop_txid}: {str(e)}"
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error validating airdrop: {str(e)}",
+                )
 
         # Step 1: Extract Twitter information and save to tweet table
         tweet_db_ids = []
