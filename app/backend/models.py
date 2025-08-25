@@ -957,6 +957,40 @@ class PromptFilter(CustomBaseModel):
 
 
 #
+# LOTTERY RESULTS
+#
+class LotteryResultBase(CustomBaseModel):
+    """Base model for lottery results."""
+
+    proposal_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    bitcoin_block_height: Optional[int] = None
+    bitcoin_block_hash: Optional[str] = None
+    lottery_seed: Optional[str] = None
+    selected_wallet_ids: Optional[List[UUID]] = None
+    total_eligible_wallets: Optional[int] = None
+    max_selections: Optional[int] = 25  # Default to 25 as specified
+
+
+class LotteryResultCreate(LotteryResultBase):
+    pass
+
+
+class LotteryResult(LotteryResultBase):
+    id: UUID
+    created_at: datetime
+
+
+class LotteryResultFilter(CustomBaseModel):
+    """Filter model for lottery results."""
+
+    proposal_id: Optional[UUID] = None
+    dao_id: Optional[UUID] = None
+    bitcoin_block_height: Optional[int] = None
+    bitcoin_block_hash: Optional[str] = None
+
+
+#
 # AIRDROPS
 #
 class AirdropBase(CustomBaseModel):
