@@ -1,11 +1,10 @@
 """Handler for capturing STX airdrop transactions."""
 
-import re
 from datetime import datetime
 from typing import Dict, List
 
 from app.backend.factory import backend
-from app.backend.models import AirdropCreate, AirdropFilter
+from app.backend.models import AirdropCreate, AirdropFilter, WalletFilterN
 from app.services.integrations.webhooks.chainhook.handlers.base import (
     ChainhookEventHandler,
 )
@@ -21,16 +20,21 @@ class AirdropSTXHandler(ChainhookEventHandler):
     This handler identifies contract calls with send-many method on the specific
     SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.send-many contract,
     parses STX transfer events to extract airdrop details for agent accounts,
-    and creates airdrop records in the database.
+    validates basic requirements (minimum STX amount and recipient count),
+    validates recipients against the wallets table, and creates airdrop records.
+
+    Advanced validations (expiry and cooldown) are handled at the API level
+    during proposal creation to enforce business rules only when airdrops are
+    actually used in proposals.
     """
 
     # The specific contract we're monitoring
     TARGET_CONTRACT = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.send-many"
 
-    # Pattern to match agent account addresses
-    AGENT_ACCOUNT_PATTERN = re.compile(
-        r"\.aibtc-acct-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$"
-    )
+    # Business rule constants for basic transaction validation
+    MIN_TOTAL_STX = 5_000_000  # 5 STX in microSTX (1 STX = 1,000,000 microSTX)
+    MIN_RECIPIENTS = 5
+    # Note: Expiry and cooldown validations are now handled at API level during proposal creation
 
     def can_handle_transaction(self, transaction: TransactionWithReceipt) -> bool:
         """Check if this handler can handle the given transaction.
@@ -96,18 +100,18 @@ class AirdropSTXHandler(ChainhookEventHandler):
         )
 
     def _has_agent_account_stx_transfers(self, events: List[Event]) -> bool:
-        """Check if there are any STX transfers to agent accounts.
+        """Check if there are any STX transfers.
 
         Args:
             events: List of events from the transaction
 
         Returns:
-            bool: True if there are STX transfers to agent accounts
+            bool: True if there are STX transfers (recipient validation happens later)
         """
         for event in events:
             if event.type == "STXTransferEvent" and hasattr(event, "data"):
                 recipient = event.data.get("recipient", "")
-                if self.AGENT_ACCOUNT_PATTERN.search(recipient):
+                if recipient:  # Any valid recipient address
                     return True
         return False
 
@@ -133,8 +137,8 @@ class AirdropSTXHandler(ChainhookEventHandler):
                 recipient = event_data.get("recipient")
                 event_sender = event_data.get("sender")
 
-                # Only include recipients that match the agent account pattern
-                if recipient and self.AGENT_ACCOUNT_PATTERN.search(recipient):
+                # Include all recipients (validation against wallets table happens later)
+                if recipient:
                     recipients.append(recipient)
                     try:
                         total_amount += int(amount_str)
@@ -154,11 +158,79 @@ class AirdropSTXHandler(ChainhookEventHandler):
             "sender": sender,
         }
 
+    async def _validate_recipients_against_wallets(
+        self, recipients: List[str]
+    ) -> Dict[str, bool]:
+        """Validate recipients against the wallets table.
+
+        Args:
+            recipients: List of recipient addresses to validate
+
+        Returns:
+            Dict mapping each recipient to whether it exists in wallets table
+        """
+        if not recipients:
+            return {}
+
+        # Query wallets table for all recipients at once
+        wallet_filter = WalletFilterN(
+            mainnet_addresses=recipients, testnet_addresses=recipients
+        )
+        wallets = backend.list_wallets_n(filters=wallet_filter)
+
+        # Create sets of valid addresses for efficient lookup
+        valid_mainnet_addresses = {
+            w.mainnet_address for w in wallets if w.mainnet_address
+        }
+        valid_testnet_addresses = {
+            w.testnet_address for w in wallets if w.testnet_address
+        }
+
+        # Check each recipient
+        validation_results = {}
+        for recipient in recipients:
+            is_valid = (
+                recipient in valid_mainnet_addresses
+                or recipient in valid_testnet_addresses
+            )
+            validation_results[recipient] = is_valid
+
+        return validation_results
+
+    def _validate_minimum_requirements(
+        self, total_amount: int, recipient_count: int
+    ) -> Dict[str, str]:
+        """Validate minimum STX amount and recipient count.
+
+        Args:
+            total_amount: Total amount to be airdropped in microSTX
+            recipient_count: Number of recipients
+
+        Returns:
+            Dict with validation errors, empty if all validations pass
+        """
+        errors = {}
+
+        if total_amount < self.MIN_TOTAL_STX:
+            errors["total_amount"] = (
+                f"Total amount {total_amount / 1_000_000:.6f} STX is below minimum "
+                f"{self.MIN_TOTAL_STX / 1_000_000:.6f} STX"
+            )
+
+        if recipient_count < self.MIN_RECIPIENTS:
+            errors["recipient_count"] = (
+                f"Recipient count {recipient_count} is below minimum {self.MIN_RECIPIENTS}"
+            )
+
+        return errors
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle STX airdrop transactions.
 
-        Processes send-many contract call transactions that send STX to agent accounts
-        and creates airdrop records in the database.
+        Processes send-many contract call transactions that send STX to agent accounts,
+        validates basic requirements (minimum STX/recipients) and recipient registry,
+        and creates airdrop records. Advanced validations (expiry, cooldown) are
+        handled at API level during proposal creation.
 
         Args:
             transaction: The transaction to handle
@@ -196,11 +268,13 @@ class AirdropSTXHandler(ChainhookEventHandler):
             )
             return
 
+        recipients = airdrop_data["recipients"]
+        total_amount = int(airdrop_data["total_amount"])
         sender = airdrop_data["sender"]
 
         self.logger.info(
             f"Processing STX airdrop transaction {tx_id}: "
-            f"{airdrop_data['total_amount']} STX to {len(airdrop_data['recipients'])} agent accounts"
+            f"{total_amount / 1_000_000:.6f} STX to {len(recipients)} agent accounts"
         )
 
         # Check if airdrop already exists
@@ -212,7 +286,74 @@ class AirdropSTXHandler(ChainhookEventHandler):
             )
             return
 
-        # Create the airdrop record
+        # Validate recipients against wallets table
+        self.logger.info(
+            f"Validating {len(recipients)} recipients against wallets table"
+        )
+        recipient_validation = await self._validate_recipients_against_wallets(
+            recipients
+        )
+
+        invalid_recipients = [
+            addr for addr, is_valid in recipient_validation.items() if not is_valid
+        ]
+
+        if invalid_recipients:
+            self.logger.error(
+                f"Airdrop validation failed for transaction {tx_id}: "
+                f"Invalid recipients not found in wallets table: {invalid_recipients}"
+            )
+            # Create failed airdrop record
+            try:
+                backend.create_airdrop(
+                    AirdropCreate(
+                        tx_hash=tx_id,
+                        block_height=block_height,
+                        timestamp=timestamp,
+                        sender=sender,
+                        contract_identifier=contract_identifier,
+                        token_identifier="STX",
+                        success=False,
+                        total_amount_airdropped=airdrop_data["total_amount"],
+                        recipients=recipients,
+                        proposal_id=None,
+                    )
+                )
+            except Exception as e:
+                self.logger.error(f"Error creating failed airdrop record: {str(e)}")
+            return
+
+        # Validate minimum requirements
+        requirement_errors = self._validate_minimum_requirements(
+            total_amount, len(recipients)
+        )
+        if requirement_errors:
+            self.logger.error(
+                f"Airdrop validation failed for transaction {tx_id}: "
+                f"Minimum requirements not met: {requirement_errors}"
+            )
+            # Create failed airdrop record
+            try:
+                backend.create_airdrop(
+                    AirdropCreate(
+                        tx_hash=tx_id,
+                        block_height=block_height,
+                        timestamp=timestamp,
+                        sender=sender,
+                        contract_identifier=contract_identifier,
+                        token_identifier="STX",
+                        success=False,
+                        total_amount_airdropped=airdrop_data["total_amount"],
+                        recipients=recipients,
+                        proposal_id=None,
+                    )
+                )
+            except Exception as e:
+                self.logger.error(f"Error creating failed airdrop record: {str(e)}")
+            return
+
+        # All basic validations passed - create successful airdrop record
+        # Note: Expiry and cooldown validations are now handled at API level during proposal creation
         try:
             airdrop = backend.create_airdrop(
                 AirdropCreate(
@@ -224,14 +365,14 @@ class AirdropSTXHandler(ChainhookEventHandler):
                     token_identifier="STX",
                     success=True,
                     total_amount_airdropped=airdrop_data["total_amount"],
-                    recipients=airdrop_data["recipients"],
-                    proposal_tx_id=None,  # STX airdrop, not proposal-related
+                    recipients=recipients,
+                    proposal_id=None,  # Can be linked to a proposal if needed
                 )
             )
 
             self.logger.info(
-                f"Created STX airdrop record {airdrop.id} for transaction {tx_id}: "
-                f"{airdrop_data['total_amount']} STX airdropped to {len(airdrop_data['recipients'])} agent accounts"
+                f"Created validated STX airdrop record {airdrop.id} for transaction {tx_id}: "
+                f"{total_amount / 1_000_000:.6f} STX airdropped to {len(recipients)} validated agent accounts"
             )
 
         except Exception as e:

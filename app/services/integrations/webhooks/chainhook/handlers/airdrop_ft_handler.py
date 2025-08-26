@@ -226,7 +226,7 @@ class AirdropFTHandler(ChainhookEventHandler):
                     success=True,
                     total_amount_airdropped=airdrop_data["total_amount"],
                     recipients=airdrop_data["recipients"],
-                    proposal_tx_id=None,  # Will be updated later if used for proposal boosting
+                    proposal_id=None,  # Will be updated later if used for proposal boosting
                 )
             )
 
