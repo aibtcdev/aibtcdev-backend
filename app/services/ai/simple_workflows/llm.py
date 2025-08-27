@@ -19,7 +19,7 @@ logger = configure_logger(__name__)
 
 def get_default_model() -> str:
     """Get the default model name from configuration."""
-    return config.chat_llm.default_model or "gpt-4.1"
+    return config.chat_llm.default_model or "gpt-5"
 
 
 def get_default_temperature() -> float:
