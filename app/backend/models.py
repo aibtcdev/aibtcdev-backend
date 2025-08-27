@@ -960,16 +960,36 @@ class PromptFilter(CustomBaseModel):
 # LOTTERY RESULTS
 #
 class LotteryResultBase(CustomBaseModel):
-    """Base model for lottery results."""
+    """Base model for lottery results with quorum-aware selection."""
 
     proposal_id: Optional[UUID] = None
     dao_id: Optional[UUID] = None
     bitcoin_block_height: Optional[int] = None
     bitcoin_block_hash: Optional[str] = None
     lottery_seed: Optional[str] = None
-    selected_wallet_ids: Optional[List[UUID]] = None
+
+    # Enhanced wallet tracking with token amounts
+    selected_wallets: Optional[List[Dict[str, Any]]] = (
+        None  # [{"wallet_id": str, "token_amount": str}]
+    )
+
+    # Quorum tracking fields
+    liquid_tokens_at_creation: Optional[str] = None  # Total liquid supply from proposal
+    quorum_threshold: Optional[str] = (
+        None  # 15% of liquid_tokens (or custom percentage)
+    )
+    total_selected_tokens: Optional[str] = None  # Sum of selected wallet token amounts
+    quorum_achieved: Optional[bool] = None  # Whether we met the quorum threshold
+    quorum_percentage: Optional[float] = 0.15  # Default 15% quorum
+
+    # Metadata about the selection
     total_eligible_wallets: Optional[int] = None
-    max_selections: Optional[int] = 25  # Default to 25 as specified
+    total_eligible_tokens: Optional[str] = None  # Sum of all available tokens
+    selection_rounds: Optional[int] = None  # How many lottery rounds were needed
+    max_selections: Optional[int] = 100  # Safety cap to prevent runaway selection
+
+    # Legacy field for backward compatibility
+    selected_wallet_ids: Optional[List[UUID]] = None
 
 
 class LotteryResultCreate(LotteryResultBase):
