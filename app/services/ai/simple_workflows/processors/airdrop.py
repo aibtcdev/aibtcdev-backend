@@ -40,7 +40,7 @@ async def fetch_airdrop(airdrop_id: UUID) -> Optional[Dict[str, Any]]:
             "success": airdrop.success,
             "total_amount_airdropped": airdrop.total_amount_airdropped,
             "recipients": airdrop.recipients or [],
-            "proposal_tx_id": airdrop.proposal_tx_id,
+            "proposal_id": airdrop.proposal_id,
             "created_at": airdrop.created_at,
             "updated_at": airdrop.updated_at,
         }
@@ -72,7 +72,7 @@ def format_airdrop(airdrop_data: Dict[str, Any]) -> str:
         success = airdrop_data.get("success", False)
         total_amount = airdrop_data.get("total_amount_airdropped", "0")
         recipients = airdrop_data.get("recipients", [])
-        proposal_tx_id = airdrop_data.get("proposal_tx_id", "")
+        proposal_id = airdrop_data.get("proposal_id", "")
 
         # Format timestamp
         timestamp_str = ""
@@ -113,7 +113,7 @@ def format_airdrop(airdrop_data: Dict[str, Any]) -> str:
   <total_amount_distributed>{total_amount}</total_amount_distributed>
   <recipients_count>{recipients_count}</recipients_count>
   <recipients_sample>{recipients_sample or "None"}</recipients_sample>
-  <linked_proposal_tx>{proposal_tx_id or "None"}</linked_proposal_tx>
+  <linked_proposal_id>{proposal_id or "None"}</linked_proposal_id>
 </airdrop>
 """
         return formatted_airdrop.strip()

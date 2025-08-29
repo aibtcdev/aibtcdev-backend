@@ -1,5 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -13,6 +14,7 @@ from app.api.tools.models import (
 from app.backend.factory import backend
 from app.backend.models import (
     AgentFilter,
+    AirdropFilter,
     ContractStatus,
     Profile,
     Proposal,
@@ -20,6 +22,7 @@ from app.backend.models import (
     ProposalType,
     Wallet,
     WalletFilter,
+    WalletFilterN,
 )
 from app.config import config
 from app.lib.logger import configure_logger
@@ -38,6 +41,102 @@ logger = configure_logger(__name__)
 
 # Create the router
 router = APIRouter()
+
+# Business rule constants for airdrop validation
+EXPIRY_BLOCKS = 1008  # 1008 blocks from original transaction
+COOLDOWN_HOURS = 24  # 1 boost per day per wallet per DAO
+
+
+def _validate_airdrop_expiry(current_block: int, original_block: int) -> Optional[str]:
+    """Validate airdrop transaction hasn't expired.
+
+    Args:
+        current_block: Current block height
+        original_block: Original transaction block height
+
+    Returns:
+        Error message if expired, None if valid
+    """
+    blocks_elapsed = current_block - original_block
+    if blocks_elapsed > EXPIRY_BLOCKS:
+        return (
+            f"Airdrop expired: {blocks_elapsed} blocks elapsed, "
+            f"maximum allowed is {EXPIRY_BLOCKS}"
+        )
+    return None
+
+
+async def _validate_airdrop_cooldown(
+    recipients: List[str], dao_id: Optional[UUID] = None
+) -> Dict[str, str]:
+    """Validate cooldown period for airdrop recipients.
+
+    Args:
+        recipients: List of recipient addresses
+        dao_id: DAO ID for cooldown scope (if applicable)
+
+    Returns:
+        Dict mapping recipients to cooldown violation messages
+    """
+    if not recipients:
+        return {}
+
+    cooldown_violations = {}
+    cutoff_time = datetime.now() - timedelta(hours=COOLDOWN_HOURS)
+
+    # Check recent airdrops for each recipient
+    for recipient in recipients:
+        # Build filter for recent airdrops to this recipient
+        recent_airdrops = backend.list_airdrops(
+            filters=AirdropFilter(
+                timestamp_after=cutoff_time,
+                success=True,
+            )
+        )
+
+        # Check if any recent airdrop included this recipient
+        for airdrop in recent_airdrops:
+            if airdrop.recipients and recipient in airdrop.recipients:
+                cooldown_violations[recipient] = (
+                    f"Recipient {recipient} received airdrop within last "
+                    f"{COOLDOWN_HOURS} hours at {airdrop.timestamp}"
+                )
+                break
+
+    return cooldown_violations
+
+
+async def _validate_airdrop_recipients(recipients: List[str]) -> Dict[str, bool]:
+    """Validate airdrop recipients against the wallets table.
+
+    Args:
+        recipients: List of recipient addresses to validate
+
+    Returns:
+        Dict mapping each recipient to whether it exists in wallets table
+    """
+    if not recipients:
+        return {}
+
+    # Query wallets table for all recipients at once
+    wallet_filter = WalletFilterN(
+        mainnet_addresses=recipients, testnet_addresses=recipients
+    )
+    wallets = backend.list_wallets_n(filters=wallet_filter)
+
+    # Create sets of valid addresses for efficient lookup
+    valid_mainnet_addresses = {w.mainnet_address for w in wallets if w.mainnet_address}
+    valid_testnet_addresses = {w.testnet_address for w in wallets if w.testnet_address}
+
+    # Check each recipient
+    validation_results = {}
+    for recipient in recipients:
+        is_valid = (
+            recipient in valid_mainnet_addresses or recipient in valid_testnet_addresses
+        )
+        validation_results[recipient] = is_valid
+
+    return validation_results
 
 
 async def _create_proposal_from_tool_result(
@@ -142,22 +241,64 @@ async def _create_proposal_from_tool_result(
         else:
             logger.info("No tweet database IDs provided")
 
-        # Lookup airdrop data if airdrop_txid is provided
+        # Lookup and validate airdrop data if airdrop_txid is provided
         airdrop_id = None
         if payload.airdrop_txid:
             try:
                 airdrop = backend.get_airdrop_by_tx_hash(payload.airdrop_txid)
                 if airdrop:
                     # Check if this airdrop has already been used in a proposal
-                    if airdrop.proposal_tx_id:
+                    if airdrop.proposal_id:
                         logger.warning(
-                            f"Airdrop {airdrop.id} (tx: {payload.airdrop_txid}) has already been used in proposal with tx_id: {airdrop.proposal_tx_id}"
+                            f"Airdrop {airdrop.id} (tx: {payload.airdrop_txid}) has already been used in proposal with ID: {airdrop.proposal_id}"
                         )
                         return None
 
+                    # Validate airdrop expiry
+                    try:
+                        latest_chain_state = backend.get_latest_chain_state()
+                        if latest_chain_state and airdrop.block_height:
+                            expiry_error = _validate_airdrop_expiry(
+                                latest_chain_state.block_height, airdrop.block_height
+                            )
+                            if expiry_error:
+                                logger.warning(
+                                    f"Airdrop validation failed for tx {payload.airdrop_txid}: {expiry_error}"
+                                )
+                                return None
+                    except Exception as e:
+                        logger.warning(f"Could not validate airdrop expiry: {str(e)}")
+
+                    # Validate airdrop cooldown for recipients
+                    if airdrop.recipients:
+                        cooldown_violations = await _validate_airdrop_cooldown(
+                            airdrop.recipients, dao_id
+                        )
+                        if cooldown_violations:
+                            logger.warning(
+                                f"Airdrop cooldown validation failed for tx {payload.airdrop_txid}: {cooldown_violations}"
+                            )
+                            return None
+
+                        # Validate recipients against wallets table
+                        recipient_validation = await _validate_airdrop_recipients(
+                            airdrop.recipients
+                        )
+                        invalid_recipients = [
+                            addr
+                            for addr, is_valid in recipient_validation.items()
+                            if not is_valid
+                        ]
+                        if invalid_recipients:
+                            logger.warning(
+                                f"Airdrop recipient validation failed for tx {payload.airdrop_txid}: "
+                                f"Invalid recipients not in wallets table: {invalid_recipients}"
+                            )
+                            return None
+
                     airdrop_id = airdrop.id
                     logger.info(
-                        f"Found airdrop record {airdrop_id} for tx {payload.airdrop_txid}"
+                        f"Found and validated airdrop record {airdrop_id} for tx {payload.airdrop_txid}"
                     )
                 else:
                     logger.warning(
@@ -192,24 +333,24 @@ async def _create_proposal_from_tool_result(
         proposal = backend.create_proposal(proposal_content)
         logger.info(f"Created proposal record {proposal.id} for transaction {tx_id}")
 
-        # Update airdrop record with proposal transaction ID if applicable
-        if airdrop_id and tx_id:
+        # Update airdrop record with proposal ID if applicable
+        if airdrop_id and proposal:
             try:
                 from app.backend.models import AirdropBase
 
-                update_data = AirdropBase(proposal_tx_id=tx_id)
+                update_data = AirdropBase(proposal_id=proposal.id)
                 updated_airdrop = backend.update_airdrop(airdrop_id, update_data)
                 if updated_airdrop:
                     logger.info(
-                        f"Updated airdrop {airdrop_id} with proposal_tx_id {tx_id}"
+                        f"Updated airdrop {airdrop_id} with proposal_id {proposal.id}"
                     )
                 else:
                     logger.warning(
-                        f"Failed to update airdrop {airdrop_id} with proposal_tx_id {tx_id}"
+                        f"Failed to update airdrop {airdrop_id} with proposal_id {proposal.id}"
                     )
             except Exception as e:
                 logger.error(
-                    f"Error updating airdrop {airdrop_id} with proposal_tx_id: {str(e)}"
+                    f"Error updating airdrop {airdrop_id} with proposal_id: {str(e)}"
                 )
 
         return proposal
@@ -449,19 +590,11 @@ async def propose_dao_action_send_message(
         # Validate required payload fields
         _validate_payload_fields(payload)
 
-        # Validate airdrop if provided - check if it's already been used
+        # Validate airdrop if provided - check if it's already been used and validate business rules
         if payload.airdrop_txid:
             try:
                 airdrop = backend.get_airdrop_by_tx_hash(payload.airdrop_txid)
-                if airdrop and airdrop.proposal_tx_id:
-                    logger.warning(
-                        f"Airdrop transaction {payload.airdrop_txid} has already been used in proposal with tx_id: {airdrop.proposal_tx_id}"
-                    )
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Airdrop transaction {payload.airdrop_txid} has already been used in another proposal",
-                    )
-                elif not airdrop:
+                if not airdrop:
                     logger.warning(
                         f"Airdrop transaction {payload.airdrop_txid} not found"
                     )
@@ -469,6 +602,69 @@ async def propose_dao_action_send_message(
                         status_code=404,
                         detail=f"Airdrop transaction {payload.airdrop_txid} not found",
                     )
+
+                if airdrop.proposal_id:
+                    logger.warning(
+                        f"Airdrop transaction {payload.airdrop_txid} has already been used in proposal with ID: {airdrop.proposal_id}"
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Airdrop transaction {payload.airdrop_txid} has already been used in another proposal",
+                    )
+
+                # Validate airdrop expiry
+                try:
+                    latest_chain_state = backend.get_latest_chain_state()
+                    if latest_chain_state and airdrop.block_height:
+                        expiry_error = _validate_airdrop_expiry(
+                            latest_chain_state.block_height, airdrop.block_height
+                        )
+                        if expiry_error:
+                            logger.warning(
+                                f"Airdrop validation failed for tx {payload.airdrop_txid}: {expiry_error}"
+                            )
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Airdrop expired: {expiry_error}",
+                            )
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.warning(f"Could not validate airdrop expiry: {str(e)}")
+
+                # Validate airdrop cooldown for recipients
+                if airdrop.recipients:
+                    cooldown_violations = await _validate_airdrop_cooldown(
+                        airdrop.recipients
+                    )
+                    if cooldown_violations:
+                        logger.warning(
+                            f"Airdrop cooldown validation failed for tx {payload.airdrop_txid}: {cooldown_violations}"
+                        )
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Airdrop cooldown violations: {list(cooldown_violations.values())[0]}",
+                        )
+
+                    # Validate recipients against wallets table
+                    recipient_validation = await _validate_airdrop_recipients(
+                        airdrop.recipients
+                    )
+                    invalid_recipients = [
+                        addr
+                        for addr, is_valid in recipient_validation.items()
+                        if not is_valid
+                    ]
+                    if invalid_recipients:
+                        logger.warning(
+                            f"Airdrop recipient validation failed for tx {payload.airdrop_txid}: "
+                            f"Invalid recipients not in wallets table: {invalid_recipients}"
+                        )
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid airdrop recipients not found in wallets table: {invalid_recipients}",
+                        )
+
             except HTTPException:
                 raise
             except Exception as e:

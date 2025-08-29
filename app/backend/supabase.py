@@ -2188,8 +2188,8 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("token_identifier", filters.token_identifier)
             if filters.success is not None:
                 query = query.eq("success", filters.success)
-            if filters.proposal_tx_id is not None:
-                query = query.eq("proposal_tx_id", filters.proposal_tx_id)
+            if filters.proposal_id is not None:
+                query = query.eq("proposal_id", str(filters.proposal_id))
             # Range filters
             if filters.block_height_gte is not None:
                 query = query.gte("block_height", filters.block_height_gte)

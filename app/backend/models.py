@@ -1027,7 +1027,7 @@ class AirdropBase(CustomBaseModel):
         None  # Using string to handle large numbers
     )
     recipients: Optional[List[str]] = None
-    proposal_tx_id: Optional[str] = None
+    proposal_id: Optional[UUID] = None
 
 
 class AirdropCreate(AirdropBase):
@@ -1047,7 +1047,7 @@ class AirdropFilter(CustomBaseModel):
     contract_identifier: Optional[str] = None
     token_identifier: Optional[str] = None
     success: Optional[bool] = None
-    proposal_tx_id: Optional[str] = None
+    proposal_id: Optional[UUID] = None
     # Range filters
     block_height_gte: Optional[int] = None
     block_height_lte: Optional[int] = None
