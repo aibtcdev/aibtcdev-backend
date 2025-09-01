@@ -123,6 +123,7 @@ class JobManager:
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
         """Execute a job through the enhanced executor system with proper concurrency control."""
+        logger.info(f"🚀 Scheduled execution triggered for job type: {job_type}")
         try:
             from app.backend.models import QueueMessage, QueueMessageType
 
@@ -131,6 +132,7 @@ class JobManager:
 
             # Convert job_type string to JobType enum
             job_type_enum = JobType.get_or_create(job_type)
+            logger.debug(f"Converted job type '{job_type}' to enum: {job_type_enum}")
 
             logger.debug(f"🔍 Checking if {job_type} has work to do...")
 
@@ -172,21 +174,22 @@ class JobManager:
                     "triggered_at": str(datetime.now()),
                 },
                 dao_id=None,
-                tweet_id=None,
-                conversation_id=None,
+                wallet_id=None,
                 is_processed=False,
                 result=None,
                 created_at=datetime.now(),
-                updated_at=datetime.now(),
             )
 
             # Enqueue the synthetic message with the job's priority
+            logger.debug(
+                f"Enqueuing job {job_type} to executor with priority {metadata.priority}"
+            )
             job_id = await self._executor.priority_queue.enqueue(
                 synthetic_message, metadata.priority
             )
 
             logger.info(
-                f"✅ Queued {job_type} job {job_id} for execution (priority: {metadata.priority})"
+                f"✅ Enqueued scheduled job '{job_type}' with ID {job_id} (priority: {metadata.priority})"
             )
 
         except Exception as e:

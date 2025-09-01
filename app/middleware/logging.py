@@ -37,9 +37,14 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             "process_time_ms": round(process_time * 1000, 2),
         }
 
-        # Log the request/response
+        # Log the request/response with structured data
         logger.info(
-            f"{request_info['method']} {request_info['path']} - {response_info['status_code']} - {response_info['process_time_ms']}ms"
+            f"HTTP {request_info['method']} {request_info['path']} - {response_info['status_code']}",
+            extra={
+                "request": request_info,
+                "response": response_info,
+                "event_type": "http_request",
+            },
         )
 
         return response
