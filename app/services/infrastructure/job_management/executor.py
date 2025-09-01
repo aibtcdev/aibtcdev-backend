@@ -253,7 +253,9 @@ class JobExecutor:
                 # Get next job from priority queue
                 execution = await self.priority_queue.get_next_job()
                 if not execution:
-                    await asyncio.sleep(0.1)  # Brief pause if no jobs
+                    await asyncio.sleep(
+                        0.5
+                    )  # Increased pause if no jobs to reduce CPU usage
                     continue
 
                 # Check if we can acquire a slot for this job type
