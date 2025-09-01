@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from app.backend.factory import backend
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -131,11 +132,35 @@ class JobManager:
             # Convert job_type string to JobType enum
             job_type_enum = JobType.get_or_create(job_type)
 
+            logger.debug(f"🔍 Checking if {job_type} has work to do...")
+
             # Get job metadata to check if it should run
             metadata = JobRegistry.get_metadata(job_type_enum)
             if not metadata:
                 logger.error(f"No metadata found for job type: {job_type}")
                 return
+
+            # For jobs that process messages, check if there are pending messages first
+            # This prevents unnecessary job executions when there's no work
+            if job_type in ["tweet", "discord", "stx_transfer"]:
+                from app.backend.models import QueueMessageFilter
+
+                pending_messages = backend.list_queue_messages(
+                    filters=QueueMessageFilter(
+                        type=QueueMessageType.get_or_create(job_type),
+                        is_processed=False,
+                    )
+                )
+
+                if not pending_messages:
+                    logger.debug(
+                        f"⏭️ Skipping {job_type} execution - no pending messages"
+                    )
+                    return
+
+                logger.debug(
+                    f"📝 Found {len(pending_messages)} pending {job_type} messages"
+                )
 
             # Create a synthetic queue message for scheduled execution
             # This allows the job to go through the proper executor pipeline with concurrency control
@@ -160,8 +185,8 @@ class JobManager:
                 synthetic_message, metadata.priority
             )
 
-            logger.debug(
-                f"Enqueued scheduled job {job_type} with ID {job_id} (priority: {metadata.priority})"
+            logger.info(
+                f"✅ Queued {job_type} job {job_id} for execution (priority: {metadata.priority})"
             )
 
         except Exception as e:

@@ -43,12 +43,12 @@ class TweetProcessingResult(RunnerResult):
     job_type="tweet",
     name="Tweet Processor",
     description="Processes and sends tweets for DAOs with automatic retry and error handling",
-    interval_seconds=5,
-    priority=JobPriority.HIGH,
+    interval_seconds=30,  # Reduced frequency from 5s to 30s
+    priority=JobPriority.NORMAL,  # Changed from HIGH to NORMAL to not dominate queue
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=1,
+    max_concurrent=2,  # Increased from 1 to 2 to allow parallel processing
     requires_twitter=True,
     batch_size=5,
     enable_dead_letter_queue=True,
@@ -200,7 +200,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
         if not self._pending_messages:
-            logger.debug("No pending tweet messages found")
+            logger.debug("No pending tweet messages found - skipping execution")
             return False
 
         # Validate each message before processing
