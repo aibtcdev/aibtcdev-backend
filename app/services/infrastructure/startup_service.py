@@ -91,19 +91,34 @@ class EnhancedStartupService:
             raise RuntimeError("Job system initialization failed")
 
         # Schedule jobs with the scheduler
+        logger.info("Attempting to schedule jobs with the job manager...")
         any_jobs_scheduled = self.job_manager.schedule_jobs(self.scheduler)
         if any_jobs_scheduled:
             # Start the scheduler
+            logger.info("Starting APScheduler with scheduled jobs...")
             self.scheduler.start()
             logger.info("Job scheduler started successfully")
+
+            # Log scheduler status
+            jobs = self.scheduler.get_jobs()
+            logger.info(
+                f"APScheduler is running with {len(jobs)} active job schedules:"
+            )
+            for job in jobs:
+                logger.info(f"  - Job ID: {job.id}, next run: {job.next_run_time}")
         else:
-            logger.warning("No jobs were scheduled")
+            logger.warning("No jobs were scheduled - scheduler will not be started")
 
         # Start the job executor
+        logger.info("Starting job executor for background job processing...")
         await self.job_manager.start_executor()
-        logger.info("Enhanced job manager executor started successfully")
+        executor_stats = self.job_manager.get_executor_stats()
+        logger.info(
+            f"Enhanced job executor started with {executor_stats.get('worker_count', 0)} workers"
+        )
 
         # Start system metrics collection
+        logger.info("Starting system metrics monitoring...")
         await system_metrics.start_monitoring()
         logger.info("System metrics monitoring started")
 

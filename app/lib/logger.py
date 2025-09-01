@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Optional
@@ -10,6 +11,51 @@ LOG_LEVELS = {
     "ERROR": logging.ERROR,
     "CRITICAL": logging.CRITICAL,
 }
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON formatter that outputs single-line structured logs."""
+
+    def format(self, record):
+        log_entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        # Add exception info if present
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+
+        # Add extra fields if present
+        for key, value in record.__dict__.items():
+            if key not in [
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "message",
+            ]:
+                log_entry[key] = value
+
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 def configure_logger(name: Optional[str] = None) -> logging.Logger:
@@ -34,7 +80,7 @@ def configure_logger(name: Optional[str] = None) -> logging.Logger:
     if not logger.handlers:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(log_level)
-        formatter = logging.Formatter("%(levelname)s:     %(message)s")
+        formatter = JSONFormatter()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
@@ -42,29 +88,29 @@ def configure_logger(name: Optional[str] = None) -> logging.Logger:
 
 
 def setup_uvicorn_logging():
-    """Configure uvicorn and other loggers to use normal formatting."""
+    """Configure uvicorn and other loggers to use JSON formatting."""
     # Disable uvicorn access logging since we handle it with middleware
     logging.getLogger("uvicorn.access").disabled = True
 
-    # Create a standard formatter
-    standard_formatter = logging.Formatter("%(levelname)s:     %(message)s")
+    # Create a JSON formatter
+    json_formatter = JSONFormatter()
 
     # Get all existing loggers and configure them
     for logger_name in ["uvicorn", "uvicorn.error", "fastapi"]:
         logger = logging.getLogger(logger_name)
         for handler in logger.handlers:
-            handler.setFormatter(standard_formatter)
+            handler.setFormatter(json_formatter)
 
     # Configure root logger
     root_logger = logging.getLogger()
     for handler in root_logger.handlers:
-        handler.setFormatter(standard_formatter)
+        handler.setFormatter(json_formatter)
 
     # Set up a hook to catch any new handlers that get added later
     original_add_handler = logging.Logger.addHandler
 
     def patched_add_handler(self, hdlr):
-        hdlr.setFormatter(standard_formatter)
+        hdlr.setFormatter(json_formatter)
         return original_add_handler(self, hdlr)
 
     logging.Logger.addHandler = patched_add_handler
