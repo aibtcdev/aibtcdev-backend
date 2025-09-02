@@ -53,51 +53,72 @@ class AirdropSTXHandler(ChainhookEventHandler):
         tx_data_content = tx_data["tx_data"]
         tx_metadata = tx_data["tx_metadata"]
 
+        # Add debug logging
+        tx_hash = transaction.transaction_identifier.hash
+        self.logger.debug(f"AirdropSTXHandler checking transaction: {tx_hash}")
+
         # Only handle ContractCall type transactions
         if not isinstance(tx_kind, dict):
-            self.logger.debug(f"Skipping: tx_kind is not a dict: {type(tx_kind)}")
+            self.logger.debug(
+                f"[{tx_hash}] Rejecting: tx_kind is not a dict: {type(tx_kind)}"
+            )
             return False
 
         tx_kind_type = tx_kind.get("type")
+        self.logger.debug(f"[{tx_hash}] tx_kind_type: {tx_kind_type}")
 
         if not isinstance(tx_data_content, dict):
             self.logger.debug(
-                f"Skipping: tx_data_content is not a dict: {type(tx_data_content)}"
+                f"[{tx_hash}] Rejecting: tx_data_content is not a dict: {type(tx_data_content)}"
             )
             return False
 
         # Check if the method name is exactly "send-many"
         tx_method = tx_data_content.get("method", "")
         is_send_many = tx_method == "send-many"
+        self.logger.debug(
+            f"[{tx_hash}] method: '{tx_method}', is_send_many: {is_send_many}"
+        )
 
         # Check if this is the specific send-many contract
         contract_identifier = tx_data_content.get("contract_identifier", "")
         is_target_contract = contract_identifier == self.TARGET_CONTRACT
+        self.logger.debug(
+            f"[{tx_hash}] contract: '{contract_identifier}', is_target_contract: {is_target_contract}"
+        )
+        self.logger.debug(f"[{tx_hash}] TARGET_CONTRACT: '{self.TARGET_CONTRACT}'")
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
+        self.logger.debug(
+            f"[{tx_hash}] tx_success: {tx_success} (type: {type(tx_success)})"
+        )
 
         # Check if there are any STX transfers to agent accounts in the events
         events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
+        self.logger.debug(f"[{tx_hash}] events count: {len(events)}")
+
         has_agent_account_transfers = self._has_agent_account_stx_transfers(events)
+        self.logger.debug(
+            f"[{tx_hash}] has_agent_account_transfers: {has_agent_account_transfers}"
+        )
 
-        if (
-            is_send_many
-            and is_target_contract
-            and tx_success
-            and has_agent_account_transfers
-        ):
-            self.logger.debug(
-                f"Found send-many STX funding to agent accounts: {tx_method} on contract: {contract_identifier}"
-            )
-
-        return (
+        final_result = (
             tx_kind_type == "ContractCall"
             and is_send_many
             and is_target_contract
             and tx_success is True
             and has_agent_account_transfers
         )
+
+        self.logger.debug(f"[{tx_hash}] Final result: {final_result}")
+
+        if final_result:
+            self.logger.info(f"AirdropSTXHandler CLAIMING transaction: {tx_hash}")
+        else:
+            self.logger.info(f"AirdropSTXHandler REJECTING transaction: {tx_hash}")
+
+        return final_result
 
     def _has_agent_account_stx_transfers(self, events: List[Event]) -> bool:
         """Check if there are any STX transfers.

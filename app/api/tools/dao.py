@@ -118,23 +118,29 @@ async def _validate_airdrop_recipients(recipients: List[str]) -> Dict[str, bool]
     if not recipients:
         return {}
 
-    # Query wallets table for all recipients at once
-    wallet_filter = WalletFilterN(
-        mainnet_addresses=recipients, testnet_addresses=recipients
-    )
+    # Determine which network to check based on config
+    from app.config import config
+
+    use_mainnet = config.network.network == "mainnet"
+
+    # Query wallets table for all recipients at once, filtering by the appropriate network
+    if use_mainnet:
+        wallet_filter = WalletFilterN(mainnet_addresses=recipients)
+    else:
+        wallet_filter = WalletFilterN(testnet_addresses=recipients)
+
     wallets = backend.list_wallets_n(filters=wallet_filter)
 
-    # Create sets of valid addresses for efficient lookup
-    valid_mainnet_addresses = {w.mainnet_address for w in wallets if w.mainnet_address}
-    valid_testnet_addresses = {w.testnet_address for w in wallets if w.testnet_address}
+    # Create set of valid addresses for efficient lookup
+    if use_mainnet:
+        valid_addresses = {w.mainnet_address for w in wallets if w.mainnet_address}
+    else:
+        valid_addresses = {w.testnet_address for w in wallets if w.testnet_address}
 
     # Check each recipient
     validation_results = {}
     for recipient in recipients:
-        is_valid = (
-            recipient in valid_mainnet_addresses or recipient in valid_testnet_addresses
-        )
-        validation_results[recipient] = is_valid
+        validation_results[recipient] = recipient in valid_addresses
 
     return validation_results
 

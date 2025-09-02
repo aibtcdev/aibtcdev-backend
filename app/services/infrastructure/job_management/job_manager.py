@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from app.backend.factory import backend
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -122,6 +123,7 @@ class JobManager:
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
         """Execute a job through the enhanced executor system with proper concurrency control."""
+        logger.info(f"🚀 Scheduled execution triggered for job type: {job_type}")
         try:
             from app.backend.models import QueueMessage, QueueMessageType
 
@@ -130,12 +132,37 @@ class JobManager:
 
             # Convert job_type string to JobType enum
             job_type_enum = JobType.get_or_create(job_type)
+            logger.debug(f"Converted job type '{job_type}' to enum: {job_type_enum}")
+
+            logger.debug(f"🔍 Checking if {job_type} has work to do...")
 
             # Get job metadata to check if it should run
             metadata = JobRegistry.get_metadata(job_type_enum)
             if not metadata:
                 logger.error(f"No metadata found for job type: {job_type}")
                 return
+
+            # For jobs that process messages, check if there are pending messages first
+            # This prevents unnecessary job executions when there's no work
+            if job_type in ["tweet", "discord", "stx_transfer"]:
+                from app.backend.models import QueueMessageFilter
+
+                pending_messages = backend.list_queue_messages(
+                    filters=QueueMessageFilter(
+                        type=QueueMessageType.get_or_create(job_type),
+                        is_processed=False,
+                    )
+                )
+
+                if not pending_messages:
+                    logger.debug(
+                        f"⏭️ Skipping {job_type} execution - no pending messages"
+                    )
+                    return
+
+                logger.debug(
+                    f"📝 Found {len(pending_messages)} pending {job_type} messages"
+                )
 
             # Create a synthetic queue message for scheduled execution
             # This allows the job to go through the proper executor pipeline with concurrency control
@@ -147,21 +174,22 @@ class JobManager:
                     "triggered_at": str(datetime.now()),
                 },
                 dao_id=None,
-                tweet_id=None,
-                conversation_id=None,
+                wallet_id=None,
                 is_processed=False,
                 result=None,
                 created_at=datetime.now(),
-                updated_at=datetime.now(),
             )
 
             # Enqueue the synthetic message with the job's priority
+            logger.debug(
+                f"Enqueuing job {job_type} to executor with priority {metadata.priority}"
+            )
             job_id = await self._executor.priority_queue.enqueue(
                 synthetic_message, metadata.priority
             )
 
-            logger.debug(
-                f"Enqueued scheduled job {job_type} with ID {job_id} (priority: {metadata.priority})"
+            logger.info(
+                f"✅ Enqueued scheduled job '{job_type}' with ID {job_id} (priority: {metadata.priority})"
             )
 
         except Exception as e:

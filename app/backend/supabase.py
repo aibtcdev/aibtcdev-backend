@@ -2265,12 +2265,11 @@ class SupabaseBackend(AbstractBackend):
             self.client.table("lottery_results")
             .select("*")
             .eq("proposal_id", str(proposal_id))
-            .single()
             .execute()
         )
         if not response.data:
             return None
-        return LotteryResult(**response.data)
+        return LotteryResult(**response.data[0])
 
     def list_lottery_results(
         self, filters: Optional["LotteryResultFilter"] = None
