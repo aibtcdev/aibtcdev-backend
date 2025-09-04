@@ -566,3 +566,45 @@ def calculate_token_cost(
         "currency": "USD",
         "details": token_details,
     }
+
+
+async def validate_wallet_recipients(recipients: List[str]) -> Dict[str, bool]:
+    """Validate recipients against the wallets table using network-specific filtering.
+
+    Args:
+        recipients: List of recipient addresses to validate
+
+    Returns:
+        Dict mapping each recipient to whether it exists in wallets table
+    """
+    if not recipients:
+        return {}
+
+    # Import here to avoid circular imports
+    from app.config import config
+    from app.backend.factory import backend
+    from app.backend.models import WalletFilterN
+
+    # Determine which network to check based on config
+    use_mainnet = config.network.network == "mainnet"
+
+    # Query wallets table for all recipients at once, filtering by the appropriate network
+    if use_mainnet:
+        wallet_filter = WalletFilterN(mainnet_addresses=recipients)
+    else:
+        wallet_filter = WalletFilterN(testnet_addresses=recipients)
+
+    wallets = backend.list_wallets_n(filters=wallet_filter)
+
+    # Create set of valid addresses for efficient lookup
+    if use_mainnet:
+        valid_addresses = {w.mainnet_address for w in wallets if w.mainnet_address}
+    else:
+        valid_addresses = {w.testnet_address for w in wallets if w.testnet_address}
+
+    # Check each recipient
+    validation_results = {}
+    for recipient in recipients:
+        validation_results[recipient] = recipient in valid_addresses
+
+    return validation_results

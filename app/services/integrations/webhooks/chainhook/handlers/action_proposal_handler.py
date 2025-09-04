@@ -860,22 +860,49 @@ class ActionProposalHandler(BaseProposalHandler):
                     f"Created new {'successful' if tx_success else 'failed'} action proposal record in database: {proposal.id}"
                 )
 
-                # Only queue evaluation messages for successful proposals with agents holding governance tokens
-                if tx_success:
-                    agents = self._get_agent_token_holders(dao_data["id"])
-                    if agents:
-                        # Conduct quorum-aware lottery
-                        lottery_selection = LotterySelection()
-                        if bitcoin_block_hash and proposal.liquid_tokens:
-                            lottery_selection = self._conduct_quorum_lottery(
-                                agents,
-                                proposal.liquid_tokens,
-                                bitcoin_block_hash,
-                                bitcoin_block_height or 0,
-                            )
+                # Queue evaluation messages for proposals with agents holding governance tokens
+                # Note: Removing tx_success check to debug lottery creation issues
+                self.logger.info(
+                    f"Starting lottery process for proposal {proposal.id} (tx_success: {tx_success})"
+                )
 
-                            # Record the lottery results
-                            backend.create_lottery_result(
+                agents = self._get_agent_token_holders(dao_data["id"])
+                self.logger.info(
+                    f"Found {len(agents) if agents else 0} agents with tokens for DAO {dao_data['id']}"
+                )
+
+                if agents:
+                    # Conduct quorum-aware lottery
+                    lottery_selection = LotterySelection()
+                    self.logger.info(
+                        f"Bitcoin block hash available: {bool(bitcoin_block_hash)}"
+                    )
+                    self.logger.info(
+                        f"Proposal liquid tokens: {proposal.liquid_tokens}"
+                    )
+                    self.logger.info(f"Bitcoin block height: {bitcoin_block_height}")
+
+                    if bitcoin_block_hash and proposal.liquid_tokens:
+                        self.logger.info(
+                            "Conditions met for full lottery - conducting quorum lottery"
+                        )
+                        lottery_selection = self._conduct_quorum_lottery(
+                            agents,
+                            proposal.liquid_tokens,
+                            bitcoin_block_hash,
+                            bitcoin_block_height or 0,
+                        )
+
+                        self.logger.info(
+                            f"Lottery selection completed: {len(lottery_selection.selected_wallets)} wallets selected"
+                        )
+
+                        # Record the lottery results
+                        try:
+                            self.logger.info(
+                                "Attempting to create lottery result in database"
+                            )
+                            lottery_result = backend.create_lottery_result(
                                 LotteryResultCreate(
                                     proposal_id=proposal.id,
                                     dao_id=dao_data["id"],
@@ -899,56 +926,125 @@ class ActionProposalHandler(BaseProposalHandler):
                                     ),
                                 )
                             )
+                            self.logger.info(
+                                f"Successfully created lottery result with ID: {lottery_result.id}"
+                            )
+                        except Exception as lottery_error:
+                            self.logger.error(
+                                f"Failed to create lottery result: {str(lottery_error)}"
+                            )
+                            self.logger.error(
+                                f"Lottery data: proposal_id={proposal.id}, dao_id={dao_data['id']}, "
+                                f"bitcoin_block_height={bitcoin_block_height}, bitcoin_block_hash={bitcoin_block_hash}"
+                            )
+                            raise
 
                             self.logger.info(
                                 f"Quorum lottery completed for proposal {proposal.id}: "
                                 f"selected {len(lottery_selection.selected_wallets)} agents "
                                 f"({'✓' if lottery_selection.quorum_achieved else '✗'} quorum achieved)"
                             )
-                        else:
-                            # Fallback: use old system if no Bitcoin block hash or liquid tokens
-                            for agent in agents[:25]:  # Limit to 25 agents
-                                lottery_selection.selected_wallets.append(
-                                    create_wallet_selection_dict(
-                                        agent.wallet_id, agent.token_amount
-                                    )
-                                )
-
-                            self.logger.warning(
-                                f"No Bitcoin block hash or liquid tokens available, "
-                                f"selecting first {len(lottery_selection.selected_wallets)} agents"
-                            )
-
-                        # Create evaluation queue messages for selected agents only
-                        selected_wallet_ids = extract_wallet_ids_from_selection(
-                            lottery_selection.selected_wallets
-                        )
-                        for wallet_id in selected_wallet_ids:
-                            message_data = {
-                                "proposal_id": proposal.id,  # Only pass the proposal UUID
-                            }
-
-                            backend.create_queue_message(
-                                QueueMessageCreate(
-                                    type=QueueMessageType.get_or_create(
-                                        "dao_proposal_evaluation"
-                                    ),
-                                    message=message_data,
-                                    dao_id=dao_data["id"],
-                                    wallet_id=wallet_id,
-                                )
-                            )
-
-                        self.logger.info(
-                            f"Created {len(selected_wallet_ids)} evaluation queue messages for proposal {proposal.id}"
-                        )
                     else:
+                        # Fallback: use old system if no Bitcoin block hash or liquid tokens
                         self.logger.warning(
-                            f"No agents found holding tokens for DAO {dao_data['id']}"
+                            "Bitcoin block hash or liquid tokens missing - using fallback lottery"
                         )
-                else:
+                        self.logger.warning(f"Bitcoin block hash: {bitcoin_block_hash}")
+                        self.logger.warning(f"Liquid tokens: {proposal.liquid_tokens}")
+
+                        for agent in agents[:25]:  # Limit to 25 agents
+                            lottery_selection.selected_wallets.append(
+                                create_wallet_selection_dict(
+                                    agent.wallet_id, agent.token_amount
+                                )
+                            )
+
+                        self.logger.warning(
+                            f"Fallback lottery completed: selected {len(lottery_selection.selected_wallets)} agents"
+                        )
+
+                        # IMPORTANT: Also create lottery result for fallback case
+                        try:
+                            self.logger.info(
+                                "Creating lottery result for fallback case"
+                            )
+                            # Use dummy values for missing data
+                            fallback_bitcoin_height = bitcoin_block_height or 0
+                            fallback_bitcoin_hash = (
+                                bitcoin_block_hash or "fallback-hash"
+                            )
+
+                            lottery_result = backend.create_lottery_result(
+                                LotteryResultCreate(
+                                    proposal_id=proposal.id,
+                                    dao_id=dao_data["id"],
+                                    bitcoin_block_height=fallback_bitcoin_height,
+                                    bitcoin_block_hash=fallback_bitcoin_hash,
+                                    lottery_seed=hashlib.sha256(
+                                        f"{fallback_bitcoin_hash}-fallback".encode()
+                                    ).hexdigest(),
+                                    selected_wallets=lottery_selection.selected_wallets,
+                                    liquid_tokens_at_creation=proposal.liquid_tokens
+                                    or "0",
+                                    quorum_threshold="0",  # No quorum calculation in fallback
+                                    total_selected_tokens=str(
+                                        sum(
+                                            int(w.get("token_amount", "0"))
+                                            for w in lottery_selection.selected_wallets
+                                        )
+                                    ),
+                                    quorum_achieved=False,  # Fallback doesn't achieve quorum
+                                    quorum_percentage=0.15,
+                                    total_eligible_wallets=len(agents),
+                                    total_eligible_tokens=str(
+                                        sum(int(agent.token_amount) for agent in agents)
+                                    ),
+                                    selection_rounds=1,
+                                    # Backward compatibility
+                                    selected_wallet_ids=extract_wallet_ids_from_selection(
+                                        lottery_selection.selected_wallets
+                                    ),
+                                )
+                            )
+                            self.logger.info(
+                                f"Successfully created fallback lottery result with ID: {lottery_result.id}"
+                            )
+                        except Exception as fallback_lottery_error:
+                            self.logger.error(
+                                f"Failed to create fallback lottery result: {str(fallback_lottery_error)}"
+                            )
+                            raise
+
+                    # Create evaluation queue messages for selected agents only
+                    selected_wallet_ids = extract_wallet_ids_from_selection(
+                        lottery_selection.selected_wallets
+                    )
                     self.logger.info(
-                        f"Skipping agent evaluation for failed proposal {proposal.id}"
+                        f"Creating queue messages for {len(selected_wallet_ids)} selected wallets"
+                    )
+
+                    for wallet_id in selected_wallet_ids:
+                        message_data = {
+                            "proposal_id": proposal.id,  # Only pass the proposal UUID
+                        }
+
+                        backend.create_queue_message(
+                            QueueMessageCreate(
+                                type=QueueMessageType.get_or_create(
+                                    "dao_proposal_evaluation"
+                                ),
+                                message=message_data,
+                                dao_id=dao_data["id"],
+                                wallet_id=wallet_id,
+                            )
+                        )
+
+                    self.logger.info(
+                        f"Created {len(selected_wallet_ids)} evaluation queue messages for proposal {proposal.id}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"No agents found holding tokens for DAO {dao_data['id']} - skipping lottery entirely"
                     )
             except Exception as e:
                 self.logger.error(f"Error creating proposal in database: {str(e)}")
@@ -1025,28 +1121,46 @@ class ActionProposalHandler(BaseProposalHandler):
                     f"Successfully updated action proposal {updated_proposal.id} with chainhook data"
                 )
 
-                # Only queue evaluation messages for successful proposals with agents
-                if tx_success:
-                    # Check if lottery has already been conducted for this proposal
-                    existing_lottery = backend.get_lottery_result_by_proposal(
-                        updated_proposal.id
-                    )
+                # Queue evaluation messages for proposals with agents
+                # Note: Removing tx_success check to debug lottery creation issues
+                self.logger.info(
+                    f"Starting lottery process for updated proposal {updated_proposal.id} (tx_success: {tx_success})"
+                )
 
-                    if not existing_lottery:
-                        # Conduct new quorum-aware lottery if none exists
-                        agents = self._get_agent_token_holders(dao_data["id"])
-                        if agents:
-                            lottery_selection = LotterySelection()
-                            if bitcoin_block_hash and updated_proposal.liquid_tokens:
-                                lottery_selection = self._conduct_quorum_lottery(
-                                    agents,
-                                    updated_proposal.liquid_tokens,
-                                    bitcoin_block_hash,
-                                    bitcoin_block_height or 0,
+                # Check if lottery has already been conducted for this proposal
+                existing_lottery = backend.get_lottery_result_by_proposal(
+                    updated_proposal.id
+                )
+
+                if not existing_lottery:
+                    # Conduct new quorum-aware lottery if none exists
+                    agents = self._get_agent_token_holders(dao_data["id"])
+                    if agents:
+                        lottery_selection = LotterySelection()
+                        self.logger.info(
+                            f"Update path - Bitcoin block hash available: {bool(bitcoin_block_hash)}"
+                        )
+                        self.logger.info(
+                            f"Update path - Proposal liquid tokens: {updated_proposal.liquid_tokens}"
+                        )
+
+                        if bitcoin_block_hash and updated_proposal.liquid_tokens:
+                            self.logger.info(
+                                "Update path - Conditions met for full lottery"
+                            )
+                            lottery_selection = self._conduct_quorum_lottery(
+                                agents,
+                                updated_proposal.liquid_tokens,
+                                bitcoin_block_hash,
+                                bitcoin_block_height or 0,
+                            )
+
+                            # Record the lottery results
+                            try:
+                                self.logger.info(
+                                    "Update path - Attempting to create lottery result"
                                 )
-
-                                # Record the lottery results
-                                backend.create_lottery_result(
+                                lottery_result = backend.create_lottery_result(
                                     LotteryResultCreate(
                                         proposal_id=updated_proposal.id,
                                         dao_id=dao_data["id"],
@@ -1070,60 +1184,119 @@ class ActionProposalHandler(BaseProposalHandler):
                                         ),
                                     )
                                 )
-
                                 self.logger.info(
-                                    f"Quorum lottery completed for updated proposal {updated_proposal.id}: "
-                                    f"selected {len(lottery_selection.selected_wallets)} agents "
-                                    f"({'✓' if lottery_selection.quorum_achieved else '✗'} quorum achieved)"
+                                    f"Update path - Successfully created lottery result with ID: {lottery_result.id}"
                                 )
-                            else:
-                                # Fallback: use old system if no Bitcoin block hash or liquid tokens
-                                for agent in agents[:25]:  # Limit to 25 agents
-                                    lottery_selection.selected_wallets.append(
-                                        create_wallet_selection_dict(
-                                            agent.wallet_id, agent.token_amount
-                                        )
-                                    )
-
-                                self.logger.warning(
-                                    f"No Bitcoin block hash or liquid tokens available, "
-                                    f"selecting first {len(lottery_selection.selected_wallets)} agents"
+                            except Exception as update_lottery_error:
+                                self.logger.error(
+                                    f"Update path - Failed to create lottery result: {str(update_lottery_error)}"
                                 )
-
-                            # Create evaluation queue messages for selected agents only
-                            selected_wallet_ids = extract_wallet_ids_from_selection(
-                                lottery_selection.selected_wallets
-                            )
-                            for wallet_id in selected_wallet_ids:
-                                message_data = {
-                                    "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
-                                }
-
-                                backend.create_queue_message(
-                                    QueueMessageCreate(
-                                        type=QueueMessageType.get_or_create(
-                                            "dao_proposal_evaluation"
-                                        ),
-                                        message=message_data,
-                                        dao_id=dao_data["id"],
-                                        wallet_id=wallet_id,
-                                    )
-                                )
+                                raise
 
                             self.logger.info(
-                                f"Created {len(selected_wallet_ids)} evaluation queue messages for updated proposal {updated_proposal.id}"
+                                f"Quorum lottery completed for updated proposal {updated_proposal.id}: "
+                                f"selected {len(lottery_selection.selected_wallets)} agents "
+                                f"({'✓' if lottery_selection.quorum_achieved else '✗'} quorum achieved)"
                             )
                         else:
+                            # Fallback: use old system if no Bitcoin block hash or liquid tokens
                             self.logger.warning(
-                                f"No agents found holding tokens for DAO {dao_data['id']}"
+                                "Update path - Using fallback lottery system"
                             )
-                    else:
+                            for agent in agents[:25]:  # Limit to 25 agents
+                                lottery_selection.selected_wallets.append(
+                                    create_wallet_selection_dict(
+                                        agent.wallet_id, agent.token_amount
+                                    )
+                                )
+
+                            self.logger.warning(
+                                f"Update path - Fallback lottery completed: selected {len(lottery_selection.selected_wallets)} agents"
+                            )
+
+                            # IMPORTANT: Also create lottery result for fallback case in update path
+                            try:
+                                self.logger.info(
+                                    "Update path - Creating lottery result for fallback case"
+                                )
+                                fallback_bitcoin_height = bitcoin_block_height or 0
+                                fallback_bitcoin_hash = (
+                                    bitcoin_block_hash or "fallback-hash-update"
+                                )
+
+                                lottery_result = backend.create_lottery_result(
+                                    LotteryResultCreate(
+                                        proposal_id=updated_proposal.id,
+                                        dao_id=dao_data["id"],
+                                        bitcoin_block_height=fallback_bitcoin_height,
+                                        bitcoin_block_hash=fallback_bitcoin_hash,
+                                        lottery_seed=hashlib.sha256(
+                                            f"{fallback_bitcoin_hash}-fallback-update".encode()
+                                        ).hexdigest(),
+                                        selected_wallets=lottery_selection.selected_wallets,
+                                        liquid_tokens_at_creation=updated_proposal.liquid_tokens
+                                        or "0",
+                                        quorum_threshold="0",
+                                        total_selected_tokens=str(
+                                            sum(
+                                                int(w.get("token_amount", "0"))
+                                                for w in lottery_selection.selected_wallets
+                                            )
+                                        ),
+                                        quorum_achieved=False,
+                                        quorum_percentage=0.15,
+                                        total_eligible_wallets=len(agents),
+                                        total_eligible_tokens=str(
+                                            sum(
+                                                int(agent.token_amount)
+                                                for agent in agents
+                                            )
+                                        ),
+                                        selection_rounds=1,
+                                        selected_wallet_ids=extract_wallet_ids_from_selection(
+                                            lottery_selection.selected_wallets
+                                        ),
+                                    )
+                                )
+                                self.logger.info(
+                                    f"Update path - Successfully created fallback lottery result with ID: {lottery_result.id}"
+                                )
+                            except Exception as update_fallback_error:
+                                self.logger.error(
+                                    f"Update path - Failed to create fallback lottery result: {str(update_fallback_error)}"
+                                )
+                                raise
+
+                        # Create evaluation queue messages for selected agents only
+                        selected_wallet_ids = extract_wallet_ids_from_selection(
+                            lottery_selection.selected_wallets
+                        )
+                        for wallet_id in selected_wallet_ids:
+                            message_data = {
+                                "proposal_id": updated_proposal.id,  # Only pass the proposal UUID
+                            }
+
+                            backend.create_queue_message(
+                                QueueMessageCreate(
+                                    type=QueueMessageType.get_or_create(
+                                        "dao_proposal_evaluation"
+                                    ),
+                                    message=message_data,
+                                    dao_id=dao_data["id"],
+                                    wallet_id=wallet_id,
+                                )
+                            )
+
                         self.logger.info(
-                            f"Lottery already exists for proposal {updated_proposal.id}, skipping lottery selection"
+                            f"Created {len(selected_wallet_ids)} evaluation queue messages for updated proposal {updated_proposal.id}"
+                        )
+                    else:
+                        self.logger.warning(
+                            f"Update path - No agents found holding tokens for DAO {dao_data['id']}"
                         )
                 else:
                     self.logger.info(
-                        f"Skipping agent evaluation for failed proposal update {updated_proposal.id}"
+                        f"Lottery already exists for proposal {updated_proposal.id}, skipping lottery selection"
                     )
 
             except Exception as e:
