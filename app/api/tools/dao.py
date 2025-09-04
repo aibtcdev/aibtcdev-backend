@@ -22,7 +22,6 @@ from app.backend.models import (
     ProposalType,
     Wallet,
     WalletFilter,
-    WalletFilterN,
 )
 from app.config import config
 from app.lib.logger import configure_logger
@@ -115,34 +114,9 @@ async def _validate_airdrop_recipients(recipients: List[str]) -> Dict[str, bool]
     Returns:
         Dict mapping each recipient to whether it exists in wallets table
     """
-    if not recipients:
-        return {}
+    from app.lib.utils import validate_wallet_recipients
 
-    # Determine which network to check based on config
-    from app.config import config
-
-    use_mainnet = config.network.network == "mainnet"
-
-    # Query wallets table for all recipients at once, filtering by the appropriate network
-    if use_mainnet:
-        wallet_filter = WalletFilterN(mainnet_addresses=recipients)
-    else:
-        wallet_filter = WalletFilterN(testnet_addresses=recipients)
-
-    wallets = backend.list_wallets_n(filters=wallet_filter)
-
-    # Create set of valid addresses for efficient lookup
-    if use_mainnet:
-        valid_addresses = {w.mainnet_address for w in wallets if w.mainnet_address}
-    else:
-        valid_addresses = {w.testnet_address for w in wallets if w.testnet_address}
-
-    # Check each recipient
-    validation_results = {}
-    for recipient in recipients:
-        validation_results[recipient] = recipient in valid_addresses
-
-    return validation_results
+    return await validate_wallet_recipients(recipients)
 
 
 async def _create_proposal_from_tool_result(
