@@ -32,7 +32,9 @@ class AirdropSTXHandler(ChainhookEventHandler):
     TARGET_CONTRACT = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.send-many"
 
     # Business rule constants for basic transaction validation
-    MIN_TOTAL_STX = 5_000_000  # 5 STX in microSTX (1 STX = 1,000,000 microSTX)
+    MIN_AMOUNT_PER_RECIPIENT = (
+        100_000  # 0.1 STX in microSTX (1 STX = 1,000,000 microSTX)
+    )
     MIN_RECIPIENTS = 5
     # Note: Expiry and cooldown validations are now handled at API level during proposal creation
 
@@ -143,9 +145,10 @@ class AirdropSTXHandler(ChainhookEventHandler):
             events: List of events from the transaction
 
         Returns:
-            Dict containing parsed airdrop data
+            Dict containing parsed airdrop data with individual recipient amounts
         """
         recipients = []
+        recipient_amounts = {}  # Track individual amounts per recipient
         total_amount = 0
         sender = None
 
@@ -162,7 +165,13 @@ class AirdropSTXHandler(ChainhookEventHandler):
                 if recipient:
                     recipients.append(recipient)
                     try:
-                        total_amount += int(amount_str)
+                        amount = int(amount_str)
+                        total_amount += amount
+                        # Track individual recipient amounts (handle multiple transfers to same recipient)
+                        if recipient in recipient_amounts:
+                            recipient_amounts[recipient] += amount
+                        else:
+                            recipient_amounts[recipient] = amount
                     except (ValueError, TypeError):
                         self.logger.warning(
                             f"Invalid amount in STX transfer: {amount_str}"
@@ -174,6 +183,7 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         return {
             "recipients": recipients,
+            "recipient_amounts": recipient_amounts,
             "total_amount": str(total_amount),
             "token_identifier": "STX",  # STX transfers
             "sender": sender,
@@ -195,12 +205,12 @@ class AirdropSTXHandler(ChainhookEventHandler):
         return await validate_wallet_recipients(recipients)
 
     def _validate_minimum_requirements(
-        self, total_amount: int, recipient_count: int
+        self, recipient_amounts: Dict[str, int], recipient_count: int
     ) -> Dict[str, str]:
-        """Validate minimum STX amount and recipient count.
+        """Validate minimum STX amount per recipient and recipient count.
 
         Args:
-            total_amount: Total amount to be airdropped in microSTX
+            recipient_amounts: Dict mapping recipient addresses to amounts in microSTX
             recipient_count: Number of recipients
 
         Returns:
@@ -208,10 +218,17 @@ class AirdropSTXHandler(ChainhookEventHandler):
         """
         errors = {}
 
-        if total_amount < self.MIN_TOTAL_STX:
-            errors["total_amount"] = (
-                f"Total amount {total_amount / 1_000_000:.6f} STX is below minimum "
-                f"{self.MIN_TOTAL_STX / 1_000_000:.6f} STX"
+        # Check minimum amount per recipient
+        insufficient_recipients = []
+        for recipient, amount in recipient_amounts.items():
+            if amount < self.MIN_AMOUNT_PER_RECIPIENT:
+                insufficient_recipients.append(
+                    f"{recipient}: {amount / 1_000_000:.6f} STX (min: {self.MIN_AMOUNT_PER_RECIPIENT / 1_000_000:.1f} STX)"
+                )
+
+        if insufficient_recipients:
+            errors["recipient_amounts"] = (
+                f"Recipients with insufficient amounts: {', '.join(insufficient_recipients)}"
             )
 
         if recipient_count < self.MIN_RECIPIENTS:
@@ -266,6 +283,7 @@ class AirdropSTXHandler(ChainhookEventHandler):
             return
 
         recipients = airdrop_data["recipients"]
+        recipient_amounts = airdrop_data["recipient_amounts"]
         total_amount = int(airdrop_data["total_amount"])
         sender = airdrop_data["sender"]
 
@@ -322,7 +340,7 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         # Validate minimum requirements
         requirement_errors = self._validate_minimum_requirements(
-            total_amount, len(recipients)
+            recipient_amounts, len(recipients)
         )
         if requirement_errors:
             self.logger.error(
