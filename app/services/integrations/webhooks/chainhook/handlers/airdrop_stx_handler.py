@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from app.backend.factory import backend
-from app.backend.models import AirdropCreate, AirdropFilter, WalletFilterN
+from app.backend.models import AirdropCreate, AirdropFilter
 from app.services.integrations.webhooks.chainhook.handlers.base import (
     ChainhookEventHandler,
 )
@@ -190,33 +190,9 @@ class AirdropSTXHandler(ChainhookEventHandler):
         Returns:
             Dict mapping each recipient to whether it exists in wallets table
         """
-        if not recipients:
-            return {}
+        from app.lib.utils import validate_wallet_recipients
 
-        # Query wallets table for all recipients at once
-        wallet_filter = WalletFilterN(
-            mainnet_addresses=recipients, testnet_addresses=recipients
-        )
-        wallets = backend.list_wallets_n(filters=wallet_filter)
-
-        # Create sets of valid addresses for efficient lookup
-        valid_mainnet_addresses = {
-            w.mainnet_address for w in wallets if w.mainnet_address
-        }
-        valid_testnet_addresses = {
-            w.testnet_address for w in wallets if w.testnet_address
-        }
-
-        # Check each recipient
-        validation_results = {}
-        for recipient in recipients:
-            is_valid = (
-                recipient in valid_mainnet_addresses
-                or recipient in valid_testnet_addresses
-            )
-            validation_results[recipient] = is_valid
-
-        return validation_results
+        return await validate_wallet_recipients(recipients)
 
     def _validate_minimum_requirements(
         self, total_amount: int, recipient_count: int
