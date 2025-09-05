@@ -578,18 +578,26 @@ async def propose_dao_action_send_message(
                     logger.warning(
                         f"Airdrop transaction {payload.airdrop_txid} not found"
                     )
-                    raise HTTPException(
+                    return JSONResponse(
                         status_code=404,
-                        detail=f"Airdrop transaction {payload.airdrop_txid} not found",
+                        content={
+                            "success": False,
+                            "output": {},
+                            "error": f"Airdrop transaction {payload.airdrop_txid} not found",
+                        },
                     )
 
                 if airdrop.proposal_id:
                     logger.warning(
                         f"Airdrop transaction {payload.airdrop_txid} has already been used in proposal with ID: {airdrop.proposal_id}"
                     )
-                    raise HTTPException(
+                    return JSONResponse(
                         status_code=400,
-                        detail=f"Airdrop transaction {payload.airdrop_txid} has already been used in another proposal",
+                        content={
+                            "success": False,
+                            "output": {},
+                            "error": f"Airdrop transaction {payload.airdrop_txid} has already been used in another proposal",
+                        },
                     )
 
                 # Validate airdrop expiry
@@ -603,9 +611,13 @@ async def propose_dao_action_send_message(
                             logger.warning(
                                 f"Airdrop validation failed for tx {payload.airdrop_txid}: {expiry_error}"
                             )
-                            raise HTTPException(
+                            return JSONResponse(
                                 status_code=400,
-                                detail=f"Airdrop expired: {expiry_error}",
+                                content={
+                                    "success": False,
+                                    "output": {},
+                                    "error": f"Airdrop expired: {expiry_error}",
+                                },
                             )
                 except HTTPException:
                     raise
@@ -621,9 +633,13 @@ async def propose_dao_action_send_message(
                         logger.warning(
                             f"Airdrop cooldown validation failed for tx {payload.airdrop_txid}: {cooldown_violations}"
                         )
-                        raise HTTPException(
+                        return JSONResponse(
                             status_code=400,
-                            detail=f"Airdrop cooldown violations: {list(cooldown_violations.values())[0]}",
+                            content={
+                                "success": False,
+                                "output": {},
+                                "error": f"Airdrop cooldown violations: {list(cooldown_violations.values())[0]}",
+                            },
                         )
 
                     # Validate recipients against wallets table
@@ -640,10 +656,14 @@ async def propose_dao_action_send_message(
                             f"Airdrop recipient validation failed for tx {payload.airdrop_txid}: "
                             f"Invalid recipients not in wallets table: {invalid_recipients}"
                         )
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Invalid airdrop recipients not found in wallets table: {invalid_recipients}",
-                        )
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "success": False,
+                            "output": {},
+                            "error": f"Invalid airdrop recipients not found in wallets table: {invalid_recipients}",
+                        },
+                    )
 
             except HTTPException:
                 raise
