@@ -6,7 +6,13 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import verify_faktory_access_token
 from app.backend.factory import backend
-from app.backend.models import AgentFilter, ProfileFilter, WalletFilter
+from app.backend.models import (
+    AgentFilter,
+    DAOFilter,
+    HolderFilter,
+    ProfileFilter,
+    WalletFilter,
+)
 from app.config import config
 from app.lib.logger import configure_logger
 
@@ -34,6 +40,7 @@ class ProfileAddresses(BaseModel):
 @router.get("/addresses", response_model=List[ProfileAddresses])
 async def get_all_profile_addresses(
     request: Request,
+    dao_name: Optional[str] = None,
     _: None = Depends(verify_faktory_access_token),
 ) -> JSONResponse:
     """Get all profile addresses with their associated agent and wallet information.
@@ -44,6 +51,7 @@ async def get_all_profile_addresses(
 
     Args:
         request: The FastAPI request object.
+        dao_name: Optional DAO name to filter results by.
 
     Returns:
         JSONResponse: Array of profile address information.
@@ -52,8 +60,9 @@ async def get_all_profile_addresses(
         HTTPException: If there's an error retrieving the data.
     """
     try:
+        dao_filter_msg = f" (filtered by DAO: {dao_name})" if dao_name else ""
         logger.info(
-            f"Profile addresses request received from {request.client.host if request.client else 'unknown'}"
+            f"Profile addresses request{dao_filter_msg} received from {request.client.host if request.client else 'unknown'}"
         )
 
         # Determine which address field to use based on network configuration
@@ -68,6 +77,35 @@ async def get_all_profile_addresses(
         if not profiles:
             logger.info("No profiles found in the database")
             return JSONResponse(content=[])
+
+        # If DAO name filter is provided, find the DAO and filter profiles
+        dao_agents = None
+        if dao_name:
+            daos = backend.list_daos(DAOFilter(name=dao_name))
+            if not daos:
+                logger.warning(f"No DAO found with name: {dao_name}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"DAO with name '{dao_name}' not found",
+                )
+
+            dao = daos[0]
+            logger.debug(f"Found DAO: {dao.name} (ID: {dao.id})")
+
+            # Get agents associated with this DAO
+            all_agents = backend.list_agents(AgentFilter())
+            dao_agents = []
+
+            for agent in all_agents:
+                if agent.profile_id:
+                    # Check if this agent has holders associated with the DAO
+                    holders = backend.list_holders(
+                        HolderFilter(dao_id=dao.id, agent_id=agent.id)
+                    )
+                    if holders:
+                        dao_agents.append(agent.id)
+
+            logger.debug(f"Found {len(dao_agents)} agents for DAO: {dao_name}")
 
         result = []
 
@@ -89,6 +127,11 @@ async def get_all_profile_addresses(
                 agents = backend.list_agents(AgentFilter(profile_id=profile.id))
                 if agents:
                     agent = agents[0]  # Take the first agent
+
+                    # If DAO filtering is enabled, skip profiles without agents in the DAO
+                    if dao_agents is not None and agent.id not in dao_agents:
+                        continue
+
                     profile_data.agent_account_contract = agent.account_contract
 
                     # Get wallet for this agent
@@ -101,6 +144,9 @@ async def get_all_profile_addresses(
                             else wallet.testnet_address
                         )
                         profile_data.wallet_address = wallet_address
+                elif dao_agents is not None:
+                    # If DAO filtering is enabled and profile has no agents, skip it
+                    continue
 
                 result.append(profile_data)
 
@@ -109,9 +155,15 @@ async def get_all_profile_addresses(
                 # Continue processing other profiles even if one fails
                 continue
 
-        logger.info(f"Successfully retrieved address data for {len(result)} profiles")
+        dao_log_msg = f" for DAO '{dao_name}'" if dao_name else ""
+        logger.info(
+            f"Successfully retrieved address data for {len(result)} profiles{dao_log_msg}"
+        )
         return JSONResponse(content=[profile.model_dump() for profile in result])
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404 for DAO not found)
+        raise
     except Exception as e:
         logger.error(f"Failed to retrieve profile addresses: {str(e)}", exc_info=e)
         raise HTTPException(
