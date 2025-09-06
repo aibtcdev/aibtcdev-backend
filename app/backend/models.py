@@ -195,6 +195,7 @@ class QueueMessageCreate(QueueMessageBase):
 class QueueMessage(QueueMessageBase):
     id: UUID
     created_at: datetime
+    updated_at: datetime
 
 
 #

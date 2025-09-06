@@ -707,6 +707,7 @@ class SupabaseBackend(AbstractBackend):
         payload = update_data.model_dump(exclude_unset=True, mode="json")
         if not payload:
             return self.get_queue_message(queue_message_id)
+
         response = (
             self.client.table("queue")
             .update(payload)
