@@ -955,6 +955,11 @@ class SupabaseBackend(AbstractBackend):
                 query = query.eq("profile_id", str(filters.profile_id))
             if filters.account_contract is not None:
                 query = query.eq("account_contract", filters.account_contract)
+            if (
+                filters.account_contracts is not None
+                and len(filters.account_contracts) > 0
+            ):
+                query = query.in_("account_contract", filters.account_contracts)
         response = query.execute()
         data = response.data or []
         return [Agent(**row) for row in data]
