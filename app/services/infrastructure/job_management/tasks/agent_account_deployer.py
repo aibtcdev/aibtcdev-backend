@@ -11,7 +11,6 @@ from app.backend.models import (
     AgentBase,
     QueueMessage,
     QueueMessageBase,
-    QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
     WalletFilter,
@@ -36,7 +35,6 @@ class AgentAccountDeployResult(RunnerResult):
 
     accounts_processed: int = 0
     accounts_deployed: int = 0
-    funding_messages_created: int = 0
     errors: List[str] = None
 
     def __post_init__(self):
@@ -61,10 +59,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     """Task runner for deploying agent account contracts with enhanced capabilities."""
 
     QUEUE_TYPE = QueueMessageType.get_or_create("agent_account_deploy")
-
-    # Configuration for initial agent funding
-    DEFAULT_AGENT_FUNDING_AMOUNT = 1  # STX to send to newly deployed agent accounts
-    DEFAULT_AGENT_FUNDING_FEE = 200  # microSTX transaction fee
 
     def __init__(self, config: Optional[RunnerConfig] = None):
         super().__init__(config)
@@ -167,57 +161,12 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             logger.error(f"Failed to parse deployment output: {str(e)}")
             return None
 
-    def _create_agent_funding_message(
-        self, contract_principal: str, dao_id: str = None
-    ) -> bool:
-        """Create an STX transfer queue message to fund the newly deployed agent account.
-
-        Args:
-            contract_principal: The deployed agent contract address (recipient)
-            dao_id: Optional DAO ID for tracking
-
-        Returns:
-            bool: True if message was created successfully, False otherwise
-        """
-        try:
-            # Create STX transfer message to fund the agent account
-            # Use None for wallet_id so STX transfer task will use the backend wallet
-            funding_message = QueueMessageCreate(
-                type=QueueMessageType.get_or_create("stx_transfer"),
-                wallet_id=None,  # STX transfer task will use backend wallet when None
-                dao_id=dao_id,
-                message={
-                    "recipient": contract_principal,
-                    "amount": self.DEFAULT_AGENT_FUNDING_AMOUNT,
-                    "fee": self.DEFAULT_AGENT_FUNDING_FEE,
-                    "memo": f"Initial funding for deployed agent account: {contract_principal}",
-                },
-            )
-
-            # Queue the transfer message
-            created_message = backend.create_queue_message(funding_message)
-            logger.info(
-                f"Created STX funding message {created_message.id} to send {self.DEFAULT_AGENT_FUNDING_AMOUNT} STX "
-                f"to agent contract {contract_principal}"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(
-                f"Failed to create agent funding message for {contract_principal}: {str(e)}",
-                exc_info=True,
-            )
-            return False
-
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
         message_id = message.id
         message_data = self._parse_message_data(message.message)
 
         logger.debug(f"Processing agent account deployment message {message_id}")
-
-        # Track whether funding was successfully queued
-        funding_queued = False
 
         try:
             # Validate message data
@@ -400,24 +349,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                             logger.info(
                                                 f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
                                             )
-
-                                            # Create funding message for the newly deployed agent account
-                                            # Uses backend wallet automatically (wallet_id=None)
-                                            funding_success = self._create_agent_funding_message(
-                                                contract_principal=full_contract_principal,
-                                                dao_id=str(message.dao_id)
-                                                if message.dao_id
-                                                else None,
-                                            )
-                                            if funding_success:
-                                                funding_queued = True
-                                                logger.info(
-                                                    f"Queued initial funding for agent contract: {full_contract_principal}"
-                                                )
-                                            else:
-                                                logger.warning(
-                                                    f"Failed to queue funding for agent contract: {full_contract_principal}"
-                                                )
 
                                         else:
                                             logger.warning(
@@ -624,26 +555,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         f"Updated agent {wallet.agent_id} with existing contract: {full_contract_principal}"
                                     )
 
-                                    # Create funding message for the existing agent account
-                                    # Uses backend wallet automatically (wallet_id=None)
-                                    funding_success = (
-                                        self._create_agent_funding_message(
-                                            contract_principal=full_contract_principal,
-                                            dao_id=str(message.dao_id)
-                                            if message.dao_id
-                                            else None,
-                                        )
-                                    )
-                                    if funding_success:
-                                        funding_queued = True
-                                        logger.info(
-                                            f"Queued initial funding for existing agent contract: {full_contract_principal}"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Failed to queue funding for existing agent contract: {full_contract_principal}"
-                                        )
-
                                 else:
                                     logger.warning(
                                         f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
@@ -677,7 +588,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 "success": True,
                 "deployed": deployed,
                 "result": deployment_result,
-                "funding_queued": funding_queued,
             }
 
             # Store result and mark as processed
@@ -768,14 +678,12 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     message="No pending messages found",
                     accounts_processed=0,
                     accounts_deployed=0,
-                    funding_messages_created=0,
                 )
             ]
 
         # Process each message in batches
         processed_count = 0
         deployed_count = 0
-        funding_messages_created = 0
         errors = []
         batch_size = getattr(context, "batch_size", 5)
 
@@ -793,8 +701,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     if result.get("success"):
                         if result.get("deployed", False):
                             deployed_count += 1
-                        if result.get("funding_queued", False):
-                            funding_messages_created += 1
                     else:
                         errors.append(result.get("error", "Unknown error"))
 
@@ -807,17 +713,15 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
         logger.info(
             f"Agent account deployment completed - Processed: {processed_count}, "
-            f"Deployed: {deployed_count}, Funding messages created: {funding_messages_created}, "
-            f"Errors: {len(errors)}"
+            f"Deployed: {deployed_count}, Errors: {len(errors)}"
         )
 
         return [
             AgentAccountDeployResult(
                 success=True,
-                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s), created {funding_messages_created} funding message(s)",
+                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s)",
                 accounts_processed=processed_count,
                 accounts_deployed=deployed_count,
-                funding_messages_created=funding_messages_created,
                 errors=errors,
             )
         ]
