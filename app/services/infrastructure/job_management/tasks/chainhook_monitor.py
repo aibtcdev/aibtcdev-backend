@@ -140,14 +140,16 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
         """Cleanup after task execution."""
         logger.debug("Chainhook monitor task cleanup completed")
 
-    def _is_chainhook_healthy(self, chainhook_uuid: str) -> bool:
+    def _is_chainhook_healthy(self, chainhook_uuid: str) -> tuple[bool, bool]:
         """Check if a chainhook is in a healthy state by checking its status directly.
 
         Args:
             chainhook_uuid: UUID of the chainhook to check
 
         Returns:
-            bool: True if chainhook is healthy, False otherwise
+            tuple[bool, bool]: (is_healthy, should_recreate)
+                - is_healthy: True if chainhook is healthy
+                - should_recreate: True if chainhook should be recreated (permanent failure)
         """
         try:
             # Get the specific chainhook status
@@ -156,7 +158,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             # Check if chainhook is enabled
             if not status_response.get("enabled", False):
                 logger.warning(f"Chainhook {chainhook_uuid} is not enabled")
-                return False
+                return False, True  # Not healthy, should recreate
 
             # Check status type for any failure indicators
             status_info = status_response.get("status", {})
@@ -166,7 +168,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 logger.warning(
                     f"Chainhook {chainhook_uuid} has status type: {status_type}"
                 )
-                return False
+                return False, True  # Not healthy, should recreate
 
             # Additional checks on status info if available
             info = status_info.get("info", {})
@@ -179,12 +181,16 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                     logger.warning(
                         f"Chainhook {chainhook_uuid} has expired (expired_at: {expired_at}, last_evaluated: {last_evaluated})"
                     )
-                    return False
+                    return False, True  # Not healthy, should recreate
 
-            return True
+            return True, False  # Healthy, no need to recreate
         except Exception as e:
-            logger.error(f"Error checking chainhook {chainhook_uuid} health: {str(e)}")
-            return False
+            # This is likely a temporary failure (network, API timeout, etc.)
+            # Don't recreate the chainhook, just log the error and try again later
+            logger.warning(
+                f"Temporary error checking chainhook {chainhook_uuid} health: {str(e)}"
+            )
+            return False, False  # Not healthy (unknown), but don't recreate
 
     def _recreate_chainhook_for_chain_state(self, chain_state) -> Optional[str]:
         """Recreate a chainhook for a given chain state.
@@ -329,33 +335,43 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 )
 
                 # Check if chainhook is healthy using direct status check
-                if not self._is_chainhook_healthy(chainhook_uuid):
+                is_healthy, should_recreate = self._is_chainhook_healthy(chainhook_uuid)
+
+                if not is_healthy:
                     logger.warning(
-                        f"Chainhook {chainhook_uuid} is unhealthy or not found"
+                        f"Chainhook {chainhook_uuid} is unhealthy (should_recreate={should_recreate})"
                     )
                     chainhooks_failed += 1
                     failed_chainhook_ids.append(chainhook_uuid)
 
-                    # Try to recreate the chainhook
-                    new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
-                    if new_uuid:
-                        chainhooks_recreated += 1
-                        recreated_chainhook_ids.append(new_uuid)
+                    # Only recreate if it's a permanent failure, not a temporary one
+                    if should_recreate:
                         logger.info(
-                            f"Successfully recreated chainhook {new_uuid} to replace unhealthy {chainhook_uuid}"
+                            f"Recreating chainhook {chainhook_uuid} due to permanent failure"
                         )
+                        new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
+                        if new_uuid:
+                            chainhooks_recreated += 1
+                            recreated_chainhook_ids.append(new_uuid)
+                            logger.info(
+                                f"Successfully recreated chainhook {new_uuid} to replace failed {chainhook_uuid}"
+                            )
 
-                        # Delete the old chainhook if it exists
-                        try:
-                            self.platform_api.delete_chainhook(chainhook_uuid)
-                            logger.info(f"Deleted old chainhook {chainhook_uuid}")
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to delete old chainhook {chainhook_uuid}: {str(e)}"
+                            # Delete the old chainhook if it exists
+                            try:
+                                self.platform_api.delete_chainhook(chainhook_uuid)
+                                logger.info(f"Deleted old chainhook {chainhook_uuid}")
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to delete old chainhook {chainhook_uuid}: {str(e)}"
+                                )
+                        else:
+                            logger.error(
+                                f"Failed to recreate chainhook for chain state {chain_state.id}"
                             )
                     else:
-                        logger.error(
-                            f"Failed to recreate chainhook for chain state {chain_state.id}"
+                        logger.info(
+                            f"Skipping recreation of chainhook {chainhook_uuid} - likely temporary failure"
                         )
                 else:
                     logger.debug(f"Chainhook {chainhook_uuid} is healthy")
