@@ -37,6 +37,9 @@ from app.services.integrations.webhooks.chainhook.handlers.dao_vote_handler impo
 from app.services.integrations.webhooks.chainhook.handlers.sell_event_handler import (
     SellEventHandler,
 )
+from app.services.integrations.webhooks.chainhook.handlers.stx_event_handler import (
+    STXEventHandler,
+)
 from app.services.integrations.webhooks.chainhook.models import ChainHookData
 
 
@@ -65,6 +68,7 @@ class ChainhookHandler(WebhookHandler):
             AirdropSTXHandler(),
             BuyEventHandler(),
             SellEventHandler(),
+            STXEventHandler(),
             DAOProposalHandler(),
             DAOProposalBurnHeightHandler(),
             DAOVoteHandler(),
