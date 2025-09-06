@@ -14,7 +14,7 @@ def create_stx_transfer_message(
     wallet_id: UUID = None,
     recipient: str = None,
     amount: int = None,
-    fee: int = 200,
+    fee: int = 400,
     memo: str = "",
     dao_id: UUID = None,
 ) -> str:
@@ -24,7 +24,7 @@ def create_stx_transfer_message(
         wallet_id: UUID of the wallet to send STX from (None = use backend wallet)
         recipient: STX address to send tokens to (e.g., "SP1ABC...DEF")
         amount: Amount of STX to send (in STX, not microSTX)
-        fee: Transaction fee in microSTX (default: 200)
+        fee: Transaction fee in microSTX (default: 400)
         memo: Optional memo for the transaction
         dao_id: Optional DAO ID if this transfer is DAO-related
 
@@ -100,7 +100,7 @@ def create_multiple_stx_transfers(transfers: list) -> list:
             wallet_id=transfer["wallet_id"],
             recipient=transfer["recipient"],
             amount=transfer["amount"],
-            fee=transfer.get("fee", 200),
+            fee=transfer.get("fee", 400),
             memo=transfer.get("memo", ""),
             dao_id=transfer.get("dao_id"),
         )
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             wallet_id=example_wallet_id,
             recipient=example_recipient,
             amount=1,  # Send 1 STX
-            fee=200,  # 200 microSTX fee
+            fee=400,  # 200 microSTX fee
             memo="Test transfer from example script",
         )
 

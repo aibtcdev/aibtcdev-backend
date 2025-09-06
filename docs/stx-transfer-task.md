@@ -46,7 +46,7 @@ queue_message = QueueMessageCreate(
     message={
         "recipient": "SP1ABC123...",  # Required: STX recipient address
         "amount": 5,                  # Required: Amount in STX (not microSTX)
-        "fee": 200,                  # Optional: Fee in microSTX (default: 200)
+        "fee": 400,                  # Optional: Fee in microSTX (default: 200)
         "memo": "Payment for..."     # Optional: Transaction memo
     }
 )
@@ -55,7 +55,7 @@ queue_message = QueueMessageCreate(
 ### Required Fields
 
 - **`wallet_id`**: UUID of the wallet to send STX from (or `null` to use backend wallet)
-- **`message.recipient`**: Valid STX address (starts with SP or ST)  
+- **`message.recipient`**: Valid STX address (starts with SP or ST)
 - **`message.amount`**: Positive integer amount in STX
 
 ### Optional Fields
@@ -109,7 +109,7 @@ message = QueueMessageCreate(
     message={
         "recipient": "SP1ABC123DEF456GHI789JKL012MNO345PQR678",
         "amount": 1,
-        "fee": 200,
+        "fee": 400,
         "memo": "Initial funding for agent account"
     }
 )
@@ -130,7 +130,7 @@ transfers = [
         "memo": "Payment 1"
     },
     {
-        "wallet_id": UUID("wallet-2"), 
+        "wallet_id": UUID("wallet-2"),
         "recipient": "SP2DEF...",
         "amount": 3,
         "memo": "Payment 2"
@@ -266,4 +266,4 @@ This will log:
 - Message validation details
 - Transfer parameters
 - Tool execution results
-- Error details 
+- Error details

@@ -166,7 +166,7 @@ class STXTransferTask(BaseTask[STXTransferResult]):
             # Extract transfer parameters
             recipient = message_data["recipient"]
             amount = message_data["amount"]
-            fee = message_data.get("fee", 200)  # Default fee
+            fee = message_data.get("fee", 400)  # Default fee
             memo = "dusting"  # Hard coded memo
 
             # Validate and truncate memo to ensure it doesn't exceed 34 bytes
