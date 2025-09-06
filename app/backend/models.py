@@ -625,6 +625,9 @@ class QueueMessageFilter(CustomBaseModel):
 class AgentFilter(CustomBaseModel):
     profile_id: Optional[UUID] = None
     account_contract: Optional[str] = None
+    account_contracts: Optional[List[str]] = (
+        None  # Batch filter for multiple account contracts
+    )
 
 
 class ExtensionFilter(CustomBaseModel):

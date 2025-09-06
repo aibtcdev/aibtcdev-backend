@@ -92,20 +92,27 @@ async def get_all_profile_addresses(
             dao = daos[0]
             logger.debug(f"Found DAO: {dao.name} (ID: {dao.id})")
 
-            # Get agents associated with this DAO
-            all_agents = backend.list_agents(AgentFilter())
-            dao_agents = []
+            # Get all holders for this DAO
+            holders = backend.list_holders(HolderFilter(dao_id=dao.id))
+            holder_addresses = {holder.address for holder in holders if holder.address}
 
-            for agent in all_agents:
-                if agent.profile_id:
-                    # Check if this agent has holders associated with the DAO
-                    holders = backend.list_holders(
-                        HolderFilter(dao_id=dao.id, agent_id=agent.id)
-                    )
-                    if holders:
-                        dao_agents.append(agent.id)
+            logger.debug(
+                f"Found {len(holder_addresses)} unique holder addresses for DAO: {dao_name}"
+            )
 
-            logger.debug(f"Found {len(dao_agents)} agents for DAO: {dao_name}")
+            # Get agents whose account_contract matches a holder address
+            if holder_addresses:
+                # Use the efficient batch filtering
+                filtered_agents = backend.list_agents(
+                    AgentFilter(account_contracts=list(holder_addresses))
+                )
+                dao_agents = [agent.id for agent in filtered_agents]
+            else:
+                dao_agents = []
+
+            logger.debug(
+                f"Found {len(dao_agents)} agents holding tokens for DAO: {dao_name}"
+            )
 
         result = []
 
