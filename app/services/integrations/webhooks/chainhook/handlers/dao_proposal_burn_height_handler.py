@@ -36,6 +36,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         super().__init__()
         self.logger = configure_logger(self.__class__.__name__)
         self.chainhook_data: Optional[ChainHookData] = None
+        self._processed_burn_heights: set = (
+            set()
+        )  # Track processed burn heights in this session
 
     def set_chainhook_data(self, data: ChainHookData) -> None:
         """Set the chainhook data for this handler.
@@ -134,7 +137,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         filters = QueueMessageFilter(
             type=message_type,
             dao_id=dao_id,
-            is_processed=False,
+            # Check both processed and unprocessed to prevent duplicates
         )
 
         if wallet_id:
@@ -148,6 +151,44 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             for msg in existing_messages
         )
 
+    def _discord_message_exists(
+        self, proposal_id: UUID, dao_id: UUID, proposal_status: str
+    ) -> bool:
+        """Check if a Discord message already exists for this proposal and status.
+
+        Args:
+            proposal_id: The proposal ID
+            dao_id: The DAO ID
+            proposal_status: The specific proposal status (e.g., 'veto_window_open')
+
+        Returns:
+            bool: True if message exists, False otherwise
+        """
+        filters = QueueMessageFilter(
+            type=QueueMessageType.get_or_create("discord"),
+            dao_id=dao_id,
+            # Check both processed and unprocessed to prevent duplicates
+        )
+
+        existing_messages = backend.list_queue_messages(filters=filters)
+
+        # Create a unique identifier for this specific message type
+        unique_identifier = f"proposal-{proposal_id}-{proposal_status}"
+
+        # Check for existing messages with matching proposal status and proposal reference
+        return any(
+            msg.message
+            and msg.message.get("proposal_status") == proposal_status
+            and (
+                # Check for unique identifier in content
+                unique_identifier in str(msg.message.get("content", ""))
+                or
+                # Fallback: check for proposal ID in content
+                str(proposal_id) in str(msg.message.get("content", ""))
+            )
+            for msg in existing_messages
+        )
+
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle burn height check transactions.
 
@@ -158,91 +199,126 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
         Args:
             transaction: The transaction to handle
         """
-        tx_data = self.extract_transaction_data(transaction)
-        burn_height = self._get_burn_height(tx_data)
+        try:
+            tx_data = self.extract_transaction_data(transaction)
+            burn_height = self._get_burn_height(tx_data)
 
-        if burn_height is None:
-            self.logger.warning("Could not determine burn height from transaction")
-            return
+            if burn_height is None:
+                self.logger.warning("Could not determine burn height from transaction")
+                return
 
-        self.logger.info(f"Processing burn height: {burn_height}")
+            # Skip if we've already processed this burn height in this session
+            burn_height_key = f"burn_{burn_height}"
+            if burn_height_key in self._processed_burn_heights:
+                self.logger.debug(
+                    f"Burn height {burn_height} already processed in this session, skipping"
+                )
+                return
 
-        # Find proposals that should start at this height
-        proposals = backend.list_proposals(
-            filters=ProposalFilter(
-                status=ContractStatus.DEPLOYED,
+            self.logger.info(f"Processing burn height: {burn_height}")
+
+            # Mark this burn height as being processed
+            self._processed_burn_heights.add(burn_height_key)
+
+            # Find proposals that should start at this height
+            proposals = backend.list_proposals(
+                filters=ProposalFilter(
+                    status=ContractStatus.DEPLOYED,
+                )
             )
-        )
 
-        # Filter proposals that should start or end at this burn height
-        vote_proposals = [
-            p
-            for p in proposals
-            if p.vote_start is not None
-            and p.vote_end is not None
-            and p.vote_start == burn_height
-            and p.content is not None  # Ensure content exists
-        ]
+            # Filter proposals that should start or end at this burn height
+            vote_proposals = [
+                p
+                for p in proposals
+                if p.vote_start is not None
+                and p.vote_end is not None
+                and p.vote_start == burn_height
+                and p.content is not None  # Ensure content exists
+            ]
 
-        end_proposals = [
-            p
-            for p in proposals
-            if p.vote_start is not None
-            and p.exec_start is not None
-            and p.exec_start == burn_height
-            and p.content is not None  # Ensure content exists
-        ]
+            end_proposals = [
+                p
+                for p in proposals
+                if p.vote_start is not None
+                and p.exec_start is not None
+                and p.exec_start == burn_height
+                and p.content is not None  # Ensure content exists
+            ]
 
-        # Add veto window proposals
-        veto_start_proposals = [
-            p
-            for p in proposals
-            if p.vote_end is not None
-            and p.vote_end == burn_height
-            and p.content is not None
-        ]
+            # Add veto window proposals
+            veto_start_proposals = [
+                p
+                for p in proposals
+                if p.vote_end is not None
+                and p.vote_end == burn_height
+                and p.content is not None
+            ]
 
-        veto_end_proposals = [
-            p
-            for p in proposals
-            if p.exec_start is not None
-            and p.exec_start == burn_height
-            and p.content is not None
-        ]
+            veto_end_proposals = [
+                p
+                for p in proposals
+                if p.exec_start is not None
+                and p.exec_start == burn_height
+                and p.content is not None
+            ]
 
-        if not (
-            vote_proposals
-            or end_proposals
-            or veto_start_proposals
-            or veto_end_proposals
-        ):
+            if not (
+                vote_proposals
+                or end_proposals
+                or veto_start_proposals
+                or veto_end_proposals
+            ):
+                self.logger.debug(
+                    f"No eligible proposals found for burn height {burn_height}"
+                )
+                return
+
             self.logger.info(
-                f"No eligible proposals found for burn height {burn_height}"
+                f"Found {len(vote_proposals)} proposals to vote, "
+                f"{len(end_proposals)} proposals to conclude, "
+                f"{len(veto_start_proposals)} proposals entering veto window, "
+                f"{len(veto_end_proposals)} proposals ending veto window"
             )
-            return
 
-        self.logger.info(
-            f"Found {len(vote_proposals)} proposals to vote, "
-            f"{len(end_proposals)} proposals to conclude, "
-            f"{len(veto_start_proposals)} proposals entering veto window, "
-            f"{len(veto_end_proposals)} proposals ending veto window"
-        )
+            # Process veto window start notifications
+            self._process_veto_window_start_notifications(veto_start_proposals)
 
-        # Process veto window start notifications
+            # Process veto window end notifications
+            self._process_veto_window_end_notifications(veto_end_proposals)
+
+            # Process proposals that are ending
+            self._process_ending_proposals(end_proposals)
+
+            # Process proposals that are ready for voting
+            self._process_voting_proposals(vote_proposals)
+
+        except Exception as e:
+            self.logger.error(
+                f"Error processing transaction in DAOProposalBurnHeightHandler: {str(e)}",
+                exc_info=True,
+            )
+            # Remove the burn height from processed set on error to allow retry
+            if "burn_height_key" in locals():
+                self._processed_burn_heights.discard(burn_height_key)
+
+    def _process_veto_window_start_notifications(self, veto_start_proposals):
+        """Process veto window start notifications."""
         for proposal in veto_start_proposals:
             dao = backend.get_dao(proposal.dao_id)
             if not dao:
                 self.logger.warning(f"No DAO found for proposal {proposal.id}")
                 continue
 
-            # Check if a veto notification message already exists
-            if self._queue_message_exists(
-                QueueMessageType.get_or_create("discord"), proposal.id, dao.id
-            ):
+            # Check if a veto window start Discord message already exists
+            if self._discord_message_exists(proposal.id, dao.id, "veto_window_open"):
                 self.logger.debug(
-                    f"Veto notification Discord message already exists for proposal {proposal.id}, skipping"
+                    f"Veto window start Discord message already exists for proposal {proposal.id}, skipping"
                 )
                 continue
+
+            # Create unique identifier for this message
+            unique_identifier = f"proposal-{proposal.id}-veto_window_open"
 
             # Create veto window start Discord message
             message = (
@@ -251,7 +327,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"**Veto Window Details:**\n"
                 f"• Opens at: Block {proposal.vote_end}\n"
                 f"• Closes at: Block {proposal.exec_start}\n\n"
-                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}"
+                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}\n\n"
+                f"<!-- {unique_identifier} -->"
             )
 
             backend.create_queue_message(
@@ -265,21 +342,23 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"Created veto window start Discord message for proposal {proposal.id}"
             )
 
-        # Process veto window end notifications
+    def _process_veto_window_end_notifications(self, veto_end_proposals):
+        """Process veto window end notifications."""
         for proposal in veto_end_proposals:
             dao = backend.get_dao(proposal.dao_id)
             if not dao:
                 self.logger.warning(f"No DAO found for proposal {proposal.id}")
                 continue
 
-            # Check if a veto end notification message already exists
-            if self._queue_message_exists(
-                QueueMessageType.get_or_create("discord"), proposal.id, dao.id
-            ):
+            # Check if a veto window end Discord message already exists
+            if self._discord_message_exists(proposal.id, dao.id, "veto_window_closed"):
                 self.logger.debug(
-                    f"Veto end notification Discord message already exists for proposal {proposal.id}, skipping"
+                    f"Veto window end Discord message already exists for proposal {proposal.id}, skipping"
                 )
                 continue
+
+            # Create unique identifier for this message
+            unique_identifier = f"proposal-{proposal.id}-veto_window_closed"
 
             # Create veto window end Discord message
             message = (
@@ -288,7 +367,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"**Status:**\n"
                 f"• Veto window has now closed\n"
                 f"• Proposal will be executed if it passed voting\n\n"
-                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}"
+                f"View proposal details: {config.api.base_url}/proposals/{proposal.id}\n\n"
+                f"<!-- {unique_identifier} -->"
             )
 
             backend.create_queue_message(
@@ -305,7 +385,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"Created veto window end Discord message for proposal {proposal.id}"
             )
 
-        # Process proposals that are ending
+    def _process_ending_proposals(self, end_proposals):
+        """Process proposals that are ending."""
         for proposal in end_proposals:
             dao = backend.get_dao(proposal.dao_id)
             if not dao:
@@ -341,7 +422,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 f"Created conclude queue message for proposal {proposal.id}"
             )
 
-        # Process proposals that are ready for voting
+    def _process_voting_proposals(self, vote_proposals):
+        """Process proposals that are ready for voting."""
         for proposal in vote_proposals:
             # Get the DAO for this proposal
             dao = backend.get_dao(proposal.dao_id)
