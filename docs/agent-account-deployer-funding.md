@@ -16,7 +16,7 @@ The funding behavior is controlled by these constants in the `AgentAccountDeploy
 
 ```python
 DEFAULT_AGENT_FUNDING_AMOUNT = 1    # STX to send to newly deployed agent accounts
-DEFAULT_AGENT_FUNDING_FEE = 200     # microSTX transaction fee
+DEFAULT_AGENT_FUNDING_FEE = 400     # microSTX transaction fee
 ```
 
 ## Funding Process
@@ -31,7 +31,7 @@ Automatic funding is triggered after:
 
 Each funded agent account receives:
 - **Amount**: 1 STX (configurable via `DEFAULT_AGENT_FUNDING_AMOUNT`)
-- **Fee**: 200 microSTX (configurable via `DEFAULT_AGENT_FUNDING_FEE`) 
+- **Fee**: 200 microSTX (configurable via `DEFAULT_AGENT_FUNDING_FEE`)
 - **Recipient**: The deployed contract principal (e.g., `SP1ABC...DEF.aibtc-acct-12345`)
 - **Memo**: Descriptive text: `"Initial funding for deployed agent account: {contract_principal}"`
 
@@ -61,7 +61,7 @@ QueueMessageCreate(
     message={
         "recipient": "SP1ABC...DEF.aibtc-acct-12345",  # Agent contract address
         "amount": 1,                                    # STX amount
-        "fee": 200,                                    # microSTX fee
+        "fee": 400,                                    # microSTX fee
         "memo": "Initial funding for deployed agent account: SP1ABC...DEF.aibtc-acct-12345"
     }
 )
@@ -191,7 +191,7 @@ if contract_balance < minimum_required_balance:
 Monitor funding operations through:
 
 - **Deployment Results**: Check `funding_messages_created` in task results
-- **STX Transfer Task**: Monitor funding transfer success rates  
+- **STX Transfer Task**: Monitor funding transfer success rates
 - **Wallet Balances**: Track treasury wallet balance for funding capacity
 - **Failed Funding**: Alert on persistent funding failures
 
@@ -200,4 +200,4 @@ Monitor funding operations through:
 - **Wallet Security**: Ensure funding wallet private keys are secure
 - **Amount Limits**: Configure reasonable funding amounts to prevent abuse
 - **Rate Limiting**: Monitor funding frequency to detect anomalies
-- **Access Control**: Restrict who can modify funding configuration 
+- **Access Control**: Restrict who can modify funding configuration

@@ -134,7 +134,7 @@ class WalletSendSTXInput(BaseModel):
         ..., description="Amount of STX to send not in microSTX. Default is 1."
     )
     fee: Optional[int] = Field(
-        200, description="Transaction fee in microSTX. Default is 200."
+        400, description="Transaction fee in microSTX. Default is 400."
     )
     memo: Optional[str] = Field(
         "", description="Optional memo to include with the transaction."
@@ -145,7 +145,7 @@ class WalletSendSTX(BaseTool):
     name: str = "wallet_send_stx"
     description: str = (
         "Send STX tokens from your wallet to a recipient address. Specify amount in STX "
-        "(not microSTX), optional fee in microSTX (default 200), and optional memo."
+        "(not microSTX), optional fee in microSTX (default 400), and optional memo."
     )
     args_schema: Type[BaseModel] = WalletSendSTXInput
     return_direct: bool = False
@@ -159,7 +159,7 @@ class WalletSendSTX(BaseTool):
         self,
         recipient: str,
         amount: int,
-        fee: Optional[int] = 200,
+        fee: Optional[int] = 400,
         memo: Optional[str] = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
@@ -184,7 +184,7 @@ class WalletSendSTX(BaseTool):
         self,
         recipient: str,
         amount: int,
-        fee: Optional[int] = 200,
+        fee: Optional[int] = 400,
         memo: Optional[str] = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:
@@ -195,7 +195,7 @@ class WalletSendSTX(BaseTool):
         self,
         recipient: str,
         amount: int,
-        fee: Optional[int] = 200,
+        fee: Optional[int] = 400,
         memo: Optional[str] = "",
         **kwargs,
     ) -> Dict[str, Union[str, bool, None]]:

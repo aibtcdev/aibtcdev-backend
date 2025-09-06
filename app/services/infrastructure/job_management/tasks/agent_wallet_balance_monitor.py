@@ -238,7 +238,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 message={
                     "recipient": wallet_address,
                     "amount": self.funding_amount,
-                    "fee": 200,  # Standard fee
+                    "fee": 400,  # Standard fee
                     "memo": f"Auto-fund: {current_balance}",
                     "reason": reason,
                 },
