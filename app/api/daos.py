@@ -56,13 +56,19 @@ def _agent_voted_in_last_proposals(
                 VoteFilter(agent_id=agent_id, proposal_id=proposal.id)
             )
             if votes:
-                logger.debug(f"Agent {agent_id} voted in proposal {proposal.id}")
+                logger.debug(
+                    "Agent voted in proposal",
+                    extra={"agent_id": agent_id, "proposal_id": str(proposal.id)},
+                )
                 return True
 
         return False
 
     except Exception as e:
-        logger.warning(f"Error checking voting history for agent {agent_id}: {str(e)}")
+        logger.warning(
+            "Error checking voting history",
+            extra={"agent_id": agent_id, "error": str(e)},
+        )
         return False
 
 
@@ -106,14 +112,20 @@ def _agent_submitted_proposal(agent_id: str, dao_id: str) -> bool:
         result = len(proposals) > 0
         if result:
             logger.debug(
-                f"Agent {agent_id} (address: {agent_address}) has submitted {len(proposals)} proposals"
+                "Agent has submitted proposals",
+                extra={
+                    "agent_id": agent_id,
+                    "agent_address": agent_address,
+                    "proposal_count": len(proposals),
+                },
             )
 
         return result
 
     except Exception as e:
         logger.warning(
-            f"Error checking proposal submission history for agent {agent_id}: {str(e)}"
+            "Error checking proposal submission history",
+            extra={"agent_id": agent_id, "error": str(e)},
         )
         return False
 
@@ -167,12 +179,15 @@ async def get_dao_token_holders(
         if has_submitted_proposal is not None:
             filters_applied.append(f"has_submitted_proposal={has_submitted_proposal}")
 
-        filter_str = (
-            f" with filters: {', '.join(filters_applied)}" if filters_applied else ""
-        )
+        # Build filter info for logging
 
-        logger.info(
-            f"DAO token holders request received from {request.client.host if request.client else 'unknown'} for token: {token_contract_principal}{filter_str}"
+        logger.debug(
+            "DAO token holders request",
+            extra={
+                "token_contract": token_contract_principal,
+                "filters": filters_applied,
+                "event_type": "dao_holders",
+            },
         )
 
         # Step 1: Find the token by contract principal
@@ -182,7 +197,7 @@ async def get_dao_token_holders(
 
         if not tokens:
             logger.warning(
-                f"No token found with contract principal: {token_contract_principal}"
+                "Token not found", extra={"token_contract": token_contract_principal}
             )
             raise HTTPException(
                 status_code=404,
@@ -191,18 +206,26 @@ async def get_dao_token_holders(
 
         token = tokens[0]  # Take the first matching token
         logger.debug(
-            f"Found token {token.id} for contract principal: {token_contract_principal}"
+            "Token found",
+            extra={
+                "token_id": str(token.id),
+                "token_contract": token_contract_principal,
+            },
         )
 
         # Step 2: Find all holders of this token
         holders = backend.list_holders(HolderFilter(token_id=token.id))
 
         if not holders:
-            logger.info(f"No holders found for token: {token_contract_principal}")
+            logger.info(
+                "No token holders found",
+                extra={"token_contract": token_contract_principal},
+            )
             return JSONResponse(content={"holders": []})
 
         logger.debug(
-            f"Found {len(holders)} holders for token: {token_contract_principal}"
+            "Token holders found",
+            extra={"count": len(holders), "token_contract": token_contract_principal},
         )
 
         # Step 3: Get agent account contracts for holders that have agents
@@ -212,20 +235,29 @@ async def get_dao_token_holders(
             try:
                 # Skip holders without agent_id
                 if not holder.agent_id:
-                    logger.debug(f"Holder {holder.id} has no agent_id, skipping")
+                    logger.debug(
+                        "Holder has no agent", extra={"holder_id": str(holder.id)}
+                    )
                     continue
 
                 # Get the agent
                 agent = backend.get_agent(holder.agent_id)
                 if not agent:
                     logger.warning(
-                        f"Agent {holder.agent_id} not found for holder {holder.id}"
+                        "Agent not found for holder",
+                        extra={
+                            "agent_id": str(holder.agent_id),
+                            "holder_id": str(holder.id),
+                        },
                     )
                     continue
 
                 # Skip agents without account contracts
                 if not agent.account_contract:
-                    logger.debug(f"Agent {agent.id} has no account_contract")
+                    logger.debug(
+                        "Agent missing account contract",
+                        extra={"agent_id": str(agent.id)},
+                    )
                     continue
 
                 # Apply filters if specified
@@ -234,7 +266,11 @@ async def get_dao_token_holders(
                         str(agent.id), str(token.dao_id), voted_in_last_proposals
                     ):
                         logger.debug(
-                            f"Agent {agent.id} did not vote in last {voted_in_last_proposals} proposals, skipping"
+                            "Agent filtered by voting history",
+                            extra={
+                                "agent_id": str(agent.id),
+                                "proposals_checked": voted_in_last_proposals,
+                            },
                         )
                         continue
 
@@ -244,21 +280,29 @@ async def get_dao_token_holders(
                     )
                     if has_submitted_proposal and not agent_has_submitted:
                         logger.debug(
-                            f"Agent {agent.id} has not submitted proposals, skipping"
+                            "Agent filtered - no proposals submitted",
+                            extra={"agent_id": str(agent.id)},
                         )
                         continue
                     elif not has_submitted_proposal and agent_has_submitted:
                         logger.debug(
-                            f"Agent {agent.id} has submitted proposals but filter excludes them, skipping"
+                            "Agent filtered - has submitted proposals",
+                            extra={"agent_id": str(agent.id)},
                         )
                         continue
 
                 # Add account contract if it passes all filters
                 account_contracts.append(agent.account_contract)
-                logger.debug(f"Added account contract: {agent.account_contract}")
+                logger.debug(
+                    "Account contract added",
+                    extra={"account_contract": agent.account_contract},
+                )
 
             except Exception as e:
-                logger.warning(f"Error processing holder {holder.id}: {str(e)}")
+                logger.warning(
+                    "Error processing holder",
+                    extra={"holder_id": str(holder.id), "error": str(e)},
+                )
                 # Continue processing other holders even if one fails
                 continue
 
@@ -266,7 +310,12 @@ async def get_dao_token_holders(
         unique_contracts = sorted(list(set(account_contracts)))
 
         logger.info(
-            f"Successfully found {len(unique_contracts)} unique agent account contracts for token: {token_contract_principal}{filter_str}"
+            "DAO token holders retrieved",
+            extra={
+                "token_contract": token_contract_principal,
+                "unique_contracts": len(unique_contracts),
+                "filters": filters_applied,
+            },
         )
 
         return JSONResponse(content={"holders": unique_contracts})
@@ -275,7 +324,8 @@ async def get_dao_token_holders(
         raise he
     except Exception as e:
         logger.error(
-            f"Failed to retrieve DAO token holders for token {token_contract_principal}: {str(e)}",
+            "DAO token holders retrieval failed",
+            extra={"token_contract": token_contract_principal, "error": str(e)},
             exc_info=e,
         )
         raise HTTPException(

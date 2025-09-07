@@ -32,24 +32,31 @@ async def get_profile_from_api_key(api_key: str) -> Optional[Profile]:
         # List all enabled keys that match this key ID
         keys = backend.list_keys(KeyFilter(id=uuid.UUID(api_key), is_enabled=True))
         if not keys:
-            logger.error("No enabled API key found")
+            logger.debug("API key not found or disabled", extra={"key_id": api_key[:8]})
             return None
 
         key = keys[0]
         if not key.profile_id:
-            logger.error("API key has no associated profile")
+            logger.warning(
+                "API key missing profile association", extra={"key_id": api_key[:8]}
+            )
             return None
 
         # Get the associated profile
         profile = backend.get_profile(key.profile_id)
         if not profile:
-            logger.error("No profile found for API key")
+            logger.warning(
+                "Profile not found for API key",
+                extra={"key_id": api_key[:8], "profile_id": str(key.profile_id)},
+            )
             return None
 
         return profile
 
     except Exception as e:
-        logger.error(f"Error verifying API key: {str(e)}", exc_info=True)
+        logger.error(
+            "API key verification failed", extra={"error": str(e)}, exc_info=True
+        )
         return None
 
 
@@ -78,16 +85,16 @@ async def verify_profile(
         profile = await get_profile_from_api_key(x_api_key)
         if profile:
             return profile
-        logger.error("Invalid API key")
+        logger.debug("Invalid API key provided")
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     # Fall back to Bearer token authentication
     if not authorization:
-        logger.error("Authorization header is missing")
+        logger.debug("Authorization header missing")
         raise HTTPException(status_code=401, detail="Missing authorization header")
 
     if not authorization.startswith("Bearer "):
-        logger.error("Invalid authorization header format")
+        logger.debug("Invalid authorization header format")
         raise HTTPException(
             status_code=401, detail="Invalid authorization format. Use 'Bearer <token>'"
         )
@@ -96,12 +103,15 @@ async def verify_profile(
         token = authorization.split(" ")[1]
         identifier = backend.verify_session_token(token)
         if not identifier:
-            logger.error("Invalid bearer token")
+            logger.debug("Invalid bearer token")
             raise HTTPException(status_code=401, detail="Invalid bearer token")
 
         profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
-            logger.error("Profile not found in database")
+            logger.warning(
+                "Profile not found for authenticated user",
+                extra={"identifier": identifier},
+            )
             raise HTTPException(status_code=404, detail="Profile not found")
 
         return profile_response[0]
@@ -109,7 +119,9 @@ async def verify_profile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
+        logger.error(
+            "Profile verification failed", extra={"error": str(e)}, exc_info=True
+        )
         raise HTTPException(status_code=401, detail="Authorization failed")
 
 
@@ -135,23 +147,26 @@ async def verify_profile_from_token(
         profile = await get_profile_from_api_key(key)
         if profile:
             return profile
-        logger.error("Invalid API key")
+        logger.debug("Invalid API key in query parameter")
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     # Fall back to Bearer token authentication
     if not token:
-        logger.error("Token parameter is missing")
+        logger.debug("Token parameter missing")
         raise HTTPException(status_code=401, detail="Missing token parameter")
 
     try:
         identifier = backend.verify_session_token(token)
         if not identifier:
-            logger.error("Invalid or expired token")
+            logger.debug("Invalid or expired token")
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
         profile_response = backend.list_profiles(ProfileFilter(email=identifier))
         if not profile_response:
-            logger.error(f"No profile found for email: {identifier}")
+            logger.warning(
+                "No profile found for authenticated email",
+                extra={"identifier": identifier},
+            )
             raise HTTPException(
                 status_code=404,
                 detail="No profile found for the authenticated email. Please ensure your profile is properly set up.",
@@ -162,7 +177,11 @@ async def verify_profile_from_token(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Profile verification failed: {str(e)}", exc_info=True)
+        logger.error(
+            "Profile verification from token failed",
+            extra={"error": str(e)},
+            exc_info=True,
+        )
         raise HTTPException(status_code=401, detail="Authorization failed")
 
 
@@ -177,11 +196,11 @@ async def verify_webhook_auth(authorization: Optional[str] = Header(None)) -> No
         HTTPException: If authentication fails
     """
     if not authorization:
-        logger.error("Missing Authorization header for webhook")
+        logger.warning("Webhook missing authorization header")
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     if not authorization.startswith("Bearer "):
-        logger.error("Invalid Authorization header format for webhook")
+        logger.warning("Webhook invalid authorization format")
         raise HTTPException(
             status_code=401, detail="Invalid Authorization format. Use 'Bearer <token>'"
         )
@@ -194,7 +213,7 @@ async def verify_webhook_auth(authorization: Optional[str] = Header(None)) -> No
     )
 
     if token != expected_token:
-        logger.error("Invalid webhook authentication token")
+        logger.warning("Invalid webhook authentication token")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 
@@ -211,9 +230,9 @@ async def verify_faktory_access_token(
         HTTPException: If authentication fails
     """
     if not x_api_key:
-        logger.error("Missing X-API-Key header for agent lookup")
+        logger.debug("Agent lookup missing X-API-Key header")
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
     if x_api_key != config.api.faktory_access_token:
-        logger.error("Invalid agent lookup API key")
+        logger.warning("Invalid agent lookup API key")
         raise HTTPException(status_code=401, detail="Invalid API key")

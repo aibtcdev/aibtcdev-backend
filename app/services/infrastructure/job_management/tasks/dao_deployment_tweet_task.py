@@ -57,7 +57,8 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating DAO deployment tweet task config: {str(e)}",
+                "Error validating DAO deployment tweet task config",
+                extra={"task": "dao_deployment_tweet", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -67,7 +68,10 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
         try:
             return True
         except Exception as e:
-            logger.error(f"Backend not available for DAO deployment tweets: {str(e)}")
+            logger.error(
+                "Backend not available for DAO deployment tweets",
+                extra={"task": "dao_deployment_tweet", "error": str(e)},
+            )
             return False
 
     async def _validate_prerequisites(self, context: JobContext) -> bool:
@@ -83,7 +87,8 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating DAO deployment tweet prerequisites: {str(e)}",
+                "Error validating DAO deployment tweet prerequisites",
+                extra={"task": "dao_deployment_tweet", "error": str(e)},
                 exc_info=True,
             )
             self._pending_messages = None
@@ -93,7 +98,10 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
         """Validate DAO deployment tweet task-specific conditions."""
         try:
             if not self._pending_messages:
-                logger.debug("No pending DAO deployment tweet messages found")
+                logger.debug(
+                    "No pending DAO deployment tweet messages found",
+                    extra={"task": "dao_deployment_tweet"},
+                )
                 return False
 
             # Validate each message has valid deployed DAO data
@@ -106,16 +114,24 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
 
             if valid_messages:
                 logger.debug(
-                    f"Found {len(valid_messages)} valid DAO deployment tweet messages"
+                    "Found valid DAO deployment tweet messages",
+                    extra={
+                        "task": "dao_deployment_tweet",
+                        "valid_message_count": len(valid_messages),
+                    },
                 )
                 return True
 
-            logger.debug("No valid DAO deployment tweet messages to process")
+            logger.debug(
+                "No valid DAO deployment tweet messages to process",
+                extra={"task": "dao_deployment_tweet"},
+            )
             return False
 
         except Exception as e:
             logger.error(
-                f"Error in DAO deployment tweet task validation: {str(e)}",
+                "Error in DAO deployment tweet task validation",
+                extra={"task": "dao_deployment_tweet", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -181,7 +197,12 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
 
         except Exception as e:
             logger.error(
-                f"Error validating DAO deployment message {message.id}: {str(e)}",
+                "Error validating DAO deployment message",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "message_id": message.id,
+                    "error": str(e),
+                },
                 exc_info=True,
             )
             return DAODeploymentTweetResult(
@@ -206,10 +227,22 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             token = backend.list_tokens(filters=TokenFilter(dao_id=message.dao_id))[0]
 
             logger.info(
-                f"Generating congratulatory tweet for deployed DAO: {dao.name} ({dao.id})"
+                "Generating congratulatory tweet for deployed DAO",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "dao_name": dao.name,
+                    "dao_id": dao.id,
+                },
             )
             logger.debug(
-                f"Deployed DAO details - Symbol: {token.symbol}, Mission: {dao.mission[:100]}..."
+                "Deployed DAO details",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "symbol": token.symbol,
+                    "mission_preview": dao.mission[:100] + "..."
+                    if len(dao.mission) > 100
+                    else dao.mission,
+                },
             )
 
             # Generate congratulatory tweet for the deployment
@@ -243,13 +276,27 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             )
 
             logger.info(
-                f"Created congratulatory tweet message for deployed DAO: {dao.name}"
+                "Created congratulatory tweet message for deployed DAO",
+                extra={"task": "dao_deployment_tweet", "dao_name": dao.name},
             )
             logger.debug(
-                f"Congratulatory tweet message ID: {congratulatory_tweet_message.id}"
+                "Congratulatory tweet message ID",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "tweet_message_id": congratulatory_tweet_message.id,
+                },
             )
             logger.debug(
-                f"Generated congratulatory tweet content: {generated_congratulatory_tweet['tweet_text'][:100]}..."
+                "Generated congratulatory tweet content",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "content_preview": generated_congratulatory_tweet["tweet_text"][
+                        :100
+                    ]
+                    + "..."
+                    if len(generated_congratulatory_tweet["tweet_text"]) > 100
+                    else generated_congratulatory_tweet["tweet_text"],
+                },
             )
 
             return DAODeploymentTweetResult(
@@ -263,7 +310,12 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
 
         except Exception as e:
             logger.error(
-                f"Error processing DAO deployment message {message.id}: {str(e)}",
+                "Error processing DAO deployment message",
+                extra={
+                    "task": "dao_deployment_tweet",
+                    "message_id": message.id,
+                    "error": str(e),
+                },
                 exc_info=True,
             )
             return DAODeploymentTweetResult(
@@ -297,13 +349,15 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
         """Handle DAO deployment tweet execution errors with recovery logic."""
         if "ai" in str(error).lower() or "openai" in str(error).lower():
             logger.warning(
-                f"AI service error during congratulatory tweet generation: {str(error)}, will retry"
+                "AI service error during congratulatory tweet generation, will retry",
+                extra={"task": "dao_deployment_tweet", "error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
-                f"Network error during DAO deployment tweet: {str(error)}, will retry"
+                "Network error during DAO deployment tweet, will retry",
+                extra={"task": "dao_deployment_tweet", "error": str(error)},
             )
             return None
 
@@ -322,7 +376,10 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
         """Cleanup after DAO deployment tweet task execution."""
         # Clear cached pending messages
         self._pending_messages = None
-        logger.debug("DAO deployment tweet task cleanup completed")
+        logger.debug(
+            "DAO deployment tweet task cleanup completed",
+            extra={"task": "dao_deployment_tweet"},
+        )
 
     async def _execute_impl(
         self, context: JobContext
@@ -331,7 +388,10 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
         results: List[DAODeploymentTweetResult] = []
 
         if not self._pending_messages:
-            logger.debug("No pending DAO deployment tweet messages to process")
+            logger.debug(
+                "No pending DAO deployment tweet messages to process",
+                extra={"task": "dao_deployment_tweet"},
+            )
             return results
 
         processed_count = 0
@@ -343,7 +403,10 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
             batch = self._pending_messages[i : i + batch_size]
 
             for message in batch:
-                logger.debug(f"Processing DAO deployment tweet message: {message.id}")
+                logger.debug(
+                    "Processing DAO deployment tweet message",
+                    extra={"task": "dao_deployment_tweet", "message_id": message.id},
+                )
                 result = await self._process_dao_deployment_message(message)
                 results.append(result)
                 processed_count += 1
@@ -355,12 +418,21 @@ class DAODeploymentTweetTask(BaseTask[DAODeploymentTweetResult]):
                         update_data=QueueMessageBase(is_processed=True),
                     )
                     logger.debug(
-                        f"Marked DAO deployment tweet message {message.id} as processed"
+                        "Marked DAO deployment tweet message as processed",
+                        extra={
+                            "task": "dao_deployment_tweet",
+                            "message_id": message.id,
+                        },
                     )
 
         logger.info(
-            f"DAO deployment tweet task completed - Processed: {processed_count}, "
-            f"Successful: {success_count}, Failed: {processed_count - success_count}"
+            "DAO deployment tweet task completed",
+            extra={
+                "task": "dao_deployment_tweet",
+                "processed_count": processed_count,
+                "successful_count": success_count,
+                "failed_count": processed_count - success_count,
+            },
         )
 
         return results

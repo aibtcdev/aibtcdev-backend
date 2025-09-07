@@ -40,14 +40,22 @@ async def execute_faktory_buy(
                        agent for the profile is not found.
     """
     try:
-        logger.info(
-            f"Faktory execute buy request received from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
+        logger.debug(
+            "Faktory buy request",
+            extra={
+                "profile_id": str(profile.id),
+                "btc_amount": payload.btc_amount,
+                "token_contract": payload.dao_token_dex_contract_address,
+                "event_type": "faktory_buy",
+            },
         )
 
         # Get agent_id from profile_id
         agents = backend.list_agents(AgentFilter(profile_id=profile.id))
         if not agents:
-            logger.error(f"No agent found for profile ID: {profile.id}")
+            logger.warning(
+                "Agent not found for profile", extra={"profile_id": str(profile.id)}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No agent found for profile ID: {profile.id}",
@@ -59,7 +67,9 @@ async def execute_faktory_buy(
         # get wallet id from agent
         wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
         if not wallets:
-            logger.error(f"No wallet found for agent ID: {agent_id}")
+            logger.warning(
+                "Wallet not found for agent", extra={"agent_id": str(agent_id)}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No wallet found for agent ID: {agent_id}",
@@ -67,8 +77,9 @@ async def execute_faktory_buy(
 
         wallet = wallets[0]  # Get the first wallet for this agent
 
-        logger.info(
-            f"Using agent {agent_id} for profile {profile.id} to execute Faktory buy."
+        logger.debug(
+            "Faktory buy initiated",
+            extra={"agent_id": str(agent_id), "wallet_id": str(wallet.id)},
         )
 
         tool = FaktoryExecuteBuyTool(wallet_id=wallet.id)  # Use fetched agent_id
@@ -78,8 +89,13 @@ async def execute_faktory_buy(
             slippage=payload.slippage,
         )
 
-        logger.debug(
-            f"Faktory execute buy result for agent {agent_id} (profile {profile.id}): {result}"
+        logger.info(
+            "Faktory buy completed",
+            extra={
+                "agent_id": str(agent_id),
+                "profile_id": str(profile.id),
+                "success": result.get("success", False),
+            },
         )
         return JSONResponse(content=result)
 
@@ -88,7 +104,9 @@ async def execute_faktory_buy(
         raise he
     except Exception as e:
         logger.error(
-            f"Failed to execute Faktory buy for profile {profile.id}", exc_info=e
+            "Faktory buy failed",
+            extra={"profile_id": str(profile.id), "error": str(e)},
+            exc_info=e,
         )
         raise HTTPException(
             status_code=500,

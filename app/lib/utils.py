@@ -2,13 +2,14 @@
 
 import binascii
 import json
-import logging
 import re
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from app.lib.logger import configure_logger
+
+logger = configure_logger(__name__)
 
 
 def split_text_into_chunks(text: str, limit: int = 280) -> List[str]:
@@ -269,29 +270,40 @@ def extract_image_urls(text: str) -> List[str]:
                         if content_type in image_mime_types:
                             image_urls.append(url)
                             logger.debug(
-                                f"Found image URL: {url} (Content-Type: {content_type})"
+                                "Image URL found",
+                                extra={"url": url, "content_type": content_type},
                             )
                         else:
                             logger.debug(
-                                f"Skipped non-image URL: {url} (Content-Type: {content_type})"
+                                "Non-image URL skipped",
+                                extra={"url": url, "content_type": content_type},
                             )
                     else:
                         logger.debug(
-                            f"Failed to access URL: {url} (Status: {response.status_code})"
+                            "URL access failed",
+                            extra={"url": url, "status_code": response.status_code},
                         )
 
                 except httpx.TimeoutException:
-                    logger.debug(f"Timeout checking URL: {url}")
+                    logger.debug("URL check timeout", extra={"url": url})
                 except httpx.RequestError as e:
-                    logger.debug(f"Request error checking URL {url}: {str(e)}")
+                    logger.debug(
+                        "URL request error", extra={"url": url, "error": str(e)}
+                    )
                 except Exception as e:
-                    logger.debug(f"Unexpected error checking URL {url}: {str(e)}")
+                    logger.debug(
+                        "Unexpected URL check error",
+                        extra={"url": url, "error": str(e)},
+                    )
 
     except Exception as e:
-        logger.error(f"Failed to initialize HTTP client: {str(e)}")
+        logger.error("HTTP client initialization failed", extra={"error": str(e)})
         return []
 
-    logger.info(f"Found {len(image_urls)} image URLs out of {len(urls)} total URLs")
+    logger.debug(
+        "Image URL extraction completed",
+        extra={"image_urls_found": len(image_urls), "total_urls_checked": len(urls)},
+    )
     return image_urls
 
 
@@ -332,10 +344,19 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
             decoded_bytes = decoded_bytes[5:]
 
         decoded_string = decoded_bytes.decode("utf-8", errors="ignore")
-        logger.debug(f"Successfully decoded hex string: {hex_string[:20]}...")
+        logger.debug(
+            "Hex string decoded successfully",
+            extra={"hex_preview": hex_string[:20] + "..."},
+        )
         return decoded_string
     except (binascii.Error, UnicodeDecodeError) as e:
-        logger.warning(f"Failed to decode hex string: {str(e)}")
+        logger.warning(
+            "Hex string decoding failed",
+            extra={
+                "error": str(e),
+                "hex_preview": hex_string[:20] + "..." if hex_string else "None",
+            },
+        )
         return None  # Return None if decoding fails
 
 
@@ -365,7 +386,7 @@ def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
     # Extract the output field which contains the actual ToolResponse
     output = tool_result.get("output")
     if not output:
-        logger.warning("No output field in tool result, returning as-is")
+        logger.debug("No output field in tool result, returning as-is")
         return tool_result
 
     try:
@@ -374,7 +395,7 @@ def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 parsed_output = json.loads(output)
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse output as JSON: {str(e)}")
+                logger.debug("Tool output JSON parse failed", extra={"error": str(e)})
                 # Return original tool_result if output can't be parsed
                 return tool_result
         else:
@@ -398,11 +419,11 @@ def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
             return result
         else:
             # Output doesn't have ToolResponse structure, return original
-            logger.warning("Output doesn't have expected ToolResponse structure")
+            logger.debug("Output missing ToolResponse structure")
             return tool_result
 
     except Exception as e:
-        logger.error(f"Error parsing agent tool result: {str(e)}")
+        logger.error("Agent tool result parsing failed", extra={"error": str(e)})
         # Return original tool_result if parsing fails
         return tool_result
 
@@ -441,7 +462,9 @@ def extract_transaction_id_from_tool_result(
             if raw_tx_id:
                 # Ensure tx_id always has 0x prefix
                 tx_id = raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
-                logger.debug(f"Extracted transaction ID from data field: {tx_id}")
+                logger.debug(
+                    "Transaction ID extracted from data field", extra={"tx_id": tx_id}
+                )
                 return tx_id
 
         # If not found in data field, try to extract from raw output using regex
@@ -456,15 +479,16 @@ def extract_transaction_id_from_tool_result(
                         raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
                     )
                     logger.debug(
-                        f"Extracted transaction ID using regex fallback: {tx_id}"
+                        "Transaction ID extracted using regex fallback",
+                        extra={"tx_id": tx_id},
                     )
                     return tx_id
 
-        logger.warning("No transaction ID found in tool result")
+        logger.debug("No transaction ID found in tool result")
         return None
 
     except Exception as e:
-        logger.error(f"Error extracting transaction ID from tool result: {str(e)}")
+        logger.error("Transaction ID extraction failed", extra={"error": str(e)})
         return None
 
 
@@ -529,7 +553,14 @@ def calculate_token_cost(
         input_tokens = int(token_usage.get("input_tokens", 0))
         output_tokens = int(token_usage.get("output_tokens", 0))
     except (TypeError, ValueError) as e:
-        logger.error(f"Error converting token counts to integers: {str(e)}")
+        logger.warning(
+            "Token count conversion failed",
+            extra={
+                "error": str(e),
+                "input_tokens": token_usage.get("input_tokens"),
+                "output_tokens": token_usage.get("output_tokens"),
+            },
+        )
         input_tokens = 0
         output_tokens = 0
 
@@ -554,9 +585,18 @@ def calculate_token_cost(
     if "output_token_details" in token_usage:
         token_details["output_token_details"] = token_usage["output_token_details"]
 
-    # Debug logging with more detail
+    # Debug logging with structured data
     logger.debug(
-        f"Cost calculation details: Model={model_name} | Input={input_tokens} tokens * ${model_prices['input']}/1M = ${input_cost:.6f} | Output={output_tokens} tokens * ${model_prices['output']}/1M = ${output_cost:.6f} | Total=${total_cost:.6f} | Token details={token_details}"
+        "Token cost calculated",
+        extra={
+            "model": model_name,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "input_cost": round(input_cost, 6),
+            "output_cost": round(output_cost, 6),
+            "total_cost": round(total_cost, 6),
+            "event_type": "token_cost_calculation",
+        },
     )
 
     return {

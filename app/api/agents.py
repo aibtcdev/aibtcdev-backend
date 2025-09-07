@@ -35,8 +35,9 @@ async def get_agent_account_contract(
         HTTPException: If the profile or agent is not found.
     """
     try:
-        logger.info(
-            f"Agent account contract lookup request received from {request.client.host if request.client else 'unknown'} for address: {stacks_address}"
+        logger.debug(
+            "Agent account contract lookup",
+            extra={"stacks_address": stacks_address, "event_type": "agent_lookup"},
         )
 
         # Look up profile by mainnet_address or testnet_address
@@ -46,7 +47,10 @@ async def get_agent_account_contract(
         profiles = backend.list_profiles(ProfileFilter(mainnet_address=stacks_address))
         if profiles:
             profile = profiles[0]
-            logger.info(f"Found profile {profile.id} by mainnet address")
+            logger.debug(
+                "Found profile by mainnet address",
+                extra={"profile_id": str(profile.id)},
+            )
         else:
             # Try testnet address
             profiles = backend.list_profiles(
@@ -54,10 +58,15 @@ async def get_agent_account_contract(
             )
             if profiles:
                 profile = profiles[0]
-                logger.info(f"Found profile {profile.id} by testnet address")
+                logger.debug(
+                    "Found profile by testnet address",
+                    extra={"profile_id": str(profile.id)},
+                )
 
         if not profile:
-            logger.error(f"No profile found for Stacks address: {stacks_address}")
+            logger.warning(
+                "Profile not found", extra={"stacks_address": stacks_address}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No profile found for Stacks address: {stacks_address}",
@@ -66,7 +75,7 @@ async def get_agent_account_contract(
         # Look up agent by profile_id
         agents = backend.list_agents(AgentFilter(profile_id=profile.id))
         if not agents:
-            logger.error(f"No agent found for profile ID: {profile.id}")
+            logger.warning("Agent not found", extra={"profile_id": str(profile.id)})
             raise HTTPException(
                 status_code=404,
                 detail=f"No agent found for profile ID: {profile.id}",
@@ -76,14 +85,20 @@ async def get_agent_account_contract(
         account_contract = agent.account_contract
 
         if not account_contract:
-            logger.error(f"No account contract found for agent ID: {agent.id}")
+            logger.warning(
+                "Account contract missing", extra={"agent_id": str(agent.id)}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No account contract found for agent ID: {agent.id}",
             )
 
         logger.info(
-            f"Successfully retrieved account contract for address {stacks_address}: {account_contract}"
+            "Agent account contract retrieved",
+            extra={
+                "stacks_address": stacks_address,
+                "account_contract": account_contract,
+            },
         )
 
         return JSONResponse(content={"account_contract": account_contract})
@@ -92,7 +107,8 @@ async def get_agent_account_contract(
         raise he
     except Exception as e:
         logger.error(
-            f"Failed to lookup agent account contract for address {stacks_address}",
+            "Agent account contract lookup failed",
+            extra={"stacks_address": stacks_address, "error": str(e)},
             exc_info=e,
         )
         raise HTTPException(

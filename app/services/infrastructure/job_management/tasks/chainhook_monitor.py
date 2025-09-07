@@ -67,7 +67,9 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating chainhook monitor config: {str(e)}", exc_info=True
+                "Error validating chainhook monitor config",
+                extra={"task": "chainhook_monitor", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -79,11 +81,18 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             # Try to list chainhooks to test connectivity
             chainhooks = platform_api.list_chainhooks()
             logger.debug(
-                f"Platform API test successful, found {len(chainhooks)} chainhooks"
+                "Platform API test successful",
+                extra={
+                    "task": "chainhook_monitor",
+                    "chainhooks_count": len(chainhooks),
+                },
             )
             return True
         except Exception as e:
-            logger.error(f"Resource validation failed: {str(e)}")
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "chainhook_monitor", "error": str(e)},
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -93,7 +102,9 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating chainhook monitor task: {str(e)}", exc_info=True
+                "Error validating chainhook monitor task",
+                extra={"task": "chainhook_monitor", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -118,11 +129,17 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
     ) -> Optional[List[ChainhookMonitorResult]]:
         """Handle execution errors with recovery logic."""
         if "api" in str(error).lower() or "platform" in str(error).lower():
-            logger.warning(f"Platform API error: {str(error)}, will retry")
+            logger.warning(
+                "Platform API error, will retry",
+                extra={"task": "chainhook_monitor", "error": str(error)},
+            )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
-            logger.warning(f"Network error: {str(error)}, will retry")
+            logger.warning(
+                "Network error, will retry",
+                extra={"task": "chainhook_monitor", "error": str(error)},
+            )
             return None
 
         # For configuration errors, don't retry
@@ -138,7 +155,7 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
         self, context: JobContext, results: List[ChainhookMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("Chainhook monitor task cleanup completed")
+        logger.debug("Task cleanup completed", extra={"task": "chainhook_monitor"})
 
     def _is_chainhook_healthy(self, chainhook_uuid: str) -> tuple[bool, bool]:
         """Check if a chainhook is in a healthy state by checking its status directly.
@@ -157,7 +174,13 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             # Check if chainhook is enabled
             if not status_response.get("enabled", False):
-                logger.warning(f"Chainhook {chainhook_uuid} is not enabled")
+                logger.warning(
+                    "Chainhook is not enabled",
+                    extra={
+                        "task": "chainhook_monitor",
+                        "chainhook_uuid": chainhook_uuid,
+                    },
+                )
                 return False, True  # Not healthy, should recreate
 
             # Check status type for any failure indicators
@@ -166,7 +189,12 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             if status_type in ["failed", "error", "disabled", "terminated", "expired"]:
                 logger.warning(
-                    f"Chainhook {chainhook_uuid} has status type: {status_type}"
+                    "Chainhook has failure status type",
+                    extra={
+                        "task": "chainhook_monitor",
+                        "chainhook_uuid": chainhook_uuid,
+                        "status_type": status_type,
+                    },
                 )
                 return False, True  # Not healthy, should recreate
 
@@ -179,7 +207,13 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
                 if expired_at and last_evaluated and last_evaluated >= expired_at:
                     logger.warning(
-                        f"Chainhook {chainhook_uuid} has expired (expired_at: {expired_at}, last_evaluated: {last_evaluated})"
+                        "Chainhook has expired",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chainhook_uuid": chainhook_uuid,
+                            "expired_at": expired_at,
+                            "last_evaluated": last_evaluated,
+                        },
                     )
                     return False, True  # Not healthy, should recreate
 
@@ -188,7 +222,12 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             # This is likely a temporary failure (network, API timeout, etc.)
             # Don't recreate the chainhook, just log the error and try again later
             logger.warning(
-                f"Temporary error checking chainhook {chainhook_uuid} health: {str(e)}"
+                "Temporary error checking chainhook health",
+                extra={
+                    "task": "chainhook_monitor",
+                    "chainhook_uuid": chainhook_uuid,
+                    "error": str(e),
+                },
             )
             return False, False  # Not healthy (unknown), but don't recreate
 
@@ -203,7 +242,12 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
         """
         try:
             logger.info(
-                f"Recreating chainhook for chain state {chain_state.id} on network {chain_state.network}"
+                "Recreating chainhook for chain state",
+                extra={
+                    "task": "chainhook_monitor",
+                    "chain_state_id": chain_state.id,
+                    "network": chain_state.network,
+                },
             )
 
             # Create a new block height chainhook starting from this chain state
@@ -217,7 +261,10 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             new_chainhook_uuid = response.get("chainhookUuid")
             if not new_chainhook_uuid:
-                logger.error("No UUID returned from chainhook creation")
+                logger.error(
+                    "No UUID returned from chainhook creation",
+                    extra={"task": "chainhook_monitor"},
+                )
                 return None
 
             # Update the chain state with the new chainhook UUID
@@ -227,13 +274,23 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             backend.update_chain_state(chain_state.id, update_data)
 
             logger.info(
-                f"Successfully created new chainhook {new_chainhook_uuid} for chain state {chain_state.id}"
+                "Successfully created new chainhook for chain state",
+                extra={
+                    "task": "chainhook_monitor",
+                    "chainhook_uuid": new_chainhook_uuid,
+                    "chain_state_id": chain_state.id,
+                },
             )
             return new_chainhook_uuid
 
         except Exception as e:
             logger.error(
-                f"Error recreating chainhook for chain state {chain_state.id}: {str(e)}"
+                "Error recreating chainhook",
+                extra={
+                    "task": "chainhook_monitor",
+                    "chain_state_id": chain_state.id,
+                    "error": str(e),
+                },
             )
             return None
 
@@ -265,24 +322,43 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             ]
 
             logger.info(
-                f"Found {len(chain_states_with_chainhooks)} chain states with chainhooks and {len(chain_states_without_chainhooks)} without chainhooks for network {network}"
+                "Found chain states for monitoring",
+                extra={
+                    "task": "chainhook_monitor",
+                    "network": network,
+                    "with_chainhooks": len(chain_states_with_chainhooks),
+                    "without_chainhooks": len(chain_states_without_chainhooks),
+                },
             )
 
             # First, create chainhooks for chain states that don't have them
             for chain_state in chain_states_without_chainhooks:
                 logger.info(
-                    f"Creating chainhook for chain state {chain_state.id} without chainhook_uuid"
+                    "Creating chainhook for chain state without chainhook_uuid",
+                    extra={
+                        "task": "chainhook_monitor",
+                        "chain_state_id": chain_state.id,
+                    },
                 )
                 new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
                 if new_uuid:
                     chainhooks_recreated += 1
                     recreated_chainhook_ids.append(new_uuid)
                     logger.info(
-                        f"Successfully created new chainhook {new_uuid} for chain state {chain_state.id}"
+                        "Successfully created new chainhook for chain state",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chainhook_uuid": new_uuid,
+                            "chain_state_id": chain_state.id,
+                        },
                     )
                 else:
                     logger.error(
-                        f"Failed to create chainhook for chain state {chain_state.id}"
+                        "Failed to create chainhook for chain state",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chain_state_id": chain_state.id,
+                        },
                     )
 
             # Continue with monitoring existing chainhooks
@@ -324,14 +400,23 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                 # but add an assertion for type safety
                 if chainhook_uuid is None:
                     logger.error(
-                        f"Chain state {chain_state.id} has None chainhook_uuid, skipping"
+                        "Chain state has None chainhook_uuid, skipping",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chain_state_id": chain_state.id,
+                        },
                     )
                     continue
 
                 chainhooks_checked += 1
 
                 logger.debug(
-                    f"Checking chainhook {chainhook_uuid} status for chain state {chain_state.id}"
+                    "Checking chainhook status for chain state",
+                    extra={
+                        "task": "chainhook_monitor",
+                        "chainhook_uuid": chainhook_uuid,
+                        "chain_state_id": chain_state.id,
+                    },
                 )
 
                 # Check if chainhook is healthy using direct status check
@@ -339,7 +424,12 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
                 if not is_healthy:
                     logger.warning(
-                        f"Chainhook {chainhook_uuid} is unhealthy (should_recreate={should_recreate})"
+                        "Chainhook is unhealthy",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chainhook_uuid": chainhook_uuid,
+                            "should_recreate": should_recreate,
+                        },
                     )
                     chainhooks_failed += 1
                     failed_chainhook_ids.append(chainhook_uuid)
@@ -347,34 +437,68 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
                     # Only recreate if it's a permanent failure, not a temporary one
                     if should_recreate:
                         logger.info(
-                            f"Recreating chainhook {chainhook_uuid} due to permanent failure"
+                            "Recreating chainhook due to permanent failure",
+                            extra={
+                                "task": "chainhook_monitor",
+                                "chainhook_uuid": chainhook_uuid,
+                            },
                         )
                         new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
                         if new_uuid:
                             chainhooks_recreated += 1
                             recreated_chainhook_ids.append(new_uuid)
                             logger.info(
-                                f"Successfully recreated chainhook {new_uuid} to replace failed {chainhook_uuid}"
+                                "Successfully recreated chainhook to replace failed one",
+                                extra={
+                                    "task": "chainhook_monitor",
+                                    "new_chainhook_uuid": new_uuid,
+                                    "old_chainhook_uuid": chainhook_uuid,
+                                },
                             )
 
                             # Delete the old chainhook if it exists
                             try:
                                 self.platform_api.delete_chainhook(chainhook_uuid)
-                                logger.info(f"Deleted old chainhook {chainhook_uuid}")
+                                logger.info(
+                                    "Deleted old chainhook",
+                                    extra={
+                                        "task": "chainhook_monitor",
+                                        "chainhook_uuid": chainhook_uuid,
+                                    },
+                                )
                             except Exception as e:
                                 logger.warning(
-                                    f"Failed to delete old chainhook {chainhook_uuid}: {str(e)}"
+                                    "Failed to delete old chainhook",
+                                    extra={
+                                        "task": "chainhook_monitor",
+                                        "chainhook_uuid": chainhook_uuid,
+                                        "error": str(e),
+                                    },
                                 )
                         else:
                             logger.error(
-                                f"Failed to recreate chainhook for chain state {chain_state.id}"
+                                "Failed to recreate chainhook for chain state",
+                                extra={
+                                    "task": "chainhook_monitor",
+                                    "chain_state_id": chain_state.id,
+                                },
                             )
                     else:
                         logger.info(
-                            f"Skipping recreation of chainhook {chainhook_uuid} - likely temporary failure"
+                            "Skipping recreation of chainhook - likely temporary failure",
+                            extra={
+                                "task": "chainhook_monitor",
+                                "chainhook_uuid": chainhook_uuid,
+                            },
                         )
                 else:
-                    logger.debug(f"Chainhook {chainhook_uuid} is healthy")
+                    logger.debug(
+                        "Chainhook is healthy",
+                        extra={
+                            "task": "chainhook_monitor",
+                            "chainhook_uuid": chainhook_uuid,
+                        },
+                    )
 
             # Create result summary
             message = (
@@ -408,7 +532,9 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
         except Exception as e:
             logger.error(
-                f"Error executing chainhook monitoring task: {str(e)}", exc_info=True
+                "Error executing chainhook monitoring task",
+                extra={"task": "chainhook_monitor", "error": str(e)},
+                exc_info=True,
             )
             return [
                 ChainhookMonitorResult(

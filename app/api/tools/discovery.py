@@ -37,9 +37,9 @@ async def get_tools(
         HTTPException: If there's an error serving the tools
     """
     try:
-        # Log the request
-        logger.info(
-            f"Tools request received from {request.client.host if request.client else 'unknown'}"
+        logger.debug(
+            "Tools discovery request",
+            extra={"category": category, "event_type": "tool_discovery"},
         )
 
         # Filter by category if provided
@@ -50,15 +50,15 @@ async def get_tools(
                 if tool.category.upper() == category.upper()
             ]
             logger.debug(
-                f"Filtered tools by category '{category}', found {len(filtered_tools)} tools"
+                "Tools filtered by category",
+                extra={"category": category, "count": len(filtered_tools)},
             )
             return JSONResponse(content=[tool.model_dump() for tool in filtered_tools])
 
-        # Return all tools
-        logger.debug(f"Returning all {len(available_tools)} available tools")
+        logger.debug("Returning all tools", extra={"count": len(available_tools)})
         return JSONResponse(content=[tool.model_dump() for tool in available_tools])
     except Exception as e:
-        logger.error("Failed to serve available tools", exc_info=e)
+        logger.error("Tool discovery failed", extra={"error": str(e)}, exc_info=e)
         raise HTTPException(
             status_code=500, detail=f"Failed to serve available tools: {str(e)}"
         )
@@ -77,10 +77,12 @@ async def get_tool_categories() -> JSONResponse:
     try:
         # Extract unique categories
         categories = sorted(list(set(tool.category for tool in available_tools)))
-        logger.debug(f"Returning {len(categories)} tool categories")
+        logger.debug("Tool categories retrieved", extra={"count": len(categories)})
         return JSONResponse(content=categories)
     except Exception as e:
-        logger.error("Failed to serve tool categories", exc_info=e)
+        logger.error(
+            "Tool categories retrieval failed", extra={"error": str(e)}, exc_info=e
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to serve tool categories: {str(e)}"
         )
@@ -109,7 +111,9 @@ async def search_tools(
     try:
         # Convert query to lowercase for case-insensitive matching
         query = query.lower()
-        logger.debug(f"Searching tools with query: '{query}', category: '{category}'")
+        logger.debug(
+            "Tool search request", extra={"query": query, "category": category}
+        )
 
         # Filter tools by query and category
         filtered_tools = []
@@ -126,8 +130,12 @@ async def search_tools(
 
                 filtered_tools.append(tool)
 
-        logger.debug(f"Found {len(filtered_tools)} tools matching search criteria")
+        logger.debug(
+            "Tool search results", extra={"query": query, "count": len(filtered_tools)}
+        )
         return JSONResponse(content=[tool.model_dump() for tool in filtered_tools])
     except Exception as e:
-        logger.error(f"Failed to search tools with query '{query}'", exc_info=e)
+        logger.error(
+            "Tool search failed", extra={"query": query, "error": str(e)}, exc_info=e
+        )
         raise HTTPException(status_code=500, detail=f"Failed to search tools: {str(e)}")

@@ -39,12 +39,16 @@ async def chainhook(
     service = ChainhookService()
 
     try:
-        logger.info("Processing chainhook webhook")
+        logger.debug(
+            "Chainhook webhook received", extra={"event_type": "chainhook_webhook"}
+        )
         await service.process(data)
-        logger.info("Chainhook processing completed successfully")
+        logger.info("Chainhook processing completed")
         return Response(status_code=204)
     except Exception as e:
-        logger.error(f"Chainhook processing failed: {str(e)}", exc_info=True)
+        logger.error(
+            "Chainhook processing failed", extra={"error": str(e)}, exc_info=True
+        )
         raise HTTPException(
             status_code=500, detail=f"Error processing chainhook webhook: {str(e)}"
         )
@@ -75,11 +79,17 @@ async def dao_creation(
     service = DAOService()
 
     try:
-        logger.info("Processing DAO creation webhook")
+        logger.debug(
+            "DAO creation webhook received",
+            extra={"event_type": "dao_creation_webhook"},
+        )
         result = await service.process(data)
+        logger.info("DAO creation processing completed")
         return WebhookResponse(**result)
     except Exception as e:
-        logger.error(f"Error processing DAO creation webhook: {str(e)}", exc_info=True)
+        logger.error(
+            "DAO creation processing failed", extra={"error": str(e)}, exc_info=True
+        )
         raise HTTPException(
             status_code=500, detail=f"Error processing DAO creation webhook: {str(e)}"
         )
