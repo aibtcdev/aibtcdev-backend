@@ -60,22 +60,25 @@ async def get_all_profile_addresses(
         HTTPException: If there's an error retrieving the data.
     """
     try:
-        dao_filter_msg = f" (filtered by DAO: {dao_name})" if dao_name else ""
-        logger.info(
-            f"Profile addresses request{dao_filter_msg} received from {request.client.host if request.client else 'unknown'}"
+        logger.debug(
+            "Profile addresses request",
+            extra={"dao_name": dao_name, "event_type": "profile_addresses"},
         )
 
         # Determine which address field to use based on network configuration
         use_mainnet = config.network.network == "mainnet"
         address_type = "mainnet" if use_mainnet else "testnet"
 
-        logger.debug(f"Using {address_type} addresses based on network configuration")
+        logger.debug(
+            "Network configuration determined",
+            extra={"address_type": address_type, "use_mainnet": use_mainnet},
+        )
 
         # Get all profiles
         profiles = backend.list_profiles(ProfileFilter())
 
         if not profiles:
-            logger.info("No profiles found in the database")
+            logger.info("No profiles found")
             return JSONResponse(content=[])
 
         # If DAO name filter is provided, find the DAO and filter profiles
@@ -83,21 +86,25 @@ async def get_all_profile_addresses(
         if dao_name:
             daos = backend.list_daos(DAOFilter(name=dao_name))
             if not daos:
-                logger.warning(f"No DAO found with name: {dao_name}")
+                logger.warning("DAO not found", extra={"dao_name": dao_name})
                 raise HTTPException(
                     status_code=404,
                     detail=f"DAO with name '{dao_name}' not found",
                 )
 
             dao = daos[0]
-            logger.debug(f"Found DAO: {dao.name} (ID: {dao.id})")
+            logger.debug(
+                "DAO found for filtering",
+                extra={"dao_name": dao.name, "dao_id": str(dao.id)},
+            )
 
             # Get all holders for this DAO
             holders = backend.list_holders(HolderFilter(dao_id=dao.id))
             holder_addresses = {holder.address for holder in holders if holder.address}
 
             logger.debug(
-                f"Found {len(holder_addresses)} unique holder addresses for DAO: {dao_name}"
+                "Holder addresses found for DAO",
+                extra={"count": len(holder_addresses), "dao_name": dao_name},
             )
 
             # Get agents whose account_contract matches a holder address
@@ -111,7 +118,8 @@ async def get_all_profile_addresses(
                 dao_agents = []
 
             logger.debug(
-                f"Found {len(dao_agents)} agents holding tokens for DAO: {dao_name}"
+                "DAO agents found",
+                extra={"count": len(dao_agents), "dao_name": dao_name},
             )
 
         result = []
@@ -158,13 +166,16 @@ async def get_all_profile_addresses(
                 result.append(profile_data)
 
             except Exception as e:
-                logger.warning(f"Error processing profile: {str(e)}")
+                logger.warning(
+                    "Error processing profile",
+                    extra={"profile_id": str(profile.id), "error": str(e)},
+                )
                 # Continue processing other profiles even if one fails
                 continue
 
-        dao_log_msg = f" for DAO '{dao_name}'" if dao_name else ""
         logger.info(
-            f"Successfully retrieved address data for {len(result)} profiles{dao_log_msg}"
+            "Profile addresses retrieved",
+            extra={"profile_count": len(result), "dao_name": dao_name},
         )
         return JSONResponse(content=[profile.model_dump() for profile in result])
 
@@ -172,7 +183,9 @@ async def get_all_profile_addresses(
         # Re-raise HTTP exceptions (like 404 for DAO not found)
         raise
     except Exception as e:
-        logger.error(f"Failed to retrieve profile addresses: {str(e)}", exc_info=e)
+        logger.error(
+            "Profile addresses retrieval failed", extra={"error": str(e)}, exc_info=e
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve profile addresses: {str(e)}",

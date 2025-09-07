@@ -80,7 +80,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating chain state monitor config: {str(e)}", exc_info=True
+                "Error validating chain state monitor config",
+                extra={"task": "chain_state_monitor", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -91,12 +93,17 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             hiro_api = HiroApi()
             api_info = await hiro_api.aget_info()
             if not api_info:
-                logger.error("Cannot connect to Hiro API")
+                logger.error(
+                    "Cannot connect to Hiro API", extra={"task": "chain_state_monitor"}
+                )
                 return False
 
             return True
         except Exception as e:
-            logger.error(f"Resource validation failed: {str(e)}")
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "chain_state_monitor", "error": str(e)},
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -107,7 +114,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating chain state monitor task: {str(e)}", exc_info=True
+                "Error validating chain state monitor task",
+                extra={"task": "chain_state_monitor", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -135,11 +144,21 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         try:
             block_data = self.hiro_api.get_block_by_height(block_height)
             logger.debug(
-                f"Retrieved block data for height {block_height}: {block_data}"
+                "Retrieved block data for height",
+                extra={
+                    "task": "chain_state_monitor",
+                    "block_height": block_height,
+                    "block_data": block_data,
+                },
             )
         except Exception as e:
             logger.warning(
-                f"Could not fetch detailed block data for height {block_height}: {e}"
+                "Could not fetch detailed block data for height",
+                extra={
+                    "task": "chain_state_monitor",
+                    "block_height": block_height,
+                    "error": str(e),
+                },
             )
             block_data = {}
 
@@ -170,7 +189,8 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         if not block_time:
             block_time = int(datetime.now().timestamp())
             logger.warning(
-                f"Using current timestamp for block {block_height} as block_time was not available"
+                "Using current timestamp for block as block_time was not available",
+                extra={"task": "chain_state_monitor", "block_height": block_height},
             )
 
         # Create comprehensive metadata with all available fields
@@ -607,11 +627,17 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
     ) -> Optional[List[ChainStateMonitorResult]]:
         """Handle execution errors with recovery logic."""
         if "blockchain" in str(error).lower() or "rpc" in str(error).lower():
-            logger.warning(f"Blockchain/RPC error: {str(error)}, will retry")
+            logger.warning(
+                "Blockchain/RPC error, will retry",
+                extra={"task": "chain_state_monitor", "error": str(error)},
+            )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
-            logger.warning(f"Network error: {str(error)}, will retry")
+            logger.warning(
+                "Network error, will retry",
+                extra={"task": "chain_state_monitor", "error": str(error)},
+            )
             return None
 
         # For configuration errors, don't retry
@@ -627,7 +653,10 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         self, context: JobContext, results: List[ChainStateMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("Chain state monitor task cleanup completed")
+        logger.debug(
+            "Chain state monitor task cleanup completed",
+            extra={"task": "chain_state_monitor"},
+        )
 
     async def _execute_impl(self, context: JobContext) -> List[ChainStateMonitorResult]:
         """Execute chain state monitoring task with blockchain synchronization."""
@@ -641,7 +670,10 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             latest_chain_state = backend.get_latest_chain_state(network)
 
             if not latest_chain_state:
-                logger.warning(f"No chain state found for network {network}")
+                logger.warning(
+                    "No chain state found for network",
+                    extra={"task": "chain_state_monitor", "network": network},
+                )
                 results.append(
                     ChainStateMonitorResult(
                         success=False,
@@ -665,7 +697,10 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
             # Get current chain height from API
             try:
-                logger.debug("Fetching current chain info from API")
+                logger.debug(
+                    "Fetching current chain info from API",
+                    extra={"task": "chain_state_monitor"},
+                )
                 api_info = self.hiro_api.get_info()
 
                 # Handle different response types
@@ -675,7 +710,13 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         chain_tip = api_info["chain_tip"]
                         current_api_block_height = chain_tip.get("block_height", 0)
                     else:
-                        logger.error(f"Missing chain_tip in API response: {api_info}")
+                        logger.error(
+                            "Missing chain_tip in API response",
+                            extra={
+                                "task": "chain_state_monitor",
+                                "api_response": api_info,
+                            },
+                        )
                         raise ValueError(
                             "Invalid API response format - missing chain_tip"
                         )
@@ -689,9 +730,21 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     else:
                         current_api_block_height = api_info.chain_tip.block_height
 
-                logger.info(f"Current API block height: {current_api_block_height}")
+                logger.info(
+                    "Current API block height",
+                    extra={
+                        "task": "chain_state_monitor",
+                        "api_block_height": current_api_block_height,
+                    },
+                )
                 db_block_height = latest_chain_state.block_height
-                logger.info(f"Current DB block height: {db_block_height}")
+                logger.info(
+                    "Current DB block height",
+                    extra={
+                        "task": "chain_state_monitor",
+                        "db_block_height": db_block_height,
+                    },
+                )
 
                 blocks_behind = current_api_block_height - db_block_height
 
@@ -700,15 +753,26 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
-                    f"Chain state is {blocks_behind} blocks behind the current chain tip. "
-                    f"DB height: {db_block_height}, API height: {current_api_block_height}"
+                    "Chain state is blocks behind the current chain tip",
+                    extra={
+                        "task": "chain_state_monitor",
+                        "blocks_behind": blocks_behind,
+                        "db_block_height": db_block_height,
+                        "api_block_height": current_api_block_height,
+                    },
                 )
 
                 # Process missing blocks if we're behind
                 if blocks_behind > 0 and is_stale:
                     logger.warning(
-                        f"Chain state is {blocks_behind} blocks behind, which exceeds the threshold of {stale_threshold_blocks}. "
-                        f"DB height: {db_block_height}, API height: {current_api_block_height}"
+                        "Chain state is behind and exceeds threshold",
+                        extra={
+                            "task": "chain_state_monitor",
+                            "blocks_behind": blocks_behind,
+                            "threshold": stale_threshold_blocks,
+                            "db_block_height": db_block_height,
+                            "api_block_height": current_api_block_height,
+                        },
                     )
 
                     blocks_processed = []
@@ -718,7 +782,11 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         db_block_height + 1, current_api_block_height + 1
                     ):
                         logger.info(
-                            f"Processing transactions for block height {height}"
+                            "Processing transactions for block height",
+                            extra={
+                                "task": "chain_state_monitor",
+                                "block_height": height,
+                            },
                         )
 
                         try:
@@ -729,7 +797,12 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                             # Log transaction count and details
                             logger.info(
-                                f"Block {height}: Found {transactions.total} transactions"
+                                "Found transactions for block",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "transaction_count": transactions.total,
+                                },
                             )
 
                             # Get block details and burn block height
@@ -772,12 +845,22 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                         )
                                 except Exception as e:
                                     logger.error(
-                                        f"Error fetching block {height}: {str(e)}"
+                                        "Error fetching block",
+                                        extra={
+                                            "task": "chain_state_monitor",
+                                            "block_height": height,
+                                            "error": str(e),
+                                        },
                                     )
                                     raise
 
                             logger.debug(
-                                f"Block {height}: burn_block_height={burn_block_height}"
+                                "Block burn block height",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "burn_block_height": burn_block_height,
+                                },
                             )
 
                             # Convert to chainhook format
@@ -794,14 +877,24 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                 chainhook_data
                             )
                             logger.info(
-                                f"Block {height} processed with result: {result}"
+                                "Block processed with result",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "result": result,
+                                },
                             )
 
                             blocks_processed.append(height)
 
                         except Exception as e:
                             logger.error(
-                                f"Error processing block {height}: {str(e)}",
+                                "Error processing block",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "error": str(e),
+                                },
                                 exc_info=True,
                             )
                             # Continue with next block instead of failing the entire process
@@ -821,8 +914,14 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     return results
                 else:
                     logger.info(
-                        f"Chain state for network {network} is {'stale' if is_stale else 'fresh'}. "
-                        f"{blocks_behind} blocks behind (threshold: {stale_threshold_blocks})."
+                        "Chain state status for network",
+                        extra={
+                            "task": "chain_state_monitor",
+                            "network": network,
+                            "status": "stale" if is_stale else "fresh",
+                            "blocks_behind": blocks_behind,
+                            "threshold": stale_threshold_blocks,
+                        },
                     )
 
                 # Return result based on blocks_behind check
@@ -842,10 +941,15 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
             except Exception as e:
                 logger.error(
-                    f"Error getting current chain info: {str(e)}", exc_info=True
+                    "Error getting current chain info",
+                    extra={"task": "chain_state_monitor", "error": str(e)},
+                    exc_info=True,
                 )
                 # Fall back to legacy time-based staleness check if API call fails
-                logger.warning("Falling back to time-based staleness check")
+                logger.warning(
+                    "Falling back to time-based staleness check",
+                    extra={"task": "chain_state_monitor"},
+                )
                 stale_threshold_minutes = 5
                 is_stale = minutes_difference > stale_threshold_minutes
 
@@ -863,7 +967,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
         except Exception as e:
             logger.error(
-                f"Error executing chain state monitoring task: {str(e)}", exc_info=True
+                "Error executing chain state monitoring task",
+                extra={"task": "chain_state_monitor", "error": str(e)},
+                exc_info=True,
             )
             return [
                 ChainStateMonitorResult(

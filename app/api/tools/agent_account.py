@@ -38,14 +38,22 @@ async def approve_agent_account_contract(
         HTTPException: If there's an error, or if the agent/wallet for the profile is not found.
     """
     try:
-        logger.info(
-            f"Agent account approve contract request received from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
+        logger.debug(
+            "Agent account contract approval",
+            extra={
+                "profile_id": str(profile.id),
+                "contract_to_approve": payload.contract_to_approve,
+                "approval_type": payload.approval_type,
+                "event_type": "agent_contract_approval",
+            },
         )
 
         # Get agent from profile
         agents = backend.list_agents(AgentFilter(profile_id=profile.id))
         if not agents:
-            logger.error(f"No agent found for profile ID: {profile.id}")
+            logger.warning(
+                "Agent not found for profile", extra={"profile_id": str(profile.id)}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No agent found for profile ID: {profile.id}",
@@ -57,7 +65,9 @@ async def approve_agent_account_contract(
         # Get wallet from agent
         wallets = backend.list_wallets(WalletFilter(agent_id=agent_id))
         if not wallets:
-            logger.error(f"No wallet found for agent ID: {agent_id}")
+            logger.warning(
+                "Wallet not found for agent", extra={"agent_id": str(agent_id)}
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"No wallet found for agent ID: {agent_id}",
@@ -65,8 +75,15 @@ async def approve_agent_account_contract(
 
         wallet = wallets[0]  # Get the first wallet for this agent
 
-        logger.info(
-            f"Using wallet {wallet.id} for profile {profile.id} to approve contract {payload.contract_to_approve} for agent account {payload.agent_account_contract} of type {payload.approval_type}."
+        logger.debug(
+            "Contract approval initiated",
+            extra={
+                "wallet_id": str(wallet.id),
+                "profile_id": str(profile.id),
+                "contract_to_approve": payload.contract_to_approve,
+                "agent_account_contract": payload.agent_account_contract,
+                "approval_type": payload.approval_type,
+            },
         )
 
         # Initialize and execute the agent account approve contract tool
@@ -77,8 +94,13 @@ async def approve_agent_account_contract(
             approval_type=payload.approval_type,
         )
 
-        logger.debug(
-            f"Agent account approve contract result for wallet {wallet.id} (profile {profile.id}): {result}"
+        logger.info(
+            "Contract approval completed",
+            extra={
+                "wallet_id": str(wallet.id),
+                "profile_id": str(profile.id),
+                "success": result.get("success", False),
+            },
         )
         return JSONResponse(content=result)
 
@@ -86,7 +108,8 @@ async def approve_agent_account_contract(
         raise he
     except Exception as e:
         logger.error(
-            f"Failed to approve contract for agent account for profile {profile.id}",
+            "Contract approval failed",
+            extra={"profile_id": str(profile.id), "error": str(e)},
             exc_info=e,
         )
         raise HTTPException(

@@ -61,12 +61,17 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
         try:
             # Check if backend wallet configuration is available
             if not config.backend_wallet or not config.backend_wallet.seed_phrase:
-                logger.error("Backend wallet seed phrase not configured")
+                logger.error(
+                    "Backend wallet seed phrase not configured",
+                    extra={"task": "dao_proposal_conclude", "validation": "config"},
+                )
                 return False
             return True
         except Exception as e:
             logger.error(
-                f"Error validating proposal concluder config: {str(e)}", exc_info=True
+                "Config validation failed",
+                extra={"task": "dao_proposal_conclude", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -75,7 +80,10 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
         try:
             return True
         except Exception as e:
-            logger.error(f"Backend not available: {str(e)}")
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "dao_proposal_conclude", "error": str(e)},
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -84,10 +92,15 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             # Get pending messages from the queue
             pending_messages = await self.get_pending_messages()
             message_count = len(pending_messages)
-            logger.debug(f"Found {message_count} pending proposal conclusion messages")
+            logger.debug(
+                "Found pending proposal conclusion messages",
+                extra={"task": "dao_proposal_conclude", "message_count": message_count},
+            )
 
             if message_count == 0:
-                logger.info("No pending proposal conclusion messages found")
+                logger.debug(
+                    "No pending messages found", extra={"task": "dao_proposal_conclude"}
+                )
                 return False
 
             # Validate each message has valid proposal data
@@ -97,17 +110,26 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                     valid_messages.append(message)
 
             if valid_messages:
-                logger.info(
-                    f"Found {len(valid_messages)} valid proposal conclusion messages"
+                logger.debug(
+                    "Found valid messages",
+                    extra={
+                        "task": "dao_proposal_conclude",
+                        "valid_count": len(valid_messages),
+                    },
                 )
                 return True
 
-            logger.warning("No valid proposals found in pending messages")
+            logger.warning(
+                "No valid proposals found in pending messages",
+                extra={"task": "dao_proposal_conclude"},
+            )
             return False
 
         except Exception as e:
             logger.error(
-                f"Error validating proposal conclusion task: {str(e)}", exc_info=True
+                "Error validating task",
+                extra={"task": "dao_proposal_conclude", "error": str(e)},
+                exc_info=True,
             )
             return False
 
@@ -136,13 +158,19 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
         message_data = message.message or {}
         dao_id = message.dao_id
 
-        logger.debug(f"Processing proposal conclusion message {message_id}")
+        logger.debug(
+            "Processing proposal conclusion message",
+            extra={"task": "dao_proposal_conclude", "message_id": message_id},
+        )
 
         # Get the proposal ID from the message
         proposal_id = message_data.get("proposal_id")
         if not proposal_id:
             error_msg = f"Missing proposal_id in message {message_id}"
-            logger.error(error_msg)
+            logger.error(
+                "Missing proposal_id in message",
+                extra={"task": "dao_proposal_conclude", "message_id": message_id},
+            )
             return {"success": False, "error": error_msg}
 
         try:
@@ -150,28 +178,42 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             proposal = backend.get_proposal(proposal_id)
             if not proposal:
                 error_msg = f"Proposal {proposal_id} not found in database"
-                logger.error(error_msg)
+                logger.error(
+                    "Proposal not found in database",
+                    extra={"task": "dao_proposal_conclude", "proposal_id": proposal_id},
+                )
                 return {"success": False, "error": error_msg}
 
             # Get the DAO information
             dao = backend.get_dao(dao_id) if dao_id else None
             if not dao:
                 error_msg = f"DAO not found for proposal {proposal_id}"
-                logger.error(error_msg)
+                logger.error(
+                    "DAO not found for proposal",
+                    extra={"task": "dao_proposal_conclude", "proposal_id": proposal_id},
+                )
                 return {"success": False, "error": error_msg}
 
             # Get the DAO token information
             tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao_id))
             if not tokens:
                 error_msg = f"No token found for DAO: {dao_id}"
-                logger.error(error_msg)
+                logger.error(
+                    "No token found for DAO",
+                    extra={"task": "dao_proposal_conclude", "dao_id": str(dao_id)},
+                )
                 return {"success": False, "error": error_msg}
 
             # Use the first token as the DAO token
             dao_token = tokens[0]
 
             logger.info(
-                f"Preparing to conclude proposal {proposal.proposal_id} for DAO {dao.name}"
+                "Preparing to conclude proposal",
+                extra={
+                    "task": "dao_proposal_conclude",
+                    "proposal_id": proposal.proposal_id,
+                    "dao_name": dao.name,
+                },
             )
 
             # Initialize the ConcludeActionProposalTool
@@ -180,14 +222,23 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             )
 
             # Execute the conclusion
-            logger.debug("Executing conclusion...")
+            logger.debug(
+                "Executing conclusion", extra={"task": "dao_proposal_conclude"}
+            )
             conclusion_result = await conclude_tool._arun(
                 action_proposals_voting_extension=proposal.contract_principal,  # This is the voting extension contract
                 proposal_id=proposal.proposal_id,  # This is the on-chain proposal ID
                 action_proposal_contract_to_execute=proposal.action,  # This is the contract that will be executed
                 dao_token_contract_address=dao_token.contract_principal,  # This is the DAO token contract
             )
-            logger.debug(f"Conclusion result: {conclusion_result}")
+            logger.debug(
+                "Conclusion result",
+                extra={
+                    "task": "dao_proposal_conclude",
+                    "success": conclusion_result.get("success"),
+                    "has_result": bool(conclusion_result),
+                },
+            )
 
             result = {"success": True, "concluded": True, "result": conclusion_result}
 
@@ -195,13 +246,27 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             update_data = QueueMessageBase(is_processed=True, result=result)
             backend.update_queue_message(message_id, update_data)
 
-            logger.info(f"Successfully concluded proposal {proposal.proposal_id}")
+            logger.info(
+                "Successfully concluded proposal",
+                extra={
+                    "task": "dao_proposal_conclude",
+                    "proposal_id": proposal.proposal_id,
+                },
+            )
 
             return result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            logger.error(
+                "Error processing message",
+                extra={
+                    "task": "dao_proposal_conclude",
+                    "message_id": message_id,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
             result = {"success": False, "error": error_msg}
 
             # Store result even for failed processing
@@ -236,11 +301,17 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     ) -> Optional[List[DAOProposalConcludeResult]]:
         """Handle execution errors with recovery logic."""
         if "blockchain" in str(error).lower() or "contract" in str(error).lower():
-            logger.warning(f"Blockchain/contract error: {str(error)}, will retry")
+            logger.warning(
+                "Blockchain/contract error, will retry",
+                extra={"task": "dao_proposal_conclude", "error": str(error)},
+            )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
-            logger.warning(f"Network error: {str(error)}, will retry")
+            logger.warning(
+                "Network error, will retry",
+                extra={"task": "dao_proposal_conclude", "error": str(error)},
+            )
             return None
 
         # For validation errors, don't retry
@@ -256,7 +327,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
         self, context: JobContext, results: List[DAOProposalConcludeResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("DAO proposal concluder task cleanup completed")
+        logger.debug("Task cleanup completed", extra={"task": "dao_proposal_conclude"})
 
     async def _execute_impl(
         self, context: JobContext
@@ -302,11 +373,24 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 except Exception as e:
                     error_msg = f"Exception processing message {message.id}: {str(e)}"
                     errors.append(error_msg)
-                    logger.error(error_msg, exc_info=True)
+                    logger.error(
+                        "Exception processing message",
+                        extra={
+                            "task": "dao_proposal_conclude",
+                            "message_id": str(message.id),
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
 
         logger.info(
-            f"DAO proposal concluder task completed - Processed: {processed_count}, "
-            f"Concluded: {concluded_count}, Errors: {len(errors)}"
+            "DAO proposal concluder task completed",
+            extra={
+                "task": "dao_proposal_conclude",
+                "processed": processed_count,
+                "concluded": concluded_count,
+                "errors": len(errors),
+            },
         )
 
         return [

@@ -75,7 +75,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating DAO token holders monitor config: {str(e)}",
+                "Error validating DAO token holders monitor config",
+                extra={"task": "dao_token_holders_monitor", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -87,12 +88,18 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             hiro_api = HiroApi()
             api_info = await hiro_api.aget_info()
             if not api_info:
-                logger.error("Cannot connect to Hiro API")
+                logger.error(
+                    "Cannot connect to Hiro API",
+                    extra={"task": "dao_token_holders_monitor"},
+                )
                 return False
 
             return True
         except Exception as e:
-            logger.error(f"Resource validation failed: {str(e)}")
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "dao_token_holders_monitor", "error": str(e)},
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -102,7 +109,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             return True
         except Exception as e:
             logger.error(
-                f"Error validating DAO token holders monitor task: {str(e)}",
+                "Error validating DAO token holders monitor task",
+                extra={"task": "dao_token_holders_monitor", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -128,11 +136,17 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
     ) -> Optional[List[DaoTokenHoldersMonitorResult]]:
         """Handle execution errors with recovery logic."""
         if "blockchain" in str(error).lower() or "rpc" in str(error).lower():
-            logger.warning(f"Blockchain/RPC error: {str(error)}, will retry")
+            logger.warning(
+                "Blockchain/RPC error, will retry",
+                extra={"task": "dao_token_holders_monitor", "error": str(error)},
+            )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
-            logger.warning(f"Network error: {str(error)}, will retry")
+            logger.warning(
+                "Network error, will retry",
+                extra={"task": "dao_token_holders_monitor", "error": str(error)},
+            )
             return None
 
         # For configuration errors, don't retry
@@ -148,7 +162,10 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         self, context: JobContext, results: List[DaoTokenHoldersMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("DAO token holders monitor task cleanup completed")
+        logger.debug(
+            "DAO token holders monitor task cleanup completed",
+            extra={"task": "dao_token_holders_monitor"},
+        )
 
     def _parse_token_identifier(self, token) -> Optional[str]:
         """Parse token identifier for Hiro API call.
@@ -156,36 +173,64 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         Constructs the proper token identifier format: {contract_principal}::{symbol}
         """
         if not hasattr(token, "contract_principal") or not token.contract_principal:
-            logger.warning(f"Token {token.id} has no contract_principal")
+            logger.warning(
+                "Token has no contract_principal",
+                extra={"task": "dao_token_holders_monitor", "token_id": token.id},
+            )
             return None
 
         contract_principal = token.contract_principal
 
         try:
             # Get token metadata to extract the symbol
-            logger.debug(f"Fetching metadata for token {contract_principal}")
+            logger.debug(
+                "Fetching metadata for token",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "contract_principal": contract_principal,
+                },
+            )
             metadata = self.hiro_api.get_token_metadata(contract_principal)
 
             # Extract symbol from metadata
             symbol = metadata.get("symbol")
             if not symbol:
                 logger.warning(
-                    f"No symbol found in metadata for token {contract_principal}"
+                    "No symbol found in metadata for token",
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "contract_principal": contract_principal,
+                    },
                 )
                 return None
 
             # Construct the proper token identifier format
             token_identifier = f"{contract_principal}::{symbol}"
-            logger.debug(f"Constructed token identifier: {token_identifier}")
+            logger.debug(
+                "Constructed token identifier",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "token_identifier": token_identifier,
+                },
+            )
             return token_identifier
 
         except Exception as e:
             logger.error(
-                f"Error fetching metadata for token {contract_principal}: {str(e)}"
+                "Error fetching metadata for token",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "contract_principal": contract_principal,
+                    "error": str(e),
+                },
             )
             # Fallback to just the contract principal if metadata fails
             logger.warning(
-                f"Using contract principal as fallback: {contract_principal}"
+                "Using contract principal as fallback",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "contract_principal": contract_principal,
+                },
             )
             return contract_principal
 
@@ -205,13 +250,22 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
             # If no agent found, return None
             logger.debug(
-                f"No existing agent found for account_contract {account_contract}"
+                "No existing agent found for account_contract",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "account_contract": account_contract,
+                },
             )
             return None, None
 
         except Exception as e:
             logger.error(
-                f"Error getting agent for account_contract {account_contract}: {str(e)}"
+                "Error getting agent for account_contract",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "account_contract": account_contract,
+                    "error": str(e),
+                },
             )
             return None, None
 
@@ -231,7 +285,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             # Check if we have a wallet for this agent
             if not wallet:
                 logger.warning(
-                    f"No wallet found for agent {agent.id} - cannot queue approval"
+                    "No wallet found for agent - cannot queue approval",
+                    extra={"task": "dao_token_holders_monitor", "agent_id": agent.id},
                 )
                 return False
 
@@ -246,7 +301,8 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
             if not extensions:
                 logger.warning(
-                    f"No ACTION_PROPOSAL_VOTING extension found for DAO {dao_id}"
+                    "No ACTION_PROPOSAL_VOTING extension found for DAO",
+                    extra={"task": "dao_token_holders_monitor", "dao_id": dao_id},
                 )
                 return False
 
@@ -268,14 +324,24 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
             backend.create_queue_message(approval_message)
             logger.info(
-                f"Queued proposal approval for agent {agent.account_contract} "
-                f"to approve {voting_extension.contract_principal} using wallet {wallet.id}"
+                "Queued proposal approval for agent",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "agent_contract": agent.account_contract,
+                    "contract_to_approve": voting_extension.contract_principal,
+                    "wallet_id": wallet.id,
+                },
             )
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to queue proposal approval for agent {agent.id}: {str(e)}",
+                "Failed to queue proposal approval for agent",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "agent_id": agent.id,
+                    "error": str(e),
+                },
                 exc_info=True,
             )
             return False
@@ -287,12 +353,22 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         try:
             token_identifier = self._parse_token_identifier(token)
             if not token_identifier:
-                error_msg = f"Could not parse token identifier for token {token.id}"
-                logger.error(error_msg)
+                error_msg = "Could not parse token identifier for token"
+                logger.error(
+                    error_msg,
+                    extra={"task": "dao_token_holders_monitor", "token_id": token.id},
+                )
                 result.errors.append(error_msg)
                 return
 
-            logger.info(f"Syncing holders for token {token.name} ({token_identifier})")
+            logger.info(
+                "Syncing holders for token",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "token_name": token.name,
+                    "token_identifier": token_identifier,
+                },
+            )
 
             # Get all current holders from Hiro API (with pagination)
             try:
@@ -300,11 +376,23 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     token_identifier
                 )
                 logger.debug(
-                    f"API response for token {token_identifier}: {api_holders_response}"
+                    "API response for token",
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "token_identifier": token_identifier,
+                        "response": str(api_holders_response),
+                    },
                 )
             except Exception as e:
-                error_msg = f"Error fetching holders from API for token {token_identifier}: {str(e)}"
-                logger.error(error_msg)
+                error_msg = "Error fetching holders from API for token"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "token_identifier": token_identifier,
+                        "error": str(e),
+                    },
+                )
                 result.errors.append(error_msg)
                 return
 
@@ -319,18 +407,32 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 api_holders = api_holders_response
             else:
                 logger.warning(
-                    f"Unexpected API response format for token {token_identifier}"
+                    "Unexpected API response format for token",
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "token_identifier": token_identifier,
+                    },
                 )
                 return
 
             logger.info(
-                f"Found {len(api_holders)} holders from API for token {token.name}"
+                "Found holders from API for token",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "holder_count": len(api_holders),
+                    "token_name": token.name,
+                },
             )
 
             # Get current holders from database
             db_holders = backend.list_holders(HolderFilter(token_id=token.id))
             logger.info(
-                f"Found {len(db_holders)} existing holders in database for token {token.name}"
+                "Found existing holders in database for token",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "holder_count": len(db_holders),
+                    "token_name": token.name,
+                },
             )
 
             # Create lookup maps by address+token_id (composite key for matching)
@@ -349,13 +451,21 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
                     if not address:
                         logger.warning(
-                            f"No address found in API holder data: {api_holder}"
+                            "No address found in API holder data",
+                            extra={
+                                "task": "dao_token_holders_monitor",
+                                "api_holder": str(api_holder),
+                            },
                         )
                         continue
 
                     if not balance:
                         logger.warning(
-                            f"No balance found for address {address}, defaulting to 0"
+                            "No balance found for address, defaulting to 0",
+                            extra={
+                                "task": "dao_token_holders_monitor",
+                                "address": address,
+                            },
                         )
                         balance = "0"
 
@@ -405,7 +515,11 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             if agent and old_balance == 0 and new_balance > 0:
                                 should_trigger_approval = True
                                 logger.info(
-                                    f"First meaningful token receipt detected for agent {agent.id} during sync - will trigger proposal approval"
+                                    "First meaningful token receipt detected for agent during sync - will trigger proposal approval",
+                                    extra={
+                                        "task": "dao_token_holders_monitor",
+                                        "agent_id": agent.id,
+                                    },
                                 )
 
                         # Check if address changed
@@ -414,10 +528,18 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
                         if needs_update:
                             logger.info(
-                                f"Updating holder {address} for token {token.name}: "
-                                f"amount={existing_holder.amount}->{balance}, "
-                                f"agent_id={existing_holder.agent_id}->{agent.id if agent else None}, "
-                                f"wallet_id={existing_holder.wallet_id}->{wallet.id if wallet else None}"
+                                "Updating holder for token",
+                                extra={
+                                    "task": "dao_token_holders_monitor",
+                                    "address": address,
+                                    "token_name": token.name,
+                                    "amount_old": existing_holder.amount,
+                                    "amount_new": balance,
+                                    "agent_id_old": existing_holder.agent_id,
+                                    "agent_id_new": agent.id if agent else None,
+                                    "wallet_id_old": existing_holder.wallet_id,
+                                    "wallet_id_new": wallet.id if wallet else None,
+                                },
                             )
                             backend.update_holder(existing_holder.id, update_data)
                             result.holders_updated += 1
@@ -432,14 +554,16 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                                 if approval_queued:
                                     result.approvals_queued += 1
                     else:
-                        # Create new holder (with or without agent)
-                        agent_info = f"agent_id={agent.id}" if agent else "no agent"
-                        wallet_info = (
-                            f"wallet_id={wallet.id}" if wallet else "no wallet"
-                        )
                         logger.info(
-                            f"Creating new holder {address} for token {token.name} with balance {balance}, "
-                            f"{agent_info}, {wallet_info}"
+                            "Creating new holder for token",
+                            extra={
+                                "task": "dao_token_holders_monitor",
+                                "address": address,
+                                "token_name": token.name,
+                                "balance": balance,
+                                "agent_id": agent.id if agent else None,
+                                "wallet_id": wallet.id if wallet else None,
+                            },
                         )
                         holder_create = HolderCreate(
                             agent_id=agent.id if agent else None,
@@ -456,7 +580,11 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         # Queue proposal approval for new agent holders with positive balance
                         if agent and float(balance) > 0:
                             logger.info(
-                                f"First token receipt detected for agent {agent.id} during sync - will trigger proposal approval"
+                                "First token receipt detected for agent during sync - will trigger proposal approval",
+                                extra={
+                                    "task": "dao_token_holders_monitor",
+                                    "agent_id": agent.id,
+                                },
                             )
                             approval_queued = (
                                 await self._queue_proposal_approval_for_agent(
@@ -467,8 +595,15 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                                 result.approvals_queued += 1
 
                 except Exception as e:
-                    error_msg = f"Error processing API holder {api_holder}: {str(e)}"
-                    logger.error(error_msg)
+                    error_msg = "Error processing API holder"
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "api_holder": str(api_holder),
+                            "error": str(e),
+                        },
+                    )
                     result.errors.append(error_msg)
 
             # Check for holders that are no longer in the API response (removed holders)
@@ -486,26 +621,49 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     ):
                         # This holder is no longer holding tokens for this specific token, remove from database
                         logger.info(
-                            f"Removing holder {db_holder.address} for token {token.name} (no longer holds tokens)"
+                            "Removing holder for token (no longer holds tokens)",
+                            extra={
+                                "task": "dao_token_holders_monitor",
+                                "address": db_holder.address,
+                                "token_name": token.name,
+                            },
                         )
                         backend.delete_holder(db_holder.id)
                         result.holders_removed += 1
                 except Exception as e:
                     logger.error(
-                        f"Error processing holder {db_holder.id} with address {db_holder.address} for token {token.name}: {str(e)}"
+                        "Error processing holder",
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "holder_id": db_holder.id,
+                            "address": db_holder.address,
+                            "token_name": token.name,
+                            "error": str(e),
+                        },
                     )
                     continue
 
         except Exception as e:
-            error_msg = f"Error syncing holders for token {token.id}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            error_msg = "Error syncing holders for token"
+            logger.error(
+                error_msg,
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "token_id": token.id,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
             result.errors.append(error_msg)
 
     async def _execute_impl(
         self, context: JobContext
     ) -> List[DaoTokenHoldersMonitorResult]:
         """Execute DAO token holders monitoring task."""
-        logger.info("Starting DAO token holders monitoring task")
+        logger.info(
+            "Starting DAO token holders monitoring task",
+            extra={"task": "dao_token_holders_monitor"},
+        )
 
         result = DaoTokenHoldersMonitorResult(
             success=True, message="DAO token holders sync completed"
@@ -514,7 +672,13 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         try:
             # Get all tokens from the database
             all_tokens = backend.list_tokens()
-            logger.info(f"Found {len(all_tokens)} tokens to process")
+            logger.info(
+                "Found tokens to process",
+                extra={
+                    "task": "dao_token_holders_monitor",
+                    "token_count": len(all_tokens),
+                },
+            )
 
             if not all_tokens:
                 result.message = "No tokens found to process"
@@ -523,13 +687,28 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             # Process each token
             for token in all_tokens:
                 try:
-                    logger.info(f"Processing token: {token.name} (ID: {token.id})")
+                    logger.info(
+                        "Processing token",
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "token_name": token.name,
+                            "token_id": token.id,
+                        },
+                    )
                     await self._sync_token_holders(token, result)
                     result.tokens_processed += 1
 
                 except Exception as e:
-                    error_msg = f"Error processing token {token.id}: {str(e)}"
-                    logger.error(error_msg, exc_info=True)
+                    error_msg = "Error processing token"
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "token_id": token.id,
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
                     result.errors.append(error_msg)
                     # Continue processing other tokens even if one fails
 
@@ -546,13 +725,17 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 result.success = False
 
             result.message = summary
-            logger.info(summary)
+            logger.info(summary, extra={"task": "dao_token_holders_monitor"})
 
             return [result]
 
         except Exception as e:
-            error_msg = f"Error executing DAO token holders monitoring task: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            error_msg = "Error executing DAO token holders monitoring task"
+            logger.error(
+                error_msg,
+                extra={"task": "dao_token_holders_monitor", "error": str(e)},
+                exc_info=True,
+            )
             return [
                 DaoTokenHoldersMonitorResult(
                     success=False, message=error_msg, error=e, errors=[error_msg]

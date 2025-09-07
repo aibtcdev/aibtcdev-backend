@@ -69,13 +69,15 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             # Check if backend wallet configuration is available
             if not config.backend_wallet or not config.backend_wallet.seed_phrase:
                 logger.error(
-                    "Backend wallet seed phrase not configured for agent account deployment"
+                    "Backend wallet seed phrase not configured",
+                    extra={"task": "agent_account_deploy", "validation": "config"},
                 )
                 return False
             return True
         except Exception as e:
             logger.error(
-                f"Error validating agent account deployer config: {str(e)}",
+                "Config validation failed",
+                extra={"task": "agent_account_deploy", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -86,12 +88,19 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             # Test agent account deploy tool initialization
             tool = AgentAccountDeployTool(seed_phrase=config.backend_wallet.seed_phrase)
             if not tool:
-                logger.error("Cannot initialize AgentAccountDeployTool")
+                logger.error(
+                    "Cannot initialize AgentAccountDeployTool",
+                    extra={"task": "agent_account_deploy", "validation": "resources"},
+                )
                 return False
 
             return True
         except Exception as e:
-            logger.error(f"Resource validation failed: {str(e)}")
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "agent_account_deploy", "error": str(e)},
+                exc_info=True,
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -101,26 +110,39 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             pending_messages = await self.get_pending_messages()
             message_count = len(pending_messages)
             logger.debug(
-                f"Found {message_count} pending agent account deployment messages"
+                "Checking pending deployment messages",
+                extra={"task": "agent_account_deploy", "message_count": message_count},
             )
 
             if message_count == 0:
-                logger.debug("No pending agent account deployment messages found")
+                logger.debug(
+                    "No pending messages found", extra={"task": "agent_account_deploy"}
+                )
                 return False
 
             # Validate that at least one message has valid deployment data
             for message in pending_messages:
                 message_data = self._parse_message_data(message.message)
                 if self._validate_message_data(message_data):
-                    logger.debug("Found valid agent account deployment message")
+                    logger.debug(
+                        "Found valid deployment message",
+                        extra={
+                            "task": "agent_account_deploy",
+                            "message_id": message.id,
+                        },
+                    )
                     return True
 
-            logger.warning("No valid deployment data found in pending messages")
+            logger.warning(
+                "No valid deployment data found",
+                extra={"task": "agent_account_deploy", "message_count": message_count},
+            )
             return False
 
         except Exception as e:
             logger.error(
-                f"Error validating agent account deployment task: {str(e)}",
+                "Error validating task",
+                extra={"task": "agent_account_deploy", "error": str(e)},
                 exc_info=True,
             )
             return False
@@ -137,7 +159,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             # Try to parse as JSON string
             return json.loads(message)
         except (json.JSONDecodeError, TypeError):
-            logger.error(f"Failed to parse message data: {message}")
+            logger.error(
+                "Failed to parse message data",
+                extra={"task": "agent_account_deploy", "message": str(message)},
+            )
             return {}
 
     def _validate_message_data(self, message_data: Dict[str, Any]) -> bool:
@@ -155,10 +180,24 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             if output_data and output_data.get("success") and output_data.get("data"):
                 return output_data["data"]
             else:
-                logger.warning("Output data missing success or data fields")
+                logger.warning(
+                    "Output data missing required fields",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "has_success": bool(output_data and output_data.get("success")),
+                        "has_data": bool(output_data and output_data.get("data")),
+                    },
+                )
                 return None
         except (json.JSONDecodeError, IndexError) as e:
-            logger.error(f"Failed to parse deployment output: {str(e)}")
+            logger.error(
+                "Failed to parse deployment output",
+                extra={
+                    "task": "agent_account_deploy",
+                    "error": str(e),
+                    "output_length": len(output),
+                },
+            )
             return None
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
@@ -166,14 +205,27 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         message_id = message.id
         message_data = self._parse_message_data(message.message)
 
-        logger.debug(f"Processing agent account deployment message {message_id}")
+        logger.debug(
+            "Processing deployment message",
+            extra={"task": "agent_account_deploy", "message_id": message_id},
+        )
 
         try:
             # Validate message data
             if not self._validate_message_data(message_data):
-                error_msg = f"Invalid message data in message {message_id}"
-                logger.error(error_msg)
-                result = {"success": False, "error": error_msg}
+                error_msg = "Invalid message data"
+                logger.error(
+                    "Message validation failed",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "message_id": message_id,
+                        "error": error_msg,
+                    },
+                )
+                result = {
+                    "success": False,
+                    "error": f"{error_msg} in message {message_id}",
+                }
 
                 # Store result and mark as processed
                 update_data = QueueMessageBase(is_processed=True, result=result)
@@ -190,14 +242,26 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 wallet_filters = WalletFilter(testnet_address=agent_address)
 
             logger.debug(
-                f"Looking up wallet for {config.network.network} agent address: {agent_address}"
+                "Looking up wallet for agent",
+                extra={
+                    "task": "agent_account_deploy",
+                    "network": config.network.network,
+                    "agent_address": agent_address,
+                },
             )
 
             wallets = backend.list_wallets(wallet_filters)
 
             if not wallets:
                 error_msg = f"No wallet found for {config.network.network} agent address: {agent_address}"
-                logger.error(error_msg)
+                logger.error(
+                    "No wallet found for agent",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "network": config.network.network,
+                        "agent_address": agent_address,
+                    },
+                )
                 result = {"success": False, "error": error_msg}
                 update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)
@@ -208,7 +272,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             # Get the profile associated with this wallet
             if not wallet.profile_id:
                 error_msg = f"No profile associated with wallet {wallet.id}"
-                logger.error(error_msg)
+                logger.error(
+                    "No profile associated with wallet",
+                    extra={"task": "agent_account_deploy", "wallet_id": wallet.id},
+                )
                 result = {"success": False, "error": error_msg}
                 update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)
@@ -217,7 +284,13 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             profile = backend.get_profile(wallet.profile_id)
             if not profile:
                 error_msg = f"Profile {wallet.profile_id} not found"
-                logger.error(error_msg)
+                logger.error(
+                    "Profile not found",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "profile_id": wallet.profile_id,
+                    },
+                )
                 result = {"success": False, "error": error_msg}
                 update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)
@@ -231,30 +304,58 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             if not owner_address:
                 error_msg = f"No {config.network.network} address found for profile {profile.id}"
-                logger.error(error_msg)
+                logger.error(
+                    "No network address found for profile",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "network": config.network.network,
+                        "profile_id": profile.id,
+                    },
+                )
                 result = {"success": False, "error": error_msg}
                 update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)
                 return result
 
             logger.debug(
-                f"Using owner address {owner_address} for {config.network.network} network"
+                "Using owner address for deployment",
+                extra={
+                    "task": "agent_account_deploy",
+                    "network": config.network.network,
+                    "owner_address": owner_address,
+                },
             )
 
             # Initialize the AgentAccountDeployTool with seed phrase
-            logger.debug("Preparing to deploy agent account")
+            logger.debug(
+                "Preparing deployment tool", extra={"task": "agent_account_deploy"}
+            )
             deploy_tool = AgentAccountDeployTool(
                 seed_phrase=config.backend_wallet.seed_phrase
             )
 
             # Execute the deployment
-            logger.debug("Executing deployment...")
+            logger.debug(
+                "Executing deployment",
+                extra={
+                    "task": "agent_account_deploy",
+                    "agent_address": agent_address,
+                    "owner_address": owner_address,
+                },
+            )
             deployment_result = await deploy_tool._arun(
                 owner_address=owner_address,
                 agent_address=agent_address,
                 network=config.network.network,
             )
-            logger.debug(f"Deployment result: {deployment_result}")
+            logger.debug(
+                "Deployment completed",
+                extra={
+                    "task": "agent_account_deploy",
+                    "success": deployment_result.get("success"),
+                    "has_output": bool(deployment_result.get("output")),
+                },
+            )
 
             # Check if this is a ContractAlreadyExists case first
             is_contract_already_exists = (
@@ -265,7 +366,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             if is_contract_already_exists:
                 logger.info(
-                    "Contract already exists - this will be treated as a successful deployment"
+                    "Contract already exists",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "agent_address": agent_address,
+                    },
                 )
 
             # Extract contract information from deployment result and update agent record
@@ -281,14 +386,22 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     if data.get("displayName"):
                         contract_name = data["displayName"]
                         logger.debug(
-                            f"Found contract name in displayName: {contract_name}"
+                            "Found contract name in displayName",
+                            extra={
+                                "task": "agent_account_deploy",
+                                "contract_name": contract_name,
+                            },
                         )
 
                     # Fallback to name field
                     elif data.get("name"):
                         contract_name = data["name"]
                         logger.debug(
-                            f"Found contract name in name field: {contract_name}"
+                            "Found contract name in name field",
+                            extra={
+                                "task": "agent_account_deploy",
+                                "contract_name": contract_name,
+                            },
                         )
 
                     # If we have a contract name, we need to derive the deployer address
@@ -313,18 +426,27 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                 # Validate that we got a proper Stacks address
                                 if not deployer_address:
                                     logger.error(
-                                        "Empty deployer address returned from script"
+                                        "Empty deployer address returned",
+                                        extra={"task": "agent_account_deploy"},
                                     )
                                 elif not (
                                     deployer_address.startswith("ST")
                                     or deployer_address.startswith("SP")
                                 ):
                                     logger.error(
-                                        f"Invalid Stacks address format: {deployer_address}"
+                                        "Invalid Stacks address format",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "address": deployer_address,
+                                        },
                                     )
                                 else:
                                     logger.debug(
-                                        f"Derived deployer address: {deployer_address}"
+                                        "Derived deployer address",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "deployer_address": deployer_address,
+                                        },
                                     )
 
                                     # Construct the full contract principal
@@ -333,7 +455,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                     )
 
                                     logger.info(
-                                        f"Agent account deployed with contract: {full_contract_principal}"
+                                        "Agent account deployed with contract",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "contract_principal": full_contract_principal,
+                                        },
                                     )
 
                                     # Update the agent with the deployed contract address
@@ -347,36 +473,69 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                                 wallet.agent_id, agent_update
                                             )
                                             logger.info(
-                                                f"Updated agent {wallet.agent_id} with contract address: {full_contract_principal}"
+                                                "Updated agent with contract address",
+                                                extra={
+                                                    "task": "agent_account_deploy",
+                                                    "agent_id": wallet.agent_id,
+                                                    "contract_principal": full_contract_principal,
+                                                },
                                             )
 
                                         else:
                                             logger.warning(
-                                                f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                                                "Wallet has no associated agent_id",
+                                                extra={
+                                                    "task": "agent_account_deploy",
+                                                    "wallet_id": wallet.id,
+                                                    "agent_address": agent_address,
+                                                },
                                             )
 
                                     except Exception as e:
                                         logger.error(
-                                            f"Failed to update agent with contract address: {str(e)}",
+                                            "Failed to update agent with contract address",
+                                            extra={
+                                                "task": "agent_account_deploy",
+                                                "error": str(e),
+                                                "agent_id": wallet.agent_id,
+                                            },
                                             exc_info=True,
                                         )
                                 # Don't fail the entire deployment if agent update fails
                             else:
                                 logger.error(
-                                    f"Failed to derive deployer address: {address_result}"
+                                    "Failed to derive deployer address",
+                                    extra={
+                                        "task": "agent_account_deploy",
+                                        "result": str(address_result),
+                                    },
                                 )
 
                         except Exception as e:
                             logger.error(
-                                f"Error deriving deployer address: {str(e)}",
+                                "Error deriving deployer address",
+                                extra={"task": "agent_account_deploy", "error": str(e)},
                                 exc_info=True,
                             )
                     else:
-                        logger.warning("No contract name found in deployment result")
+                        logger.warning(
+                            "No contract name found in deployment result",
+                            extra={"task": "agent_account_deploy"},
+                        )
                 else:
-                    logger.warning("No data found in deployment result")
+                    logger.warning(
+                        "No data found in deployment result",
+                        extra={"task": "agent_account_deploy"},
+                    )
             else:
-                logger.warning("Deployment result missing success or output fields")
+                logger.warning(
+                    "Deployment result missing required fields",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "has_success": bool(deployment_result.get("success")),
+                        "has_output": bool(deployment_result.get("output")),
+                    },
+                )
 
             # Also check for failed deployments with ContractAlreadyExists error
             if deployment_result.get("success") is False and deployment_result.get(
@@ -414,7 +573,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         in str(output_data.get("message", ""))
                     ):
                         logger.info(
-                            "Contract already exists - attempting to extract contract info from error"
+                            "Contract already exists - extracting contract info",
+                            extra={"task": "agent_account_deploy"},
                         )
 
                         # Initialize variables
@@ -430,7 +590,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         if aibtc_acct_match:
                             contract_name = aibtc_acct_match.group(0)
                             logger.debug(
-                                f"Found aibtc-acct pattern in error: {contract_name}"
+                                "Found aibtc-acct pattern in error",
+                                extra={
+                                    "task": "agent_account_deploy",
+                                    "contract_name": contract_name,
+                                },
                             )
 
                         # Method 2: Try to extract from contract_identifier if available
@@ -446,10 +610,13 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         contract_identifier.split(".", 1)
                                     )
                                     logger.debug(
-                                        f"Found contract identifier: {contract_identifier}"
-                                    )
-                                    logger.debug(
-                                        f"Extracted deployer: {deployer_address}, contract: {contract_name}"
+                                        "Found contract identifier",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "contract_identifier": contract_identifier,
+                                            "deployer": deployer_address,
+                                            "contract": contract_name,
+                                        },
                                     )
 
                         # Method 2b: Also try to extract deployer address from contract_identifier even if we already have contract_name
@@ -468,7 +635,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         ".", 1
                                     )
                                     logger.debug(
-                                        f"Extracted deployer address from contract_identifier: {deployer_address}"
+                                        "Extracted deployer from contract_identifier",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "deployer_address": deployer_address,
+                                        },
                                     )
 
                         # Method 3: Try to extract from reason_data if available
@@ -484,10 +655,13 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         contract_identifier.split(".", 1)
                                     )
                                     logger.debug(
-                                        f"Found contract identifier in reason_data: {contract_identifier}"
-                                    )
-                                    logger.debug(
-                                        f"Extracted deployer: {deployer_address}, contract: {contract_name}"
+                                        "Found contract identifier in reason_data",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "contract_identifier": contract_identifier,
+                                            "deployer": deployer_address,
+                                            "contract": contract_name,
+                                        },
                                     )
 
                         # Method 3b: Also try to extract deployer address from reason_data even if we already have contract_name
@@ -507,7 +681,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         ".", 1
                                     )
                                     logger.debug(
-                                        f"Extracted deployer address from reason_data: {deployer_address}"
+                                        "Extracted deployer from reason_data",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "deployer_address": deployer_address,
+                                        },
                                     )
 
                         # If we still don't have a deployer address, derive it from seed phrase
@@ -528,11 +706,20 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                 ):
                                     deployer_address = address_result["output"].strip()
                                     logger.debug(
-                                        f"Derived deployer address: {deployer_address}"
+                                        "Derived deployer address from seed",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "deployer_address": deployer_address,
+                                        },
                                     )
                             except Exception as e:
                                 logger.error(
-                                    f"Error deriving deployer address: {str(e)}"
+                                    "Error deriving deployer address",
+                                    extra={
+                                        "task": "agent_account_deploy",
+                                        "error": str(e),
+                                    },
+                                    exc_info=True,
                                 )
 
                         # If we have both contract name and deployer address, update the agent
@@ -542,7 +729,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             )
 
                             logger.info(
-                                f"Contract already exists: {full_contract_principal}"
+                                "Found existing contract",
+                                extra={
+                                    "task": "agent_account_deploy",
+                                    "contract_principal": full_contract_principal,
+                                },
                             )
 
                             try:
@@ -552,30 +743,54 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                     )
                                     backend.update_agent(wallet.agent_id, agent_update)
                                     logger.info(
-                                        f"Updated agent {wallet.agent_id} with existing contract: {full_contract_principal}"
+                                        "Updated agent with existing contract",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "agent_id": wallet.agent_id,
+                                            "contract_principal": full_contract_principal,
+                                        },
                                     )
 
                                 else:
                                     logger.warning(
-                                        f"Wallet {wallet.id} found for address {agent_address} but no associated agent_id"
+                                        "Wallet has no associated agent_id for existing contract",
+                                        extra={
+                                            "task": "agent_account_deploy",
+                                            "wallet_id": wallet.id,
+                                            "agent_address": agent_address,
+                                        },
                                     )
                             except Exception as e:
                                 logger.error(
-                                    f"Failed to update agent with existing contract: {str(e)}",
+                                    "Failed to update agent with existing contract",
+                                    extra={
+                                        "task": "agent_account_deploy",
+                                        "error": str(e),
+                                        "agent_id": wallet.agent_id,
+                                    },
                                     exc_info=True,
                                 )
                         else:
                             logger.warning(
-                                "Could not extract contract information from ContractAlreadyExists error - "
-                                "but will still treat as successful deployment"
+                                "Could not extract contract information from error",
+                                extra={
+                                    "task": "agent_account_deploy",
+                                    "has_contract_name": bool(contract_name),
+                                    "has_deployer_address": bool(deployer_address),
+                                },
                             )
 
                 except (json.JSONDecodeError, Exception) as e:
-                    logger.error(f"Failed to parse failed deployment output: {str(e)}")
+                    logger.error(
+                        "Failed to parse failed deployment output",
+                        extra={"task": "agent_account_deploy", "error": str(e)},
+                        exc_info=True,
+                    )
                     # Still treat ContractAlreadyExists as successful even if parsing fails
                     if is_contract_already_exists:
                         logger.info(
-                            "Despite parsing error, treating ContractAlreadyExists as successful deployment"
+                            "Treating ContractAlreadyExists as successful despite parsing error",
+                            extra={"task": "agent_account_deploy"},
                         )
 
             # Determine if this should be considered a successful deployment
@@ -594,13 +809,28 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             update_data = QueueMessageBase(is_processed=True, result=result)
             backend.update_queue_message(message_id, update_data)
 
-            logger.info(f"Successfully deployed agent account for message {message_id}")
+            logger.info(
+                "Successfully deployed agent account",
+                extra={
+                    "task": "agent_account_deploy",
+                    "message_id": message_id,
+                    "deployed": deployed,
+                },
+            )
 
             return result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            logger.error(
+                "Error processing message",
+                extra={
+                    "task": "agent_account_deploy",
+                    "message_id": message_id,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
             result = {"success": False, "error": error_msg}
 
             # Store result even for failed processing
@@ -616,7 +846,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
         # Messages are already parsed by the backend, but we log them for debugging
         for message in messages:
-            logger.debug(f"Queue message raw data: {message.message!r}")
+            logger.debug(
+                "Queue message raw data",
+                extra={
+                    "task": "agent_account_deploy",
+                    "message_id": message.id,
+                    "message": repr(message.message),
+                },
+            )
 
         return messages
 
@@ -641,11 +878,17 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
     ) -> Optional[List[AgentAccountDeployResult]]:
         """Handle execution errors with recovery logic."""
         if "blockchain" in str(error).lower() or "contract" in str(error).lower():
-            logger.warning(f"Blockchain/contract error: {str(error)}, will retry")
+            logger.warning(
+                "Blockchain/contract error - will retry",
+                extra={"task": "agent_account_deploy", "error": str(error)},
+            )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
-            logger.warning(f"Network error: {str(error)}, will retry")
+            logger.warning(
+                "Network error - will retry",
+                extra={"task": "agent_account_deploy", "error": str(error)},
+            )
             return None
 
         # For validation errors, don't retry
@@ -661,7 +904,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         self, context: JobContext, results: List[AgentAccountDeployResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("Agent account deployer task cleanup completed")
+        logger.debug("Task cleanup completed", extra={"task": "agent_account_deploy"})
 
     async def _execute_impl(
         self, context: JobContext
@@ -669,7 +912,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         """Run the agent account deployment task with batch processing."""
         pending_messages = await self.get_pending_messages()
         message_count = len(pending_messages)
-        logger.debug(f"Found {message_count} pending agent account deployment messages")
+        logger.debug(
+            "Found pending deployment messages",
+            extra={"task": "agent_account_deploy", "message_count": message_count},
+        )
 
         if not pending_messages:
             return [
@@ -687,7 +933,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         errors = []
         batch_size = getattr(context, "batch_size", 5)
 
-        logger.info(f"Processing {message_count} agent account deployment messages")
+        logger.info(
+            "Processing deployment messages",
+            extra={
+                "task": "agent_account_deploy",
+                "message_count": message_count,
+                "batch_size": batch_size,
+            },
+        )
 
         # Process messages in batches
         for i in range(0, len(pending_messages), batch_size):
@@ -709,11 +962,24 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 except Exception as e:
                     error_msg = f"Exception processing message {message.id}: {str(e)}"
                     errors.append(error_msg)
-                    logger.error(error_msg, exc_info=True)
+                    logger.error(
+                        "Exception processing message",
+                        extra={
+                            "task": "agent_account_deploy",
+                            "message_id": message.id,
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
 
         logger.info(
-            f"Agent account deployment completed - Processed: {processed_count}, "
-            f"Deployed: {deployed_count}, Errors: {len(errors)}"
+            "Agent account deployment completed",
+            extra={
+                "task": "agent_account_deploy",
+                "processed": processed_count,
+                "deployed": deployed_count,
+                "errors": len(errors),
+            },
         )
 
         return [

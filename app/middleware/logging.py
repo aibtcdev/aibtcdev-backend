@@ -9,20 +9,10 @@ logger = configure_logger(__name__)
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log HTTP requests and responses in structured JSON format."""
+    """Middleware to log HTTP requests and responses in a clean, readable format."""
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
-
-        # Get request information
-        request_info = {
-            "method": request.method,
-            "url": str(request.url),
-            "path": request.url.path,
-            "query_params": dict(request.query_params),
-            "headers": dict(request.headers),
-            "client": request.client.host if request.client else None,
-        }
 
         # Process the request
         response: Response = await call_next(request)
@@ -30,16 +20,27 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         # Calculate processing time
         process_time = time.time() - start_time
 
-        # Get response information
+        # Create clean request info (only essential data)
+        request_info = {
+            "method": request.method,
+            "path": request.url.path,
+            "client": request.client.host if request.client else "unknown",
+        }
+
+        # Add query params if they exist
+        if request.query_params:
+            request_info["query_params"] = dict(request.query_params)
+
+        # Create clean response info
         response_info = {
             "status_code": response.status_code,
-            "headers": dict(response.headers),
             "process_time_ms": round(process_time * 1000, 2),
         }
 
-        # Log the request/response with structured data
+        # Log with a clean message format
+        status_emoji = "✓" if response.status_code < 400 else "✗"
         logger.info(
-            f"HTTP {request_info['method']} {request_info['path']} - {response_info['status_code']}",
+            f"{status_emoji} {request.method} {request.url.path}",
             extra={
                 "request": request_info,
                 "response": response_info,

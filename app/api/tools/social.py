@@ -38,13 +38,13 @@ async def get_twitter_embed(
         HTTPException: If there's an error with the request or Twitter API.
     """
     try:
-        logger.info(
-            f"Twitter oembed request received from {request.client.host if request.client else 'unknown'} for URL: {url}"
+        logger.debug(
+            "Twitter oembed request", extra={"url": url, "event_type": "twitter_embed"}
         )
 
         # Validate the URL format
         if not url.startswith(("https://x.com/", "https://twitter.com/")):
-            logger.warning(f"Invalid Twitter URL provided: {url}")
+            logger.warning("Invalid Twitter URL format", extra={"url": url})
             raise HTTPException(
                 status_code=400,
                 detail="Invalid Twitter URL. URL must start with https://x.com/ or https://twitter.com/",
@@ -60,28 +60,34 @@ async def get_twitter_embed(
                 "hide_thread": hide_thread,
             }
 
-            logger.debug(f"Making request to Twitter oembed API with params: {params}")
+            logger.debug(
+                "Twitter API request initiated",
+                extra={"url": url, "media_max_width": media_max_width},
+            )
 
             response = await client.get(oembed_url, params=params, timeout=10.0)
 
             if response.status_code == 200:
-                logger.info(f"Successfully retrieved oembed data for URL: {url}")
+                logger.info("Twitter oembed retrieved", extra={"url": url})
                 return JSONResponse(content=response.json())
             elif response.status_code == 404:
-                logger.warning(f"Twitter post not found for URL: {url}")
+                logger.warning("Twitter post not found", extra={"url": url})
                 raise HTTPException(status_code=404, detail="Twitter post not found")
             else:
-                logger.error(f"Twitter API error {response.status_code} for URL: {url}")
+                logger.warning(
+                    "Twitter API error",
+                    extra={"url": url, "status_code": response.status_code},
+                )
                 raise HTTPException(
                     status_code=response.status_code,
                     detail=f"Twitter API error: {response.status_code}",
                 )
 
     except httpx.TimeoutException:
-        logger.error(f"Request timeout for Twitter URL: {url}")
+        logger.warning("Twitter API timeout", extra={"url": url})
         raise HTTPException(status_code=408, detail="Request to Twitter API timed out")
     except httpx.RequestError as e:
-        logger.error(f"Request failed for Twitter URL {url}: {str(e)}")
+        logger.error("Twitter API request failed", extra={"url": url, "error": str(e)})
         raise HTTPException(
             status_code=500, detail=f"Failed to connect to Twitter API: {str(e)}"
         )
@@ -89,5 +95,9 @@ async def get_twitter_embed(
         # Re-raise HTTPExceptions directly
         raise he
     except Exception as e:
-        logger.error(f"Unexpected error for Twitter URL {url}: {str(e)}", exc_info=e)
+        logger.error(
+            "Twitter oembed unexpected error",
+            extra={"url": url, "error": str(e)},
+            exc_info=e,
+        )
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
