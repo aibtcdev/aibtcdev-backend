@@ -41,7 +41,7 @@ class ChainStateCreate(ChainStateBase):
 class ChainState(ChainStateBase):
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class ChainStateFilter(CustomBaseModel):
@@ -195,7 +195,7 @@ class QueueMessageCreate(QueueMessageBase):
 class QueueMessage(QueueMessageBase):
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 #
@@ -217,7 +217,7 @@ class SecretCreate(SecretBase):
 class Secret(SecretBase):
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 #
@@ -285,7 +285,7 @@ class AgentCreate(AgentBase):
 class Agent(AgentBase):
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 #
