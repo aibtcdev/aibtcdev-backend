@@ -15,7 +15,7 @@ dependencies = [
     "langchain-core>=0.3.56,<1.0.0",
     "langchain-openai==0.3.28",
     "langchain-text-splitters==0.3.11",
-    "langgraph==0.6.6",
+    "langgraph==0.6.7",
     "openai==1.93.0",
     "pgvector<=0.4.1",
     "pillow>=10.0.0",
