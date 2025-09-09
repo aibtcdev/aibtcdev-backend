@@ -166,20 +166,19 @@ For detailed folder-by-folder technical documentation, see the README files thro
 This repository is organized with modular folders for different components. Each major folder has its own README.md for detailed documentation.
 
 - **Top-Level Folders**:
-  - [api/](./api/README.md): API-related components.
   - [app/](./app/README.md): Core application logic and entry points.
-  - [backend/](./backend/README.md): Alternative backend structures.
-  - [crews/](./crews/README.md): Crew management.
-  - [db/](./db/README.md): Database configurations.
   - [docs/](./docs/README.md): Project guides and references.
+  - [docs-v2/](./docs-v2/README.md): Structured documentation system.
   - [examples/](./examples/README.md): Usage examples.
-  - [lib/](./lib/README.md): Shared libraries.
   - [scripts/](./scripts/README.md): Utility scripts.
   - [services/](./services/README.md): Service executions.
   - [supabase/](./supabase/README.md): Database configurations.
-  - [tools/](./tools/README.md): Additional tools.
-  - [webhooks/](./webhooks/README.md): Webhook configurations.
-  - [.claude/](./.claude/README.md): Claude code hooks (hidden folder).
+
+- **Configuration and Build Files**:
+  - [Dockerfile](Dockerfile): Containerization setup.
+  - [pyproject.toml](pyproject.toml): Project dependencies and settings.
+  - [ruff.toml](ruff.toml): Code style configuration.
+  - [uv.lock](uv.lock): Dependency lock file.
 
 For a complete documentation plan and template, see [docs-v2/README_PLAN.md](./docs-v2/README_PLAN.md) and [docs-v2/README_TEMPLATE.md](./docs-v2/README_TEMPLATE.md).
 
