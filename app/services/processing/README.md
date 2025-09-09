@@ -5,8 +5,8 @@ This folder manages data processing services, particularly for social media data
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
-  - twitter_data_service.py: Processes Twitter data.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [twitter_data_service.py](twitter_data_service.py): Processes Twitter data.
 
 - **Subfolders**:
   - (None)

@@ -5,11 +5,11 @@ This folder orchestrates external integrations, including webhook handling and A
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
-  - webhooks/: Base and specific webhook services. [webhooks README](./webhooks/README.md) - Webhook processing.
-  - hiro/: Hiro API integrations. [hiro README](./hiro/README.md) - Blockchain data access.
+  - [webhooks/](webhooks/): Base and specific webhook services. [webhooks README](./webhooks/README.md) - Webhook processing.
+  - [hiro/](hiro/): Hiro API integrations. [hiro README](./hiro/README.md) - Blockchain data access.
 
 ## Relationships and Integration
 Integrations here are utilized in job tasks (app/services/infrastructure/job_management/tasks/) for event-driven processing and monitoring. They interact with backend for data storage (app/backend/supabase.py) and may trigger communications via app/services/communication/.

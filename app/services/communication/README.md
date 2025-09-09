@@ -5,12 +5,12 @@ This folder provides services for external communications, including Discord, Te
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
-  - telegram_bot_service.py: Implements Telegram bot functionality.
-  - twitter_service.py: Handles Twitter (X) interactions.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [telegram_bot_service.py](telegram_bot_service.py): Implements Telegram bot functionality.
+  - [twitter_service.py](twitter_service.py): Handles Twitter (X) interactions.
 
 - **Subfolders**:
-  - discord/: Discord-specific services. [discord README](./discord/README.md) - Discord message sending.
+  - [discord/](discord/): Discord-specific services. [discord README](./discord/README.md) - Discord message sending.
 
 ## Relationships and Integration
 Services are invoked by job tasks like tweet_task.py and discord_task.py in app/services/infrastructure/job_management/tasks/. Depend on config for API keys and integrate with processing/ for data preparation.
