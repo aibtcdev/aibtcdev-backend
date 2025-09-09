@@ -67,7 +67,7 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
 ## Maintenance and Re-running
 To keep documentation current as the repository changes (e.g., new files/folders added), follow these steps:
 1. Remove all **[Completed]** markers from the "Folder Processing Order" section.
-2. Review and update the group listings if new folders are added based on an updated `tree` output.
+2. Generate an updated repository structure by running `tree -I "__pycache__|agent-tools-ts"` from the root, then review and update the group listings if new folders are added.
 3. Re-iterate through the groups bottom-up, regenerating or updating README.md files using the template.
 4. Use tools like diff or git to compare changes and apply selectively.
 This process ensures documentation remains accurate and comprehensive over time.
