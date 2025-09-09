@@ -33,11 +33,11 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `app/services/communication/discord/` (Discord services). **[Completed]**
 
 - **Group 3: Depth 4**
-  - `app/services/integrations/webhooks/` (Base webhook services).
-  - `app/services/integrations/hiro/` (Hiro API integrations).
-  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.).
-  - `app/services/ai/embeddings/` (Embedding services).
-  - `app/api/tools/` (API models and routers for tools).
+  - `app/services/integrations/webhooks/` (Base webhook services). **[Completed]**
+  - `app/services/integrations/hiro/` (Hiro API integrations). **[Completed]**
+  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.). **[Completed]**
+  - `app/services/ai/embeddings/` (Embedding services). **[Completed]**
+  - `app/api/tools/` (API models and routers for tools). **[Completed]**
 
 - **Group 4: Depth 3**
   - `app/services/integrations/` (Integration services).
