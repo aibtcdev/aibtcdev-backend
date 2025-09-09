@@ -5,15 +5,15 @@ This folder centralizes all service-layer components, orchestrating business log
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
-  - ai/: AI services and workflows. [ai README](./ai/README.md) - AI orchestration.
-  - communication/: Communication channels. [communication README](./communication/README.md) - Message sending services.
-  - core/: Core DAO services. [core README](./core/README.md) - DAO business logic.
-  - infrastructure/: Job and startup management. [infrastructure README](./infrastructure/README.md) - Background processing.
-  - integrations/: External integrations. [integrations README](./integrations/README.md) - Webhooks and APIs.
-  - processing/: Data processing. [processing README](./processing/README.md) - Social data handling.
+  - [ai/](ai/): AI services and workflows. [ai README](./ai/README.md) - AI orchestration.
+  - [communication/](communication/): Communication channels. [communication README](./communication/README.md) - Message sending services.
+  - [core/](core/): Core DAO services. [core README](./core/README.md) - DAO business logic.
+  - [infrastructure/](infrastructure/): Job and startup management. [infrastructure README](./infrastructure/README.md) - Background processing.
+  - [integrations/](integrations/): External integrations. [integrations README](./integrations/README.md) - Webhooks and APIs.
+  - [processing/](processing/): Data processing. [processing README](./processing/README.md) - Social data handling.
 
 ## Relationships and Integration
 Services here are dependency-injected into API endpoints (app/api/) and interact with backend (app/backend/) for data access. They drive job tasks and use utilities from app/lib/ for common functions.
