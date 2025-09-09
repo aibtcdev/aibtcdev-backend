@@ -5,10 +5,10 @@ This is the core application folder, containing the main FastAPI app, configurat
 
 ## Key Components
 - **Files**:
-  - config.py: Application configuration.
-  - __init__.py: Package initialization.
-  - main.py: Main FastAPI application entry point.
-  - worker.py: Worker processes.
+  - [config.py](config.py): Application configuration.
+  - [__init__.py](__init__.py): Package initialization.
+  - [main.py](main.py): Main FastAPI application entry point.
+  - [worker.py](worker.py): Worker processes.
 
 - **Subfolders**:
   - api/: API routers and endpoints. [api README](./api/README.md) - API definitions.

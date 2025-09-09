@@ -5,8 +5,8 @@ This folder provides example files for API requests and scripts, such as JSON bo
 
 ## Key Components
 - **Files**:
-  - new_dao_body.json: Example DAO creation payload.
-  - stx_transfer_example.py: STX transfer script example.
+  - [new_dao_body.json](new_dao_body.json): Example DAO creation payload.
+  - [stx_transfer_example.py](stx_transfer_example.py): STX transfer script example.
 
 - **Subfolders**:
   - (None)
