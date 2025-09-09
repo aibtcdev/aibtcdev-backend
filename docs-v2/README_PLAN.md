@@ -40,13 +40,13 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `app/api/tools/` (API models and routers for tools). **[Completed]**
 
 - **Group 4: Depth 3**
-  - `app/services/integrations/` (Integration services).
-  - `app/services/infrastructure/` (Job management and startup).
-  - `app/services/communication/` (Communication services like Twitter/Telegram).
-  - `app/services/processing/` (Data processing like Twitter).
-  - `app/services/ai/` (AI services).
-  - `app/services/core/` (Core DAO services).
-  - `supabase/migrations/` (Database migrations).
+  - `app/services/integrations/` (Integration services). **[Completed]**
+  - `app/services/infrastructure/` (Job management and startup). **[Completed]**
+  - `app/services/communication/` (Communication services like Twitter/Telegram). **[Completed]**
+  - `app/services/processing/` (Data processing like Twitter). **[Completed]**
+  - `app/services/ai/` (AI services). **[Completed]**
+  - `app/services/core/` (Core DAO services). **[Completed]**
+  - `supabase/migrations/` (Database migrations). **[Completed]**
 
 - **Group 5: Depth 2**
   - `app/services/` (All services).
