@@ -49,14 +49,14 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `supabase/migrations/` (Database migrations). **[Completed]**
 
 - **Group 5: Depth 2**
-  - `app/services/` (All services).
-  - `app/backend/` (Backend abstractions and models).
-  - `app/middleware/` (Logging middleware).
-  - `app/lib/` (Utility libraries).
-  - `app/tools/` (Tool implementations).
-  - `app/api/` (API routers and endpoints).
-  - `services/runner/tasks/` (Runner tasks – appears minimal from tree).
-  - `services/webhooks/` and `services/workflows/` (If they have content).
+  - `app/services/` (All services). **[Completed]**
+  - `app/backend/` (Backend abstractions and models). **[Completed]**
+  - `app/middleware/` (Logging middleware). **[Completed]**
+  - `app/lib/` (Utility libraries). **[Completed]**
+  - `app/tools/` (Tool implementations). **[Completed]**
+  - `app/api/` (API routers and endpoints). **[Completed]**
+  - `services/runner/tasks/` (Runner tasks – appears minimal from tree). **[Completed]**
+  - `services/webhooks/` and `services/workflows/` (If they have content). **[Completed]**
 
 - **Group 6: Depth 1**
   - `api/`, `app/`, `backend/`, `crews/`, `db/`, `docs/`, `examples/`, `lib/`, `scripts/`, `services/`, `supabase/`, `tools/`, `webhooks/` (Top-level folders).
