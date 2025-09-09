@@ -5,8 +5,8 @@
 
 ## Key Components
 - **Files**:
-  - [file1.py]: [Brief description of its role, e.g., "Defines abstract base classes for backend operations."]
-  - [file2.py]: [Brief description.]
+  - [file1.py](file1.py): [Brief description of its role, e.g., "Defines abstract base classes for backend operations."]
+  - [file2.py](file2.py): [Brief description.]
   - ... (List all files with concise explanations.)
 
 - **Subfolders**:
