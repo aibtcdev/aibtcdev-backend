@@ -31,44 +31,44 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `app/services/integrations/webhooks/dao/` (DAO webhook parsing). **[Completed]**
 
 - **Group 3: Depth 4**
-  - `app/services/ai/embeddings/` (Embedding services).
-  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models).
-  - `app/services/communication/discord/` (Discord services).
-  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.).
-  - `app/services/integrations/hiro/` (Hiro API integrations).
-  - `app/services/integrations/webhooks/` (Base webhook services).
+  - `app/services/ai/embeddings/` (Embedding services). **[Completed]**
+  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models). **[Completed]**
+  - `app/services/communication/discord/` (Discord services). **[Completed]**
+  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.). **[Completed]**
+  - `app/services/integrations/hiro/` (Hiro API integrations). **[Completed]**
+  - `app/services/integrations/webhooks/` (Base webhook services). **[Completed]**
 
 - **Group 4: Depth 3**
-  - `app/services/ai/` (AI services).
-  - `app/services/communication/` (Communication services like Twitter/Telegram).
-  - `app/services/core/` (Core DAO services).
-  - `app/services/infrastructure/` (Job management and startup).
-  - `app/services/integrations/` (Integration services).
-  - `app/services/processing/` (Data processing like Twitter).
-  - `services/runner/tasks/` (Runner tasks).
+  - `app/services/ai/` (AI services). **[Completed]**
+  - `app/services/communication/` (Communication services like Twitter/Telegram). **[Completed]**
+  - `app/services/core/` (Core DAO services). **[Completed]**
+  - `app/services/infrastructure/` (Job management and startup). **[Completed]**
+  - `app/services/integrations/` (Integration services). **[Completed]**
+  - `app/services/processing/` (Data processing like Twitter). **[Completed]**
+  - `services/runner/tasks/` (Runner tasks). **[Completed]**
 
 - **Group 5: Depth 2**
-  - `app/api/` (API routers and endpoints).
-  - `app/backend/` (Backend abstractions and models).
-  - `app/lib/` (Utility libraries).
-  - `app/middleware/` (Logging middleware).
-  - `app/services/` (All services).
-  - `app/tools/` (Tool implementations).
-  - `services/runner/` (Runner services).
-  - `services/webhooks/` (Webhooks services).
-  - `services/workflows/` (Workflows services).
+  - `app/api/` (API routers and endpoints). **[Completed]**
+  - `app/backend/` (Backend abstractions and models). **[Completed]**
+  - `app/lib/` (Utility libraries). **[Completed]**
+  - `app/middleware/` (Logging middleware). **[Completed]**
+  - `app/services/` (All services). **[Completed]**
+  - `app/tools/` (Tool implementations). **[Completed]**
+  - `services/runner/` (Runner services). **[Completed]**
+  - `services/webhooks/` (Webhooks services). **[Completed]**
+  - `services/workflows/` (Workflows services). **[Completed]**
 
 - **Group 6: Depth 1**
-  - `app/` (Main application code).
-  - `docs/` (Documentation).
-  - `docs-v2/` (Version 2 documentation).
-  - `examples/` (Example files).
-  - `scripts/` (Utility scripts).
-  - `services/` (Top-level services).
-  - `supabase/` (Supabase configurations).
+  - `app/` (Main application code). **[Completed]**
+  - `docs/` (Documentation). **[Completed]**
+  - `docs-v2/` (Version 2 documentation). **[Completed]**
+  - `examples/` (Example files). **[Completed]**
+  - `scripts/` (Utility scripts). **[Completed]**
+  - `services/` (Top-level services). **[Completed]**
+  - `supabase/` (Supabase configurations). **[Completed]**
 
 - **Group 7: Root (Depth 0)**
-  - Root folder (synthesize everything into a main README.md).
+  - Root folder (synthesize everything into a main README.md). **[Completed]**
 
 ## Maintenance and Re-running
 To keep documentation current as the repository changes (e.g., new files/folders added), follow these steps:
