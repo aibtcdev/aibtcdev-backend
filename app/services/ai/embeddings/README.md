@@ -5,8 +5,8 @@ This folder provides services for generating text embeddings using AI models lik
 
 ## Key Components
 - **Files**:
-  - embed_service.py: Implements EmbedService for text embedding.
-  - __init__.py: Initialization file for the package.
+  - [embed_service.py](embed_service.py): Implements EmbedService for text embedding.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
   - (None)

@@ -5,17 +5,17 @@ This folder manages job scheduling, execution, and monitoring, including auto-di
 
 ## Key Components
 - **Files**:
-  - auto_discovery.py: Discovers and registers jobs dynamically.
-  - base.py: Defines BaseTask, JobType, and RunnerConfig.
-  - decorators.py: Provides @job decorator for task definition.
-  - executor.py: Handles job execution.
-  - __init__.py: Initialization file for the package.
-  - job_manager.py: Manages job scheduling with JobScheduleConfig.
-  - monitoring.py: Implements MetricsCollector for job metrics.
-  - registry.py: Registers discovered jobs.
+  - [auto_discovery.py](auto_discovery.py): Discovers and registers jobs dynamically.
+  - [base.py](base.py): Defines BaseTask, JobType, and RunnerConfig.
+  - [decorators.py](decorators.py): Provides @job decorator for task definition.
+  - [executor.py](executor.py): Handles job execution.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [job_manager.py](job_manager.py): Manages job scheduling with JobScheduleConfig.
+  - [monitoring.py](monitoring.py): Implements MetricsCollector for job metrics.
+  - [registry.py](registry.py): Registers discovered jobs.
 
 - **Subfolders**:
-  - tasks/: Specific job task implementations. [tasks README](./tasks/README.md) - Individual task definitions.
+  - [tasks/](tasks/): Specific job task implementations. [tasks README](./tasks/README.md) - Individual task definitions.
 
 ## Relationships and Integration
 Jobs are discovered from the tasks subfolder and executed via the executor, integrating with backend queue messages (app/backend/models.py). Used by startup services in the parent folder and may trigger communications or integrations.

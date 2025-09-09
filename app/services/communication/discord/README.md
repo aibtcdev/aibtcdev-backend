@@ -5,9 +5,9 @@ This folder provides Discord integration services, including factory and service
 
 ## Key Components
 - **Files**:
-  - discord_factory.py: Factory for creating Discord services.
-  - discord_service.py: Implements DiscordService for message sending.
-  - __init__.py: Initialization file for the package.
+  - [discord_factory.py](discord_factory.py): Factory for creating Discord services.
+  - [discord_service.py](discord_service.py): Implements DiscordService for message sending.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
   - (None)
