@@ -5,8 +5,8 @@ This folder provides core services for DAO operations, focusing on essential bus
 
 ## Key Components
 - **Files**:
-  - dao_service.py: Implements core DAO services.
-  - __init__.py: Initialization file for the package.
+  - [dao_service.py](dao_service.py): Implements core DAO services.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
   - (None)

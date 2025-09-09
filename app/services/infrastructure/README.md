@@ -5,12 +5,12 @@ This folder handles core infrastructure services, including job management, sche
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
-  - scheduler_service.py: Manages job scheduling.
-  - startup_service.py: Handles application startup logic.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [scheduler_service.py](scheduler_service.py): Manages job scheduling.
+  - [startup_service.py](startup_service.py): Handles application startup logic.
 
 - **Subfolders**:
-  - job_management/: Job execution and monitoring. [job_management README](./job_management/README.md) - Job scheduling and tasks.
+  - [job_management/](job_management/): Job execution and monitoring. [job_management README](./job_management/README.md) - Job scheduling and tasks.
 
 ## Relationships and Integration
 Services here initialize jobs from job_management/ and integrate with backend for queue management (app/backend/models.py). Used during app startup in app/main.py and interacts with integrations for event triggering.
