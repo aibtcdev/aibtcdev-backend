@@ -179,7 +179,7 @@ This repository is organized with modular folders for different components. Each
   - [supabase/](./supabase/README.md): Database configurations.
   - [tools/](./tools/README.md): Additional tools.
   - [webhooks/](./webhooks/README.md): Webhook configurations.
-  - [.claude/](./.claude/README.md): Claude code hooks.
+  - [.claude/](./.claude/README.md): Claude code hooks (hidden folder).
 
 For a complete documentation plan and template, see [docs-v2/README_PLAN.md](./docs-v2/README_PLAN.md) and [docs-v2/README_TEMPLATE.md](./docs-v2/README_TEMPLATE.md).
 
