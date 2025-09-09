@@ -5,10 +5,10 @@ This folder contains specialized processors for handling specific data types in 
 
 ## Key Components
 - **Files**:
-  - airdrop.py: Processes airdrop-related data in workflows.
-  - images.py: Handles image generation and evaluation, including ImageGenerationError exceptions.
-  - __init__.py: Initialization file for the package.
-  - twitter.py: Manages Twitter (X) data processing, such as tweet retrieval and analysis.
+  - [airdrop.py](airdrop.py): Processes airdrop-related data in workflows.
+  - [images.py](images.py): Handles image generation and evaluation, including ImageGenerationError exceptions.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [twitter.py](twitter.py): Manages Twitter (X) data processing, such as tweet retrieval and analysis.
 
 - **Subfolders**:
   - (None)
