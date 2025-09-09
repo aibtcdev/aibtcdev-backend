@@ -59,7 +59,7 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `services/webhooks/` and `services/workflows/` (If they have content). **[Completed]**
 
 - **Group 6: Depth 1**
-  - `api/`, `app/`, `backend/`, `crews/`, `db/`, `docs/`, `examples/`, `lib/`, `scripts/`, `services/`, `supabase/`, `tools/`, `webhooks/` (Top-level folders).
+  - `api/`, `app/`, `backend/`, `crews/`, `db/`, `docs/`, `examples/`, `lib/`, `scripts/`, `services/`, `supabase/`, `tools/`, `webhooks/` (Top-level folders). **[Completed]**
 
 - **Group 7: Root (Depth 0)**
   - Root folder (synthesize everything into a main README.md).
