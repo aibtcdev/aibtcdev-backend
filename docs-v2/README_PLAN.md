@@ -26,11 +26,11 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `app/services/ai/simple_workflows/processors/` (Processors for images, Twitter, etc.). **[Completed]**
 
 - **Group 2: Depth 5**
-  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling).
-  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing).
-  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models).
-  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment).
-  - `app/services/communication/discord/` (Discord services).
+  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling). **[Completed]**
+  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing). **[Completed]**
+  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models). **[Completed]**
+  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment). **[Completed]**
+  - `app/services/communication/discord/` (Discord services). **[Completed]**
 
 - **Group 3: Depth 4**
   - `app/services/integrations/webhooks/` (Base webhook services).
