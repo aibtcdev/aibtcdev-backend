@@ -5,8 +5,8 @@ This folder contains FastAPI middleware, focusing on logging and request handlin
 
 ## Key Components
 - **Files**:
-  - __init__.py: Initialization file for the package.
-  - logging.py: Configures logging middleware.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [logging.py](logging.py): Configures logging middleware.
 
 - **Subfolders**:
   - (None)

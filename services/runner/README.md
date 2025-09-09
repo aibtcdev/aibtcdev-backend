@@ -8,7 +8,7 @@ This folder manages runner services for task execution, possibly for background 
   - (None specified.)
 
 - **Subfolders**:
-  - tasks/: Runner tasks. [tasks README](./tasks/README.md) - Task implementations.
+  - [tasks/](tasks/): Runner tasks. [tasks README](./tasks/README.md) - Task implementations.
 
 ## Relationships and Integration
 Parallels app/services/infrastructure/job_management/ for job running.

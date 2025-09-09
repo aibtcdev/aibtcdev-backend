@@ -5,11 +5,11 @@ This folder provides backend abstractions, models, and factory for data access, 
 
 ## Key Components
 - **Files**:
-  - abstract.py: AbstractBackend ABC with methods for data operations.
-  - factory.py: Factory to get backend instances.
-  - __init__.py: Initialization file for the package.
-  - models.py: Pydantic models like QueueMessage, WalletFilter.
-  - supabase.py: Supabase-specific backend implementation.
+  - [abstract.py](abstract.py): AbstractBackend ABC with methods for data operations.
+  - [factory.py](factory.py): Factory to get backend instances.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [models.py](models.py): Pydantic models like QueueMessage, WalletFilter.
+  - [supabase.py](supabase.py): Supabase-specific backend implementation.
 
 - **Subfolders**:
   - (None)
