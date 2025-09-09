@@ -5,11 +5,11 @@ This folder manages prompt templates and loading utilities for AI-driven workflo
 
 ## Key Components
 - **Files**:
-  - evaluation.py: Defines evaluation system prompts and user templates for assessing DAO proposals.
-  - __init__.py: Initialization file for the package.
-  - loader.py: Contains the PromptLoader class for loading and managing prompt types dynamically.
-  - metadata.py: Provides metadata system prompts and templates for generating proposal titles, descriptions, and images.
-  - recommendation.py: Defines recommendation system prompts and templates for generating DAO improvement suggestions.
+  - [evaluation.py](evaluation.py): Defines evaluation system prompts and user templates for assessing DAO proposals.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [loader.py](loader.py): Contains the PromptLoader class for loading and managing prompt types dynamically.
+  - [metadata.py](metadata.py): Provides metadata system prompts and templates for generating proposal titles, descriptions, and images.
+  - [recommendation.py](recommendation.py): Defines recommendation system prompts and templates for generating DAO improvement suggestions.
 
 - **Subfolders**:
   - (None)
