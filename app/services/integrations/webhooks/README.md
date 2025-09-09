@@ -5,12 +5,12 @@ This folder provides base classes and services for webhook integrations, handlin
 
 ## Key Components
 - **Files**:
-  - base.py: Defines base WebhookService and related abstractions.
-  - __init__.py: Initialization file for the package.
+  - [base.py](base.py): Defines base WebhookService and related abstractions.
+  - [__init__.py](__init__.py): Initialization file for the package.
 
 - **Subfolders**:
-  - chainhook/: Manages Chainhook-specific webhook handling. [chainhook README](./chainhook/README.md) - Chainhook event processing.
-  - dao/: Handles DAO webhook parsing. [dao README](./dao/README.md) - DAO event management.
+  - [chainhook/](chainhook/): Manages Chainhook-specific webhook handling. [chainhook README](./chainhook/README.md) - Chainhook event processing.
+  - [dao/](dao/): Handles DAO webhook parsing. [dao README](./dao/README.md) - DAO event management.
 
 ## Relationships and Integration
 Base classes here are extended in subfolders like chainhook/service.py and dao/service.py. Integrates with infrastructure jobs in app/services/infrastructure/job_management/ for event-triggered tasks and uses models from app/backend/models.py for data persistence.

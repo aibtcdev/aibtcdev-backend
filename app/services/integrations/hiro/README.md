@@ -5,12 +5,12 @@ This folder integrates with the Hiro API for blockchain data access, including m
 
 ## Key Components
 - **Files**:
-  - base.py: Base classes for Hiro integrations.
-  - hiro_api.py: Implements Hiro API client.
-  - __init__.py: Initialization file for the package.
-  - models.py: Defines models like ChainTip.
-  - platform_api.py: Handles platform-specific API interactions.
-  - utils.py: Utilities including WebhookConfig dataclass.
+  - [base.py](base.py): Base classes for Hiro integrations.
+  - [hiro_api.py](hiro_api.py): Implements Hiro API client.
+  - [__init__.py](__init__.py): Initialization file for the package.
+  - [models.py](models.py): Defines models like ChainTip.
+  - [platform_api.py](platform_api.py): Handles platform-specific API interactions.
+  - [utils.py](utils.py): Utilities including WebhookConfig dataclass.
 
 - **Subfolders**:
   - (None)
