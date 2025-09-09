@@ -5,10 +5,10 @@ This folder manages Supabase configurations and migrations for the database back
 
 ## Key Components
 - **Files**:
-  - config.toml: Supabase configuration.
+  - [config.toml](config.toml): Supabase configuration.
 
 - **Subfolders**:
-  - migrations/: Database migration scripts. [migrations README](./migrations/README.md) - Schema changes.
+  - [migrations/](migrations/): Database migration scripts. [migrations README](./migrations/README.md) - Schema changes.
 
 ## Relationships and Integration
 Used in app/backend/supabase.py for DB connections; migrations align with models.

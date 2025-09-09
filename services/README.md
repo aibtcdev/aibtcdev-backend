@@ -8,9 +8,9 @@ This top-level folder organizes service-related components, including runners, w
   - (None specified.)
 
 - **Subfolders**:
-  - runner/: Runner services. [runner README](./runner/README.md) - Task runners.
-  - webhooks/: Top-level webhooks. [webhooks README](./webhooks/README.md) - Webhook handling.
-  - workflows/: Workflow definitions. [workflows README](./workflows/README.md) - Custom workflows.
+  - [runner/](runner/): Runner services. [runner README](./runner/README.md) - Task runners.
+  - [webhooks/](webhooks/): Top-level webhooks. [webhooks README](./webhooks/README.md) - Webhook handling.
+  - [workflows/](workflows/): Workflow definitions. [workflows README](./workflows/README.md) - Custom workflows.
 
 ## Relationships and Integration
 Complements app/services/ for additional service layers; may run parallel to app/worker.py.
