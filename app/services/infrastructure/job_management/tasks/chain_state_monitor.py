@@ -872,6 +872,20 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                 burn_block_height,
                             )
 
+                            logger.info(
+                                "Generated chainhook message for block processing",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "block_hash": block_hash,
+                                    "burn_block_height": burn_block_height,
+                                    "transaction_count": transactions.total,
+                                    "chainhook_uuid": chainhook_data.get(
+                                        "chainhook", {}
+                                    ).get("uuid"),
+                                },
+                            )
+
                             # Process through chainhook service
                             result = await self.chainhook_service.process(
                                 chainhook_data
