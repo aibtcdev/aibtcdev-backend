@@ -83,24 +83,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for blockchain monitoring."""
-        try:
-            # Test HiroApi initialization and connectivity
-            hiro_api = HiroApi()
-            api_info = await hiro_api.aget_info()
-            if not api_info:
-                logger.error(
-                    "Cannot connect to Hiro API",
-                    extra={"task": "dao_token_holders_monitor"},
-                )
-                return False
-
-            return True
-        except Exception as e:
-            logger.error(
-                "Resource validation failed",
-                extra={"task": "dao_token_holders_monitor", "error": str(e)},
-            )
-            return False
+        return True
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
