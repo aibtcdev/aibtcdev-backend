@@ -57,7 +57,7 @@ class TwitterService:
                 self.access_token,
                 self.access_secret,
             )
-            self.api = tweepy.API(auth, wait_on_rate_limit=True)
+            self.api = tweepy.API(auth, wait_on_rate_limit=False)
 
             # Initialize Client for API v2 (used for tweet creation)
             self.client = tweepy.Client(
@@ -66,7 +66,7 @@ class TwitterService:
                 access_token=self.access_token,
                 access_token_secret=self.access_secret,
                 bearer_token=self.bearer_token,
-                wait_on_rate_limit=True,
+                wait_on_rate_limit=False,
             )
             logger.info("Twitter client and API initialized successfully")
         except Exception as e:
