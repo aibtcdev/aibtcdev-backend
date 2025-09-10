@@ -142,7 +142,7 @@ class SchedulerConfig:
         == "true"
     )
     agent_wallet_balance_monitor_interval_seconds: int = int(
-        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "120")
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "300")
     )
 
     # chain_state_monitor job

@@ -38,7 +38,6 @@ class ChainStateMonitorResult(RunnerResult):
     network: str = None
     is_stale: bool = False
     last_updated: Optional[datetime] = None
-    elapsed_minutes: float = 0
     blocks_behind: int = 0
     blocks_processed: Optional[List[int]] = None
 
@@ -684,16 +683,8 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 )
                 return results
 
-            # Calculate how old the chain state is
-            now = datetime.now()
+            # Get the last updated time for logging purposes only
             last_updated = latest_chain_state.updated_at
-
-            # Convert last_updated to naive datetime if it has timezone info
-            if last_updated.tzinfo is not None:
-                last_updated = last_updated.replace(tzinfo=None)
-
-            time_difference = now - last_updated
-            minutes_difference = time_difference.total_seconds() / 60
 
             # Get current chain height from API
             try:
@@ -748,8 +739,8 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                 blocks_behind = current_api_block_height - db_block_height
 
-                # Consider stale if more than 10 blocks behind
-                stale_threshold_blocks = 10
+                # Consider stale if more than 30 blocks behind
+                stale_threshold_blocks = 30
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
@@ -762,10 +753,10 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     },
                 )
 
-                # Process missing blocks if we're behind
+                # Process missing blocks if we're behind and stale
                 if blocks_behind > 0 and is_stale:
                     logger.warning(
-                        "Chain state is behind and exceeds threshold",
+                        "Chain state is behind and exceeds threshold, processing missing blocks",
                         extra={
                             "task": "chain_state_monitor",
                             "blocks_behind": blocks_behind,
@@ -872,6 +863,20 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                 burn_block_height,
                             )
 
+                            logger.info(
+                                "Generated chainhook message for block processing",
+                                extra={
+                                    "task": "chain_state_monitor",
+                                    "block_height": height,
+                                    "block_hash": block_hash,
+                                    "burn_block_height": burn_block_height,
+                                    "transaction_count": transactions.total,
+                                    "chainhook_uuid": chainhook_data.get(
+                                        "chainhook", {}
+                                    ).get("uuid"),
+                                },
+                            )
+
                             # Process through chainhook service
                             result = await self.chainhook_service.process(
                                 chainhook_data
@@ -906,7 +911,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                             network=network,
                             is_stale=is_stale,
                             last_updated=last_updated,
-                            elapsed_minutes=minutes_difference,
                             blocks_behind=blocks_behind,
                             blocks_processed=blocks_processed,
                         )
@@ -932,7 +936,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         network=network,
                         is_stale=is_stale,
                         last_updated=last_updated,
-                        elapsed_minutes=minutes_difference,
                         blocks_behind=blocks_behind,
                     )
                 )
@@ -945,22 +948,19 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     extra={"task": "chain_state_monitor", "error": str(e)},
                     exc_info=True,
                 )
-                # Fall back to legacy time-based staleness check if API call fails
+                # Cannot determine staleness without API access
                 logger.warning(
-                    "Falling back to time-based staleness check",
+                    "Cannot determine chain state without API access",
                     extra={"task": "chain_state_monitor"},
                 )
-                stale_threshold_minutes = 5
-                is_stale = minutes_difference > stale_threshold_minutes
 
                 results.append(
                     ChainStateMonitorResult(
                         success=False,
-                        message=f"Error checking chain height, using time-based check instead: {str(e)}",
+                        message=f"Error checking chain height: {str(e)}",
                         network=network,
-                        is_stale=is_stale,
+                        is_stale=True,  # Assume stale if we can't check
                         last_updated=last_updated,
-                        elapsed_minutes=minutes_difference,
                     )
                 )
                 return results

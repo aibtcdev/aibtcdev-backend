@@ -45,8 +45,8 @@ class AgentWalletBalanceMonitorResult(RunnerResult):
 @job(
     job_type="agent_wallet_balance_monitor",
     name="Agent Wallet Balance Monitor",
-    description="Monitors agent wallet STX balances and auto-funds low balance wallets every 2 minutes",
-    interval_seconds=120,  # 2 minutes
+    description="Monitors agent wallet STX balances and auto-funds low balance wallets every 5 minutes",
+    interval_seconds=300,  # 5 minutes
     priority=JobPriority.HIGH,
     max_retries=3,
     retry_delay_seconds=60,
@@ -94,24 +94,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
 
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for blockchain monitoring."""
-        try:
-            # Test HiroApi initialization and connectivity
-            hiro_api = HiroApi()
-            api_info = await hiro_api.aget_info()
-            if not api_info:
-                logger.error(
-                    "Cannot connect to Hiro API",
-                    extra={"task": "wallet_balance_monitor", "service": "hiro_api"},
-                )
-                return False
-
-            return True
-        except Exception as e:
-            logger.error(
-                "Resource validation failed",
-                extra={"task": "wallet_balance_monitor", "error": str(e)},
-            )
-            return False
+        return True
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
