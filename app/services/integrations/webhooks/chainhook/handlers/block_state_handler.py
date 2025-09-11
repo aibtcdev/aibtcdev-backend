@@ -95,11 +95,14 @@ class BlockStateHandler(ChainhookEventHandler):
             )
 
             if current_state:
+                # Ensure we have the current state loaded in memory
+                self._latest_chain_state = current_state
+
                 # Only update if new block is higher
                 if block_height <= current_state.block_height:
                     self.logger.debug(
                         f"Skipping block update - current: {current_state.block_height}, "
-                        f"new: {block_height}"
+                        f"new: {block_height} (block is older or equal)"
                     )
                     return
 
