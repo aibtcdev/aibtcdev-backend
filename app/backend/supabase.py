@@ -665,12 +665,66 @@ class SupabaseBackend(AbstractBackend):
     def create_queue_message(
         self, new_queue_message: "QueueMessageCreate"
     ) -> "QueueMessage":
-        payload = new_queue_message.model_dump(exclude_unset=True, mode="json")
-        response = self.client.table("queue").insert(payload).execute()
-        data = response.data or []
-        if not data:
-            raise ValueError("No data returned from Supabase insert for queue message.")
-        return QueueMessage(**data[0])
+        """Create a new queue message with deduplication logic to prevent 5x message multiplication."""
+
+        # Check for existing unprocessed messages with same content to prevent duplicates
+        if new_queue_message.dao_id and new_queue_message.message:
+            try:
+                # Use Supabase query to find existing unprocessed messages
+                query = (
+                    self.client.table("queue")
+                    .select("*")
+                    .eq("type", new_queue_message.type)
+                    .eq("dao_id", str(new_queue_message.dao_id))
+                    .eq("is_processed", False)
+                )
+
+                # Add wallet_id filter if present
+                if new_queue_message.wallet_id:
+                    query = query.eq("wallet_id", str(new_queue_message.wallet_id))
+
+                response = query.execute()
+                existing_data = response.data or []
+
+                # Check for duplicate content in existing messages
+                new_message_str = (
+                    str(new_queue_message.message) if new_queue_message.message else ""
+                )
+                for existing_row in existing_data:
+                    existing_message_str = str(existing_row.get("message", ""))
+                    if existing_message_str == new_message_str:
+                        existing_message = QueueMessage(**existing_row)
+                        logger.debug(
+                            f"Duplicate queue message detected for DAO {new_queue_message.dao_id}, "
+                            f"type {new_queue_message.type}, returning existing message {existing_message.id}"
+                        )
+                        return existing_message
+
+            except Exception as e:
+                # If deduplication check fails, log warning but continue with creation
+                logger.warning(
+                    f"Deduplication check failed: {str(e)}, proceeding with message creation"
+                )
+
+        # No duplicate found or deduplication skipped, create new message using Supabase
+        try:
+            payload = new_queue_message.model_dump(exclude_unset=True, mode="json")
+            response = self.client.table("queue").insert(payload).execute()
+            data = response.data or []
+            if not data:
+                raise ValueError(
+                    "No data returned from Supabase insert for queue message."
+                )
+
+            created_message = QueueMessage(**data[0])
+            logger.debug(
+                f"Created new queue message {created_message.id} for DAO {new_queue_message.dao_id}, type {new_queue_message.type}"
+            )
+            return created_message
+
+        except Exception as e:
+            logger.error(f"Failed to create queue message in Supabase: {str(e)}")
+            raise
 
     def get_queue_message(self, queue_message_id: UUID) -> Optional["QueueMessage"]:
         response = (
