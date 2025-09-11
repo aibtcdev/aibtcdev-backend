@@ -107,18 +107,32 @@ class ChainhookHandler(WebhookHandler):
                     await self.block_state_handler.handle_block(apply)
 
                 # Check if BlockStateHandler successfully processed *this* block.
-                # This implies the block was newer than the DB state AND the DB update succeeded.
-                # We check if the handler's internal state now matches this block's height.
+                # This happens when: 1) Block is newer than DB state, 2) DB update succeeded
+                # We validate by checking if the handler's state matches this block's height
+                current_db_state = self.block_state_handler.latest_chain_state
+                block_height = apply.block_identifier.index
+
                 block_processed_by_state_handler = (
-                    self.block_state_handler.latest_chain_state is not None
-                    and self.block_state_handler.latest_chain_state.block_height
-                    == apply.block_identifier.index
+                    current_db_state is not None
+                    and current_db_state.block_height == block_height
                 )
+
+                # Additional validation: ensure block is not older than database state
+                if (
+                    current_db_state
+                    and block_height <= current_db_state.block_height
+                    and not block_processed_by_state_handler
+                ):
+                    self.logger.info(
+                        f"Block {block_height} is older than or equal to current DB state "
+                        f"({current_db_state.block_height}). Skipping processing to prevent duplicate work."
+                    )
+                    continue  # Skip to the next block
 
                 if not block_processed_by_state_handler:
                     self.logger.warning(
-                        f"Block {apply.block_identifier.index} was not processed by BlockStateHandler "
-                        f"(likely older than current DB state or failed update). Skipping other handlers for this block."
+                        f"Block {block_height} was not processed by BlockStateHandler "
+                        f"(failed update or other error). Skipping other handlers for this block."
                     )
                     continue  # Skip to the next block in the webhook payload
 
