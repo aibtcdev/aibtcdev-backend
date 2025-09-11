@@ -183,7 +183,14 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 error_msg,
                 extra={"task": "dao_proposal_voter", "message_id": message_id},
             )
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": error_msg,
+                "error_type": "missing_proposal_id",
+                "message_id": message_id,
+                "wallet_id": wallet_id,
+                "status": "failed",
+            }
 
         try:
             # Convert string UUID to UUID object
@@ -199,7 +206,15 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         "message_id": message_id,
                     },
                 )
-                return {"success": False, "error": error_msg}
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "error_type": "invalid_proposal_id_format",
+                    "proposal_id": proposal_id,
+                    "message_id": message_id,
+                    "wallet_id": wallet_id,
+                    "status": "failed",
+                }
 
             # Get the proposal by its database ID
             proposal = backend.get_proposal(proposal_uuid)
@@ -209,7 +224,15 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     error_msg,
                     extra={"task": "dao_proposal_voter", "proposal_id": proposal_id},
                 )
-                return {"success": False, "error": error_msg}
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "error_type": "proposal_not_found",
+                    "proposal_id": proposal_id,
+                    "message_id": message_id,
+                    "wallet_id": wallet_id,
+                    "status": "failed",
+                }
 
             # Get the wallet
             wallet = backend.get_wallet(wallet_id)
@@ -219,7 +242,14 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     error_msg,
                     extra={"task": "dao_proposal_voter", "wallet_id": wallet_id},
                 )
-                return {"success": False, "error": error_msg}
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "error_type": "wallet_not_found",
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "failed",
+                }
 
             # Get unvoted votes for this specific proposal and wallet
             votes = backend.list_votes(
@@ -239,6 +269,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "success": True,
                     "message": "No votes to process",
                     "votes_processed": 0,
+                    "proposal_id": proposal_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "completed_no_votes",
                 }
                 # Mark message as processed to avoid endless retries
                 update_data = QueueMessageBase(is_processed=True, result=result)
@@ -262,6 +296,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "success": True,
                     "message": "No votes to process",
                     "votes_processed": 0,
+                    "proposal_id": proposal_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "completed_no_unvoted",
                 }
                 # Mark message as processed to avoid endless retries
                 update_data = QueueMessageBase(is_processed=True, result=result)
@@ -288,6 +326,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 return {
                     "success": False,
                     "error": error_msg,
+                    "error_type": "wallet_no_agent",
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "failed",
                 }
 
             agent = backend.get_agent(wallet.agent_id)
@@ -304,6 +346,11 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 return {
                     "success": False,
                     "error": error_msg,
+                    "error_type": "agent_not_found",
+                    "agent_id": wallet.agent_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "failed",
                 }
 
             if not agent.account_contract:
@@ -315,6 +362,11 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 return {
                     "success": False,
                     "error": error_msg,
+                    "error_type": "agent_no_account_contract",
+                    "agent_id": agent.id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "failed",
                 }
 
             # Initialize the voting tool
@@ -342,7 +394,16 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         },
                     )
                     results.append(
-                        {"success": False, "error": error_msg, "vote_id": vote.id}
+                        {
+                            "success": False,
+                            "error": error_msg,
+                            "error_type": "vote_submission_failed",
+                            "vote_id": vote.id,
+                            "vote_answer": vote.answer,
+                            "tool_error": vote_result.get("message", "Unknown error"),
+                            "proposal_id": proposal.proposal_id,
+                            "contract_principal": proposal.contract_principal,
+                        }
                     )
                     continue
 
@@ -363,8 +424,12 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         {
                             "success": False,
                             "error": "No transaction ID found in response",
+                            "error_type": "missing_transaction_id",
                             "vote_id": vote.id,
+                            "vote_answer": vote.answer,
                             "vote_result": vote_result,
+                            "proposal_id": proposal.proposal_id,
+                            "contract_principal": proposal.contract_principal,
                         }
                     )
                     continue
@@ -399,6 +464,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                                 "success": True,
                                 "vote_id": vote.id,
                                 "tx_id": tx_id,
+                                "vote_answer": vote.answer,
+                                "proposal_id": proposal.proposal_id,
+                                "contract_principal": proposal.contract_principal,
+                                "address": address,
                             }
                         )
                     else:
@@ -410,7 +479,12 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                             {
                                 "success": False,
                                 "error": "Failed to update vote in database",
+                                "error_type": "database_update_failed",
                                 "vote_id": vote.id,
+                                "vote_answer": vote.answer,
+                                "tx_id": tx_id,
+                                "proposal_id": proposal.proposal_id,
+                                "contract_principal": proposal.contract_principal,
                             }
                         )
                 except Exception as e:
@@ -427,7 +501,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         {
                             "success": False,
                             "error": f"Failed to update vote: {str(e)}",
+                            "error_type": "database_update_exception",
                             "vote_id": vote.id,
+                            "vote_answer": vote.answer,
+                            "tx_id": tx_id,
+                            "proposal_id": proposal.proposal_id,
+                            "contract_principal": proposal.contract_principal,
+                            "exception_details": str(e),
                         }
                     )
 
@@ -438,6 +518,11 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "success": True,
                     "votes_processed": successful_votes,
                     "votes_failed": len(results) - successful_votes,
+                    "total_votes": len(results),
+                    "proposal_id": proposal_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "completed_success",
                     "results": results,
                 }
                 update_data = QueueMessageBase(is_processed=True, result=result)
@@ -455,8 +540,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "success": False,
                     "votes_processed": successful_votes,
                     "votes_failed": len(results) - successful_votes,
-                    "results": results,
+                    "total_votes": len(results),
+                    "proposal_id": proposal_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "partial_success",
                     "message": "Partial success - some votes failed",
+                    "results": results,
                 }
                 update_data = QueueMessageBase(result=result)
                 backend.update_queue_message(message_id, update_data)
@@ -474,8 +564,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "success": False,
                     "votes_processed": 0,
                     "votes_failed": len(results),
-                    "results": results,
+                    "total_votes": len(results),
+                    "proposal_id": proposal_id,
+                    "wallet_id": wallet_id,
+                    "message_id": message_id,
+                    "status": "all_failed",
                     "message": "All votes failed",
+                    "results": results,
                 }
                 update_data = QueueMessageBase(result=result)
                 backend.update_queue_message(message_id, update_data)
@@ -488,6 +583,11 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 "success": True,
                 "votes_processed": successful_votes,
                 "votes_failed": len(results) - successful_votes,
+                "total_votes": len(results),
+                "proposal_id": proposal_id,
+                "wallet_id": wallet_id,
+                "message_id": message_id,
+                "status": "processing_completed",
                 "results": results,
             }
 
@@ -502,7 +602,15 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 },
                 exc_info=True,
             )
-            result = {"success": False, "error": error_msg}
+            result = {
+                "success": False,
+                "error": error_msg,
+                "error_type": "processing_exception",
+                "message_id": message_id,
+                "wallet_id": wallet_id,
+                "status": "failed",
+                "exception_details": str(e),
+            }
 
             # Store result even for failed processing
             update_data = QueueMessageBase(result=result)
