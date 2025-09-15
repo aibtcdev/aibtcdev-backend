@@ -20,12 +20,12 @@ dependencies = [
     "pgvector<=0.4.1",
     "pillow>=10.0.0",
     "psycopg2-binary==2.9.10",
-    "pydantic==2.11.7",
+    "pydantic==2.11.9",
     "python-dotenv==1.1.1",
     "python-magic==0.4.27",
-    "python-telegram-bot==22.3",
+    "python-telegram-bot==22.4",
     "sqlalchemy==2.0.43",
-    "starlette<=0.47.3",
+    "starlette<=0.48.0",
     "supabase==2.18.1",
     "tiktoken==0.11.0",
     "tweepy==4.16.0",
@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 testing = [
     "pytest==8.4.2",
-    "pytest-asyncio==1.1.0",
+    "pytest-asyncio==1.2.0",
     "pytest-mock==3.15.0",
     "responses==0.25.8",
 ]
