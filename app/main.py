@@ -24,7 +24,7 @@ app.add_middleware(LoggingMiddleware)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(https://((sprint|sprint-faster|app|app-staging)\.aibtc\.dev|aibtc\.dev|aibtc\.com|staging\.aibtc\.chat|[^.]+\.aibtcdev-frontend(-staging)?\.pages\.dev)|http://localhost:3000)$",
+    allow_origin_regex=r"^(?:https://(?:aibtc\.dev|[^.]+\.aibtc\.dev|aibtc\.com|[^.]+\.aibtc\.com|[^.]+\.aibtcdev-frontend(?:-staging)?\.pages\.dev)|http://localhost:3000)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
