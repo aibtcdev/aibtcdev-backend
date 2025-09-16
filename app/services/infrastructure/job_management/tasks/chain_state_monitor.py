@@ -874,6 +874,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                     "chainhook_uuid": chainhook_data.get(
                                         "chainhook", {}
                                     ).get("uuid"),
+                                    "chainhook_payload": chainhook_data,
                                 },
                             )
 
