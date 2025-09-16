@@ -62,10 +62,10 @@ class STXTransferTask(BaseTask[STXTransferResult]):
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
-            # Check if backend wallet seed phrase is configured for cases where wallet_id is None
-            if not config.backend_wallet.seed_phrase:
+            # Check if STX transfer wallet seed phrase is configured for cases where wallet_id is None
+            if not config.stx_transfer_wallet.seed_phrase:
                 logger.warning(
-                    "Backend wallet seed phrase not configured - transfers with wallet_id=None will fail"
+                    "STX transfer wallet seed phrase not configured - transfers with wallet_id=None will fail"
                 )
             return True
         except Exception as e:
@@ -126,8 +126,8 @@ class STXTransferTask(BaseTask[STXTransferResult]):
                 if field not in message.message:
                     return False
 
-            # Validate wallet_id is present OR we have backend wallet config for None case
-            if not message.wallet_id and not config.backend_wallet.seed_phrase:
+            # Validate wallet_id is present OR we have STX transfer wallet config for None case
+            if not message.wallet_id and not config.stx_transfer_wallet.seed_phrase:
                 return False
 
             # Validate recipient is a valid string
@@ -184,10 +184,10 @@ class STXTransferTask(BaseTask[STXTransferResult]):
             # Execute the transfer
             logger.debug("Executing STX transfer...")
 
-            # If wallet_id is None, use backend wallet with seed phrase
+            # If wallet_id is None, use STX transfer wallet with seed phrase
             if wallet_id is None:
-                if not config.backend_wallet.seed_phrase:
-                    error_msg = "No wallet_id provided and backend wallet seed phrase not configured"
+                if not config.stx_transfer_wallet.seed_phrase:
+                    error_msg = "No wallet_id provided and STX transfer wallet seed phrase not configured"
                     logger.error(error_msg)
                     result = {"success": False, "error": error_msg}
                     update_data = QueueMessageBase(is_processed=True, result=result)
@@ -196,14 +196,14 @@ class STXTransferTask(BaseTask[STXTransferResult]):
 
                 logger.debug(
                     f"Transfer parameters - Recipient: {recipient}, Amount: {amount} STX, "
-                    f"Fee: {fee} microSTX, Using backend wallet (seed phrase)"
+                    f"Fee: {fee} microSTX, Using STX transfer wallet (seed phrase)"
                 )
 
-                # Use BunScriptRunner directly for backend wallet transfers
+                # Use BunScriptRunner directly for STX transfer wallet transfers
                 from app.tools.bun import BunScriptRunner
 
                 transfer_result = BunScriptRunner.bun_run_with_seed_phrase(
-                    config.backend_wallet.seed_phrase,
+                    config.stx_transfer_wallet.seed_phrase,
                     "stacks-wallet",
                     "transfer-my-stx.ts",
                     recipient,
@@ -230,7 +230,7 @@ class STXTransferTask(BaseTask[STXTransferResult]):
             # Check if transfer was successful
             if transfer_result.get("success"):
                 wallet_info = (
-                    "backend wallet (seed phrase)"
+                    "STX transfer wallet (seed phrase)"
                     if wallet_id is None
                     else f"wallet {wallet_id}"
                 )
@@ -242,7 +242,7 @@ class STXTransferTask(BaseTask[STXTransferResult]):
                     "transferred": True,
                     "amount": amount,
                     "recipient": recipient,
-                    "wallet_type": "backend" if wallet_id is None else "user",
+                    "wallet_type": "stx_transfer" if wallet_id is None else "user",
                     "result": transfer_result,
                 }
             else:

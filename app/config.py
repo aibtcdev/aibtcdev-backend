@@ -56,6 +56,13 @@ class BackendWalletConfig:
 
 
 @dataclass
+class STXTransferWalletConfig:
+    """Configuration for STX transfer operations with dedicated wallet."""
+
+    seed_phrase: str = os.getenv("AIBTC_STX_TRANSFER_WALLET_SEED_PHRASE", "")
+
+
+@dataclass
 class TelegramConfig:
     token: str = os.getenv("AIBTC_TELEGRAM_BOT_TOKEN", "")
     enabled: bool = os.getenv("AIBTC_TELEGRAM_BOT_ENABLED", "false").lower() == "true"
@@ -259,6 +266,9 @@ class Config:
     network: NetworkConfig = field(default_factory=NetworkConfig)
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     backend_wallet: BackendWalletConfig = field(default_factory=BackendWalletConfig)
+    stx_transfer_wallet: STXTransferWalletConfig = field(
+        default_factory=STXTransferWalletConfig
+    )
     chat_llm: ChatLLMConfig = field(default_factory=ChatLLMConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     huggingface: HuggingFaceConfig = field(default_factory=HuggingFaceConfig)
