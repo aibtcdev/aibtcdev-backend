@@ -67,7 +67,7 @@ async def generate_proposal_metadata(
         result = await invoke_structured(
             messages=prompt,
             output_schema=ProposalMetadataOutput,
-            model="openai/gpt-5-nano",
+            model="google/gemini-2.5-flash-lite",
             callbacks=callbacks,
         )
 
