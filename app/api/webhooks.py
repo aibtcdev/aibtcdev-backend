@@ -49,7 +49,7 @@ async def chainhook(
             "Chainhook processing failed", extra={"error": str(e)}, exc_info=True
         )
 
-    return Response(status_code=200)
+    return Response(status_code=204)
 
 
 @router.post("/dao")
