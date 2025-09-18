@@ -25,16 +25,16 @@ async def chainhook(
     This endpoint requires Bearer token authentication via the Authorization header.
     The token must match the one configured in AIBTC_WEBHOOK_AUTH_TOKEN.
 
-    Returns 204 only if processing is successful, otherwise raises HTTPException.
+    Always returns 200 status code regardless of processing outcome.
 
     Args:
         data: The webhook payload as JSON
 
     Returns:
-        Response: 204 No Content status on success
+        Response: 200 OK status always
 
     Raises:
-        HTTPException: If authentication fails or processing fails
+        HTTPException: If authentication fails
     """
     service = ChainhookService()
 
@@ -44,14 +44,12 @@ async def chainhook(
         )
         await service.process(data)
         logger.info("Chainhook processing completed")
-        return Response(status_code=204)
     except Exception as e:
         logger.error(
             "Chainhook processing failed", extra={"error": str(e)}, exc_info=True
         )
-        raise HTTPException(
-            status_code=500, detail=f"Error processing chainhook webhook: {str(e)}"
-        )
+
+    return Response(status_code=200)
 
 
 @router.post("/dao")
