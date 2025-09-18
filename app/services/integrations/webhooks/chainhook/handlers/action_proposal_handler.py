@@ -989,7 +989,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                     quorum_threshold="0",  # No quorum calculation in fallback
                                     total_selected_tokens=str(
                                         sum(
-                                            int(w.get("token_amount", "0"))
+                                            int(float(w.get("token_amount", "0")))
                                             for w in lottery_selection.selected_wallets
                                         )
                                     ),
@@ -997,7 +997,10 @@ class ActionProposalHandler(BaseProposalHandler):
                                     quorum_percentage=0.15,
                                     total_eligible_wallets=len(agents),
                                     total_eligible_tokens=str(
-                                        sum(int(agent.token_amount) for agent in agents)
+                                        sum(
+                                            int(float(agent.token_amount))
+                                            for agent in agents
+                                        )
                                     ),
                                     selection_rounds=1,
                                     # Backward compatibility
@@ -1239,7 +1242,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                         quorum_threshold="0",
                                         total_selected_tokens=str(
                                             sum(
-                                                int(w.get("token_amount", "0"))
+                                                int(float(w.get("token_amount", "0")))
                                                 for w in lottery_selection.selected_wallets
                                             )
                                         ),
@@ -1248,7 +1251,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                         total_eligible_wallets=len(agents),
                                         total_eligible_tokens=str(
                                             sum(
-                                                int(agent.token_amount)
+                                                int(float(agent.token_amount))
                                                 for agent in agents
                                             )
                                         ),
