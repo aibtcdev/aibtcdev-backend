@@ -315,10 +315,14 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             # Separate chain states with and without chainhook UUIDs
             chain_states_with_chainhooks = [
-                cs for cs in chain_states_for_network if cs.chainhook_uuid is not None
+                cs
+                for cs in chain_states_for_network
+                if cs.chainhook_uuid is not None and cs.chainhook_uuid.strip() != ""
             ]
             chain_states_without_chainhooks = [
-                cs for cs in chain_states_for_network if cs.chainhook_uuid is None
+                cs
+                for cs in chain_states_for_network
+                if cs.chainhook_uuid is None or cs.chainhook_uuid.strip() == ""
             ]
 
             logger.info(
@@ -333,11 +337,13 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             # First, create chainhooks for chain states that don't have them
             for chain_state in chain_states_without_chainhooks:
+                uuid_status = "None" if chain_state.chainhook_uuid is None else "empty"
                 logger.info(
-                    "Creating chainhook for chain state without chainhook_uuid",
+                    f"Creating chainhook for chain state with {uuid_status} chainhook_uuid",
                     extra={
                         "task": "chainhook_monitor",
                         "chain_state_id": chain_state.id,
+                        "current_uuid": chain_state.chainhook_uuid,
                     },
                 )
                 new_uuid = self._recreate_chainhook_for_chain_state(chain_state)
@@ -396,11 +402,11 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
             # Check each chain state's chainhook status directly
             for chain_state in chain_states_with_chainhooks:
                 chainhook_uuid = chain_state.chainhook_uuid
-                # Since we filtered for non-None chainhook_uuid, this should never be None
+                # Since we filtered for non-None and non-empty chainhook_uuid, this should never be None or empty
                 # but add an assertion for type safety
-                if chainhook_uuid is None:
+                if chainhook_uuid is None or chainhook_uuid.strip() == "":
                     logger.error(
-                        "Chain state has None chainhook_uuid, skipping",
+                        "Chain state has None or empty chainhook_uuid, skipping",
                         extra={
                             "task": "chainhook_monitor",
                             "chain_state_id": chain_state.id,
