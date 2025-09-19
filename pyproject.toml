@@ -8,7 +8,7 @@ dependencies = [
     "aiohttp==3.12.15",
     "apscheduler==3.11.0",
     "cachetools==6.2.0",
-    "fastapi==0.116.1",
+    "fastapi==0.116.2",
     "httpx>=0.25.0",
     "langchain==0.3.27",
     "langchain-community==0.3.29",
@@ -26,7 +26,7 @@ dependencies = [
     "python-telegram-bot==22.4",
     "sqlalchemy==2.0.43",
     "starlette<=0.48.0",
-    "supabase==2.18.1",
+    "supabase==2.19.0",
     "tiktoken==0.11.0",
     "tweepy==4.16.0",
     "uvicorn==0.35.0",
@@ -37,6 +37,6 @@ dependencies = [
 testing = [
     "pytest==8.4.2",
     "pytest-asyncio==1.2.0",
-    "pytest-mock==3.15.0",
+    "pytest-mock==3.15.1",
     "responses==0.25.8",
 ]
