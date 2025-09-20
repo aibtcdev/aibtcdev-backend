@@ -337,13 +337,21 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
     try:
         decoded_bytes = binascii.unhexlify(hex_string)
 
-        # Handle Clarity hex format which often includes length prefixes
-        # First 5 bytes typically contain: 4-byte length + 1-byte type indicator
-        if len(decoded_bytes) > 5 and decoded_bytes[0] == 0x0D:  # Length byte check
-            # Skip the 4-byte length prefix and any potential type indicator
-            decoded_bytes = decoded_bytes[5:]
+        # Handle Clarity hex format with various string prefixes
+        if len(decoded_bytes) > 5:
+            # Try common Clarity string prefixes
+            if decoded_bytes[0] == 0x0D:  # Most common string type
+                decoded_bytes = decoded_bytes[5:]
+            elif len(decoded_bytes) > 1:
+                # Try skipping first few bytes for other formats
+                decoded_bytes = decoded_bytes[1:]
 
-        decoded_string = decoded_bytes.decode("utf-8", errors="ignore")
+        # ROBUST CLEANUP: Remove any remaining non-printable ASCII characters at the start
+        # This handles cases where prefix bytes are left behind (like &, >, 5, ` etc.)
+        while decoded_bytes and not (32 <= decoded_bytes[0] <= 126):
+            decoded_bytes = decoded_bytes[1:]
+
+        decoded_string = decoded_bytes.decode("utf-8", errors="ignore").strip()
         logger.debug(
             "Hex string decoded successfully",
             extra={"hex_preview": hex_string[:20] + "..."},
