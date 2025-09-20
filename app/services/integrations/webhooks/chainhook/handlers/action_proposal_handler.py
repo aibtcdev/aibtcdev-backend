@@ -861,36 +861,6 @@ class ActionProposalHandler(BaseProposalHandler):
                     f"Created new {'successful' if tx_success else 'failed'} action proposal record in database: {proposal.id}"
                 )
 
-                # Create Twitter post for successful proposal submissions
-                if tx_success:
-                    # Create Twitter post for new proposal submission
-                    proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
-                    follow_up_message = f"\nView contribution details:\n{proposal.title}\n{proposal_url}"
-
-                    # Create the first post for new proposal submission
-                    first_post = f"📥 Submitted: Contribution #{proposal.proposal_id} \n🤖 Agent Voting Begins: Block {proposal.vote_start}"
-
-                    # Add x_url if available
-                    if proposal.x_url:
-                        first_post += f"\n{proposal.x_url}"
-
-                    # Create the posts array
-                    posts = [first_post, follow_up_message]
-
-                    # Create queue message for Twitter
-                    tweet_message = backend.create_queue_message(
-                        QueueMessageCreate(
-                            type=QueueMessageType.get_or_create("tweet"),
-                            message={
-                                "posts": posts,
-                            },
-                            dao_id=dao_data["id"],
-                        )
-                    )
-                    self.logger.info(
-                        f"Created tweet queue message for new proposal submission: {tweet_message.id}"
-                    )
-
                 # Queue evaluation messages for proposals with agents holding governance tokens
                 # Note: Removing tx_success check to debug lottery creation issues
                 self.logger.info(
