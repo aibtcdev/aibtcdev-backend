@@ -50,7 +50,7 @@ class DAOProposalEvaluationResult(RunnerResult):
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=1,
+    max_concurrent=5,
     requires_ai=True,
     batch_size=5,
     enable_dead_letter_queue=True,
