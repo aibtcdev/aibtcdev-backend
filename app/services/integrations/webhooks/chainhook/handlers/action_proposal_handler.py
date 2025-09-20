@@ -1155,6 +1155,38 @@ class ActionProposalHandler(BaseProposalHandler):
                     f"Successfully updated action proposal {updated_proposal.id} with chainhook data"
                 )
 
+                # Create Twitter post for successful proposal updates (when blockchain data is added)
+                if tx_success:
+                    # Create Twitter post for updated proposal submission
+                    proposal_url = (
+                        f"{config.api.base_url}/proposals/{updated_proposal.id}"
+                    )
+                    follow_up_message = f"\nView contribution details:\n{updated_proposal.title}\n{proposal_url}"
+
+                    # Create the first post for proposal submission
+                    first_post = f"📥 Submitted: Contribution #{updated_proposal.proposal_id} \n🤖 Agent Voting Begins: Block {updated_proposal.vote_start}"
+
+                    # Add x_url if available
+                    if updated_proposal.x_url:
+                        first_post += f"\n{updated_proposal.x_url}"
+
+                    # Create the posts array
+                    posts = [first_post, follow_up_message]
+
+                    # Create queue message for Twitter
+                    tweet_message = backend.create_queue_message(
+                        QueueMessageCreate(
+                            type=QueueMessageType.get_or_create("tweet"),
+                            message={
+                                "posts": posts,
+                            },
+                            dao_id=dao_data["id"],
+                        )
+                    )
+                    self.logger.info(
+                        f"Created tweet queue message for updated proposal submission: {tweet_message.id}"
+                    )
+
                 # Queue evaluation messages for proposals with agents
                 # Note: Removing tx_success check to debug lottery creation issues
                 self.logger.info(
