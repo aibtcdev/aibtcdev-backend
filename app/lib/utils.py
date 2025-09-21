@@ -3,6 +3,7 @@
 import binascii
 import json
 import re
+import struct
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -322,7 +323,7 @@ def strip_metadata_section(text: str) -> str:
 
 
 def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
-    """Decodes a hexadecimal-encoded string if valid.
+    """Decodes a Clarity-encoded hexadecimal string.
 
     Args:
         hex_string: The hexadecimal string to decode.
@@ -332,32 +333,33 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
     """
     if not hex_string:
         return None
+
     if hex_string.startswith("0x"):
-        hex_string = hex_string[2:]  # Remove "0x" prefix
+        hex_string = hex_string[2:]
+
     try:
         decoded_bytes = binascii.unhexlify(hex_string)
 
-        # Handle Clarity hex format which often includes length prefixes
-        # First 5 bytes typically contain: 4-byte length + 1-byte type indicator
-        if len(decoded_bytes) > 5 and decoded_bytes[0] == 0x0D:  # Length byte check
-            # Skip the 4-byte length prefix and any potential type indicator
-            decoded_bytes = decoded_bytes[5:]
+        # Check for Clarity string types
+        if len(decoded_bytes) > 5:
+            type_tag = decoded_bytes[0]
 
-        decoded_string = decoded_bytes.decode("utf-8", errors="ignore")
-        logger.debug(
-            "Hex string decoded successfully",
-            extra={"hex_preview": hex_string[:20] + "..."},
-        )
-        return decoded_string
-    except (binascii.Error, UnicodeDecodeError) as e:
-        logger.warning(
-            "Hex string decoding failed",
-            extra={
-                "error": str(e),
-                "hex_preview": hex_string[:20] + "..." if hex_string else "None",
-            },
-        )
-        return None  # Return None if decoding fails
+            if type_tag == 0x0D or type_tag == 0x0E:  # ASCII or UTF-8 string
+                # Read length from bytes 1-4 (big-endian)
+                length = struct.unpack(">I", decoded_bytes[1:5])[0]
+
+                # Extract content starting from byte 5
+                if len(decoded_bytes) >= 5 + length:
+                    content = decoded_bytes[5 : 5 + length]
+                    encoding = "ascii" if type_tag == 0x0D else "utf-8"
+                    return content.decode(encoding, errors="ignore")
+
+        # Fallback for non-Clarity format
+        return decoded_bytes.decode("utf-8", errors="ignore")
+
+    except Exception as e:
+        logger.warning(f"Hex decoding failed: {e}")
+        return None
 
 
 def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
