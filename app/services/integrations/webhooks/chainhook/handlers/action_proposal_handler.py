@@ -1134,7 +1134,7 @@ class ActionProposalHandler(BaseProposalHandler):
                     follow_up_message = f"\nView contribution details:\n{proposal_url}"
 
                     # Create the first post for proposal submission
-                    first_post = f"📥 Submitted: Contribution #{updated_proposal.proposal_id} \n🤖 Agent Voting Begins: Block {updated_proposal.vote_start:,} "
+                    first_post = f"📥 Submitted: Contribution #{updated_proposal.proposal_id} (testnet)\n🤖 Agent Voting Begins: Block {updated_proposal.vote_start:,} "
 
                     # Add x_url if available
                     if updated_proposal.x_url:
