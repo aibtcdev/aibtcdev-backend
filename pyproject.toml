@@ -8,7 +8,7 @@ dependencies = [
     "aiohttp==3.12.15",
     "apscheduler==3.11.0",
     "cachetools==6.2.0",
-    "fastapi==0.116.2",
+    "fastapi==0.117.1",
     "httpx>=0.25.0",
     "langchain==0.3.27",
     "langchain-community==0.3.29",
@@ -29,7 +29,7 @@ dependencies = [
     "supabase==2.19.0",
     "tiktoken==0.11.0",
     "tweepy==4.16.0",
-    "uvicorn==0.35.0",
+    "uvicorn==0.36.0",
     "vecs==0.4.5",
 ]
 
