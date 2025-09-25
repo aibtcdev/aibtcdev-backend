@@ -59,6 +59,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     """Task runner for processing and voting on DAO proposals with enhanced capabilities."""
 
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_vote")
+    MAX_MESSAGE_RETRIES = 3
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed DAO proposal vote messages from the queue."""
@@ -548,17 +549,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "message": "Partial success - some votes failed",
                     "results": results,
                 }
-                update_data = QueueMessageBase(result=result)
-                backend.update_queue_message(message_id, update_data)
-                logger.warning(
-                    "Only partial votes succeeded for message - leaving unprocessed for retry",
-                    extra={
-                        "task": "dao_proposal_voter",
-                        "successful_votes": successful_votes,
-                        "total_results": len(results),
-                        "message_id": message_id,
-                    },
-                )
             else:
                 result = {
                     "success": False,
@@ -572,24 +562,42 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "message": "All votes failed",
                     "results": results,
                 }
-                update_data = QueueMessageBase(result=result)
-                backend.update_queue_message(message_id, update_data)
-                logger.error(
-                    "No votes succeeded for message - leaving unprocessed for retry",
-                    extra={"task": "dao_proposal_voter", "message_id": message_id},
-                )
 
-            return {
-                "success": True,
-                "votes_processed": successful_votes,
-                "votes_failed": len(results) - successful_votes,
-                "total_votes": len(results),
-                "proposal_id": proposal_id,
-                "wallet_id": wallet_id,
-                "message_id": message_id,
-                "status": "processing_completed",
-                "results": results,
-            }
+            # Handle retries for failure cases
+            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            if not result["success"]:
+                current_retries += 1
+                result["retry_count"] = current_retries
+                if current_retries >= self.MAX_MESSAGE_RETRIES:
+                    result["final_status"] = "failed_after_retries"
+                    update_data = QueueMessageBase(is_processed=True, result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.error(
+                        "Message failed after max retries - marking as processed",
+                        extra={
+                            "task": "dao_proposal_voter",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+                else:
+                    update_data = QueueMessageBase(result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.warning(
+                        "Message processing failed - incrementing retry count",
+                        extra={
+                            "task": "dao_proposal_voter",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+            else:
+                # For success, include retry_count reset if needed
+                result["retry_count"] = 0
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+
+            return result
 
         except Exception as e:
             error_msg = "Error processing message"
@@ -612,9 +620,33 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 "exception_details": str(e),
             }
 
-            # Store result even for failed processing
-            update_data = QueueMessageBase(result=result)
-            backend.update_queue_message(message_id, update_data)
+            # Handle retries for exception case
+            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries += 1
+            result["retry_count"] = current_retries
+            if current_retries >= self.MAX_MESSAGE_RETRIES:
+                result["final_status"] = "failed_after_retries"
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.error(
+                    "Message failed after max retries - marking as processed",
+                    extra={
+                        "task": "dao_proposal_voter",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
+            else:
+                update_data = QueueMessageBase(result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.warning(
+                    "Message processing failed - incrementing retry count",
+                    extra={
+                        "task": "dao_proposal_voter",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
 
             return result
 

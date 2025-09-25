@@ -55,6 +55,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     """Task runner for processing and concluding DAO proposals with enhanced capabilities."""
 
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_conclude")
+    MAX_MESSAGE_RETRIES = 3
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
@@ -240,19 +241,66 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 },
             )
 
-            result = {"success": True, "concluded": True, "result": conclusion_result}
+            from app.lib.utils import extract_transaction_id_from_tool_result
 
-            # Store result and mark the message as processed
-            update_data = QueueMessageBase(is_processed=True, result=result)
-            backend.update_queue_message(message_id, update_data)
+            if conclusion_result.get("success", False):
+                tx_id = extract_transaction_id_from_tool_result(conclusion_result)
+                if not tx_id:
+                    result = {"success": False, "error": "No transaction ID in tool result"}
+                else:
+                    result = {"success": True, "concluded": True, "result": conclusion_result, "tx_id": tx_id}
+                    logger.info(
+                        "Successfully concluded proposal",
+                        extra={
+                            "task": "dao_proposal_conclude",
+                            "proposal_id": proposal.proposal_id,
+                        },
+                    )
+            else:
+                error_msg = conclusion_result.get("message", "Tool execution failed")
+                result = {"success": False, "error": error_msg}
+                logger.error(
+                    "Failed to conclude proposal",
+                    extra={
+                        "task": "dao_proposal_conclude",
+                        "proposal_id": proposal.proposal_id,
+                        "error": error_msg,
+                    },
+                )
 
-            logger.info(
-                "Successfully concluded proposal",
-                extra={
-                    "task": "dao_proposal_conclude",
-                    "proposal_id": proposal.proposal_id,
-                },
-            )
+            # Handle retries for failure cases
+            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            if not result["success"]:
+                current_retries += 1
+                result["retry_count"] = current_retries
+                if current_retries >= self.MAX_MESSAGE_RETRIES:
+                    result["final_status"] = "failed_after_retries"
+                    update_data = QueueMessageBase(is_processed=True, result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.error(
+                        "Message failed after max retries - marking as processed",
+                        extra={
+                            "task": "dao_proposal_conclude",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+                else:
+                    update_data = QueueMessageBase(result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.warning(
+                        "Message processing failed - incrementing retry count",
+                        extra={
+                            "task": "dao_proposal_conclude",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+            else:
+                # For success, include retry_count reset if needed
+                result["retry_count"] = 0
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
 
             return result
 
@@ -269,9 +317,33 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             )
             result = {"success": False, "error": error_msg}
 
-            # Store result even for failed processing
-            update_data = QueueMessageBase(result=result)
-            backend.update_queue_message(message_id, update_data)
+            # Handle retries for exception case
+            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries += 1
+            result["retry_count"] = current_retries
+            if current_retries >= self.MAX_MESSAGE_RETRIES:
+                result["final_status"] = "failed_after_retries"
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.error(
+                    "Message failed after max retries - marking as processed",
+                    extra={
+                        "task": "dao_proposal_conclude",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
+            else:
+                update_data = QueueMessageBase(result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.warning(
+                    "Message processing failed - incrementing retry count",
+                    extra={
+                        "task": "dao_proposal_conclude",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
 
             return result
 
