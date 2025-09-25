@@ -162,7 +162,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             return False
 
     async def _process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single DAO proposal voting message with enhanced error handling."""
+        """Process a single DAO proposal voting message, handling votes and retries.
+
+        Retries are driven by config.max_retries from the @job decorator.
+        """
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
@@ -565,6 +568,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
+                # Use task-configured max retries from @job decorator
                 if current_retries >= self.config.max_retries:
                     result["final_status"] = "failed_after_retries"
                     update_data = QueueMessageBase(is_processed=True, result=result)
@@ -621,6 +625,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             current_retries = self._get_current_retry_count(message)
             current_retries += 1
             result["retry_count"] = current_retries
+            # Use task-configured max retries from @job decorator
             if current_retries >= self.config.max_retries:
                 result["final_status"] = "failed_after_retries"
                 update_data = QueueMessageBase(is_processed=True, result=result)

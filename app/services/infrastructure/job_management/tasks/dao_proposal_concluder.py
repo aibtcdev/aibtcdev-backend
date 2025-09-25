@@ -154,7 +154,10 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             return False
 
     async def _process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single DAO proposal conclusion message with enhanced error handling."""
+        """Process a single DAO proposal conclusion message, handling conclusion and retries.
+
+        Retries are driven by config.max_retries from the @job decorator.
+        """
         message_id = message.id
         message_data = message.message or {}
         dao_id = message.dao_id
@@ -279,6 +282,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
+                # Use task-configured max retries from @job decorator
                 if current_retries >= self.config.max_retries:
                     result["final_status"] = "failed_after_retries"
                     update_data = QueueMessageBase(is_processed=True, result=result)
@@ -327,6 +331,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             current_retries = self._get_current_retry_count(message)
             current_retries += 1
             result["retry_count"] = current_retries
+            # Use task-configured max retries from @job decorator
             if current_retries >= self.config.max_retries:
                 result["final_status"] = "failed_after_retries"
                 update_data = QueueMessageBase(is_processed=True, result=result)

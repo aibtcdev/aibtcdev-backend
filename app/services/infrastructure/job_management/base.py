@@ -118,6 +118,7 @@ class BaseTask(ABC, Generic[T]):
         self._start_time: Optional[float] = None
 
     def _get_current_retry_count(self, message: QueueMessage) -> int:
+        """Retrieve the current retry count from the message's result, defaulting to 0."""
         return message.result.get("retry_count", 0) if message.result else 0
 
     @property
