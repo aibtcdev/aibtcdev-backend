@@ -60,7 +60,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     """Task runner for processing and voting on DAO proposals with enhanced capabilities."""
 
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_vote")
-    MAX_MESSAGE_RETRIES = 3
 
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed DAO proposal vote messages from the queue."""
@@ -566,7 +565,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
-                if current_retries >= self.MAX_MESSAGE_RETRIES:
+                if current_retries >= self.config.max_retries:
                     result["final_status"] = "failed_after_retries"
                     update_data = QueueMessageBase(is_processed=True, result=result)
                     backend.update_queue_message(message_id, update_data)
@@ -622,7 +621,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             current_retries = self._get_current_retry_count(message)
             current_retries += 1
             result["retry_count"] = current_retries
-            if current_retries >= self.MAX_MESSAGE_RETRIES:
+            if current_retries >= self.config.max_retries:
                 result["final_status"] = "failed_after_retries"
                 update_data = QueueMessageBase(is_processed=True, result=result)
                 backend.update_queue_message(message_id, update_data)

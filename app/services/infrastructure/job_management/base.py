@@ -24,7 +24,7 @@ T = TypeVar("T", bound=RunnerResult)
 class RunnerConfig:
     """Configuration class for runners."""
 
-    pass
+    max_retries: int = 3
 
 
 class JobType:
