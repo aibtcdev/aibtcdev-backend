@@ -15,6 +15,7 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import extract_transaction_id_from_tool_result
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -410,9 +411,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         }
                     )
                     continue
-
-                # Extract transaction ID using shared utility function
-                from app.lib.utils import extract_transaction_id_from_tool_result
 
                 tx_id = extract_transaction_id_from_tool_result(vote_result)
 

@@ -13,6 +13,7 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import extract_transaction_id_from_tool_result
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -243,8 +244,6 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                     "has_result": bool(conclusion_result),
                 },
             )
-
-            from app.lib.utils import extract_transaction_id_from_tool_result
 
             if conclusion_result.get("success", False):
                 tx_id = extract_transaction_id_from_tool_result(conclusion_result)
