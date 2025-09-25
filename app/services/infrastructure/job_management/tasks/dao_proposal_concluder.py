@@ -246,9 +246,17 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             if conclusion_result.get("success", False):
                 tx_id = extract_transaction_id_from_tool_result(conclusion_result)
                 if not tx_id:
-                    result = {"success": False, "error": "No transaction ID in tool result"}
+                    result = {
+                        "success": False,
+                        "error": "No transaction ID in tool result",
+                    }
                 else:
-                    result = {"success": True, "concluded": True, "result": conclusion_result, "tx_id": tx_id}
+                    result = {
+                        "success": True,
+                        "concluded": True,
+                        "result": conclusion_result,
+                        "tx_id": tx_id,
+                    }
                     logger.info(
                         "Successfully concluded proposal",
                         extra={
@@ -269,7 +277,9 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 )
 
             # Handle retries for failure cases
-            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries = (
+                message.result.get("retry_count", 0) if message.result else 0
+            )
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
@@ -318,7 +328,9 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             result = {"success": False, "error": error_msg}
 
             # Handle retries for exception case
-            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries = (
+                message.result.get("retry_count", 0) if message.result else 0
+            )
             current_retries += 1
             result["retry_count"] = current_retries
             if current_retries >= self.MAX_MESSAGE_RETRIES:

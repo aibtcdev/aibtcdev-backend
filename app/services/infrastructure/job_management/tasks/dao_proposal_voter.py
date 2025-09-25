@@ -564,7 +564,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 }
 
             # Handle retries for failure cases
-            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries = (
+                message.result.get("retry_count", 0) if message.result else 0
+            )
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
@@ -621,7 +623,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             }
 
             # Handle retries for exception case
-            current_retries = message.result.get("retry_count", 0) if message.result else 0
+            current_retries = (
+                message.result.get("retry_count", 0) if message.result else 0
+            )
             current_retries += 1
             result["retry_count"] = current_retries
             if current_retries >= self.MAX_MESSAGE_RETRIES:
