@@ -58,9 +58,6 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_conclude")
     MAX_MESSAGE_RETRIES = 3
 
-    def _get_current_retry_count(self, message: QueueMessage) -> int:
-        return message.result.get("retry_count", 0) if message.result else 0
-
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
