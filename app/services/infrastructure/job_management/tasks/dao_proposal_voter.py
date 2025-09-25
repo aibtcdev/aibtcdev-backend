@@ -61,6 +61,9 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_vote")
     MAX_MESSAGE_RETRIES = 3
 
+    def _get_current_retry_count(self, message: QueueMessage) -> int:
+        return message.result.get("retry_count", 0) if message.result else 0
+
     async def get_pending_messages(self) -> List[QueueMessage]:
         """Get all unprocessed DAO proposal vote messages from the queue."""
         filters = QueueMessageFilter(type=self.QUEUE_TYPE, is_processed=False)
@@ -623,9 +626,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             }
 
             # Handle retries for exception case
-            current_retries = (
-                message.result.get("retry_count", 0) if message.result else 0
-            )
+            current_retries = self._get_current_retry_count(message)
             current_retries += 1
             result["retry_count"] = current_retries
             if current_retries >= self.MAX_MESSAGE_RETRIES:

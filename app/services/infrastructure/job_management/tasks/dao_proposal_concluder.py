@@ -57,6 +57,9 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
     QUEUE_TYPE = QueueMessageType.get_or_create("dao_proposal_conclude")
     MAX_MESSAGE_RETRIES = 3
 
+    def _get_current_retry_count(self, message: QueueMessage) -> int:
+        return message.result.get("retry_count", 0) if message.result else 0
+
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
@@ -277,9 +280,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
                 )
 
             # Handle retries for failure cases
-            current_retries = (
-                message.result.get("retry_count", 0) if message.result else 0
-            )
+            current_retries = self._get_current_retry_count(message)
             if not result["success"]:
                 current_retries += 1
                 result["retry_count"] = current_retries
@@ -328,9 +329,7 @@ class DAOProposalConcluderTask(BaseTask[DAOProposalConcludeResult]):
             result = {"success": False, "error": error_msg}
 
             # Handle retries for exception case
-            current_retries = (
-                message.result.get("retry_count", 0) if message.result else 0
-            )
+            current_retries = self._get_current_retry_count(message)
             current_retries += 1
             result["retry_count"] = current_retries
             if current_retries >= self.MAX_MESSAGE_RETRIES:
