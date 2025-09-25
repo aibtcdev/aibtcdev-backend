@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 
 from app.lib.logger import configure_logger
 
-from .base import BaseTask, JobType
+from .base import BaseTask, JobType, RunnerConfig
 
 logger = configure_logger(__name__)
 
