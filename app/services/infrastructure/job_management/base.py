@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
+from app.backend.models import QueueMessage
 from app.lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -23,7 +24,7 @@ T = TypeVar("T", bound=RunnerResult)
 class RunnerConfig:
     """Configuration class for runners."""
 
-    pass
+    max_retries: int = 3
 
 
 class JobType:
@@ -115,6 +116,10 @@ class BaseTask(ABC, Generic[T]):
     def __init__(self, config: Optional[RunnerConfig] = None):
         self.config = config or RunnerConfig()
         self._start_time: Optional[float] = None
+
+    def _get_current_retry_count(self, message: QueueMessage) -> int:
+        """Retrieve the current retry count from the message's result, defaulting to 0."""
+        return message.result.get("retry_count", 0) if message.result else 0
 
     @property
     def task_name(self) -> str:

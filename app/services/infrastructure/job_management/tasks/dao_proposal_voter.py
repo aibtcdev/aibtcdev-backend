@@ -15,6 +15,7 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import extract_transaction_id_from_tool_result
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -161,7 +162,10 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             return False
 
     async def _process_message(self, message: QueueMessage) -> Dict[str, Any]:
-        """Process a single DAO proposal voting message with enhanced error handling."""
+        """Process a single DAO proposal voting message, handling votes and retries.
+
+        Retries are driven by config.max_retries from the @job decorator.
+        """
         message_id = message.id
         message_data = message.message or {}
         wallet_id = message.wallet_id
@@ -407,9 +411,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     )
                     continue
 
-                # Extract transaction ID using shared utility function
-                from app.lib.utils import extract_transaction_id_from_tool_result
-
                 tx_id = extract_transaction_id_from_tool_result(vote_result)
 
                 if not tx_id:
@@ -548,17 +549,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "message": "Partial success - some votes failed",
                     "results": results,
                 }
-                update_data = QueueMessageBase(result=result)
-                backend.update_queue_message(message_id, update_data)
-                logger.warning(
-                    "Only partial votes succeeded for message - leaving unprocessed for retry",
-                    extra={
-                        "task": "dao_proposal_voter",
-                        "successful_votes": successful_votes,
-                        "total_results": len(results),
-                        "message_id": message_id,
-                    },
-                )
             else:
                 result = {
                     "success": False,
@@ -572,24 +562,43 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     "message": "All votes failed",
                     "results": results,
                 }
-                update_data = QueueMessageBase(result=result)
-                backend.update_queue_message(message_id, update_data)
-                logger.error(
-                    "No votes succeeded for message - leaving unprocessed for retry",
-                    extra={"task": "dao_proposal_voter", "message_id": message_id},
-                )
 
-            return {
-                "success": True,
-                "votes_processed": successful_votes,
-                "votes_failed": len(results) - successful_votes,
-                "total_votes": len(results),
-                "proposal_id": proposal_id,
-                "wallet_id": wallet_id,
-                "message_id": message_id,
-                "status": "processing_completed",
-                "results": results,
-            }
+            # Handle retries for failure cases
+            current_retries = self._get_current_retry_count(message)
+            if not result["success"]:
+                current_retries += 1
+                result["retry_count"] = current_retries
+                # Use task-configured max retries from @job decorator
+                if current_retries >= self.config.max_retries:
+                    result["final_status"] = "failed_after_retries"
+                    update_data = QueueMessageBase(is_processed=True, result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.error(
+                        "Message failed after max retries - marking as processed",
+                        extra={
+                            "task": "dao_proposal_voter",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+                else:
+                    update_data = QueueMessageBase(result=result)
+                    backend.update_queue_message(message_id, update_data)
+                    logger.warning(
+                        "Message processing failed - incrementing retry count",
+                        extra={
+                            "task": "dao_proposal_voter",
+                            "message_id": message_id,
+                            "retry_count": current_retries,
+                        },
+                    )
+            else:
+                # For success, include retry_count reset if needed
+                result["retry_count"] = 0
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+
+            return result
 
         except Exception as e:
             error_msg = "Error processing message"
@@ -612,9 +621,34 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 "exception_details": str(e),
             }
 
-            # Store result even for failed processing
-            update_data = QueueMessageBase(result=result)
-            backend.update_queue_message(message_id, update_data)
+            # Handle retries for exception case
+            current_retries = self._get_current_retry_count(message)
+            current_retries += 1
+            result["retry_count"] = current_retries
+            # Use task-configured max retries from @job decorator
+            if current_retries >= self.config.max_retries:
+                result["final_status"] = "failed_after_retries"
+                update_data = QueueMessageBase(is_processed=True, result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.error(
+                    "Message failed after max retries - marking as processed",
+                    extra={
+                        "task": "dao_proposal_voter",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
+            else:
+                update_data = QueueMessageBase(result=result)
+                backend.update_queue_message(message_id, update_data)
+                logger.warning(
+                    "Message processing failed - incrementing retry count",
+                    extra={
+                        "task": "dao_proposal_voter",
+                        "message_id": message_id,
+                        "retry_count": current_retries,
+                    },
+                )
 
             return result
 
