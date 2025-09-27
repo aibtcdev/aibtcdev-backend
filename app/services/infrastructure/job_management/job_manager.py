@@ -123,7 +123,10 @@ class JobManager:
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
         """Execute a job through the enhanced executor system with proper concurrency control."""
-        logger.info(f"🚀 Scheduled execution triggered for job type: {job_type}")
+        logger.info(
+            "Scheduled execution triggered",
+            extra={"job_type": job_type, "event_type": "scheduled_trigger"},
+        )
         try:
             from app.backend.models import QueueMessage, QueueMessageType
 
@@ -132,14 +135,23 @@ class JobManager:
 
             # Convert job_type string to JobType enum
             job_type_enum = JobType.get_or_create(job_type)
-            logger.debug(f"Converted job type '{job_type}' to enum: {job_type_enum}")
+            logger.debug(
+                "Job type converted to enum",
+                extra={"job_type": job_type, "job_type_enum": str(job_type_enum)},
+            )
 
-            logger.debug(f"🔍 Checking if {job_type} has work to do...")
+            logger.debug(
+                "Checking for available work",
+                extra={"job_type": job_type, "event_type": "work_check"},
+            )
 
             # Get job metadata to check if it should run
             metadata = JobRegistry.get_metadata(job_type_enum)
             if not metadata:
-                logger.error(f"No metadata found for job type: {job_type}")
+                logger.error(
+                    "Job metadata not found",
+                    extra={"job_type": job_type, "event_type": "metadata_error"},
+                )
                 return
 
             # For jobs that process messages, check if there are pending messages first
@@ -156,12 +168,18 @@ class JobManager:
 
                 if not pending_messages:
                     logger.debug(
-                        f"⏭️ Skipping {job_type} execution - no pending messages"
+                        "Skipping execution - no pending messages",
+                        extra={"job_type": job_type, "event_type": "skip_no_work"},
                     )
                     return
 
                 logger.debug(
-                    f"📝 Found {len(pending_messages)} pending {job_type} messages"
+                    "Found pending messages",
+                    extra={
+                        "job_type": job_type,
+                        "pending_count": len(pending_messages),
+                        "event_type": "work_found",
+                    },
                 )
 
             # Create a synthetic queue message for scheduled execution
@@ -182,19 +200,36 @@ class JobManager:
 
             # Enqueue the synthetic message with the job's priority
             logger.debug(
-                f"Enqueuing job {job_type} to executor with priority {metadata.priority}"
+                "Enqueuing job to executor",
+                extra={
+                    "job_type": job_type,
+                    "priority": str(metadata.priority),
+                    "event_type": "enqueue",
+                },
             )
             job_id = await self._executor.priority_queue.enqueue(
                 synthetic_message, metadata.priority
             )
 
             logger.info(
-                f"✅ Enqueued scheduled job '{job_type}' with ID {job_id} (priority: {metadata.priority})"
+                "Scheduled job enqueued successfully",
+                extra={
+                    "job_type": job_type,
+                    "job_id": str(job_id),
+                    "priority": str(metadata.priority),
+                    "event_type": "enqueue_success",
+                },
             )
 
         except Exception as e:
             logger.error(
-                f"Error enqueuing scheduled job {job_type}: {str(e)}", exc_info=True
+                "Failed to enqueue scheduled job",
+                extra={
+                    "job_type": job_type,
+                    "error": str(e),
+                    "event_type": "enqueue_error",
+                },
+                exc_info=True,
             )
 
     def schedule_jobs(self, scheduler: AsyncIOScheduler) -> bool:
@@ -231,16 +266,34 @@ class JobManager:
 
                 scheduled_count += 1
                 logger.info(
-                    f"Scheduled {job_config.metadata.name} "
-                    f"(priority: {job_config.metadata.priority}, "
-                    f"interval: {interval_seconds}s, "
-                    f"max_concurrent: {job_config.metadata.max_concurrent})"
+                    "Job scheduled successfully",
+                    extra={
+                        "job_name": job_config.metadata.name,
+                        "job_type": job_config.job_type,
+                        "priority": str(job_config.metadata.priority),
+                        "interval_seconds": interval_seconds,
+                        "max_concurrent": job_config.metadata.max_concurrent,
+                        "event_type": "schedule_success",
+                    },
                 )
             else:
-                logger.info(f"{job_config.metadata.name} is disabled")
+                logger.info(
+                    "Job disabled - skipping scheduling",
+                    extra={
+                        "job_name": job_config.metadata.name,
+                        "job_type": job_config.job_type,
+                        "event_type": "job_disabled",
+                    },
+                )
 
         if scheduled_count > 0:
-            logger.info(f"Successfully scheduled {scheduled_count} jobs")
+            logger.info(
+                "Job scheduling completed",
+                extra={
+                    "scheduled_count": scheduled_count,
+                    "event_type": "scheduling_complete",
+                },
+            )
 
         return any_enabled
 
@@ -248,13 +301,16 @@ class JobManager:
         """Start the job executor."""
         await self._executor.start(num_workers)
         self._is_running = True
-        logger.info(f"Job executor started with {num_workers} workers")
+        logger.info(
+            "Job executor started",
+            extra={"worker_count": num_workers, "event_type": "executor_start"},
+        )
 
     async def stop_executor(self) -> None:
         """Stop the job executor."""
         await self._executor.stop()
         self._is_running = False
-        logger.info("Job executor stopped")
+        logger.info("Job executor stopped", extra={"event_type": "executor_stop"})
 
     def get_executor_stats(self) -> Dict[str, Any]:
         """Get executor statistics."""
@@ -446,7 +502,15 @@ class JobManager:
                 "job_type": job_type,
             }
         except Exception as e:
-            logger.error(f"Error triggering job {job_type}: {str(e)}", exc_info=True)
+            logger.error(
+                "Failed to trigger job execution",
+                extra={
+                    "job_type": job_type,
+                    "error": str(e),
+                    "event_type": "trigger_error",
+                },
+                exc_info=True,
+            )
             return {
                 "success": False,
                 "message": f"Failed to trigger job: {str(e)}",

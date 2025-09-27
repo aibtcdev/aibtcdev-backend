@@ -1,0 +1,229 @@
+{
+    "apply": [
+      {
+        "block_identifier": {
+          "hash": "0x6c5593acfd09f792aa28f26e8f3317aaec2df5709cdd0c4b39ef7977d808c272",
+          "index": 3561466
+        },
+        "metadata": {
+          "bitcoin_anchor_block_identifier": {
+            "hash": "0x4273dd5c6b9807c04515cdbc5bae8a47fad88fd1c6781ab7d01d01aeb60237e3",
+            "index": 92942
+          },
+          "block_time": 1758357173,
+          "confirm_microblock_identifier": null,
+          "cycle_number": null,
+          "pox_cycle_index": 4642,
+          "pox_cycle_length": 20,
+          "pox_cycle_position": 1,
+          "reward_set": null,
+          "signer_bitvec": "013700000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+          "signer_public_keys": [
+            "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+            "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+          ],
+          "signer_signature": [
+            "00a04cf02ed27a3d21a547bdd43db778d7c361080a359d940d52f192bc483576f8417c40f95f0316dea889b7c1d0b21e27a7bf4cedeaf90bb51a71bda0d309cf46",
+            "000f28350fa9747b87f1c0b8f3717c8f188ee26f0423b07c9bc08796c34d81507c02d949d6a9998286201d563715c330f5e30913447640628967387bb1a261f290"
+          ],
+          "stacks_block_hash": "0x0028ab6c3d5565b2a514c10b110602b7913fa045d180ccb778171f8d923e05fe",
+          "tenure_height": 89959
+        },
+        "parent_block_identifier": {
+          "hash": "0x84b7f15606fe3b0624eccddda6755c88091192c49378cd86a5ebf3ce9965b25e",
+          "index": 3561465
+        },
+        "timestamp": 1758357103,
+        "transactions": [
+          {
+            "metadata": {
+              "description": "invoked: ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF::vote-on-action-proposal(ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting, u25, false)",
+              "execution_cost": {
+                "read_count": 20,
+                "read_length": 45981,
+                "runtime": 200572,
+                "write_count": 2,
+                "write_length": 927
+              },
+              "fee": 647817,
+              "kind": {
+                "data": {
+                  "args": [
+                    "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                    "u25",
+                    "false"
+                  ],
+                  "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF",
+                  "method": "vote-on-action-proposal"
+                },
+                "type": "ContractCall"
+              },
+              "nonce": 28,
+              "position": {
+                "index": 0
+              },
+              "raw_tx": "0x8080000000040061f5342ba0260469cca730b6879d2787d500527b000000000000001c000000000009e2890000340448bf5764da667f4e08ab595ef0efd8cf2758623158e860d1afbf96216ab408d64cd683994d5ec05c4c2f2a4e23795c07c593e570f4ee660fd0fab1169762030200000000021aae73c4b18e8e994c8918a4c7b7a4df8dd50fc1792261696274632d616363742d53543335372d38355445512d535431475a2d4348334e4617766f74652d6f6e2d616374696f6e2d70726f706f73616c00000003061aae73c4b18e8e994c8918a4c7b7a4df8dd50fc1791d6661636573322d616374696f6e2d70726f706f73616c2d766f74696e67010000000000000000000000000000001904",
+              "receipt": {
+                "contract_calls_stack": [],
+                "events": [
+                  {
+                    "data": {
+                      "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                      "topic": "print",
+                      "value": {
+                        "notification": "faces2-action-proposal-voting/vote-on-action-proposal",
+                        "payload": {
+                          "amount": 496304292691,
+                          "contractCaller": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF",
+                          "proposalId": 25,
+                          "txSender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF",
+                          "vote": false,
+                          "voter": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF"
+                        }
+                      }
+                    },
+                    "position": {
+                      "index": 1
+                    },
+                    "type": "SmartContractEvent"
+                  },
+                  {
+                    "data": {
+                      "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF",
+                      "topic": "print",
+                      "value": {
+                        "notification": "aibtc-agent-account/vote-on-action-proposal",
+                        "payload": {
+                          "caller": "ST1GZAD1BM0K08TECMWRBD1WX4Y3XA02JFD4CH3NF",
+                          "proposalContract": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                          "proposalId": 25,
+                          "sender": "ST1GZAD1BM0K08TECMWRBD1WX4Y3XA02JFD4CH3NF",
+                          "vote": false
+                        }
+                      }
+                    },
+                    "position": {
+                      "index": 0
+                    },
+                    "type": "SmartContractEvent"
+                  }
+                ],
+                "mutated_assets_radius": [],
+                "mutated_contracts_radius": [
+                  "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                  "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST357-85TEQ-ST1GZ-CH3NF"
+                ]
+              },
+              "result": "(ok true)",
+              "sender": "ST1GZAD1BM0K08TECMWRBD1WX4Y3XA02JFD4CH3NF",
+              "sponsor": null,
+              "success": true
+            },
+            "operations": [],
+            "transaction_identifier": {
+              "hash": "0x1a14ca09baf4230d5b9d24796f91be035e139c6b4bc566a4d824df977e97b584"
+            }
+          },
+          {
+            "metadata": {
+              "description": "invoked: ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G::vote-on-action-proposal(ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting, u25, false)",
+              "execution_cost": {
+                "read_count": 20,
+                "read_length": 45981,
+                "runtime": 200572,
+                "write_count": 2,
+                "write_length": 927
+              },
+              "fee": 647817,
+              "kind": {
+                "data": {
+                  "args": [
+                    "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                    "u25",
+                    "false"
+                  ],
+                  "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G",
+                  "method": "vote-on-action-proposal"
+                },
+                "type": "ContractCall"
+              },
+              "nonce": 2,
+              "position": {
+                "index": 1
+              },
+              "raw_tx": "0x80800000000400f75256fb8954db53396d4b2e7b43036b542ec8f60000000000000002000000000009e28900003a8b5b20bb9b88acdc86d714d0d857ff282ffd95e3e3d5319429a31ec49b1921689790a10b72880c0c025217ac501dd6da03cf67655c4fcb20eff0dd7afdb7d3030200000000021aae73c4b18e8e994c8918a4c7b7a4df8dd50fc1792261696274632d616363742d53543244592d37353844582d535433564e2d413133304717766f74652d6f6e2d616374696f6e2d70726f706f73616c00000003061aae73c4b18e8e994c8918a4c7b7a4df8dd50fc1791d6661636573322d616374696f6e2d70726f706f73616c2d766f74696e67010000000000000000000000000000001904",
+              "receipt": {
+                "contract_calls_stack": [],
+                "events": [
+                  {
+                    "data": {
+                      "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                      "topic": "print",
+                      "value": {
+                        "notification": "faces2-action-proposal-voting/vote-on-action-proposal",
+                        "payload": {
+                          "amount": 111218681,
+                          "contractCaller": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G",
+                          "proposalId": 25,
+                          "txSender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G",
+                          "vote": false,
+                          "voter": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G"
+                        }
+                      }
+                    },
+                    "position": {
+                      "index": 3
+                    },
+                    "type": "SmartContractEvent"
+                  },
+                  {
+                    "data": {
+                      "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G",
+                      "topic": "print",
+                      "value": {
+                        "notification": "aibtc-agent-account/vote-on-action-proposal",
+                        "payload": {
+                          "caller": "ST3VN4NQVH5ADPMSSDN5JWYT30DNN8BP8YS0A130G",
+                          "proposalContract": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting",
+                          "proposalId": 25,
+                          "sender": "ST3VN4NQVH5ADPMSSDN5JWYT30DNN8BP8YS0A130G",
+                          "vote": false
+                        }
+                      }
+                    },
+                    "position": {
+                      "index": 2
+                    },
+                    "type": "SmartContractEvent"
+                  }
+                ],
+                "mutated_assets_radius": [],
+                "mutated_contracts_radius": [
+                  "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST2DY-758DX-ST3VN-A130G",
+                  "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.faces2-action-proposal-voting"
+                ]
+              },
+              "result": "(ok true)",
+              "sender": "ST3VN4NQVH5ADPMSSDN5JWYT30DNN8BP8YS0A130G",
+              "sponsor": null,
+              "success": true
+            },
+            "operations": [],
+            "transaction_identifier": {
+              "hash": "0x8bd637737d9e3e2a88d377ddb57ca8000fec22b979ed08a02a6a36b7a8939b63"
+            }
+          }
+        ]
+      }
+    ],
+    "chainhook": {
+      "is_streaming_blocks": false,
+      "predicate": {
+        "equals": 3561466,
+        "scope": "block_height"
+      },
+      "uuid": "a1a9a553-58c2-4b2b-836d-8d4f30e0b1b0"
+    },
+    "events": [],
+    "rollback": []
+  }

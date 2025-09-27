@@ -1,12 +1,11 @@
 """Chain state monitoring task implementation."""
 
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.backend.factory import backend
-from app.config import config
+from app.config import config as main_config
 from app.services.integrations.hiro.hiro_api import HiroApi
 from app.lib.logger import configure_logger
 from app.services.infrastructure.job_management.base import (
@@ -17,15 +16,11 @@ from app.services.infrastructure.job_management.base import (
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 from app.services.integrations.webhooks.chainhook import ChainhookService
-from app.services.integrations.webhooks.chainhook.models import (
-    Apply,
-    BlockIdentifier,
-    BlockMetadata,
-    ChainHookData,
-    ChainHookInfo,
-    Predicate,
-    TransactionIdentifier,
-    TransactionWithReceipt,
+from app.services.processing.stacks_chainhook_adapter import (
+    StacksChainhookAdapter,
+    AdapterConfig,
+    BlockNotFoundError,
+    TransformationError,
 )
 
 logger = configure_logger(__name__)
@@ -44,7 +39,7 @@ class ChainStateMonitorResult(RunnerResult):
     def __post_init__(self):
         """Initialize default values after dataclass creation."""
         if self.network is None:
-            self.network = config.network.network
+            self.network = main_config.network.network
         if self.blocks_processed is None:
             self.blocks_processed = []
 
@@ -70,6 +65,42 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         super().__init__(config)
         self.hiro_api = HiroApi()
         self.chainhook_service = ChainhookService()
+
+        # Initialize the Stacks Chainhook Adapter
+        adapter_config = AdapterConfig(
+            network=main_config.network.network,
+            enable_caching=True,
+            cache_ttl=300,  # 5 minute cache
+            max_concurrent_requests=3,
+            enable_hex_decoding=True,
+        )
+        self.chainhook_adapter = StacksChainhookAdapter(adapter_config)
+
+    def __del__(self):
+        """Cleanup when task instance is destroyed."""
+        # Note: __del__ can't be async, so we just log if adapter wasn't properly closed
+        if hasattr(self, "chainhook_adapter") and self.chainhook_adapter:
+            logger.warning(
+                "ChainStateMonitorTask destroyed with open chainhook adapter. "
+                "Consider calling close_adapter() explicitly.",
+                extra={"task": "chain_state_monitor"},
+            )
+
+    async def close_adapter(self):
+        """Explicitly close the chainhook adapter and cleanup resources."""
+        if hasattr(self, "chainhook_adapter") and self.chainhook_adapter:
+            try:
+                await self.chainhook_adapter.close()
+                logger.debug(
+                    "Chainhook adapter closed successfully",
+                    extra={"task": "chain_state_monitor"},
+                )
+                self.chainhook_adapter = None
+            except Exception as e:
+                logger.warning(
+                    "Error closing chainhook adapter",
+                    extra={"task": "chain_state_monitor", "error": str(e)},
+                )
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
@@ -119,505 +150,176 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             )
             return False
 
-    def _convert_to_chainhook_format(
-        self,
-        block_height: int,
-        block_hash: str,
-        parent_hash: str,
-        transactions: Any,
-        burn_block_height: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """Convert block transactions to chainhook format.
+    async def _ensure_adapter_ready(self):
+        """Ensure the chainhook adapter is ready for use."""
+        if not hasattr(self, "chainhook_adapter") or self.chainhook_adapter is None:
+            # Recreate adapter if it's missing
+            adapter_config = AdapterConfig(
+                network=main_config.network.network,
+                enable_caching=True,
+                cache_ttl=300,  # 5 minute cache
+                max_concurrent_requests=3,
+                enable_hex_decoding=True,
+            )
+            self.chainhook_adapter = StacksChainhookAdapter(adapter_config)
+            logger.info(
+                "Recreated chainhook adapter",
+                extra={"task": "chain_state_monitor"},
+            )
+
+    async def _convert_to_chainhook_format(self, block_height: int) -> Dict[str, Any]:
+        """Convert block to chainhook format using the Stacks Chainhook Adapter.
 
         Args:
-            block_height: Height of the block
-            block_hash: Hash of the block
-            parent_hash: Hash of the parent block
-            transactions: Block transactions from Hiro API
-            burn_block_height: Bitcoin burn block height (optional)
+            block_height: Height of the block to convert
 
         Returns:
-            Dict formatted as a chainhook webhook payload
+            Dict formatted as a chainhook webhook payload (simulates webhook input)
+
+        Raises:
+            TransformationError: If block transformation fails
+            BlockNotFoundError: If block is not found
         """
-        # Get detailed block information from API
         try:
-            block_data = self.hiro_api.get_block_by_height(block_height)
             logger.debug(
-                "Retrieved block data for height",
+                "Converting block to chainhook format using adapter",
                 extra={
                     "task": "chain_state_monitor",
                     "block_height": block_height,
-                    "block_data": block_data,
                 },
             )
-        except Exception as e:
-            logger.warning(
-                "Could not fetch detailed block data for height",
+
+            # Ensure adapter is ready
+            await self._ensure_adapter_ready()
+
+            # Use the adapter to get chainhook data for the block (already template-formatted)
+            result = await self.chainhook_adapter.get_block_chainhook(
+                block_height, use_template=True
+            )
+
+            logger.debug(
+                "Successfully retrieved template-formatted chainhook data",
+                extra={
+                    "task": "chain_state_monitor",
+                    "block_height": block_height,
+                    "transaction_count": len(
+                        result.get("apply", [{}])[0].get("transactions", [])
+                    ),
+                },
+            )
+
+            return result
+
+        except BlockNotFoundError as e:
+            logger.error(
+                "Block not found during chainhook conversion",
                 extra={
                     "task": "chain_state_monitor",
                     "block_height": block_height,
                     "error": str(e),
                 },
             )
-            block_data = {}
+            raise
 
-        # Create block identifier
-        block_identifier = BlockIdentifier(hash=block_hash, index=block_height)
-
-        # Create parent block identifier
-        parent_block_identifier = BlockIdentifier(
-            hash=parent_hash, index=block_height - 1
-        )
-
-        # Extract block time from block data or transaction data, fallback to current time
-        block_time = None
-        if isinstance(block_data, dict):
-            block_time = block_data.get("block_time")
-        elif hasattr(block_data, "block_time"):
-            block_time = block_data.block_time
-
-        # If block_time not available from block data, try from first transaction
-        if not block_time and transactions.results:
-            tx = transactions.results[0]
-            if isinstance(tx, dict):
-                block_time = tx.get("block_time")
-            else:
-                block_time = getattr(tx, "block_time", None)
-
-        # Fallback to current timestamp if still not found
-        if not block_time:
-            block_time = int(datetime.now().timestamp())
-            logger.warning(
-                "Using current timestamp for block as block_time was not available",
-                extra={"task": "chain_state_monitor", "block_height": block_height},
+        except TransformationError as e:
+            logger.error(
+                "Transformation error during chainhook conversion",
+                extra={
+                    "task": "chain_state_monitor",
+                    "block_height": block_height,
+                    "error": str(e),
+                    "transformation_stage": getattr(
+                        e, "transformation_stage", "unknown"
+                    ),
+                },
             )
+            raise
 
-        # Create comprehensive metadata with all available fields
-        metadata = BlockMetadata(
-            block_time=block_time,
-            stacks_block_hash=block_hash,
-        )
+        except Exception as e:
+            error_msg = str(e)
 
-        # Extract additional metadata from block data if available
-        if isinstance(block_data, dict):
-            # Bitcoin anchor block identifier with proper hash
-            bitcoin_anchor_info = block_data.get("bitcoin_anchor_block_identifier", {})
-            bitcoin_anchor_hash = (
-                bitcoin_anchor_info.get("hash", "")
-                if isinstance(bitcoin_anchor_info, dict)
-                else ""
-            )
-            if burn_block_height is not None:
-                metadata.bitcoin_anchor_block_identifier = BlockIdentifier(
-                    hash=bitcoin_anchor_hash, index=burn_block_height
+            # Check if this is a "client has been closed" error and try to recover
+            if "client has been closed" in error_msg.lower():
+                logger.warning(
+                    "HTTP client was closed, attempting to recreate adapter",
+                    extra={
+                        "task": "chain_state_monitor",
+                        "block_height": block_height,
+                        "error": error_msg,
+                    },
                 )
 
-            # PoX cycle information
-            pox_cycle_index = block_data.get("pox_cycle_index")
-            if pox_cycle_index is not None:
-                metadata.pox_cycle_index = pox_cycle_index
-
-            pox_cycle_length = block_data.get("pox_cycle_length")
-            if pox_cycle_length is not None:
-                metadata.pox_cycle_length = pox_cycle_length
-
-            pox_cycle_position = block_data.get("pox_cycle_position")
-            if pox_cycle_position is not None:
-                metadata.pox_cycle_position = pox_cycle_position
-
-            cycle_number = block_data.get("cycle_number")
-            if cycle_number is not None:
-                metadata.cycle_number = cycle_number
-
-            # Signer information
-            signer_bitvec = block_data.get("signer_bitvec")
-            if signer_bitvec is not None:
-                metadata.signer_bitvec = signer_bitvec
-
-            signer_public_keys = block_data.get("signer_public_keys")
-            if signer_public_keys is not None:
-                metadata.signer_public_keys = signer_public_keys
-
-            signer_signature = block_data.get("signer_signature")
-            if signer_signature is not None:
-                metadata.signer_signature = signer_signature
-
-            # Other metadata
-            tenure_height = block_data.get("tenure_height")
-            if tenure_height is not None:
-                metadata.tenure_height = tenure_height
-
-            confirm_microblock_identifier = block_data.get(
-                "confirm_microblock_identifier"
-            )
-            if confirm_microblock_identifier is not None:
-                metadata.confirm_microblock_identifier = confirm_microblock_identifier
-
-            reward_set = block_data.get("reward_set")
-            if reward_set is not None:
-                metadata.reward_set = reward_set
-        elif burn_block_height is not None:
-            # Fallback: create basic bitcoin anchor block identifier without hash
-            metadata.bitcoin_anchor_block_identifier = BlockIdentifier(
-                hash="", index=burn_block_height
-            )
-
-        # Convert transactions to chainhook format with enhanced data
-        chainhook_transactions = []
-        for tx in transactions.results:
-            # Handle tx as either dict or object
-            if isinstance(tx, dict):
-                tx_id = tx.get("tx_id", "")
-                exec_cost_read_count = tx.get("execution_cost_read_count", 0)
-                exec_cost_read_length = tx.get("execution_cost_read_length", 0)
-                exec_cost_runtime = tx.get("execution_cost_runtime", 0)
-                exec_cost_write_count = tx.get("execution_cost_write_count", 0)
-                exec_cost_write_length = tx.get("execution_cost_write_length", 0)
-                fee_rate = tx.get("fee_rate", "0")
-                nonce = tx.get("nonce", 0)
-                tx_index = tx.get("tx_index", 0)
-                sender_address = tx.get("sender_address", "")
-                sponsor_address = tx.get("sponsor_address", None)
-                tx.get("sponsored", False)
-                tx_status = tx.get("tx_status", "")
-                tx_type = tx.get("tx_type", "")
-                tx_result_repr = (
-                    tx.get("tx_result", {}).get("repr", "")
-                    if isinstance(tx.get("tx_result"), dict)
-                    else ""
-                )
-                # Extract events and additional transaction data
-                events = tx.get("events", [])
-                raw_tx = tx.get("raw_tx", "")
-
-                # Create better description based on transaction type and data
-                description = self._create_transaction_description(tx)
-
-                # Extract token transfer data if available
-                token_transfer = tx.get("token_transfer")
-            else:
-                tx_id = tx.tx_id
-                exec_cost_read_count = tx.execution_cost_read_count
-                exec_cost_read_length = tx.execution_cost_read_length
-                exec_cost_runtime = tx.execution_cost_runtime
-                exec_cost_write_count = tx.execution_cost_write_count
-                exec_cost_write_length = tx.execution_cost_write_length
-                fee_rate = tx.fee_rate
-                nonce = tx.nonce
-                tx_index = tx.tx_index
-                sender_address = tx.sender_address
-                sponsor_address = tx.sponsor_address if tx.sponsored else None
-                tx_status = tx.tx_status
-                tx_type = tx.tx_type
-                tx_result_repr = (
-                    tx.tx_result.repr if hasattr(tx.tx_result, "repr") else ""
-                )
-                events = getattr(tx, "events", [])
-                raw_tx = getattr(tx, "raw_tx", "")
-
-                # Create better description
-                description = self._create_transaction_description(tx)
-
-                # Extract token transfer data
-                token_transfer = getattr(tx, "token_transfer", None)
-
-            # Create transaction identifier
-            tx_identifier = TransactionIdentifier(hash=tx_id)
-
-            # Convert events to proper format
-            receipt_events = []
-            for event in events:
-                if isinstance(event, dict):
-                    receipt_events.append(
-                        {
-                            "data": event.get("data", {}),
-                            "position": {"index": event.get("event_index", 0)},
-                            "type": event.get("event_type", ""),
-                        }
-                    )
-                else:
-                    receipt_events.append(
-                        {
-                            "data": getattr(event, "data", {}),
-                            "position": {"index": getattr(event, "event_index", 0)},
-                            "type": getattr(event, "event_type", ""),
-                        }
+                # Try to recreate the adapter and retry once
+                try:
+                    await self.close_adapter()  # Clean up the old one
+                    await self._ensure_adapter_ready()  # Create a new one
+                    result = await self.chainhook_adapter.get_block_chainhook(
+                        block_height, use_template=True
                     )
 
-            # Create transaction metadata with proper receipt
-            tx_metadata = {
-                "description": description,
-                "execution_cost": {
-                    "read_count": exec_cost_read_count,
-                    "read_length": exec_cost_read_length,
-                    "runtime": exec_cost_runtime,
-                    "write_count": exec_cost_write_count,
-                    "write_length": exec_cost_write_length,
+                    logger.info(
+                        "Successfully recovered from closed client error",
+                        extra={
+                            "task": "chain_state_monitor",
+                            "block_height": block_height,
+                        },
+                    )
+
+                    return result
+
+                except Exception as retry_error:
+                    logger.error(
+                        "Failed to recover from closed client error",
+                        extra={
+                            "task": "chain_state_monitor",
+                            "block_height": block_height,
+                            "retry_error": str(retry_error),
+                        },
+                    )
+                    raise TransformationError(
+                        f"Failed to convert block {block_height} after client recovery: {retry_error}",
+                        transformation_stage="client_recovery",
+                    ) from retry_error
+
+            logger.error(
+                "Unexpected error during chainhook conversion",
+                extra={
+                    "task": "chain_state_monitor",
+                    "block_height": block_height,
+                    "error": error_msg,
                 },
-                "fee": (
-                    int(fee_rate)
-                    if isinstance(fee_rate, str) and fee_rate.isdigit()
-                    else int(fee_rate)
-                    if isinstance(fee_rate, (int, float))
-                    else 0
-                ),
-                "kind": {"type": tx_type},
-                "nonce": nonce,
-                "position": {"index": tx_index},
-                "raw_tx": raw_tx,
-                "receipt": {
-                    "contract_calls_stack": [],
-                    "events": receipt_events,
-                    "mutated_assets_radius": [],
-                    "mutated_contracts_radius": [],
-                },
-                "result": tx_result_repr,
-                "sender": sender_address,
-                "sponsor": sponsor_address,
-                "success": tx_status == "success",
-            }
-
-            # Generate operations based on transaction type and data
-            operations = self._create_transaction_operations(tx, token_transfer)
-
-            # Create transaction with receipt
-            tx_with_receipt = TransactionWithReceipt(
-                transaction_identifier=tx_identifier,
-                metadata=tx_metadata,
-                operations=operations,
+                exc_info=True,
             )
-
-            chainhook_transactions.append(tx_with_receipt)
-
-        # Create apply block
-        apply_block = Apply(
-            block_identifier=block_identifier,
-            parent_block_identifier=parent_block_identifier,
-            metadata=metadata,
-            timestamp=block_time,
-            transactions=chainhook_transactions,
-        )
-
-        # Create predicate
-        predicate = Predicate(scope="block_height", higher_than=block_height - 1)
-
-        # Create chainhook info
-        chainhook_info = ChainHookInfo(
-            is_streaming_blocks=False, predicate=predicate, uuid=str(uuid.uuid4())
-        )
-
-        # Create full chainhook data
-        ChainHookData(
-            apply=[apply_block], chainhook=chainhook_info, events=[], rollback=[]
-        )
-
-        # Convert to dict for webhook processing with complete metadata
-        metadata_dict = {
-            "block_time": apply_block.metadata.block_time,
-            "stacks_block_hash": apply_block.metadata.stacks_block_hash,
-        }
-
-        # Add all available metadata fields
-        if apply_block.metadata.bitcoin_anchor_block_identifier:
-            metadata_dict["bitcoin_anchor_block_identifier"] = {
-                "hash": apply_block.metadata.bitcoin_anchor_block_identifier.hash,
-                "index": apply_block.metadata.bitcoin_anchor_block_identifier.index,
-            }
-
-        # Add optional metadata fields if they exist
-        optional_fields = [
-            "pox_cycle_index",
-            "pox_cycle_length",
-            "pox_cycle_position",
-            "cycle_number",
-            "signer_bitvec",
-            "signer_public_keys",
-            "signer_signature",
-            "tenure_height",
-            "confirm_microblock_identifier",
-            "reward_set",
-        ]
-
-        for field in optional_fields:
-            value = getattr(apply_block.metadata, field, None)
-            if value is not None:
-                metadata_dict[field] = value
-
-        return {
-            "apply": [
-                {
-                    "block_identifier": {
-                        "hash": apply_block.block_identifier.hash,
-                        "index": apply_block.block_identifier.index,
-                    },
-                    "metadata": metadata_dict,
-                    "parent_block_identifier": {
-                        "hash": apply_block.parent_block_identifier.hash,
-                        "index": apply_block.parent_block_identifier.index,
-                    },
-                    "timestamp": apply_block.timestamp,
-                    "transactions": [
-                        {
-                            "transaction_identifier": {
-                                "hash": tx.transaction_identifier.hash
-                            },
-                            "metadata": tx.metadata,
-                            "operations": tx.operations,
-                        }
-                        for tx in apply_block.transactions
-                    ],
-                }
-            ],
-            "chainhook": {
-                "is_streaming_blocks": chainhook_info.is_streaming_blocks,
-                "predicate": {
-                    "scope": chainhook_info.predicate.scope,
-                    "higher_than": chainhook_info.predicate.higher_than,
-                },
-                "uuid": chainhook_info.uuid,
-            },
-            "events": [],
-            "rollback": [],
-        }
-
-    def _create_transaction_description(self, tx) -> str:
-        """Create a meaningful transaction description based on transaction data.
-
-        Args:
-            tx: Transaction data (dict or object)
-
-        Returns:
-            str: Human-readable transaction description
-        """
-        if isinstance(tx, dict):
-            tx_type = tx.get("tx_type", "")
-            token_transfer = tx.get("token_transfer")
-        else:
-            tx_type = getattr(tx, "tx_type", "")
-            token_transfer = getattr(tx, "token_transfer", None)
-
-        if (
-            tx_type in ["token_transfer", "stx_transfer", "NativeTokenTransfer"]
-            and token_transfer
-        ):
-            if isinstance(token_transfer, dict):
-                amount = token_transfer.get("amount", "0")
-                recipient = token_transfer.get("recipient_address", "")
-                sender = (
-                    tx.get("sender_address", "")
-                    if isinstance(tx, dict)
-                    else getattr(tx, "sender_address", "")
-                )
-            else:
-                amount = getattr(token_transfer, "amount", "0")
-                recipient = getattr(token_transfer, "recipient_address", "")
-                sender = (
-                    tx.get("sender_address", "")
-                    if isinstance(tx, dict)
-                    else getattr(tx, "sender_address", "")
-                )
-
-            return f"transfered: {amount} µSTX from {sender} to {recipient}"
-        elif tx_type == "coinbase":
-            return "coinbase transaction"
-        elif tx_type == "contract_call":
-            if isinstance(tx, dict):
-                contract_call = tx.get("contract_call", {})
-                if isinstance(contract_call, dict):
-                    contract_id = contract_call.get("contract_id", "")
-                    function_name = contract_call.get("function_name", "")
-                    return f"contract call: {contract_id}::{function_name}"
-            else:
-                contract_call = getattr(tx, "contract_call", None)
-                if contract_call:
-                    contract_id = getattr(contract_call, "contract_id", "")
-                    function_name = getattr(contract_call, "function_name", "")
-                    return f"contract call: {contract_id}::{function_name}"
-
-        # Fallback description
-        tx_id = (
-            tx.get("tx_id", "") if isinstance(tx, dict) else getattr(tx, "tx_id", "")
-        )
-        return f"Transaction {tx_id}"
-
-    def _create_transaction_operations(
-        self, tx, token_transfer=None
-    ) -> List[Dict[str, Any]]:
-        """Create transaction operations based on transaction type and data.
-
-        Args:
-            tx: Transaction data (dict or object)
-            token_transfer: Token transfer data if available
-
-        Returns:
-            List[Dict[str, Any]]: List of operations for the transaction
-        """
-        operations = []
-
-        if isinstance(tx, dict):
-            tx_type = tx.get("tx_type", "")
-            sender_address = tx.get("sender_address", "")
-        else:
-            tx_type = getattr(tx, "tx_type", "")
-            sender_address = getattr(tx, "sender_address", "")
-
-        # Handle token transfers
-        if (
-            tx_type in ["token_transfer", "stx_transfer", "NativeTokenTransfer"]
-            and token_transfer
-        ):
-            if isinstance(token_transfer, dict):
-                amount = int(token_transfer.get("amount", "0"))
-                recipient = token_transfer.get("recipient_address", "")
-            else:
-                amount = int(getattr(token_transfer, "amount", "0"))
-                recipient = getattr(token_transfer, "recipient_address", "")
-
-            # Debit operation (sender)
-            operations.append(
-                {
-                    "account": {"address": sender_address},
-                    "amount": {
-                        "currency": {"decimals": 6, "symbol": "STX"},
-                        "value": amount,
-                    },
-                    "operation_identifier": {"index": 0},
-                    "related_operations": [{"index": 1}],
-                    "status": "SUCCESS",
-                    "type": "DEBIT",
-                }
-            )
-
-            # Credit operation (recipient)
-            operations.append(
-                {
-                    "account": {"address": recipient},
-                    "amount": {
-                        "currency": {"decimals": 6, "symbol": "STX"},
-                        "value": amount,
-                    },
-                    "operation_identifier": {"index": 1},
-                    "related_operations": [{"index": 0}],
-                    "status": "SUCCESS",
-                    "type": "CREDIT",
-                }
-            )
-
-        return operations
+            raise TransformationError(
+                f"Failed to convert block {block_height} to chainhook format: {e}",
+                transformation_stage="block_conversion",
+            ) from e
 
     def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
         """Determine if error should trigger retry."""
-        # Retry on network errors, blockchain RPC issues
+        # Retry on network errors, blockchain RPC issues, and client closed errors
         retry_errors = (
             ConnectionError,
             TimeoutError,
         )
 
+        error_msg = str(error).lower()
+
         # Don't retry on configuration errors
-        if "not configured" in str(error).lower():
+        if "not configured" in error_msg:
             return False
-        if "invalid contract" in str(error).lower():
+        if "invalid contract" in error_msg:
             return False
+
+        # Retry on client closed errors (we handle recovery)
+        if "client has been closed" in error_msg:
+            return True
+
+        # Retry on transformation errors from client issues
+        if isinstance(error, TransformationError) and "client_recovery" in getattr(
+            error, "transformation_stage", ""
+        ):
+            return True
 
         return isinstance(error, retry_errors)
 
@@ -652,6 +354,10 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         self, context: JobContext, results: List[ChainStateMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
+        # Note: We don't close the chainhook_adapter here because it should persist
+        # across multiple task executions. It will be closed when the task instance
+        # is destroyed or in the __del__ method.
+
         logger.debug(
             "Chain state monitor task cleanup completed",
             extra={"task": "chain_state_monitor"},
@@ -660,7 +366,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
     async def _execute_impl(self, context: JobContext) -> List[ChainStateMonitorResult]:
         """Execute chain state monitoring task with blockchain synchronization."""
         # Use the configured network
-        network = config.network.network
+        network = main_config.network.network
 
         try:
             results = []
@@ -740,7 +446,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 blocks_behind = current_api_block_height - db_block_height
 
                 # Consider stale if more than 30 blocks behind
-                stale_threshold_blocks = 30
+                stale_threshold_blocks = 1
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
@@ -781,86 +487,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         )
 
                         try:
-                            # Get all transactions for this block
-                            transactions = self.hiro_api.get_all_transactions_by_block(
+                            # Convert block to chainhook format using the adapter
+                            chainhook_data = await self._convert_to_chainhook_format(
                                 height
-                            )
-
-                            # Log transaction count and details
-                            logger.info(
-                                "Found transactions for block",
-                                extra={
-                                    "task": "chain_state_monitor",
-                                    "block_height": height,
-                                    "transaction_count": transactions.total,
-                                },
-                            )
-
-                            # Get block details and burn block height
-                            burn_block_height = None
-                            if transactions.results:
-                                # Handle transactions.results as either dict or object
-                                tx = transactions.results[0]
-                                if isinstance(tx, dict):
-                                    block_hash = tx.get("block_hash")
-                                    parent_hash = tx.get("parent_block_hash")
-                                    burn_block_height = tx.get("burn_block_height")
-                                else:
-                                    block_hash = tx.block_hash
-                                    parent_hash = tx.parent_block_hash
-                                    burn_block_height = getattr(
-                                        tx, "burn_block_height", None
-                                    )
-                            else:
-                                # If no transactions, fetch the block directly
-                                try:
-                                    block = self.hiro_api.get_block_by_height(height)
-
-                                    # Handle different response formats
-                                    if isinstance(block, dict):
-                                        block_hash = block.get("hash")
-                                        parent_hash = block.get("parent_block_hash")
-                                        burn_block_height = block.get(
-                                            "burn_block_height"
-                                        )
-                                    else:
-                                        block_hash = block.hash
-                                        parent_hash = block.parent_block_hash
-                                        burn_block_height = getattr(
-                                            block, "burn_block_height", None
-                                        )
-
-                                    if not block_hash or not parent_hash:
-                                        raise ValueError(
-                                            f"Missing hash or parent_hash in block data: {block}"
-                                        )
-                                except Exception as e:
-                                    logger.error(
-                                        "Error fetching block",
-                                        extra={
-                                            "task": "chain_state_monitor",
-                                            "block_height": height,
-                                            "error": str(e),
-                                        },
-                                    )
-                                    raise
-
-                            logger.debug(
-                                "Block burn block height",
-                                extra={
-                                    "task": "chain_state_monitor",
-                                    "block_height": height,
-                                    "burn_block_height": burn_block_height,
-                                },
-                            )
-
-                            # Convert to chainhook format
-                            chainhook_data = self._convert_to_chainhook_format(
-                                height,
-                                block_hash,
-                                parent_hash,
-                                transactions,
-                                burn_block_height,
                             )
 
                             logger.info(
@@ -868,16 +497,18 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                                 extra={
                                     "task": "chain_state_monitor",
                                     "block_height": height,
-                                    "block_hash": block_hash,
-                                    "burn_block_height": burn_block_height,
-                                    "transaction_count": transactions.total,
+                                    "transaction_count": len(
+                                        chainhook_data.get("apply", [{}])[0].get(
+                                            "transactions", []
+                                        )
+                                    ),
                                     "chainhook_uuid": chainhook_data.get(
                                         "chainhook", {}
                                     ).get("uuid"),
                                 },
                             )
 
-                            # Process through chainhook service
+                            # Process through chainhook service (simulates full webhook flow: parse + handle)
                             result = await self.chainhook_service.process(
                                 chainhook_data
                             )
