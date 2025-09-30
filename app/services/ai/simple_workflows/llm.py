@@ -106,7 +106,7 @@ def create_chat_openai(
     # Add default headers for OpenRouter leaderboard
     config_dict["default_headers"] = {
         "HTTP-Referer": "https://aibtc.com",
-        "X-Title": "AIBTC"
+        "X-Title": "AIBTC",
     }
 
     logger.debug(f"Creating ChatOpenAI with config: {config_dict}")
