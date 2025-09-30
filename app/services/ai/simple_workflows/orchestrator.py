@@ -81,20 +81,24 @@ async def evaluate_proposal_comprehensive(
         all_images = images + tweet_images
 
         # Determine prompt type based on DAO name
-        prompt_type = 'evaluation'  # Default
+        prompt_type = "evaluation"  # Default
         if dao_id:
             dao = backend.get_dao(dao_id)
-            if dao and dao.name == 'ELONBTC':
-                prompt_type = 'evaluation_elonbtc'
-                logger.info(f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}")
+            if dao and dao.name == "ELONBTC":
+                prompt_type = "evaluation_elonbtc"
+                logger.info(
+                    f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
+                )
             else:
-                logger.debug(f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name if dao else 'unknown'}")
+                logger.debug(
+                    f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name if dao else 'unknown'}"
+                )
 
         # Load prompts if not provided
         if custom_system_prompt is None:
-            custom_system_prompt = load_prompt(prompt_type, 'system')
+            custom_system_prompt = load_prompt(prompt_type, "system")
         if custom_user_prompt is None:
-            custom_user_prompt = load_prompt(prompt_type, 'user_template')
+            custom_user_prompt = load_prompt(prompt_type, "user_template")
 
         # Step 4: Run comprehensive evaluation
         logger.debug(
