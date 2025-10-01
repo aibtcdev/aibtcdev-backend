@@ -21,59 +21,66 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
 ## Folder Processing Order (Bottom-Up)
 
 - **Group 1: Depth 6 (Deepest Leaves)**
-  - `app/services/integrations/webhooks/chainhook/handlers/` (Deepest handlers for Chainhook events). **[Completed]**
+  - `app/services/integrations/webhooks/chainhook/handlers/` (Deepest handlers for Chainhook events).
 
 - **Group 2: Depth 5**
-  - `app/services/ai/simple_workflows/prompts/` (Prompt templates and loaders). **[Completed]**
-  - `app/services/ai/simple_workflows/processors/` (Processors for images, Twitter, etc.). **[Completed]**
-  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment). **[Completed]**
-  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling). **[Completed]**
-  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing). **[Completed]**
+  - `app/services/ai/simple_workflows/prompts/` (Prompt templates and loaders).
+  - `app/services/ai/simple_workflows/processors/` (Processors for images, Twitter, etc.).
+  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment).
+  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling).
+  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing).
+  - `app/services/processing/stacks_chainhook_adapter/adapters/` (Adapters for chainhook processing).
+  - `app/services/processing/stacks_chainhook_adapter/filters/` (Transaction filters).
+  - `app/services/processing/stacks_chainhook_adapter/models/` (Data models for chainhook).
+  - `app/services/processing/stacks_chainhook_adapter/parsers/` (Parsers for chainhook data).
+  - `app/services/processing/stacks_chainhook_adapter/utils/` (Utility functions for the adapter).
 
 - **Group 3: Depth 4**
-  - `app/services/ai/embeddings/` (Embedding services). **[Completed]**
-  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models). **[Completed]**
-  - `app/services/communication/discord/` (Discord services). **[Completed]**
-  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.). **[Completed]**
-  - `app/services/integrations/hiro/` (Hiro API integrations). **[Completed]**
-  - `app/services/integrations/webhooks/` (Base webhook services). **[Completed]**
+  - `app/services/ai/embeddings/` (Embedding services).
+  - `app/services/ai/simple_workflows/` (AI workflow orchestrators and models).
+  - `app/services/communication/discord/` (Discord services).
+  - `app/services/infrastructure/job_management/` (Job executors, decorators, etc.).
+  - `app/services/integrations/hiro/` (Hiro API integrations).
+  - `app/services/integrations/webhooks/` (Base webhook services).
+  - `app/services/processing/stacks_chainhook_adapter/` (Stacks chainhook adapter for data processing).
 
 - **Group 4: Depth 3**
-  - `app/services/ai/` (AI services). **[Completed]**
-  - `app/services/communication/` (Communication services like Twitter/Telegram). **[Completed]**
-  - `app/services/core/` (Core DAO services). **[Completed]**
-  - `app/services/infrastructure/` (Job management and startup). **[Completed]**
-  - `app/services/integrations/` (Integration services). **[Completed]**
-  - `app/services/processing/` (Data processing like Twitter). **[Completed]**
-  - `services/runner/tasks/` (Runner tasks). **[Completed]**
+  - `app/services/ai/` (AI services).
+  - `app/services/communication/` (Communication services like Twitter/Telegram).
+  - `app/services/core/` (Core DAO services).
+  - `app/services/infrastructure/` (Job management and startup).
+  - `app/services/integrations/` (Integration services).
+  - `app/services/processing/` (Data processing like Twitter).
+  - `services/runner/tasks/` (Runner tasks).
 
 - **Group 5: Depth 2**
-  - `app/api/` (API routers and endpoints). **[Completed]**
-  - `app/backend/` (Backend abstractions and models). **[Completed]**
-  - `app/lib/` (Utility libraries). **[Completed]**
-  - `app/middleware/` (Logging middleware). **[Completed]**
-  - `app/services/` (All services). **[Completed]**
-  - `app/tools/` (Tool implementations). **[Completed]**
-  - `services/runner/` (Runner services). **[Completed]**
-  - `services/webhooks/` (Webhooks services). **[Completed]**
-  - `services/workflows/` (Workflows services). **[Completed]**
+  - `app/api/` (API routers and endpoints).
+  - `app/backend/` (Backend abstractions and models).
+  - `app/lib/` (Utility libraries).
+  - `app/middleware/` (Logging middleware).
+  - `app/services/` (All services).
+  - `app/tools/` (Tool implementations).
+  - `services/runner/` (Runner services).
+  - `services/webhooks/` (Webhooks services).
+  - `services/workflows/` (Workflows services).
 
 - **Group 6: Depth 1**
-  - `app/` (Main application code). **[Completed]**
-  - `docs/` (Documentation). **[Completed]**
-  - `docs-v2/` (Version 2 documentation). **[Completed]**
-  - `examples/` (Example files). **[Completed]**
-  - `scripts/` (Utility scripts). **[Completed]**
-  - `services/` (Top-level services). **[Completed]**
-  - `supabase/` (Supabase configurations). **[Completed]**
+  - `app/` (Main application code).
+  - `docs/` (Documentation).
+  - `docs-v2/` (Version 2 documentation).
+  - `examples/` (Example files).
+  - `scripts/` (Utility scripts).
+  - `services/` (Top-level services).
+  - `supabase/` (Supabase configurations).
+  - `chainhook-data/` (Sample chainhook data files).
 
 - **Group 7: Root (Depth 0)**
-  - Root folder (synthesize everything into a main README.md). **[Completed]**
+  - Root folder (synthesize everything into a main README.md).
 
 ## Maintenance and Re-running
 To keep documentation current as the repository changes (e.g., new files/folders added), follow these steps:
 1. Remove all **[Completed]** markers from the "Folder Processing Order" section.
-2. Generate an updated repository structure by running `tree -I "__pycache__|agent-tools-ts"` from the root, then review and update the group listings if new folders are added.
+2. Generate an updated repository structure by running `tree -I "__pycache__|agent-tools-ts|venv|node_modules|.git"` from the root, then review and update the group listings if new folders are added.
 3. Re-iterate through the groups bottom-up, regenerating or updating README.md files using the template.
 4. Use tools like diff or git to compare changes and apply selectively.
 This process ensures documentation remains accurate and comprehensive over time.
