@@ -24,16 +24,16 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
   - `app/services/integrations/webhooks/chainhook/handlers/` (Deepest handlers for Chainhook events). **[Completed]**
 
 - **Group 2: Depth 5**
-  - `app/services/ai/simple_workflows/prompts/` (Prompt templates and loaders).
-  - `app/services/ai/simple_workflows/processors/` (Processors for images, Twitter, etc.).
-  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment).
-  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling).
-  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing).
-  - `app/services/processing/stacks_chainhook_adapter/adapters/` (Adapters for chainhook processing).
-  - `app/services/processing/stacks_chainhook_adapter/filters/` (Transaction filters).
-  - `app/services/processing/stacks_chainhook_adapter/models/` (Data models for chainhook).
-  - `app/services/processing/stacks_chainhook_adapter/parsers/` (Parsers for chainhook data).
-  - `app/services/processing/stacks_chainhook_adapter/utils/` (Utility functions for the adapter).
+  - `app/services/ai/simple_workflows/prompts/` (Prompt templates and loaders). **[Completed]**
+  - `app/services/ai/simple_workflows/processors/` (Processors for images, Twitter, etc.). **[Completed]**
+  - `app/services/infrastructure/job_management/tasks/` (Specific job tasks like DAO deployment). **[Completed]**
+  - `app/services/integrations/webhooks/chainhook/` (Chainhook webhook handling). **[Completed]**
+  - `app/services/integrations/webhooks/dao/` (DAO webhook parsing). **[Completed]**
+  - `app/services/processing/stacks_chainhook_adapter/adapters/` (Adapters for chainhook processing). **[Completed]**
+  - `app/services/processing/stacks_chainhook_adapter/filters/` (Transaction filters). **[Completed]**
+  - `app/services/processing/stacks_chainhook_adapter/models/` (Data models for chainhook). **[Completed]**
+  - `app/services/processing/stacks_chainhook_adapter/parsers/` (Parsers for chainhook data). **[Completed]**
+  - `app/services/processing/stacks_chainhook_adapter/utils/` (Utility functions for the adapter). **[Completed]**
 
 - **Group 3: Depth 4**
   - `app/services/ai/embeddings/` (Embedding services).
