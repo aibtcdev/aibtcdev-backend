@@ -25,6 +25,7 @@ This folder contains specialized event handlers for processing Chainhook webhook
   - __init__.py: Initialization file for the package.
   - lottery_utils.py: Utilities for quorum calculations and lottery selections, including QuorumCalculator and LotterySelection classes.
   - sell_event_handler.py: Handles sell events.
+  - stx_event_handler.py: Processes STX transfer events and transaction fees.
 
 - **Subfolders**:
   - (None)

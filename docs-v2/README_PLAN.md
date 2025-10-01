@@ -21,7 +21,7 @@ See [README_TEMPLATE.md](./README_TEMPLATE.md) for the standardized structure us
 ## Folder Processing Order (Bottom-Up)
 
 - **Group 1: Depth 6 (Deepest Leaves)**
-  - `app/services/integrations/webhooks/chainhook/handlers/` (Deepest handlers for Chainhook events).
+  - `app/services/integrations/webhooks/chainhook/handlers/` (Deepest handlers for Chainhook events). **[Completed]**
 
 - **Group 2: Depth 5**
   - `app/services/ai/simple_workflows/prompts/` (Prompt templates and loaders).
