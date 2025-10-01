@@ -1,20 +1,20 @@
 # processors Folder Documentation
 
 ## Overview
-This folder contains specialized processors for handling specific data types in AI workflows, such as airdrops, images, and Twitter content. It implements task-specific logic for data extraction, generation, and integration, using exception handling and async patterns for robust processing.
+This folder contains specialized processors for handling attachments and data in AI workflows, including airdrop fetching/formatting, image generation, and tweet processing. It uses async functions for efficiency and integrates with backend models. Key technologies include async/await for concurrency and Pydantic for data validation.
 
 ## Key Components
 - **Files**:
-  - [airdrop.py](airdrop.py): Processes airdrop-related data in workflows.
-  - [images.py](images.py): Handles image generation and evaluation, including ImageGenerationError exceptions.
-  - [__init__.py](__init__.py): Initialization file for the package.
-  - [twitter.py](twitter.py): Manages Twitter (X) data processing, such as tweet retrieval and analysis.
+  - airdrop.py: Fetches and formats airdrop data from database for LLM analysis.
+  - images.py: Processes image attachments in proposals using AI generation.
+  - __init__.py: Initialization file for the package.
+  - twitter.py: Handles tweet attachments by fetching and formatting tweet data.
 
 - **Subfolders**:
   - (None)
 
 ## Relationships and Integration
-Processors here are invoked by the orchestrator in the parent folder's orchestrator.py and tool_executor.py. They rely on utilities from app/lib/images.py and app/lib/utils.py for image and URL extraction, and output to models in app/services/ai/simple_workflows/models.py.
+Processors are called from app/services/ai/simple_workflows/evaluation.py and orchestrator.py to enrich proposal content. They depend on backend models from app/backend/models.py and utilities like app/lib/images.py for image handling.
 
 ## Navigation
 - **Parent Folder**: [Up: simple_workflows Folder README](../README.md)
@@ -22,4 +22,4 @@ Processors here are invoked by the orchestrator in the parent folder's orchestra
   - (None)
 
 ## Additional Notes
-These processors are modular; add new ones for additional data types as needed. Monitor for API rate limits in Twitter processing.
+Processors are designed to be extensible; add new ones for additional attachment types. Ensure async compatibility when integrating.

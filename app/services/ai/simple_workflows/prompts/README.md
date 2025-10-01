@@ -1,21 +1,22 @@
 # prompts Folder Documentation
 
 ## Overview
-This folder manages prompt templates and loading utilities for AI-driven workflows, particularly in proposal evaluation, metadata generation, and recommendations. It uses string templates and a loader class to dynamically prepare prompts for LLM interactions, leveraging patterns like system/user prompt separation and template formatting.
+This folder contains prompt templates and utilities for AI workflows in the simple_workflows system. It includes specialized prompts for proposal evaluation (general and ELONBTC-specific), metadata generation, and recommendation creation, along with a dynamic loader for managing prompts. Key technologies include Python string constants for prompts and dynamic module importing for extensibility.
 
 ## Key Components
 - **Files**:
-  - [evaluation.py](evaluation.py): Defines evaluation system prompts and user templates for assessing DAO proposals.
-  - [__init__.py](__init__.py): Initialization file for the package.
-  - [loader.py](loader.py): Contains the PromptLoader class for loading and managing prompt types dynamically.
-  - [metadata.py](metadata.py): Provides metadata system prompts and templates for generating proposal titles, descriptions, and images.
-  - [recommendation.py](recommendation.py): Defines recommendation system prompts and templates for generating DAO improvement suggestions.
+  - evaluation_elonbtc.py: Defines ELONBTC-specific evaluation prompts with monarch alignment focus.
+  - evaluation.py: Contains general proposal evaluation prompts and templates.
+  - __init__.py: Initialization file for the package.
+  - loader.py: Utility for dynamically loading and managing prompt modules.
+  - metadata.py: Prompts for generating proposal metadata like titles and summaries.
+  - recommendation.py: Prompts for generating DAO improvement recommendations.
 
 - **Subfolders**:
   - (None)
 
 ## Relationships and Integration
-Prompts here are loaded via the PromptLoader in loader.py and used in parent folder files like evaluation.py, metadata.py, and recommendation.py for AI orchestration. They depend on models from app/services/ai/simple_workflows/models.py for output structures and integrate with LLM calls in llm.py.
+Prompts from this folder are loaded via loader.py and used in app/services/ai/simple_workflows/orchestrator.py for AI evaluations. They integrate with models from app/services/ai/simple_workflows/models.py for structured outputs and are called from tasks like dao_proposal_evaluation.py in app/services/infrastructure/job_management/tasks/.
 
 ## Navigation
 - **Parent Folder**: [Up: simple_workflows Folder README](../README.md)
@@ -23,4 +24,4 @@ Prompts here are loaded via the PromptLoader in loader.py and used in parent fol
   - (None)
 
 ## Additional Notes
-Prompts are designed to be extensible; new types can be added by registering them in the loader. Test templates with sample data to ensure compatibility with token limits.
+Extend by adding new prompt modules following the naming convention (e.g., new_type.py with UPPERCASE_PROMPT constants). Use get_available_prompt_types() for discovery.
