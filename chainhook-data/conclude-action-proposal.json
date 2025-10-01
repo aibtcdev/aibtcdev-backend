@@ -1,0 +1,214 @@
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0x87dc601dad2e7e030114230b205b9d889d91eaaad0d3bda7f9848da259f0b353",
+        "index": 3569199
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x1cd55ccc77a67c9e146a2011e59e0809f0f5f6aa2b0f48e0b2024f15a805a1dd",
+          "index": 95129
+        },
+        "block_time": 1758885681,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 4751,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 8,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "00108b3efa3a9f72631f5a9e1f7de9f9995f8b00117385bcd54e931fa9875ab78d599f33c1300fe49199e3cbc854130d68fe10ec26748e92c7bc10fe8d7d3de631",
+          "0015c9a9fab6329b2c4f407c490a3c7ba02f2db8d418608e3e268482a5cf332b2e031f02dd881f3891e6ae941ad78b76cc8163cc484e8426868001cc433d1698d8"
+        ],
+        "stacks_block_hash": "0x2e0b863918b764233d27e0877a7aea3c3e339921e6dfb3de1b80469ca23926cb",
+        "tenure_height": 92146
+      },
+      "parent_block_identifier": {
+        "hash": "0x58bab027600dae484939e6d139285d7ddcbc893d98c848ca15329dc2aded6f40",
+        "index": 3569198
+      },
+      "timestamp": 1758885615,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "invoked: ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting::conclude-action-proposal(u33, ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-send-message)",
+            "execution_cost": {
+              "read_count": 13,
+              "read_length": 27505,
+              "runtime": 244793,
+              "write_count": 4,
+              "write_length": 875
+            },
+            "fee": 799,
+            "kind": {
+              "data": {
+                "args": [
+                  "u33",
+                  "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-send-message"
+                ],
+                "contract_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting",
+                "method": "conclude-action-proposal"
+              },
+              "type": "ContractCall"
+            },
+            "nonce": 530,
+            "position": {
+              "index": 0
+            },
+            "raw_tx": "0x80800000000400ae73c4b18e8e994c8918a4c7b7a4df8dd50fc1790000000000000212000000000000031f00016a5ab57ed3a3ea199fcc2e56cd7a86298da86243b109183be6aca465d0961f8d2fceea826875ac56d2906388efa39135833b1268ab3f745a83f0a2728aa81d66030100000000021aa372c8d8b2239bb9339c38c8f136d273b7134d821d6661636573332d616374696f6e2d70726f706f73616c2d766f74696e6718636f6e636c7564652d616374696f6e2d70726f706f73616c000000020100000000000000000000000000000021061aa372c8d8b2239bb9339c38c8f136d273b7134d821a6661636573332d616374696f6e2d73656e642d6d657373616765",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [
+                {
+                  "data": {
+                    "amount": "25000000000",
+                    "asset_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory::faces3",
+                    "recipient": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-treasury",
+                    "sender": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting"
+                  },
+                  "position": {
+                    "index": 1
+                  },
+                  "type": "FTTransferEvent"
+                },
+                {
+                  "data": {
+                    "contract_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory",
+                    "topic": "print",
+                    "value": null
+                  },
+                  "position": {
+                    "index": 2
+                  },
+                  "type": "SmartContractEvent"
+                },
+                {
+                  "data": {
+                    "contract_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting",
+                    "topic": "print",
+                    "value": {
+                      "notification": "faces3-action-proposal-voting/conclude-action-proposal",
+                      "payload": {
+                        "action": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-send-message",
+                        "bond": 25000000000,
+                        "contractCaller": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+                        "creator": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-acct-ST223-TMY1P-STA5A-NSAKQ",
+                        "executed": false,
+                        "expired": false,
+                        "liquidTokens": 20001140000000000,
+                        "memo": "Contribution submitted via aibtcdev frontend",
+                        "metQuorum": false,
+                        "metThreshold": false,
+                        "parameters": "0x0e000000af676d210a0a5265666572656e63653a2068747470733a2f2f782e636f6d2f656c6f6e6d75736b2f7374617475732f313937313437373231303233313039353734300a0a2d2d2d204d65746164617461202d2d2d0a5469746c653a205468652044414f3a204578706c6f7265205368656c6c20466f726d6174696f6e73206f6e2042656163682057616c6b0a546167733a20636f6d6d756e6974797c656e676167656d656e747c646973636f76657279",
+                        "passed": false,
+                        "proposalId": 33,
+                        "status": 1,
+                        "txSender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+                        "vetoExceedsYes": false,
+                        "vetoMetQuorum": false,
+                        "vetoVotes": 0,
+                        "vetoed": false,
+                        "votesAgainst": 1056871857059378,
+                        "votesFor": 0
+                      }
+                    }
+                  },
+                  "position": {
+                    "index": 0
+                  },
+                  "type": "SmartContractEvent"
+                }
+              ],
+              "mutated_assets_radius": [
+                "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory::faces3"
+              ],
+              "mutated_contracts_radius": [
+                "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory",
+                "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting"
+              ]
+            },
+            "result": "(ok false)",
+            "sender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [
+            {
+              "account": {
+                "address": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-action-proposal-voting"
+              },
+              "amount": {
+                "currency": {
+                  "decimals": 6,
+                  "metadata": {
+                    "asset_class_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory::faces3",
+                    "asset_identifier": null,
+                    "standard": "SIP10"
+                  },
+                  "symbol": "TOKEN"
+                },
+                "value": 25000000000
+              },
+              "operation_identifier": {
+                "index": 0
+              },
+              "related_operations": [
+                {
+                  "index": 1
+                }
+              ],
+              "status": "SUCCESS",
+              "type": "DEBIT"
+            },
+            {
+              "account": {
+                "address": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-treasury"
+              },
+              "amount": {
+                "currency": {
+                  "decimals": 6,
+                  "metadata": {
+                    "asset_class_identifier": "ST2HQ5J6RP8HSQE9KKGWCHW9PT9SVE4TDGBZQ3EKR.faces3-faktory::faces3",
+                    "asset_identifier": null,
+                    "standard": "SIP10"
+                  },
+                  "symbol": "TOKEN"
+                },
+                "value": 25000000000
+              },
+              "operation_identifier": {
+                "index": 1
+              },
+              "related_operations": [
+                {
+                  "index": 0
+                }
+              ],
+              "status": "SUCCESS",
+              "type": "CREDIT"
+            }
+          ],
+          "transaction_identifier": {
+            "hash": "0x92bea2213006e0847d47e7a8ca2e268aa5bc30a30c112ea946d2211232a51428"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": {
+      "equals": 3569199,
+      "scope": "block_height"
+    },
+    "uuid": "778568f2-2a7f-4b58-a52c-9b1810abeb0a"
+  },
+  "events": [],
+  "rollback": []
+}

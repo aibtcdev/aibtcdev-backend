@@ -93,7 +93,15 @@ class MetricsCollector:
         )
         self._add_event(event)
 
-        logger.debug(f"Started tracking execution {execution.id} ({job_type})")
+        logger.debug(
+            "Job execution tracking started",
+            extra={
+                "execution_id": str(execution.id),
+                "job_type": str(job_type),
+                "worker": worker_name,
+                "event_type": "tracking_started",
+            },
+        )
 
     def record_execution_completion(self, execution: Any, duration: float) -> None:
         """Record the completion of a job execution."""
@@ -101,7 +109,10 @@ class MetricsCollector:
         metrics = self._metrics.get(job_type)
 
         if not metrics:
-            logger.warning(f"No metrics found for job type {job_type}")
+            logger.warning(
+                "Metrics not found for job type - completion",
+                extra={"job_type": str(job_type), "event_type": "metrics_not_found"},
+            )
             return
 
         metrics.current_running = max(0, metrics.current_running - 1)
@@ -123,7 +134,13 @@ class MetricsCollector:
         self._add_event(event)
 
         logger.debug(
-            f"Completed execution {execution.id} ({job_type}) in {duration:.2f}s"
+            "Job execution completed",
+            extra={
+                "execution_id": str(execution.id),
+                "job_type": str(job_type),
+                "duration_seconds": round(duration, 2),
+                "event_type": "execution_completed",
+            },
         )
 
     def record_execution_failure(
@@ -134,7 +151,10 @@ class MetricsCollector:
         metrics = self._metrics.get(job_type)
 
         if not metrics:
-            logger.warning(f"No metrics found for job type {job_type}")
+            logger.warning(
+                "Metrics not found for job type - failure",
+                extra={"job_type": str(job_type), "event_type": "metrics_not_found"},
+            )
             return
 
         metrics.current_running = max(0, metrics.current_running - 1)
@@ -157,7 +177,14 @@ class MetricsCollector:
         self._add_event(event)
 
         logger.debug(
-            f"Failed execution {execution.id} ({job_type}) after {duration:.2f}s: {error}"
+            "Job execution failed",
+            extra={
+                "execution_id": str(execution.id),
+                "job_type": str(job_type),
+                "duration_seconds": round(duration, 2),
+                "error": error,
+                "event_type": "execution_failed",
+            },
         )
 
     def record_execution_retry(self, execution: Any) -> None:
@@ -166,7 +193,10 @@ class MetricsCollector:
         metrics = self._metrics.get(job_type)
 
         if not metrics:
-            logger.warning(f"No metrics found for job type {job_type}")
+            logger.warning(
+                "Metrics not found for job type - retry",
+                extra={"job_type": str(job_type), "event_type": "metrics_not_found"},
+            )
             return
 
         metrics.retried_executions += 1
@@ -182,7 +212,13 @@ class MetricsCollector:
         self._add_event(event)
 
         logger.debug(
-            f"Retrying execution {execution.id} ({job_type}), attempt {execution.attempt}"
+            "Job execution retry scheduled",
+            extra={
+                "execution_id": str(execution.id),
+                "job_type": str(job_type),
+                "attempt": execution.attempt,
+                "event_type": "execution_retry",
+            },
         )
 
     def record_dead_letter(self, execution: Any) -> None:
@@ -191,7 +227,10 @@ class MetricsCollector:
         metrics = self._metrics.get(job_type)
 
         if not metrics:
-            logger.warning(f"No metrics found for job type {job_type}")
+            logger.warning(
+                "Metrics not found for job type - dead letter",
+                extra={"job_type": str(job_type), "event_type": "metrics_not_found"},
+            )
             return
 
         metrics.dead_letter_executions += 1
@@ -208,7 +247,14 @@ class MetricsCollector:
         self._add_event(event)
 
         logger.warning(
-            f"Dead letter execution {execution.id} ({job_type}) after {execution.attempt} attempts"
+            "Job execution moved to dead letter queue",
+            extra={
+                "execution_id": str(execution.id),
+                "job_type": str(job_type),
+                "attempts": execution.attempt,
+                "error": getattr(execution, "error", None),
+                "event_type": "dead_letter",
+            },
         )
 
     def _update_timing_metrics(self, metrics: JobMetrics, duration: float) -> None:
@@ -319,7 +365,13 @@ class MetricsCollector:
             self._metrics.clear()
             self._events.clear()
 
-        logger.info(f"Reset metrics for {job_type or 'all job types'}")
+        logger.info(
+            "Metrics reset completed",
+            extra={
+                "job_type": str(job_type) if job_type else "all",
+                "event_type": "metrics_reset",
+            },
+        )
 
     # Legacy compatibility methods for the new executor
     def get_job_metrics(self, job_type: Optional[str] = None) -> Dict[str, Any]:
@@ -408,12 +460,18 @@ class SystemMetrics:
     async def start_monitoring(self) -> None:
         """Start system monitoring."""
         self.monitoring_active = True
-        logger.info("System metrics monitoring started")
+        logger.info(
+            "System metrics monitoring started",
+            extra={"event_type": "system_monitoring_started"},
+        )
 
     async def stop_monitoring(self) -> None:
         """Stop system monitoring."""
         self.monitoring_active = False
-        logger.info("System metrics monitoring stopped")
+        logger.info(
+            "System metrics monitoring stopped",
+            extra={"event_type": "system_monitoring_stopped"},
+        )
 
     def get_current_metrics(self) -> Dict[str, Any]:
         """Get current system metrics."""
@@ -428,7 +486,10 @@ class SystemMetrics:
                 "monitoring_active": self.monitoring_active,
             }
         except ImportError:
-            logger.warning("psutil not available, returning basic metrics")
+            logger.warning(
+                "psutil not available - returning basic metrics",
+                extra={"event_type": "psutil_unavailable"},
+            )
             return {
                 "cpu_usage": 0,
                 "memory_usage": 0,

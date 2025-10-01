@@ -46,7 +46,7 @@ class BaseHiroApi:
 
         self._cache = TTLCache(maxsize=100, ttl=300)  # Cache with 5-minute TTL
         self._session: Optional[aiohttp.ClientSession] = None
-        logger.debug("Initialized API client with base URL: %s", self.base_url)
+        logger.info("Hiro API client initialized", extra={"base_url": self.base_url})
 
     def _update_rate_limits(self, headers: Mapping[str, str]) -> None:
         """Update rate limit settings from response headers.
@@ -55,130 +55,104 @@ class BaseHiroApi:
             headers: Response headers containing rate limit information
         """
         # Update limits if headers are present
+        updated_limits = {}
         if "x-ratelimit-limit-second" in headers:
             old_limit = self.__class__._second_limit
             self.__class__._second_limit = int(headers["x-ratelimit-limit-second"])
-            logger.debug(
-                "Second rate limit updated: %d → %d",
-                old_limit,
-                self.__class__._second_limit,
-            )
+            if old_limit != self.__class__._second_limit:
+                updated_limits["second"] = self.__class__._second_limit
 
         if "x-ratelimit-limit-minute" in headers:
             old_limit = self.__class__._minute_limit
             self.__class__._minute_limit = int(headers["x-ratelimit-limit-minute"])
-            logger.debug(
-                "Minute rate limit updated: %d → %d",
-                old_limit,
-                self.__class__._minute_limit,
-            )
+            if old_limit != self.__class__._minute_limit:
+                updated_limits["minute"] = self.__class__._minute_limit
 
-        # Log remaining rate limit information if available
+        if updated_limits:
+            logger.info("Rate limits updated", extra={"limits": updated_limits})
+
+        # Track remaining limits for monitoring
+        remaining = {}
         if "x-ratelimit-remaining-second" in headers:
-            logger.debug(
-                "Second rate limit remaining: %s",
-                headers["x-ratelimit-remaining-second"],
-            )
-
+            remaining["second"] = int(headers["x-ratelimit-remaining-second"])
         if "x-ratelimit-remaining-minute" in headers:
-            logger.debug(
-                "Minute rate limit remaining: %s",
-                headers["x-ratelimit-remaining-minute"],
+            remaining["minute"] = int(headers["x-ratelimit-remaining-minute"])
+
+        if remaining:
+            # Only log if we're getting close to limits (< 20% remaining)
+            second_pct = (
+                remaining.get("second", 0) / self.__class__._second_limit
+                if self.__class__._second_limit > 0
+                else 1
+            )
+            minute_pct = (
+                remaining.get("minute", 0) / self.__class__._minute_limit
+                if self.__class__._minute_limit > 0
+                else 1
             )
 
-        logger.debug(
-            "Current rate limit state - second: %d/%d, minute: %d/%d",
-            len(self.__class__._second_requests),
-            self.__class__._second_limit,
-            len(self.__class__._minute_requests),
-            self.__class__._minute_limit,
-        )
+            if second_pct < 0.2 or minute_pct < 0.2:
+                logger.warning(
+                    "Rate limit capacity low",
+                    extra={
+                        "remaining": remaining,
+                        "limits": {
+                            "second": self.__class__._second_limit,
+                            "minute": self.__class__._minute_limit,
+                        },
+                    },
+                )
 
     def _rate_limit(self) -> None:
         """Implement rate limiting for both second and minute windows."""
         current_time = time.time()
 
-        # Update second window requests
-        old_second_count = len(self.__class__._second_requests)
+        # Clean up expired requests from tracking windows
         self.__class__._second_requests = [
             t for t in self.__class__._second_requests if current_time - t < 1.0
         ]
-        new_second_count = len(self.__class__._second_requests)
-
-        if old_second_count != new_second_count:
-            logger.debug(
-                "Pruned expired second window requests: %d → %d",
-                old_second_count,
-                new_second_count,
-            )
-
-        # Update minute window requests
-        old_minute_count = len(self.__class__._minute_requests)
         self.__class__._minute_requests = [
             t for t in self.__class__._minute_requests if current_time - t < 60.0
         ]
-        new_minute_count = len(self.__class__._minute_requests)
 
-        if old_minute_count != new_minute_count:
-            logger.debug(
-                "Pruned expired minute window requests: %d → %d",
-                old_minute_count,
-                new_minute_count,
-            )
+        # Check and enforce rate limits
+        second_count = len(self.__class__._second_requests)
+        minute_count = len(self.__class__._minute_requests)
 
         # Check second limit
-        if len(self.__class__._second_requests) >= self.__class__._second_limit:
+        if second_count >= self.__class__._second_limit:
             sleep_time = self.__class__._second_requests[0] + 1.0 - current_time
             if sleep_time > 0:
                 logger.warning(
-                    "Second rate limit reached (%d/%d), sleeping for %.2f seconds",
-                    len(self.__class__._second_requests),
-                    self.__class__._second_limit,
-                    sleep_time,
+                    "Rate limit reached, waiting before next request",
+                    extra={
+                        "rate_limit_type": "second",
+                        "current_count": second_count,
+                        "limit": self.__class__._second_limit,
+                        "wait_time_seconds": round(sleep_time, 2),
+                    },
                 )
                 time.sleep(sleep_time)
-                # Recalculate current time after sleep
                 current_time = time.time()
-        else:
-            logger.debug(
-                "Second rate limit check: %d/%d (%.1f%% of limit)",
-                len(self.__class__._second_requests),
-                self.__class__._second_limit,
-                (len(self.__class__._second_requests) / self.__class__._second_limit)
-                * 100,
-            )
 
         # Check minute limit
-        if len(self.__class__._minute_requests) >= self.__class__._minute_limit:
+        if minute_count >= self.__class__._minute_limit:
             sleep_time = self.__class__._minute_requests[0] + 60.0 - current_time
             if sleep_time > 0:
                 logger.warning(
-                    "Minute rate limit reached (%d/%d), sleeping for %.2f seconds",
-                    len(self.__class__._minute_requests),
-                    self.__class__._minute_limit,
-                    sleep_time,
+                    "Rate limit reached, waiting before next request",
+                    extra={
+                        "rate_limit_type": "minute",
+                        "current_count": minute_count,
+                        "limit": self.__class__._minute_limit,
+                        "wait_time_seconds": round(sleep_time, 2),
+                    },
                 )
                 time.sleep(sleep_time)
-        else:
-            logger.debug(
-                "Minute rate limit check: %d/%d (%.1f%% of limit)",
-                len(self.__class__._minute_requests),
-                self.__class__._minute_limit,
-                (len(self.__class__._minute_requests) / self.__class__._minute_limit)
-                * 100,
-            )
 
         # Record the new request
         self.__class__._second_requests.append(time.time())
         self.__class__._minute_requests.append(time.time())
-
-        logger.debug(
-            "New request recorded: second window now %d/%d, minute window now %d/%d",
-            len(self.__class__._second_requests),
-            self.__class__._second_limit,
-            len(self.__class__._minute_requests),
-            self.__class__._minute_limit,
-        )
 
     @staticmethod
     def _retry_on_error(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -195,16 +169,27 @@ class BaseHiroApi:
                 ) as e:
                     if attempt == self.MAX_RETRIES - 1:
                         logger.error(
-                            "Max retries reached for %s: %s", func.__name__, str(e)
+                            "Request failed after all retry attempts",
+                            extra={
+                                "function": func.__name__,
+                                "max_retries": self.MAX_RETRIES,
+                                "error": str(e),
+                            },
                         )
                         raise HiroApiTimeoutError(f"Max retries reached: {str(e)}")
+
+                    retry_delay = self.RETRY_DELAY * (attempt + 1)
                     logger.warning(
-                        "Retry attempt %d for %s: %s",
-                        attempt + 1,
-                        func.__name__,
-                        str(e),
+                        "Request failed, retrying",
+                        extra={
+                            "function": func.__name__,
+                            "attempt": attempt + 1,
+                            "max_retries": self.MAX_RETRIES,
+                            "retry_delay_seconds": retry_delay,
+                            "error": str(e),
+                        },
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(retry_delay)
             return None
 
         return wrapper
@@ -243,7 +228,11 @@ class BaseHiroApi:
             if self.api_key:
                 headers["X-API-Key"] = self.api_key
 
-            logger.debug("Making %s request to %s", method, url)
+            logger.debug(
+                "API request initiated",
+                extra={"request": {"method": method, "endpoint": endpoint, "url": url}},
+            )
+
             response = httpx.request(
                 method, url, headers=headers, params=params, json=json
             )
@@ -252,15 +241,45 @@ class BaseHiroApi:
             self._update_rate_limits(response.headers)
 
             response.raise_for_status()
+
+            logger.debug(
+                "API request completed successfully",
+                extra={
+                    "request": {"method": method, "endpoint": endpoint},
+                    "response": {"status_code": response.status_code},
+                },
+            )
+
             return response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                logger.error("Rate limit exceeded: %s", str(e))
+                logger.error(
+                    "API rate limit exceeded",
+                    extra={
+                        "request": {"method": method, "endpoint": endpoint},
+                        "response": {"status_code": e.response.status_code},
+                        "error": str(e),
+                    },
+                )
                 raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}")
-            logger.error("HTTP error occurred: %s", str(e))
+
+            logger.error(
+                "API request failed with HTTP error",
+                extra={
+                    "request": {"method": method, "endpoint": endpoint},
+                    "response": {"status_code": e.response.status_code},
+                    "error": str(e),
+                },
+            )
             raise HiroApiError(f"HTTP error occurred: {str(e)}")
         except Exception as e:
-            logger.error("Unexpected error in request: %s", str(e))
+            logger.error(
+                "API request failed with unexpected error",
+                extra={
+                    "request": {"method": method, "endpoint": endpoint},
+                    "error": str(e),
+                },
+            )
             raise HiroApiError(f"Unexpected error: {str(e)}")
 
     async def _amake_request(
@@ -272,7 +291,8 @@ class BaseHiroApi:
         json: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Async version of _make_request."""
-        if self._session is None:
+        # Create session if it doesn't exist or is closed
+        if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
 
         try:
@@ -288,7 +308,11 @@ class BaseHiroApi:
             if self.api_key:
                 headers["X-API-Key"] = self.api_key
 
-            logger.debug("Making async %s request to %s", method, url)
+            logger.debug(
+                "Async API request initiated",
+                extra={"request": {"method": method, "endpoint": endpoint, "url": url}},
+            )
+
             async with self._session.request(
                 method, url, headers=headers, params=params, json=json
             ) as response:
@@ -296,16 +320,58 @@ class BaseHiroApi:
                 self._update_rate_limits(response.headers)
 
                 response.raise_for_status()
+
+                logger.debug(
+                    "Async API request completed successfully",
+                    extra={
+                        "request": {"method": method, "endpoint": endpoint},
+                        "response": {"status_code": response.status},
+                    },
+                )
+
                 return await response.json()
         except aiohttp.ClientError as e:
             if isinstance(e, aiohttp.ClientResponseError) and e.status == 429:
-                logger.error("Rate limit exceeded in async request: %s", str(e))
+                logger.error(
+                    "Async API rate limit exceeded",
+                    extra={
+                        "request": {"method": method, "endpoint": endpoint},
+                        "response": {"status_code": e.status},
+                        "error": str(e),
+                    },
+                )
                 raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}")
-            logger.error("Async request error: %s", str(e))
+
+            logger.error(
+                "Async API request failed with client error",
+                extra={
+                    "request": {"method": method, "endpoint": endpoint},
+                    "error": str(e),
+                },
+            )
             raise HiroApiError(f"Async request error: {str(e)}")
+        except Exception as e:
+            logger.error(
+                "Async API request failed with unexpected error",
+                extra={
+                    "request": {"method": method, "endpoint": endpoint},
+                    "error": str(e),
+                },
+            )
+            raise HiroApiError(f"Unexpected error: {str(e)}")
 
     async def close(self) -> None:
         """Close the async session."""
         if self._session:
+            logger.debug("Closing Hiro API async session")
             await self._session.close()
             self._session = None
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit - ensures session cleanup."""
+        await self.close()
+        return False

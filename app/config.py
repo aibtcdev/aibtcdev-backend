@@ -124,6 +124,26 @@ class SchedulerConfig:
         os.getenv("AIBTC_SCHEDULE_SYNC_INTERVAL_SECONDS", "60")
     )
 
+    # Job deduplication and concurrency control settings
+    job_deduplication_enabled: bool = (
+        os.getenv("AIBTC_JOB_DEDUPLICATION_ENABLED", "true").lower() == "true"
+    )
+    aggressive_deduplication_enabled: bool = (
+        os.getenv("AIBTC_AGGRESSIVE_DEDUPLICATION_ENABLED", "true").lower() == "true"
+    )
+    job_stacking_prevention_enabled: bool = (
+        os.getenv("AIBTC_JOB_STACKING_PREVENTION_ENABLED", "true").lower() == "true"
+    )
+    # Monitoring jobs that should have aggressive deduplication
+    monitoring_job_types: List[str] = field(
+        default_factory=lambda: [
+            "chain_state_monitor",
+            "chainhook_monitor",
+            "agent_wallet_balance_monitor",
+            "dao_token_holders_monitor",
+        ]
+    )
+
     # Job-specific configurations matching job_type names exactly
 
     # agent_account_deployer job
@@ -152,12 +172,12 @@ class SchedulerConfig:
         os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "300")
     )
 
-    # chain_state_monitor job
+    # chain_state_monitor job (reduced from 300 to 90 seconds for more responsive monitoring)
     chain_state_monitor_enabled: bool = (
         os.getenv("AIBTC_CHAIN_STATE_MONITOR_ENABLED", "true").lower() == "true"
     )
     chain_state_monitor_interval_seconds: int = int(
-        os.getenv("AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "300")
+        os.getenv("AIBTC_CHAIN_STATE_MONITOR_INTERVAL_SECONDS", "90")
     )
 
     # chainhook_monitor job

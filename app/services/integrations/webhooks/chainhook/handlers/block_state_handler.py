@@ -81,13 +81,29 @@ class BlockStateHandler(ChainhookEventHandler):
 
             # Safely extract bitcoin block height
             bitcoin_block_height = None
-            if block.metadata and block.metadata.bitcoin_anchor_block_identifier:
-                bitcoin_block_height = (
-                    block.metadata.bitcoin_anchor_block_identifier.index
+            if block.metadata:
+                self.logger.debug(f"Block metadata exists: {bool(block.metadata)}")
+                if (
+                    hasattr(block.metadata, "bitcoin_anchor_block_identifier")
+                    and block.metadata.bitcoin_anchor_block_identifier
+                ):
+                    bitcoin_block_height = (
+                        block.metadata.bitcoin_anchor_block_identifier.index
+                    )
+                    self.logger.info(
+                        f"Successfully extracted bitcoin_block_height: {bitcoin_block_height} "
+                        f"from bitcoin_anchor_block_identifier for stacks block {block_height}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Block metadata exists but bitcoin_anchor_block_identifier is missing or None "
+                        f"for stacks block {block_height}. Available metadata fields: "
+                        f"{dir(block.metadata) if hasattr(block.metadata, '__dict__') else type(block.metadata)}"
+                    )
+            else:
+                self.logger.warning(
+                    f"No block metadata available for stacks block {block_height}"
                 )
-            self.logger.debug(
-                f"Extracted bitcoin_block_height: {bitcoin_block_height} for block_hash {block.block_identifier.hash}"
-            )
 
             self.logger.info(
                 f"Processing block: height={block_height}, hash={block_hash}, "
@@ -119,9 +135,19 @@ class BlockStateHandler(ChainhookEventHandler):
                 }
                 if bitcoin_block_height is not None:
                     update_data["bitcoin_block_height"] = bitcoin_block_height
+                    self.logger.info(
+                        f"Including bitcoin_block_height={bitcoin_block_height} in chain state update "
+                        f"for stacks block {block_height}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Skipping bitcoin_block_height update (value is None) for stacks block {block_height}. "
+                        f"Current DB bitcoin_block_height will remain: {current_state.bitcoin_block_height}"
+                    )
 
-                self.logger.debug(
-                    f"Updating chain_state {current_state.id} with update_data: {update_data}"
+                self.logger.info(
+                    f"Updating chain_state {current_state.id} from (stacks: {current_state.block_height}, "
+                    f"bitcoin: {current_state.bitcoin_block_height}) to update_data: {update_data}"
                 )
                 updated = backend.update_chain_state(
                     current_state.id,

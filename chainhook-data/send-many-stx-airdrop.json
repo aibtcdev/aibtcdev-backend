@@ -1,0 +1,425 @@
+{
+    "apply": [
+      {
+        "block_identifier": {
+          "hash": "0xa08c3bcabc56ce3dcbd74b437f5f11f84cc83fb5030436621051a4ccbc7d2130",
+          "index": 3562086
+        },
+        "metadata": {
+          "bitcoin_anchor_block_identifier": {
+            "hash": "0x21d9a1652d3dd294dff9a43b4b32b022085c448e59d12ff26b3e56da1ffd55a6",
+            "index": 93089
+          },
+          "block_time": 1758392599,
+          "confirm_microblock_identifier": null,
+          "cycle_number": null,
+          "pox_cycle_index": 4649,
+          "pox_cycle_length": 20,
+          "pox_cycle_position": 8,
+          "reward_set": null,
+          "signer_bitvec": "013700000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+          "signer_public_keys": [
+            "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+            "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+          ],
+          "signer_signature": [
+            "00cc405bc3eebbbadc662b632d082559d47fd294073aa38b69840be9973add286753737baa566f86ae5f392d91a0e6b9b63697d790e331eaba47ef667fd67f77aa",
+            "01d3c390a462a7aaa4c7fcff2acf609e520e608a18afeb542308996bb3c5ab6a383261b122e1a09f5ab21b857937595c5844896b2d78eebd376edefdab3ca80333"
+          ],
+          "stacks_block_hash": "0xc87ca78610f301dbc620054b7d18463f62f3d4e3696e8472dfa4f285d654c602",
+          "tenure_height": 90106
+        },
+        "parent_block_identifier": {
+          "hash": "0xd5800b0b281d53f27146c52f301fe251f60b6941cecd2d6caf6df8ede845957b",
+          "index": 3562085
+        },
+        "timestamp": 1758392547,
+        "transactions": [
+          {
+            "metadata": {
+              "description": "invoked: ST3FFRX7C911PZP5RHE148YDVDD9JWVS6FZRA60VS.send-many-memo::send-many(((tuple (memo 0x) (to STNS7C72FXCNB528M6MZHH6VGMHCYX5C4NDXA80P) (ustx u300000)) (tuple (memo 0x) (to ST1B30RTYT4SD7XDBZ9TA75REMSDC39K7JPSBR168) (ustx u300000)) (tuple (memo 0x) (to ST17W9QNRKCF0AECQR0DBXQ4G28V4CGKDXG9KQ0DP) (ustx u300000)) (tuple (memo 0x) (to ST2X4GKAA1W3DCQDB22P24NQ1Y8ECHS6BRVXBXK30) (ustx u300000)) (tuple (memo 0x) (to ST29WRE691P8JM5XKFM6PN0PH0JNASG8DXGBFAM0V) (ustx u300000)) (tuple (memo 0x) (to ST3CKAE126BM1G0TFCT1FDP5R0HA5AZEW5RV0C28S) (ustx u300000))))",
+              "execution_cost": {
+                "read_count": 9,
+                "read_length": 553,
+                "runtime": 180760,
+                "write_count": 6,
+                "write_length": 6
+              },
+              "fee": 3000,
+              "kind": {
+                "data": {
+                  "args": [
+                    "((tuple (memo 0x) (to STNS7C72FXCNB528M6MZHH6VGMHCYX5C4NDXA80P) (ustx u300000)) (tuple (memo 0x) (to ST1B30RTYT4SD7XDBZ9TA75REMSDC39K7JPSBR168) (ustx u300000)) (tuple (memo 0x) (to ST17W9QNRKCF0AECQR0DBXQ4G28V4CGKDXG9KQ0DP) (ustx u300000)) (tuple (memo 0x) (to ST2X4GKAA1W3DCQDB22P24NQ1Y8ECHS6BRVXBXK30) (ustx u300000)) (tuple (memo 0x) (to ST29WRE691P8JM5XKFM6PN0PH0JNASG8DXGBFAM0V) (ustx u300000)) (tuple (memo 0x) (to ST3CKAE126BM1G0TFCT1FDP5R0HA5AZEW5RV0C28S) (ustx u300000)))"
+                  ],
+                  "contract_identifier": "ST3FFRX7C911PZP5RHE148YDVDD9JWVS6FZRA60VS.send-many-memo",
+                  "method": "send-many"
+                },
+                "type": "ContractCall"
+              },
+              "nonce": 6,
+              "position": {
+                "index": 0
+              },
+              "raw_tx": "0x80800000000400ca731f903b7c940550b0a4682540e0bf6f31077b00000000000000060000000000000bb8000094a95d3b8a932b0d9250897a8521e4b84c3d6cc05a2f3e457e51dac4a486c4380a2c497e6e512cf832b5962505b7417cd16a5bd3ac7d459651a64bce44b0902b030100000000021adefc74ec48436fd8b88b824479bb6b532e6f267f0e73656e642d6d616e792d6d656d6f0973656e642d6d616e79000000010b000000060c00000003046d656d6f020000000002746f051a2b93b0e27f59559448a1a9f8c4db8522cf74ac25047573747801000000000000000000000000000493e00c00000003046d656d6f020000000002746f051a5630635ed132d3f5abfa74a3970ea65ac1a66795047573747801000000000000000000000000000493e00c00000003046d656d6f020000000002746f051a4fc4deb89b1e053997c01abedc90123646426dec047573747801000000000000000000000000000493e00c00000003046d656d6f020000000002746f051aba484d4a0f06d65dab10ac2256e1f21cc8e4cbc6047573747801000000000000000000000000000493e00c00000003046d656d6f020000000002746f051a93cc38c90d912a17b37d0d6a82d104aaacc10dec047573747801000000000000000000000000000493e00c00000003046d656d6f020000000002746f051ad935382232e818034f6682f6d8b80454557ddc2e047573747801000000000000000000000000000493e0",
+              "receipt": {
+                "contract_calls_stack": [],
+                "events": [
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "ST1B30RTYT4SD7XDBZ9TA75REMSDC39K7JPSBR168",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 1
+                    },
+                    "type": "STXTransferEvent"
+                  },
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "ST3CKAE126BM1G0TFCT1FDP5R0HA5AZEW5RV0C28S",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 5
+                    },
+                    "type": "STXTransferEvent"
+                  },
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "ST2X4GKAA1W3DCQDB22P24NQ1Y8ECHS6BRVXBXK30",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 3
+                    },
+                    "type": "STXTransferEvent"
+                  },
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "ST29WRE691P8JM5XKFM6PN0PH0JNASG8DXGBFAM0V",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 4
+                    },
+                    "type": "STXTransferEvent"
+                  },
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "ST17W9QNRKCF0AECQR0DBXQ4G28V4CGKDXG9KQ0DP",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 2
+                    },
+                    "type": "STXTransferEvent"
+                  },
+                  {
+                    "data": {
+                      "amount": "300000",
+                      "recipient": "STNS7C72FXCNB528M6MZHH6VGMHCYX5C4NDXA80P",
+                      "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                    },
+                    "position": {
+                      "index": 0
+                    },
+                    "type": "STXTransferEvent"
+                  }
+                ],
+                "mutated_assets_radius": [],
+                "mutated_contracts_radius": []
+              },
+              "result": "(ok true)",
+              "sender": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ",
+              "sponsor": null,
+              "success": true
+            },
+            "operations": [
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 0
+                },
+                "related_operations": [
+                  {
+                    "index": 1
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "ST1B30RTYT4SD7XDBZ9TA75REMSDC39K7JPSBR168"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 1
+                },
+                "related_operations": [
+                  {
+                    "index": 0
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              },
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 2
+                },
+                "related_operations": [
+                  {
+                    "index": 3
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "ST3CKAE126BM1G0TFCT1FDP5R0HA5AZEW5RV0C28S"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 3
+                },
+                "related_operations": [
+                  {
+                    "index": 2
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              },
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 4
+                },
+                "related_operations": [
+                  {
+                    "index": 5
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "ST2X4GKAA1W3DCQDB22P24NQ1Y8ECHS6BRVXBXK30"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 5
+                },
+                "related_operations": [
+                  {
+                    "index": 4
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              },
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 6
+                },
+                "related_operations": [
+                  {
+                    "index": 7
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "ST29WRE691P8JM5XKFM6PN0PH0JNASG8DXGBFAM0V"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 7
+                },
+                "related_operations": [
+                  {
+                    "index": 6
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              },
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 8
+                },
+                "related_operations": [
+                  {
+                    "index": 9
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "ST17W9QNRKCF0AECQR0DBXQ4G28V4CGKDXG9KQ0DP"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 9
+                },
+                "related_operations": [
+                  {
+                    "index": 8
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              },
+              {
+                "account": {
+                  "address": "ST35767WG7DY981AGP2J6G9A0W2ZPYC87FEM85TEQ"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 10
+                },
+                "related_operations": [
+                  {
+                    "index": 11
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "DEBIT"
+              },
+              {
+                "account": {
+                  "address": "STNS7C72FXCNB528M6MZHH6VGMHCYX5C4NDXA80P"
+                },
+                "amount": {
+                  "currency": {
+                    "decimals": 6,
+                    "symbol": "STX"
+                  },
+                  "value": 300000
+                },
+                "operation_identifier": {
+                  "index": 11
+                },
+                "related_operations": [
+                  {
+                    "index": 10
+                  }
+                ],
+                "status": "SUCCESS",
+                "type": "CREDIT"
+              }
+            ],
+            "transaction_identifier": {
+              "hash": "0xe188fd4a7de11bca31709ad71cd61387b8a1fe30576c33125652f24ee9597d36"
+            }
+          }
+        ]
+      }
+    ],
+    "chainhook": {
+      "is_streaming_blocks": false,
+      "predicate": {
+        "equals": 3562086,
+        "scope": "block_height"
+      },
+      "uuid": "22641661-0b60-43ba-b6a8-195f9144f03a"
+    },
+    "events": [],
+    "rollback": []
+  }
