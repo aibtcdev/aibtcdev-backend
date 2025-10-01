@@ -103,6 +103,12 @@ def create_chat_openai(
     if default_api_key:
         config_dict["api_key"] = default_api_key
 
+    # Add default headers for OpenRouter leaderboard
+    config_dict["default_headers"] = {
+        "HTTP-Referer": "https://aibtc.com",
+        "X-Title": "AIBTC",
+    }
+
     logger.debug(f"Creating ChatOpenAI with config: {config_dict}")
     return ChatOpenAI(**config_dict)
 
