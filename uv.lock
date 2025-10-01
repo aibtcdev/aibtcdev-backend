@@ -48,14 +48,14 @@ requires-dist = [
     { name = "aiohttp", specifier = "==3.12.15" },
     { name = "apscheduler", specifier = "==3.11.0" },
     { name = "cachetools", specifier = "==6.2.0" },
-    { name = "fastapi", specifier = "==0.116.2" },
+    { name = "fastapi", specifier = "==0.118.0" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "langchain", specifier = "==0.3.27" },
-    { name = "langchain-community", specifier = "==0.3.29" },
+    { name = "langchain-community", specifier = "==0.3.30" },
     { name = "langchain-core", specifier = ">=0.3.56,<1.0.0" },
     { name = "langchain-openai", specifier = "==0.3.28" },
     { name = "langchain-text-splitters", specifier = "==0.3.11" },
-    { name = "langgraph", specifier = "==0.6.7" },
+    { name = "langgraph", specifier = "==0.6.8" },
     { name = "openai", specifier = "==1.93.0" },
     { name = "pgvector", specifier = "<=0.4.1" },
     { name = "pillow", specifier = ">=10.0.0" },
@@ -66,14 +66,14 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'testing'", specifier = "==3.15.1" },
     { name = "python-dotenv", specifier = "==1.1.1" },
     { name = "python-magic", specifier = "==0.4.27" },
-    { name = "python-telegram-bot", specifier = "==22.4" },
+    { name = "python-telegram-bot", specifier = "==22.5" },
     { name = "responses", marker = "extra == 'testing'", specifier = "==0.25.8" },
     { name = "sqlalchemy", specifier = "==2.0.43" },
     { name = "starlette", specifier = "<=0.48.0" },
-    { name = "supabase", specifier = "==2.19.0" },
+    { name = "supabase", specifier = "==2.20.0" },
     { name = "tiktoken", specifier = "==0.11.0" },
     { name = "tweepy", specifier = "==4.16.0" },
-    { name = "uvicorn", specifier = "==0.35.0" },
+    { name = "uvicorn", specifier = "==0.37.0" },
     { name = "vecs", specifier = "==0.4.5" },
 ]
 provides-extras = ["testing"]
@@ -307,16 +307,16 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.116.2"
+version = "0.118.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "starlette" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/01/64/1296f46d6b9e3b23fb22e5d01af3f104ef411425531376212f1eefa2794d/fastapi-0.116.2.tar.gz", hash = "sha256:231a6af2fe21cfa2c32730170ad8514985fc250bec16c9b242d3b94c835ef529", size = 298595, upload-time = "2025-09-16T18:29:23.058Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/28/3c/2b9345a6504e4055eaa490e0b41c10e338ad61d9aeaae41d97807873cdf2/fastapi-0.118.0.tar.gz", hash = "sha256:5e81654d98c4d2f53790a7d32d25a7353b30c81441be7d0958a26b5d761fa1c8", size = 310536, upload-time = "2025-09-29T03:37:23.126Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/e4/c543271a8018874b7f682bf6156863c416e1334b8ed3e51a69495c5d4360/fastapi-0.116.2-py3-none-any.whl", hash = "sha256:c3a7a8fb830b05f7e087d920e0d786ca1fc9892eb4e9a84b227be4c1bc7569db", size = 95670, upload-time = "2025-09-16T18:29:21.329Z" },
+    { url = "https://files.pythonhosted.org/packages/54/20/54e2bdaad22ca91a59455251998d43094d5c3d3567c52c7c04774b3f43f2/fastapi-0.118.0-py3-none-any.whl", hash = "sha256:705137a61e2ef71019d2445b123aa8845bd97273c395b744d5a7dfe559056855", size = 97694, upload-time = "2025-09-29T03:37:21.338Z" },
 ]
 
 [[package]]
@@ -575,7 +575,7 @@ wheels = [
 
 [[package]]
 name = "langchain-community"
-version = "0.3.29"
+version = "0.3.30"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -591,9 +591,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/71/72ddc8802d5edcd3b31bc4f0eb62cdf85c30c9b845e34cc879dab0b45679/langchain_community-0.3.29.tar.gz", hash = "sha256:1f3d37973b10458052bb3cc02dce9773a8ffbd02961698c6d395b8c8d7f9e004", size = 33238072, upload-time = "2025-08-27T15:29:14.249Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/32/852facdba14140bbfc9b02e6dcb00fe2e0c5f50901d512a473351cf013e2/langchain_community-0.3.30.tar.gz", hash = "sha256:df68fbde7f7fa5142ab93b0cbc104916b12ab4163e200edd933ee93e67956ee9", size = 33240417, upload-time = "2025-09-26T05:52:49.588Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/3c/107819dbed0be3f7a041245bce861c8dd4883ed08040ed482d278a274f22/langchain_community-0.3.29-py3-none-any.whl", hash = "sha256:c876ec7ef40b46353af164197f4e08e157650e8a02c9fb9d49351cdc16c839fe", size = 2530803, upload-time = "2025-08-27T15:29:12.52Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/1b/3c7930361567825a473da10deacf261e029258eb450c9fa8cb98368548ce/langchain_community-0.3.30-py3-none-any.whl", hash = "sha256:a49dcedbf8f320d9868d5944d0991c7bcc9f2182a602e5d5e872d315183c11c3", size = 2532469, upload-time = "2025-09-26T05:52:47.037Z" },
 ]
 
 [[package]]
@@ -642,7 +642,7 @@ wheels = [
 
 [[package]]
 name = "langgraph"
-version = "0.6.7"
+version = "0.6.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
@@ -652,9 +652,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/85/36feb25062da40ca395f6c44d0232a672842e5421885101f6faf4670b670/langgraph-0.6.7.tar.gz", hash = "sha256:ba7fd17b8220142d6a4269b6038f2b3dcbcef42cd5ecf4a4c8d9b60b010830a6", size = 465534, upload-time = "2025-09-07T16:49:42.895Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/3f/96e7458522b04397b03a8e715e578b9529fa428a51ebd1c7b3bee9d1a9b1/langgraph-0.6.8.tar.gz", hash = "sha256:bdb824bf29e98c3bda73f06eda8f44d10fe766a977f252c92e58ee1a0a83973d", size = 490725, upload-time = "2025-09-29T09:21:14.309Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/06/f440922a58204dbfd10f7fdda0de0325529a159e9dc3d1038afe4b431a49/langgraph-0.6.7-py3-none-any.whl", hash = "sha256:c724dd8c24806b70faf4903e8e20c0234f8c0a356e0e96a88035cbecca9df2cf", size = 153329, upload-time = "2025-09-07T16:49:40.45Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/7e/0ae1eb99e0bb9a58dd255af9fa0a843eea06206e917a96bf95249e11f632/langgraph-0.6.8-py3-none-any.whl", hash = "sha256:d4f2cab0f66a26fad2ec66e177704982526528fc99b66edd048391a066e97bad", size = 154783, upload-time = "2025-09-29T09:21:12.995Z" },
 ]
 
 [[package]]
@@ -1192,14 +1192,14 @@ wheels = [
 
 [[package]]
 name = "python-telegram-bot"
-version = "22.4"
+version = "22.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/e6/8e855e18627b7e256a57727344dd5479be0ec25e002233276b8bba7db4da/python_telegram_bot-22.4.tar.gz", hash = "sha256:ca332925a5ef3815dfba9dac12382232b840c2f57e2c1e660b1a31b5cb7341fe", size = 1482797, upload-time = "2025-09-13T15:16:21.374Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/6b/400f88e5c29a270c1c519a3ca8ad0babc650ec63dbfbd1b73babf625ed54/python_telegram_bot-22.5.tar.gz", hash = "sha256:82d4efd891d04132f308f0369f5b5929e0b96957901f58bcef43911c5f6f92f8", size = 1488269, upload-time = "2025-09-27T13:50:27.879Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/76/f38c7db5a55a176d5e194ad36ba000b6da7d15363f31cb93fa41542bd554/python_telegram_bot-22.4-py3-none-any.whl", hash = "sha256:5f73d6501fbe9118424dd04213311efec1b442e81a4900f8816102601c83685c", size = 729394, upload-time = "2025-09-13T15:16:18.813Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/c3/340c7520095a8c79455fcf699cbb207225e5b36490d2b9ee557c16a7b21b/python_telegram_bot-22.5-py3-none-any.whl", hash = "sha256:4b7cd365344a7dce54312cc4520d7fa898b44d1a0e5f8c74b5bd9b540d035d16", size = 730976, upload-time = "2025-09-27T13:50:25.93Z" },
 ]
 
 [[package]]
@@ -1386,7 +1386,7 @@ wheels = [
 
 [[package]]
 name = "supabase"
-version = "2.19.0"
+version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -1396,9 +1396,9 @@ dependencies = [
     { name = "supabase-auth" },
     { name = "supabase-functions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/89/5cafe7a91127748e1f09deda3adbdf5b884507bb83bc564c62688475862b/supabase-2.19.0.tar.gz", hash = "sha256:1dae1afe00ced6c4cc94be12be455d75fa0a34e5d14e7901576c22198d9af782", size = 9344, upload-time = "2025-09-17T15:22:06.686Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/a6/cdf48dcf6a06fdc05d9e56bf664a40f2ef55f45d640374522409c980d795/supabase-2.20.0.tar.gz", hash = "sha256:6b6e740e79cee6424b32e4213dbb861cdaa21124f167ffb4aed1a0be2f48c936", size = 9346, upload-time = "2025-09-22T19:13:27.288Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/a4/bfafa6989656c14ab8fbabd4ea745a554c85d59f94e849592ad13528d11c/supabase-2.19.0-py3-none-any.whl", hash = "sha256:c0f1cb1f761449cc9d5f8373a6d315eb28d64a4f1e06b3ad4be1646092c2ada8", size = 16324, upload-time = "2025-09-17T15:22:05.369Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/ba/f36ed9733c662abaccbcea9862d3c364fc2af803de0c61f680ba2e420480/supabase-2.20.0-py3-none-any.whl", hash = "sha256:50c07664ed1d34348a277e4d8e2596da480b6422ab0121d5e2a571cc1c2bd08a", size = 16354, upload-time = "2025-09-22T19:13:25.471Z" },
 ]
 
 [[package]]
@@ -1547,15 +1547,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.35.0"
+version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/42/e0e305207bb88c6b8d3061399c6a961ffe5fbb7e2aa63c9234df7259e9cd/uvicorn-0.35.0.tar.gz", hash = "sha256:bc662f087f7cf2ce11a1d7fd70b90c9f98ef2e2831556dd078d131b96cc94a01", size = 78473, upload-time = "2025-06-28T16:15:46.058Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/57/1616c8274c3442d802621abf5deb230771c7a0fec9414cb6763900eb3868/uvicorn-0.37.0.tar.gz", hash = "sha256:4115c8add6d3fd536c8ee77f0e14a7fd2ebba939fed9b02583a97f80648f9e13", size = 80367, upload-time = "2025-09-23T13:33:47.486Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/e2/dc81b1bd1dcfe91735810265e9d26bc8ec5da45b4c0f6237e286819194c3/uvicorn-0.35.0-py3-none-any.whl", hash = "sha256:197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a", size = 66406, upload-time = "2025-06-28T16:15:44.816Z" },
+    { url = "https://files.pythonhosted.org/packages/85/cd/584a2ceb5532af99dd09e50919e3615ba99aa127e9850eafe5f31ddfdb9a/uvicorn-0.37.0-py3-none-any.whl", hash = "sha256:913b2b88672343739927ce381ff9e2ad62541f9f8289664fa1d1d3803fa2ce6c", size = 67976, upload-time = "2025-09-23T13:33:45.842Z" },
 ]
 
 [[package]]
