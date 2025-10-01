@@ -7,12 +7,14 @@ orchestrating the various processors and providing a clean interface for callers
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from app.backend.factory import backend
 from app.lib.logger import configure_logger
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.services.ai.simple_workflows.metadata import (
     generate_proposal_metadata as _generate_metadata,
 )
 from app.services.ai.simple_workflows.processors import process_images, process_tweets
+from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.ai.simple_workflows.recommendation import (
     generate_proposal_recommendation as _generate_recommendation,
 )
@@ -77,6 +79,26 @@ async def evaluate_proposal_comprehensive(
 
         # Step 3: Combine all images
         all_images = images + tweet_images
+
+        # Determine prompt type based on DAO name
+        prompt_type = "evaluation"  # Default
+        if dao_id:
+            dao = backend.get_dao(dao_id)
+            if dao and dao.name == "ELONBTC":
+                prompt_type = "evaluation_elonbtc"
+                logger.info(
+                    f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
+                )
+            else:
+                logger.debug(
+                    f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name if dao else 'unknown'}"
+                )
+
+        # Load prompts if not provided
+        if custom_system_prompt is None:
+            custom_system_prompt = load_prompt(prompt_type, "system")
+        if custom_user_prompt is None:
+            custom_user_prompt = load_prompt(prompt_type, "user_template")
 
         # Step 4: Run comprehensive evaluation
         logger.debug(
