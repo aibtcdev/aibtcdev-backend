@@ -16,6 +16,7 @@ from app.backend.models import (
     VoteFilter,
 )
 from app.lib.logger import configure_logger
+from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -367,6 +368,18 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
                 return {"success": False, "error": error_msg}
 
+            # Determine prompt type based on DAO name
+            prompt_type = "evaluation"  # Default
+            if dao.name == "ELONBTC":
+                prompt_type = "evaluation_elonbtc"
+                logger.info(f"Using ELONBTC-specific prompts for DAO {dao.name}")
+            else:
+                logger.debug(f"Using general prompts for DAO {dao.name}")
+
+            # Load prompts
+            custom_system_prompt = load_prompt(prompt_type, "system")
+            custom_user_prompt = load_prompt(prompt_type, "user_template")
+
             # Execute the proposal evaluation workflow
             logger.info(
                 "Evaluating proposal",
@@ -384,6 +397,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 proposal_content=proposal_content,
                 dao_id=dao_id,
                 proposal_id=str(proposal.id),
+                custom_system_prompt=custom_system_prompt,
+                custom_user_prompt=custom_user_prompt,
                 streaming=False,
             )
 
