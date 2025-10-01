@@ -30,7 +30,10 @@ system_metrics = SystemMetrics()
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
-    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+    logger.info(
+        "Shutdown signal received - initiating graceful shutdown",
+        extra={"signal": signum, "event_type": "shutdown_signal"},
+    )
     shutdown_event.set()
 
 
@@ -60,71 +63,126 @@ class EnhancedStartupService:
             registered_jobs = JobRegistry.list_jobs()
 
             logger.info(
-                f"Enhanced job system initialized with {len(registered_jobs)} jobs discovered"
+                "Enhanced job system initialized",
+                extra={
+                    "discovered_jobs": len(registered_jobs),
+                    "event_type": "job_system_init",
+                },
             )
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to initialize enhanced job system: {e}", exc_info=True
+                "Failed to initialize enhanced job system",
+                extra={"error": str(e), "event_type": "job_system_init_error"},
+                exc_info=True,
             )
             return False
 
     async def start_bot(self) -> Any:
         """Start the Telegram bot in the background."""
         if not config.telegram.enabled:
-            logger.info("Telegram bot disabled. Skipping initialization.")
+            logger.info(
+                "Telegram bot disabled - skipping initialization",
+                extra={"event_type": "bot_disabled"},
+            )
             return None
 
         try:
             self.bot_application = await start_application()
-            logger.info("Telegram bot started successfully")
+            logger.info(
+                "Telegram bot started successfully", extra={"event_type": "bot_started"}
+            )
             return self.bot_application
         except Exception as e:
-            logger.error(f"Failed to start Telegram bot: {e}")
+            logger.error(
+                "Failed to start Telegram bot",
+                extra={"error": str(e), "event_type": "bot_start_error"},
+                exc_info=True,
+            )
             raise
 
     async def start_enhanced_job_system(self) -> None:
         """Start the enhanced job system."""
         if not await self.initialize_job_system():
-            logger.error("Failed to initialize enhanced job system")
+            logger.error(
+                "Enhanced job system initialization failed",
+                extra={"event_type": "job_system_failed"},
+            )
             raise RuntimeError("Job system initialization failed")
 
         # Schedule jobs with the scheduler
-        logger.info("Attempting to schedule jobs with the job manager...")
+        logger.debug(
+            "Attempting to schedule jobs with job manager",
+            extra={"event_type": "job_scheduling"},
+        )
         any_jobs_scheduled = self.job_manager.schedule_jobs(self.scheduler)
         if any_jobs_scheduled:
             # Start the scheduler
-            logger.info("Starting APScheduler with scheduled jobs...")
+            logger.debug(
+                "Starting APScheduler with scheduled jobs",
+                extra={"event_type": "scheduler_starting"},
+            )
             self.scheduler.start()
-            logger.info("Job scheduler started successfully")
+            logger.info(
+                "Job scheduler started successfully",
+                extra={"event_type": "scheduler_started"},
+            )
 
             # Log scheduler status
             jobs = self.scheduler.get_jobs()
             logger.info(
-                f"APScheduler is running with {len(jobs)} active job schedules:"
+                "APScheduler running with active job schedules",
+                extra={"active_jobs": len(jobs), "event_type": "scheduler_status"},
             )
             for job in jobs:
-                logger.info(f"  - Job ID: {job.id}, next run: {job.next_run_time}")
+                logger.debug(
+                    "Scheduled job details",
+                    extra={
+                        "job_id": job.id,
+                        "next_run": str(job.next_run_time)
+                        if job.next_run_time
+                        else None,
+                        "event_type": "job_schedule_detail",
+                    },
+                )
         else:
-            logger.warning("No jobs were scheduled - scheduler will not be started")
+            logger.warning(
+                "No jobs were scheduled - scheduler will not be started",
+                extra={"event_type": "no_jobs_scheduled"},
+            )
 
         # Start the job executor
-        logger.info("Starting job executor for background job processing...")
+        logger.debug(
+            "Starting job executor for background processing",
+            extra={"event_type": "executor_starting"},
+        )
         await self.job_manager.start_executor()
         executor_stats = self.job_manager.get_executor_stats()
         logger.info(
-            f"Enhanced job executor started with {executor_stats.get('worker_count', 0)} workers"
+            "Enhanced job executor started",
+            extra={
+                "worker_count": executor_stats.get("worker_count", 0),
+                "event_type": "executor_started",
+            },
         )
 
         # Start system metrics collection
-        logger.info("Starting system metrics monitoring...")
+        logger.debug(
+            "Starting system metrics monitoring",
+            extra={"event_type": "metrics_starting"},
+        )
         await system_metrics.start_monitoring()
-        logger.info("System metrics monitoring started")
+        logger.info(
+            "System metrics monitoring started", extra={"event_type": "metrics_started"}
+        )
 
     async def init_background_tasks(self) -> asyncio.Task:
         """Initialize all enhanced background tasks."""
-        logger.info("Starting Enhanced AIBTC Background Services...")
+        logger.info(
+            "Starting Enhanced AIBTC Background Services",
+            extra={"event_type": "service_startup"},
+        )
 
         try:
             # Start enhanced job system
@@ -133,45 +191,74 @@ class EnhancedStartupService:
             # Start bot if enabled
             await self.start_bot()
 
-            logger.info("All enhanced background services started successfully")
+            logger.info(
+                "All enhanced background services started successfully",
+                extra={"event_type": "service_startup_complete"},
+            )
             # Return a completed task since we don't have a cleanup task anymore
             return asyncio.create_task(asyncio.sleep(0))
 
         except Exception as e:
-            logger.error(f"Failed to start background services: {e}", exc_info=True)
+            logger.error(
+                "Failed to start background services",
+                extra={"error": str(e), "event_type": "service_startup_error"},
+                exc_info=True,
+            )
             raise
 
     async def shutdown(self) -> None:
         """Enhanced cleanup and shutdown with graceful task termination."""
-        logger.info("Initiating enhanced shutdown sequence...")
+        logger.info(
+            "Initiating enhanced shutdown sequence",
+            extra={"event_type": "shutdown_start"},
+        )
 
         try:
             # Stop system metrics collection
             if system_metrics:
                 await system_metrics.stop_monitoring()
-                logger.info("System metrics collection stopped")
+                logger.info(
+                    "System metrics collection stopped",
+                    extra={"event_type": "metrics_stopped"},
+                )
 
             # Stop the scheduler
             if self.scheduler and self.scheduler.running:
                 self.scheduler.shutdown()
-                logger.info("Job scheduler stopped")
+                logger.info(
+                    "Job scheduler stopped", extra={"event_type": "scheduler_stopped"}
+                )
 
             # Gracefully shutdown enhanced job manager
             if self.job_manager:
-                logger.info("Stopping enhanced job manager...")
+                logger.debug(
+                    "Stopping enhanced job manager",
+                    extra={"event_type": "job_manager_stopping"},
+                )
                 await self.job_manager.stop_executor()
-                logger.info("Enhanced job manager stopped successfully")
+                logger.info(
+                    "Enhanced job manager stopped successfully",
+                    extra={"event_type": "job_manager_stopped"},
+                )
 
             # Stop bot
             if self.bot_application:
-                logger.info("Stopping Telegram bot...")
+                logger.debug(
+                    "Stopping Telegram bot", extra={"event_type": "bot_stopping"}
+                )
                 # Add any necessary bot shutdown code here
-                logger.info("Telegram bot stopped")
+                logger.info("Telegram bot stopped", extra={"event_type": "bot_stopped"})
 
         except Exception as e:
-            logger.error(f"Error during enhanced shutdown: {e}", exc_info=True)
+            logger.error(
+                "Error during enhanced shutdown",
+                extra={"error": str(e), "event_type": "shutdown_error"},
+                exc_info=True,
+            )
 
-        logger.info("Enhanced shutdown complete")
+        logger.info(
+            "Enhanced shutdown complete", extra={"event_type": "shutdown_complete"}
+        )
 
     def get_health_status(self) -> Dict:
         """Get comprehensive health status of the enhanced startup service."""
@@ -249,11 +336,18 @@ async def run() -> asyncio.Task:
         cleanup_task = await startup_service.init_background_tasks()
         job_manager = startup_service.job_manager
 
-        logger.info("Enhanced AIBTC services running. Press Ctrl+C to stop.")
+        logger.info(
+            "Enhanced AIBTC services running - Press Ctrl+C to stop",
+            extra={"event_type": "services_running"},
+        )
         return cleanup_task
 
     except Exception as e:
-        logger.error(f"Failed to start enhanced services: {e}", exc_info=True)
+        logger.error(
+            "Failed to start enhanced services",
+            extra={"error": str(e), "event_type": "services_start_error"},
+            exc_info=True,
+        )
         raise
 
 
@@ -293,9 +387,15 @@ async def run_standalone():
         await shutdown_event.wait()
 
     except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt")
+        logger.info(
+            "Received keyboard interrupt", extra={"event_type": "keyboard_interrupt"}
+        )
     except Exception as e:
-        logger.error(f"Critical error in standalone mode: {e}", exc_info=True)
+        logger.error(
+            "Critical error in standalone mode",
+            extra={"error": str(e), "event_type": "critical_error"},
+            exc_info=True,
+        )
         sys.exit(1)
     finally:
         await shutdown()

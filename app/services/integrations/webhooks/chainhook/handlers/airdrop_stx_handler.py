@@ -55,55 +55,31 @@ class AirdropSTXHandler(ChainhookEventHandler):
         tx_data_content = tx_data["tx_data"]
         tx_metadata = tx_data["tx_metadata"]
 
-        # Add debug logging
         tx_hash = transaction.transaction_identifier.hash
-        self.logger.debug(f"AirdropSTXHandler checking transaction: {tx_hash}")
 
         # Only handle ContractCall type transactions
         if not isinstance(tx_kind, dict):
-            self.logger.debug(
-                f"[{tx_hash}] Rejecting: tx_kind is not a dict: {type(tx_kind)}"
-            )
             return False
 
         tx_kind_type = tx_kind.get("type")
-        self.logger.debug(f"[{tx_hash}] tx_kind_type: {tx_kind_type}")
 
         if not isinstance(tx_data_content, dict):
-            self.logger.debug(
-                f"[{tx_hash}] Rejecting: tx_data_content is not a dict: {type(tx_data_content)}"
-            )
             return False
 
         # Check if the method name is exactly "send-many"
         tx_method = tx_data_content.get("method", "")
         is_send_many = tx_method == "send-many"
-        self.logger.debug(
-            f"[{tx_hash}] method: '{tx_method}', is_send_many: {is_send_many}"
-        )
 
         # Check if this is the specific send-many contract
         contract_identifier = tx_data_content.get("contract_identifier", "")
         is_target_contract = contract_identifier == self.TARGET_CONTRACT
-        self.logger.debug(
-            f"[{tx_hash}] contract: '{contract_identifier}', is_target_contract: {is_target_contract}"
-        )
-        self.logger.debug(f"[{tx_hash}] TARGET_CONTRACT: '{self.TARGET_CONTRACT}'")
 
         # Access success from TransactionMetadata
         tx_success = tx_metadata.success
-        self.logger.debug(
-            f"[{tx_hash}] tx_success: {tx_success} (type: {type(tx_success)})"
-        )
 
         # Check if there are any STX transfers to agent accounts in the events
         events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
-        self.logger.debug(f"[{tx_hash}] events count: {len(events)}")
-
         has_agent_account_transfers = self._has_agent_account_stx_transfers(events)
-        self.logger.debug(
-            f"[{tx_hash}] has_agent_account_transfers: {has_agent_account_transfers}"
-        )
 
         final_result = (
             tx_kind_type == "ContractCall"
@@ -113,12 +89,29 @@ class AirdropSTXHandler(ChainhookEventHandler):
             and has_agent_account_transfers
         )
 
-        self.logger.debug(f"[{tx_hash}] Final result: {final_result}")
-
         if final_result:
-            self.logger.info(f"AirdropSTXHandler CLAIMING transaction: {tx_hash}")
+            self.logger.info(
+                "Transaction claimed for STX airdrop processing",
+                extra={
+                    "tx_hash": tx_hash,
+                    "contract_identifier": contract_identifier,
+                    "method": tx_method,
+                    "event_type": "transaction_claimed",
+                },
+            )
         else:
-            self.logger.info(f"AirdropSTXHandler REJECTING transaction: {tx_hash}")
+            self.logger.debug(
+                "Transaction rejected - criteria not met",
+                extra={
+                    "tx_hash": tx_hash,
+                    "is_contract_call": tx_kind_type == "ContractCall",
+                    "is_send_many": is_send_many,
+                    "is_target_contract": is_target_contract,
+                    "tx_success": tx_success,
+                    "has_transfers": has_agent_account_transfers,
+                    "event_type": "transaction_rejected",
+                },
+            )
 
         return final_result
 
@@ -174,7 +167,12 @@ class AirdropSTXHandler(ChainhookEventHandler):
                             recipient_amounts[recipient] = amount
                     except (ValueError, TypeError):
                         self.logger.warning(
-                            f"Invalid amount in STX transfer: {amount_str}"
+                            "Invalid amount in STX transfer event",
+                            extra={
+                                "amount_str": amount_str,
+                                "recipient": recipient,
+                                "event_type": "invalid_amount",
+                            },
                         )
 
                 # Set sender from first event
@@ -256,7 +254,10 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         # Get block metadata
         if not self.chainhook_data or not self.chainhook_data.apply:
-            self.logger.warning("No chainhook data available for block information")
+            self.logger.warning(
+                "No chainhook data available for block information",
+                extra={"tx_id": tx_id, "event_type": "missing_block_data"},
+            )
             return
 
         # Use the first apply block (should only be one for this transaction)
@@ -278,7 +279,8 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         if not airdrop_data["recipients"]:
             self.logger.warning(
-                f"No agent account recipients found in STX airdrop transaction {tx_id}"
+                "No recipients found in STX airdrop transaction",
+                extra={"tx_id": tx_id, "event_type": "no_recipients"},
             )
             return
 
@@ -288,8 +290,14 @@ class AirdropSTXHandler(ChainhookEventHandler):
         sender = airdrop_data["sender"]
 
         self.logger.info(
-            f"Processing STX airdrop transaction {tx_id}: "
-            f"{total_amount / 1_000_000:.6f} STX to {len(recipients)} agent accounts"
+            "Processing STX airdrop transaction",
+            extra={
+                "tx_id": tx_id,
+                "total_amount_stx": f"{total_amount / 1_000_000:.6f}",
+                "recipient_count": len(recipients),
+                "sender": sender,
+                "event_type": "airdrop_processing",
+            },
         )
 
         # Check if airdrop already exists
@@ -297,13 +305,19 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         if existing_airdrops:
             self.logger.info(
-                f"STX airdrop record already exists for transaction {tx_id}"
+                "STX airdrop record already exists - skipping",
+                extra={"tx_id": tx_id, "event_type": "airdrop_exists"},
             )
             return
 
         # Validate recipients against wallets table
-        self.logger.info(
-            f"Validating {len(recipients)} recipients against wallets table"
+        self.logger.debug(
+            "Validating recipients against wallets table",
+            extra={
+                "recipient_count": len(recipients),
+                "tx_id": tx_id,
+                "event_type": "recipient_validation",
+            },
         )
         recipient_validation = await self._validate_recipients_against_wallets(
             recipients
@@ -315,8 +329,13 @@ class AirdropSTXHandler(ChainhookEventHandler):
 
         if invalid_recipients:
             self.logger.error(
-                f"Airdrop validation failed for transaction {tx_id}: "
-                f"Invalid recipients not found in wallets table: {invalid_recipients}"
+                "Airdrop validation failed - invalid recipients",
+                extra={
+                    "tx_id": tx_id,
+                    "invalid_recipients": invalid_recipients,
+                    "invalid_count": len(invalid_recipients),
+                    "event_type": "validation_failed",
+                },
             )
             # Create failed airdrop record
             try:
@@ -335,7 +354,15 @@ class AirdropSTXHandler(ChainhookEventHandler):
                     )
                 )
             except Exception as e:
-                self.logger.error(f"Error creating failed airdrop record: {str(e)}")
+                self.logger.error(
+                    "Failed to create airdrop record for invalid recipients",
+                    extra={
+                        "tx_id": tx_id,
+                        "error": str(e),
+                        "event_type": "record_creation_error",
+                    },
+                    exc_info=True,
+                )
             return
 
         # Validate minimum requirements
@@ -344,8 +371,12 @@ class AirdropSTXHandler(ChainhookEventHandler):
         )
         if requirement_errors:
             self.logger.error(
-                f"Airdrop validation failed for transaction {tx_id}: "
-                f"Minimum requirements not met: {requirement_errors}"
+                "Airdrop validation failed - minimum requirements not met",
+                extra={
+                    "tx_id": tx_id,
+                    "requirement_errors": requirement_errors,
+                    "event_type": "requirements_failed",
+                },
             )
             # Create failed airdrop record
             try:
@@ -364,7 +395,15 @@ class AirdropSTXHandler(ChainhookEventHandler):
                     )
                 )
             except Exception as e:
-                self.logger.error(f"Error creating failed airdrop record: {str(e)}")
+                self.logger.error(
+                    "Failed to create airdrop record for requirement errors",
+                    extra={
+                        "tx_id": tx_id,
+                        "error": str(e),
+                        "event_type": "record_creation_error",
+                    },
+                    exc_info=True,
+                )
             return
 
         # All basic validations passed - create successful airdrop record
@@ -386,12 +425,26 @@ class AirdropSTXHandler(ChainhookEventHandler):
             )
 
             self.logger.info(
-                f"Created validated STX airdrop record {airdrop.id} for transaction {tx_id}: "
-                f"{total_amount / 1_000_000:.6f} STX airdropped to {len(recipients)} validated agent accounts"
+                "STX airdrop record created successfully",
+                extra={
+                    "airdrop_id": str(airdrop.id),
+                    "tx_id": tx_id,
+                    "total_amount_stx": f"{total_amount / 1_000_000:.6f}",
+                    "recipient_count": len(recipients),
+                    "sender": sender,
+                    "block_height": block_height,
+                    "event_type": "airdrop_created",
+                },
             )
 
         except Exception as e:
             self.logger.error(
-                f"Error creating STX airdrop record for transaction {tx_id}: {str(e)}"
+                "Failed to create STX airdrop record",
+                extra={
+                    "tx_id": tx_id,
+                    "error": str(e),
+                    "event_type": "record_creation_error",
+                },
+                exc_info=True,
             )
             raise

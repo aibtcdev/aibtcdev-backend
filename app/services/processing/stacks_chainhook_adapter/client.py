@@ -224,13 +224,37 @@ class StacksAPIClient:
             self.logger.debug(
                 f"Fetching complete block data for height {block_height}..."
             )
-            response = await self._get_with_retry(
+            # Use v2 endpoint for better metadata (includes parent_index_block_hash)
+            v2_response = await self._get_with_retry(
+                f"/extended/v2/blocks/{block_height}"
+            )
+            block_data = v2_response.json()
+
+            # Log burn block height from v2 endpoint
+            v2_burn_height = block_data.get("burn_block_height", "MISSING")
+            v2_burn_hash = block_data.get("burn_block_hash", "MISSING")
+            self.logger.info(
+                f"V2 API - Block {block_height}: burn_block_height={v2_burn_height}, "
+                f"burn_block_hash={v2_burn_hash[:20] if v2_burn_hash != 'MISSING' else 'MISSING'}..."
+            )
+
+            # Get transaction IDs from v1 endpoint (v2 doesn't include txs field)
+            v1_response = await self._get_with_retry(
                 f"/extended/v1/block/by_height/{block_height}"
             )
-            block_data = response.json()
+            v1_data = v1_response.json()
 
-            # Get transaction IDs
-            tx_ids = block_data.get("txs", [])
+            # Log burn block height from v1 endpoint
+            v1_burn_height = v1_data.get("burn_block_height", "MISSING")
+            v1_burn_hash = v1_data.get("burn_block_hash", "MISSING")
+            self.logger.info(
+                f"V1 API - Block {block_height}: burn_block_height={v1_burn_height}, "
+                f"burn_block_hash={v1_burn_hash[:20] if v1_burn_hash != 'MISSING' else 'MISSING'}..."
+            )
+
+            # Add transaction IDs from v1 to v2 data
+            tx_ids = v1_data.get("txs", [])
+            block_data["txs"] = tx_ids
             self.logger.debug(
                 f"Block {block_height} has {len(tx_ids)} transaction IDs, fetching full details..."
             )

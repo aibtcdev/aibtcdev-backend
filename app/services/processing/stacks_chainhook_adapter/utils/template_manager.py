@@ -82,6 +82,7 @@ class ChainhookTemplateManager:
             "send-many-governance-airdrop": "send-many-governance-airdrop.json",
             "send-many-stx-airdrop": "send-many-stx-airdrop.json",
             "vote-on-action-proposal": "vote-on-action-proposal.json",
+            "coinbase": "coinbase-block.json",
         }
 
         for template_name, filename in template_files.items():
@@ -117,6 +118,7 @@ class ChainhookTemplateManager:
             "send-many-governance-airdrop": "send-many-governance-airdrop",
             "send-many-stx-airdrop": "send-many-stx-airdrop",
             "vote-on-action-proposal": "vote-on-action-proposal",
+            "coinbase": "coinbase",  # Use coinbase template for tenure change + coinbase blocks
             "multi-vote-on-action-proposal": "vote-on-action-proposal",  # Use single vote template
             "governance-and-airdrop-multi-tx": "send-many-governance-airdrop",  # Use airdrop template
         }
@@ -209,56 +211,73 @@ class ChainhookTemplateManager:
         self, template_metadata: Dict[str, Any], adapter_metadata: Any
     ):
         """Populate block metadata while preserving template structure."""
-        # Update available fields
-        if hasattr(adapter_metadata, "bitcoin_anchor_block_identifier"):
-            if "bitcoin_anchor_block_identifier" in template_metadata:
-                template_metadata["bitcoin_anchor_block_identifier"]["index"] = (
-                    adapter_metadata.bitcoin_anchor_block_identifier.index
-                )
-                template_metadata["bitcoin_anchor_block_identifier"]["hash"] = (
-                    adapter_metadata.bitcoin_anchor_block_identifier.hash
-                )
+        # Handle both dict and object-style metadata
+        if isinstance(adapter_metadata, dict):
+            # Metadata is a dictionary (from adapter)
+            if "bitcoin_anchor_block_identifier" in adapter_metadata:
+                if "bitcoin_anchor_block_identifier" in template_metadata:
+                    bitcoin_anchor = adapter_metadata["bitcoin_anchor_block_identifier"]
+                    template_metadata["bitcoin_anchor_block_identifier"]["index"] = (
+                        bitcoin_anchor["index"]
+                    )
+                    template_metadata["bitcoin_anchor_block_identifier"]["hash"] = (
+                        bitcoin_anchor["hash"]
+                    )
+                    # Use debug logging instead of print
+                    import logging
 
-        if hasattr(adapter_metadata, "block_time"):
-            template_metadata["block_time"] = adapter_metadata.block_time
+                    logger = logging.getLogger(__name__)
+                    logger.info(
+                        f"Template manager: Updated bitcoin_anchor_block_identifier to index={bitcoin_anchor['index']}"
+                    )
+        else:
+            # Metadata is a dataclass object (fallback)
+            if hasattr(adapter_metadata, "bitcoin_anchor_block_identifier"):
+                if "bitcoin_anchor_block_identifier" in template_metadata:
+                    template_metadata["bitcoin_anchor_block_identifier"]["index"] = (
+                        adapter_metadata.bitcoin_anchor_block_identifier.index
+                    )
+                    template_metadata["bitcoin_anchor_block_identifier"]["hash"] = (
+                        adapter_metadata.bitcoin_anchor_block_identifier.hash
+                    )
 
-        if hasattr(adapter_metadata, "pox_cycle_index"):
-            template_metadata["pox_cycle_index"] = adapter_metadata.pox_cycle_index
+        # Handle other metadata fields for both dict and object formats
+        metadata_fields = [
+            "block_time",
+            "pox_cycle_index",
+            "pox_cycle_length",
+            "pox_cycle_position",
+            "tenure_height",
+            "stacks_block_hash",
+        ]
 
-        if hasattr(adapter_metadata, "pox_cycle_length"):
-            template_metadata["pox_cycle_length"] = adapter_metadata.pox_cycle_length
-
-        if hasattr(adapter_metadata, "pox_cycle_position"):
-            template_metadata["pox_cycle_position"] = (
-                adapter_metadata.pox_cycle_position
-            )
-
-        if hasattr(adapter_metadata, "tenure_height"):
-            template_metadata["tenure_height"] = adapter_metadata.tenure_height
-
-        if hasattr(adapter_metadata, "stacks_block_hash"):
-            template_metadata["stacks_block_hash"] = adapter_metadata.stacks_block_hash
+        for field in metadata_fields:
+            if isinstance(adapter_metadata, dict):
+                if field in adapter_metadata:
+                    template_metadata[field] = adapter_metadata[field]
+            else:
+                if hasattr(adapter_metadata, field):
+                    template_metadata[field] = getattr(adapter_metadata, field)
 
         # Handle signer fields - preserve original template values if adapter doesn't have real data
-        if "signer_bitvec" in template_metadata:
-            adapter_bitvec = getattr(adapter_metadata, "signer_bitvec", "")
-            if adapter_bitvec and adapter_bitvec.startswith(
-                "0"
-            ):  # Only use if it looks like real signer data
-                template_metadata["signer_bitvec"] = adapter_bitvec
-            # Otherwise keep original template value
+        signer_fields = ["signer_bitvec", "signer_public_keys", "signer_signature"]
+        for field in signer_fields:
+            if field in template_metadata:
+                if isinstance(adapter_metadata, dict):
+                    adapter_value = adapter_metadata.get(field, "")
+                else:
+                    adapter_value = getattr(adapter_metadata, field, "")
 
-        if "signer_public_keys" in template_metadata:
-            adapter_keys = getattr(adapter_metadata, "signer_public_keys", [])
-            if adapter_keys:  # Only use if we have actual keys
-                template_metadata["signer_public_keys"] = adapter_keys
-            # Otherwise keep original template value
-
-        if "signer_signature" in template_metadata:
-            adapter_sigs = getattr(adapter_metadata, "signer_signature", [])
-            if adapter_sigs:  # Only use if we have actual signatures
-                template_metadata["signer_signature"] = adapter_sigs
-            # Otherwise keep original template value
+                if field == "signer_bitvec":
+                    # Only use if it looks like real signer data
+                    if adapter_value and str(adapter_value).startswith("0"):
+                        template_metadata[field] = adapter_value
+                    # Otherwise keep original template value
+                elif field in ["signer_public_keys", "signer_signature"]:
+                    # Only use if we have actual data
+                    if adapter_value:
+                        template_metadata[field] = adapter_value
+                    # Otherwise keep original template value
 
     def _populate_transactions(
         self, template_transactions: List[Dict], adapter_transactions: List

@@ -3,7 +3,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from app.backend.factory import backend
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -55,6 +55,9 @@ class JobManager:
         self._metrics = get_metrics_collector()
         self._performance_monitor = get_performance_monitor()
         self._is_running = False
+        # Phase 1: Track active job types to prevent stacking
+        self._active_job_types: Set[str] = set()
+        self._pending_job_counts: Dict[str, int] = {}
 
     @property
     def is_running(self) -> bool:
@@ -122,11 +125,15 @@ class JobManager:
         return metadata.interval_seconds
 
     async def _execute_job_via_executor(self, job_type: str) -> None:
-        """Execute a job through the enhanced executor system with proper concurrency control."""
+        """Execute a job through the enhanced executor system with proper concurrency control and deduplication."""
         logger.info(
             "Scheduled execution triggered",
             extra={"job_type": job_type, "event_type": "scheduled_trigger"},
         )
+
+        # Phase 1: Check if job of this type is already active or queued
+        if await self._should_skip_job_execution(job_type):
+            return
         try:
             from app.backend.models import QueueMessage, QueueMessageType
 
@@ -198,12 +205,19 @@ class JobManager:
                 created_at=datetime.now(),
             )
 
+            # Phase 1: Mark job as active and track pending count
+            self._active_job_types.add(job_type)
+            self._pending_job_counts[job_type] = (
+                self._pending_job_counts.get(job_type, 0) + 1
+            )
+
             # Enqueue the synthetic message with the job's priority
             logger.debug(
                 "Enqueuing job to executor",
                 extra={
                     "job_type": job_type,
                     "priority": str(metadata.priority),
+                    "pending_count": self._pending_job_counts[job_type],
                     "event_type": "enqueue",
                 },
             )
@@ -217,11 +231,19 @@ class JobManager:
                     "job_type": job_type,
                     "job_id": str(job_id),
                     "priority": str(metadata.priority),
+                    "pending_count": self._pending_job_counts[job_type],
                     "event_type": "enqueue_success",
                 },
             )
 
         except Exception as e:
+            # Phase 1: Clean up tracking on error
+            self._active_job_types.discard(job_type)
+            if job_type in self._pending_job_counts:
+                self._pending_job_counts[job_type] = max(
+                    0, self._pending_job_counts[job_type] - 1
+                )
+
             logger.error(
                 "Failed to enqueue scheduled job",
                 extra={
@@ -299,6 +321,11 @@ class JobManager:
 
     async def start_executor(self, num_workers: int = 5) -> None:
         """Start the job executor."""
+        # Phase 2: Setup job completion callback before starting
+        from .executor import set_job_manager_callback
+
+        set_job_manager_callback(self._cleanup_job_tracking)
+
         await self._executor.start(num_workers)
         self._is_running = True
         logger.info(
@@ -508,6 +535,193 @@ class JobManager:
                     "job_type": job_type,
                     "error": str(e),
                     "event_type": "trigger_error",
+                },
+                exc_info=True,
+            )
+            return {
+                "success": False,
+                "message": f"Failed to trigger job: {str(e)}",
+                "job_type": job_type,
+                "error": str(e),
+            }
+
+        logger.debug(
+            "Job completion cleanup completed",
+            extra={
+                "job_type": job_type,
+                "remaining_pending": self._pending_job_counts.get(job_type, 0),
+                "event_type": "cleanup_completed",
+            },
+        )
+
+    async def _should_skip_job_execution(self, job_type: str) -> bool:
+        """Phase 1: Determine if job execution should be skipped due to deduplication logic."""
+        from .base import JobType
+        from .decorators import JobRegistry
+
+        # Check if deduplication is enabled in config
+        if not config.scheduler.job_deduplication_enabled:
+            logger.debug(
+                "Job deduplication disabled - allowing execution",
+                extra={"job_type": job_type, "event_type": "deduplication_disabled"},
+            )
+            return False
+
+        try:
+            job_type_enum = JobType.get_or_create(job_type)
+            metadata = JobRegistry.get_metadata(job_type_enum)
+
+            if not metadata:
+                logger.error(
+                    "Job metadata not found for deduplication check",
+                    extra={"job_type": job_type, "event_type": "metadata_error"},
+                )
+                return True  # Skip if we can't get metadata
+
+            # Get current running jobs of this type from executor
+            executor_stats = self._executor.get_stats()
+            active_jobs = executor_stats.get("active_jobs", {})
+            current_running = active_jobs.get(job_type, 0)
+
+            # Get pending count for this job type
+            pending_count = self._pending_job_counts.get(job_type, 0)
+
+            # Check if we're at or over the concurrency limit
+            max_concurrent = metadata.max_concurrent
+            total_jobs = current_running + pending_count
+
+            if total_jobs >= max_concurrent:
+                logger.info(
+                    "Skipping job execution - concurrency limit reached",
+                    extra={
+                        "job_type": job_type,
+                        "current_running": current_running,
+                        "pending_count": pending_count,
+                        "max_concurrent": max_concurrent,
+                        "total_jobs": total_jobs,
+                        "action": "skipped",
+                        "reason": "concurrency_limit",
+                        "event_type": "job_deduplicated",
+                    },
+                )
+                return True
+
+            # Additional deduplication for monitoring jobs (configurable)
+            if (
+                config.scheduler.aggressive_deduplication_enabled
+                and job_type in config.scheduler.monitoring_job_types
+            ):
+                if current_running > 0:
+                    logger.info(
+                        "Skipping monitoring job execution - instance already running",
+                        extra={
+                            "job_type": job_type,
+                            "current_running": current_running,
+                            "action": "skipped",
+                            "reason": "monitoring_job_already_running",
+                            "aggressive_deduplication": True,
+                            "event_type": "job_deduplicated",
+                        },
+                    )
+                    return True
+
+            logger.debug(
+                "Job execution allowed",
+                extra={
+                    "job_type": job_type,
+                    "current_running": current_running,
+                    "pending_count": pending_count,
+                    "max_concurrent": max_concurrent,
+                    "total_jobs": total_jobs,
+                    "action": "scheduled",
+                    "reason": "within_limits",
+                    "deduplication_enabled": config.scheduler.job_deduplication_enabled,
+                    "aggressive_deduplication": config.scheduler.aggressive_deduplication_enabled,
+                    "event_type": "job_allowed",
+                },
+            )
+            return False
+
+        except Exception as e:
+            logger.error(
+                "Error in deduplication check",
+                extra={
+                    "job_type": job_type,
+                    "error": str(e),
+                    "event_type": "deduplication_error",
+                },
+                exc_info=True,
+            )
+            return False  # Allow execution on error to avoid blocking jobs
+
+    def _cleanup_job_tracking(self, job_type: str) -> None:
+        """Phase 1: Clean up job tracking when job completes."""
+        self._active_job_types.discard(job_type)
+        if job_type in self._pending_job_counts:
+            self._pending_job_counts[job_type] = max(
+                0, self._pending_job_counts[job_type] - 1
+            )
+            if self._pending_job_counts[job_type] == 0:
+                del self._pending_job_counts[job_type]
+
+    def get_job_tracking_stats(self) -> Dict[str, Any]:
+        """Phase 1: Get current job tracking statistics."""
+        return {
+            "active_job_types": list(self._active_job_types),
+            "pending_job_counts": dict(self._pending_job_counts),
+            "total_active_types": len(self._active_job_types),
+            "total_pending_jobs": sum(self._pending_job_counts.values()),
+        }
+
+    def get_comprehensive_metrics(self) -> Dict[str, Any]:
+        """Phase 1 & 2: Get comprehensive metrics including deduplication stats."""
+        job_metrics = self.get_job_metrics()
+        executor_stats = self.get_executor_stats()
+        tracking_stats = self.get_job_tracking_stats()
+
+        return {
+            "job_metrics": job_metrics,
+            "executor_stats": executor_stats,
+            "tracking_stats": tracking_stats,
+            "system_health": self.get_system_health(),
+            "deduplication_config": {
+                "enabled": config.scheduler.job_deduplication_enabled,
+                "aggressive_enabled": config.scheduler.aggressive_deduplication_enabled,
+                "stacking_prevention": config.scheduler.job_stacking_prevention_enabled,
+                "monitoring_job_types": config.scheduler.monitoring_job_types,
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    def trigger_job(self, job_type: str) -> Dict[str, Any]:
+        """Phase 1: Trigger a job with deduplication logic."""
+        import asyncio
+
+        try:
+            # Use the same deduplication logic as scheduled jobs
+            async def trigger_with_dedup():
+                return await self.trigger_job_execution(job_type)
+
+            # Run the async function
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're already in an event loop, create a task
+                asyncio.create_task(trigger_with_dedup())
+                return {
+                    "success": True,
+                    "message": f"Job trigger queued for {job_type}",
+                    "job_type": job_type,
+                }
+            else:
+                # If no event loop is running, run directly
+                return loop.run_until_complete(trigger_with_dedup())
+        except Exception as e:
+            logger.error(
+                "Failed to trigger job",
+                extra={
+                    "job_type": job_type,
+                    "error": str(e),
+                    "event_type": "manual_trigger_error",
                 },
                 exc_info=True,
             )

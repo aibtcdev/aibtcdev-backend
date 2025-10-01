@@ -78,11 +78,23 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
     def __del__(self):
         """Cleanup when task instance is destroyed."""
-        # Note: __del__ can't be async, so we just log if adapter wasn't properly closed
+        # Note: __del__ can't be async, so we just log if resources weren't properly closed
         if hasattr(self, "chainhook_adapter") and self.chainhook_adapter:
             logger.warning(
                 "ChainStateMonitorTask destroyed with open chainhook adapter. "
                 "Consider calling close_adapter() explicitly.",
+                extra={"task": "chain_state_monitor"},
+            )
+
+        if (
+            hasattr(self, "hiro_api")
+            and self.hiro_api
+            and hasattr(self.hiro_api, "_session")
+            and self.hiro_api._session
+        ):
+            logger.warning(
+                "ChainStateMonitorTask destroyed with open HiroApi session. "
+                "Consider calling close_hiro_api() explicitly.",
                 extra={"task": "chain_state_monitor"},
             )
 
@@ -99,6 +111,21 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             except Exception as e:
                 logger.warning(
                     "Error closing chainhook adapter",
+                    extra={"task": "chain_state_monitor", "error": str(e)},
+                )
+
+    async def close_hiro_api(self):
+        """Explicitly close the HiroApi session and cleanup resources."""
+        if hasattr(self, "hiro_api") and self.hiro_api:
+            try:
+                await self.hiro_api.close()
+                logger.debug(
+                    "HiroApi session closed successfully",
+                    extra={"task": "chain_state_monitor"},
+                )
+            except Exception as e:
+                logger.warning(
+                    "Error closing HiroApi session",
                     extra={"task": "chain_state_monitor", "error": str(e)},
                 )
 
@@ -119,16 +146,17 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
     async def _validate_resources(self, context: JobContext) -> bool:
         """Validate resource availability for blockchain monitoring."""
         try:
-            # Test HiroApi initialization and connectivity
-            hiro_api = HiroApi()
-            api_info = await hiro_api.aget_info()
-            if not api_info:
-                logger.error(
-                    "Cannot connect to Hiro API", extra={"task": "chain_state_monitor"}
-                )
-                return False
+            # Test HiroApi initialization and connectivity using context manager
+            async with HiroApi() as hiro_api:
+                api_info = await hiro_api.aget_info()
+                if not api_info:
+                    logger.error(
+                        "Cannot connect to Hiro API",
+                        extra={"task": "chain_state_monitor"},
+                    )
+                    return False
 
-            return True
+                return True
         except Exception as e:
             logger.error(
                 "Resource validation failed",
@@ -350,13 +378,22 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             )
         ]
 
+    async def close_all_resources(self):
+        """Close all resources (adapter and hiro api) and cleanup."""
+        await self.close_adapter()
+        await self.close_hiro_api()
+        logger.debug(
+            "All ChainStateMonitorTask resources closed",
+            extra={"task": "chain_state_monitor"},
+        )
+
     async def _post_execution_cleanup(
         self, context: JobContext, results: List[ChainStateMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
-        # Note: We don't close the chainhook_adapter here because it should persist
-        # across multiple task executions. It will be closed when the task instance
-        # is destroyed or in the __del__ method.
+        # Close any open HiroApi sessions after execution to prevent resource leaks
+        # but keep the chainhook_adapter open for reuse across executions
+        await self.close_hiro_api()
 
         logger.debug(
             "Chain state monitor task cleanup completed",

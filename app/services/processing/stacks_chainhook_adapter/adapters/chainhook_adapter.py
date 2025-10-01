@@ -587,6 +587,12 @@ class StacksChainhookAdapter(BaseAdapter):
             args = data.get("args", [])
             args_str = ", ".join(args) if args else ""
             return f"invoked: {contract_id}::{method}({args_str})"
+        elif tx_kind.type == "Coinbase":
+            return "coinbase"
+        elif tx_kind.type == "TenureChange":
+            return "tenure change"
+        elif tx_kind.type == "TokenTransfer":
+            return "token transfer"
 
         return f"Transaction {stacks_tx['tx_id']}"
 
@@ -684,10 +690,18 @@ class StacksChainhookAdapter(BaseAdapter):
                 "0189e99696d492e80ef74cb97ed22e6429802a0e02258f87071dcc71bbf33deeca20d3d035754ecacb2ecc684c8f9321ffab528f076585c5bd8ecd58f3ded32b76",
             ]
 
+        # Log the burn block data for debugging
+        burn_block_height = stacks_block.get("burn_block_height", 0)
+        burn_block_hash = stacks_block.get("burn_block_hash", "0x" + "0" * 64)
+        self.logger.info(
+            f"Building block metadata: stacks_height={stacks_block.get('height')}, "
+            f"burn_block_height={burn_block_height}, burn_block_hash={burn_block_hash[:20]}..."
+        )
+
         return {
             "bitcoin_anchor_block_identifier": {
-                "hash": stacks_block.get("burn_block_hash", "0x" + "0" * 64),
-                "index": stacks_block.get("burn_block_height", 0),
+                "hash": burn_block_hash,
+                "index": burn_block_height,
             },
             "block_time": stacks_block.get(
                 "block_time", stacks_block.get("burn_block_time", 0)

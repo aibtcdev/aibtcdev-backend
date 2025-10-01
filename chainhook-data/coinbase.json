@@ -1,0 +1,121 @@
+{
+    "apply": [
+        {
+            "block_identifier": {
+                "hash": "0xe11d08d729f644d1defe3731c360b46c53013ed93755f7ced2d77898ebe750fb",
+                "index": 3571799
+            },
+            "metadata": {
+                "bitcoin_anchor_block_identifier": {
+                    "hash": "0x72110b140414cd413afddf9ca5f5f90e20e759adf3340502fd8bd9307437ad59",
+                    "index": 95979
+                },
+                "block_time": 1759091624,
+                "confirm_microblock_identifier": null,
+                "cycle_number": null,
+                "pox_cycle_index": 4793,
+                "pox_cycle_length": 20,
+                "pox_cycle_position": 18,
+                "reward_set": null,
+                "signer_bitvec": "013800000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "signer_public_keys": [
+                    "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+                    "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+                ],
+                "signer_signature": [
+                    "01de825dcd5df854c92e9a89b1a0dcddfaba638c9f8bb42f84524011472e12056f0a38786be6a61f96af847d6f0e68a149310e407abccfd2b9efa201857b0ff075",
+                    "00b351911103f62c6ef95680d088dca7dc16fbe3d835645ef260a0003a8214ca88098ffafcfb3295b0b57bd6201f16f03bcda56b0550be2ef074c8d97f25d9abf0"
+                ],
+                "stacks_block_hash": "0x0cd2cde5e2f8e17efd5f48486c949f9d5b948eec76d2a4727dda6b3151f5a47c",
+                "tenure_height": 92996
+            },
+            "parent_block_identifier": {
+                "hash": "0x6f08780a40a7a3057547ed213554018e166ce7876c3279731dfe13114f389c04",
+                "index": 3571798
+            },
+            "timestamp": 1759091396,
+            "transactions": [
+                {
+                    "metadata": {
+                        "description": "tenure change",
+                        "execution_cost": {
+                            "read_count": 0,
+                            "read_length": 0,
+                            "runtime": 0,
+                            "write_count": 0,
+                            "write_length": 0
+                        },
+                        "fee": 0,
+                        "kind": {
+                            "type": "TenureChange"
+                        },
+                        "nonce": 189828,
+                        "position": {
+                            "index": 0
+                        },
+                        "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e347000000000002e58400000000000000000001c73ded88fca9b7e895595fd72654f0785808554e33044866e2ca9d66b8f7f3560f2d3664353cada139af0d13016fac5c939d0a58977e10e93e98ea97f3311763010200000000075af39254f73c753ddd71e76cd8917efd6d0e50ab356ddc4abe66d5a8d66a38d41440086d11df78475af39254f73c753ddd71e76cd8917efd6d0e50ab6f08780a40a7a3057547ed213554018e166ce7876c3279731dfe13114f389c0400000004002d58c278d1c9e1a8a26236ac81b543193c10e347",
+                        "receipt": {
+                            "contract_calls_stack": [],
+                            "events": [],
+                            "mutated_assets_radius": [],
+                            "mutated_contracts_radius": []
+                        },
+                        "result": "(ok true)",
+                        "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1",
+                        "sponsor": null,
+                        "success": true
+                    },
+                    "operations": [],
+                    "transaction_identifier": {
+                        "hash": "0x49e1946a4919208d237bf1e0eb4dc891a68232454e140be1f7b33cdf13912519"
+                    }
+                },
+                {
+                    "metadata": {
+                        "description": "coinbase",
+                        "execution_cost": {
+                            "read_count": 0,
+                            "read_length": 0,
+                            "runtime": 0,
+                            "write_count": 0,
+                            "write_length": 0
+                        },
+                        "fee": 0,
+                        "kind": {
+                            "type": "Coinbase"
+                        },
+                        "nonce": 189829,
+                        "position": {
+                            "index": 1
+                        },
+                        "raw_tx": "0x808000000004002d58c278d1c9e1a8a26236ac81b543193c10e347000000000002e5850000000000000000000129b8c12c1a2899ffd165ded588a993940f86f438310ecc95f1d806993136505621f1738866dbc7aa092d3b8083bddb4ae6763b10e1ec83567c679e22cb9fac6901020000000008000000000000000000000000000000000000000000000000000000000000000009d115717bef2bc78c7384980743482ae6694424c2fa0fea41924ff9d0c11172291e8a48b62dc0b86bc2222f1b24c2ed908cdacf01be8fd21ad210c866e27043c51fda171a6d887435fd23b79d2b313508",
+                        "receipt": {
+                            "contract_calls_stack": [],
+                            "events": [],
+                            "mutated_assets_radius": [],
+                            "mutated_contracts_radius": []
+                        },
+                        "result": "(ok true)",
+                        "sender": "STPNHGKRT74Y3A52C8VAS0DN8CCKR4738YBAQ3E1",
+                        "sponsor": null,
+                        "success": true
+                    },
+                    "operations": [],
+                    "transaction_identifier": {
+                        "hash": "0x5a415b80f7045c15d6c27fec6fcfd5b8c00ac4bd3718866edf083cd29dfa0060"
+                    }
+                }
+            ]
+        }
+    ],
+    "chainhook": {
+        "is_streaming_blocks": false,
+        "predicate": {
+            "equals": 3571799,
+            "scope": "block_height"
+        },
+        "uuid": "e58f60f2-234e-4e36-9af6-ffeeee246ea0"
+    },
+    "events": [],
+    "rollback": []
+}

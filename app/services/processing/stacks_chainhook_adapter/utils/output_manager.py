@@ -75,6 +75,9 @@ def detect_transaction_type(transaction: TransactionWithReceipt) -> str:
             elif tx_type == "Coinbase":
                 return "coinbase"
 
+            elif tx_type == "TenureChange":
+                return "tenure-change"
+
     # Fallback: try to detect from description
     if hasattr(metadata, "description") and metadata.description:
         desc = metadata.description
@@ -174,6 +177,10 @@ def detect_block_title(chainhook_data: ChainHookData) -> str:
     else:
         # Multi-transaction block - analyze all transactions
         types = [detect_transaction_type(tx) for tx in transactions]
+
+        # Check for coinbase block (tenure-change + coinbase combination)
+        if "tenure-change" in types and "coinbase" in types:
+            return "coinbase"
 
         # Check for specific combinations
         if any("vote-on-action-proposal" in t for t in types) and any(

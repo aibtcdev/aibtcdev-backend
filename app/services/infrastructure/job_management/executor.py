@@ -47,7 +47,7 @@ class JobExecution:
 
 
 class PriorityQueue:
-    """Priority-based job queue with concurrency control."""
+    """Priority-based job queue with concurrency control and deduplication."""
 
     def __init__(self):
         self._queues: Dict[JobPriority, asyncio.Queue] = {
@@ -56,24 +56,56 @@ class PriorityQueue:
         self._active_jobs: Dict[JobType, Set[UUID]] = {}
         self._semaphores: Dict[JobType, asyncio.Semaphore] = {}
         self._executions: Dict[UUID, JobExecution] = {}
+        # Phase 2: Enhanced job type tracking
+        self._pending_jobs_by_type: Dict[JobType, Set[UUID]] = {}
+        self._job_type_locks: Dict[JobType, asyncio.Lock] = {}
 
     async def enqueue(
         self, message: QueueMessage, priority: JobPriority = JobPriority.NORMAL
     ) -> UUID:
-        """Add a job to the priority queue."""
+        """Add a job to the priority queue with Phase 2 deduplication."""
         # Convert message type to JobType, handling both DynamicQueueMessageType and string
         type_value = (
             message.type.value if hasattr(message.type, "value") else str(message.type)
         )
         job_type = JobType.get_or_create(type_value)
+
+        # Phase 2: Ensure we have tracking structures for this job type
+        if job_type not in self._pending_jobs_by_type:
+            self._pending_jobs_by_type[job_type] = set()
+        if job_type not in self._job_type_locks:
+            self._job_type_locks[job_type] = asyncio.Lock()
+
+        # Phase 2: Perform deduplication before enqueuing
+        if await self._should_deduplicate_job(job_type, message):
+            logger.debug(
+                "Job deduplicated - not enqueuing",
+                extra={
+                    "job_id": str(message.id),
+                    "job_type": str(job_type),
+                    "priority": str(priority),
+                    "event_type": "job_deduplicated",
+                },
+            )
+            return message.id
+
         execution = JobExecution(
             id=message.id, job_type=job_type, metadata={"message": message}
         )
 
         self._executions[message.id] = execution
+        self._pending_jobs_by_type[job_type].add(message.id)
         await self._queues[priority].put(execution)
 
-        logger.debug(f"Enqueued job {message.id} with priority {priority}")
+        logger.debug(
+            "Job enqueued to priority queue",
+            extra={
+                "job_id": str(message.id),
+                "job_type": str(job_type),
+                "priority": str(priority),
+                "event_type": "job_enqueued",
+            },
+        )
         return message.id
 
     async def dequeue(self, priority: JobPriority) -> Optional[JobExecution]:
@@ -86,12 +118,20 @@ class PriorityQueue:
             return None
 
     async def get_next_job(self) -> Optional[JobExecution]:
-        """Get the next job from highest priority queue."""
+        """Get the next job from highest priority queue with Phase 2 final deduplication check."""
         # Check queues in priority order (highest first)
         for priority in reversed(list(JobPriority)):
             execution = await self.dequeue(priority)
             if execution:
-                return execution
+                # Phase 2: Final deduplication check before returning job
+                if await self._final_execution_check(execution):
+                    # Remove from pending tracking since we're about to execute
+                    self._pending_jobs_by_type[execution.job_type].discard(execution.id)
+                    return execution
+                else:
+                    # Skip this job and clean it up
+                    self._cleanup_skipped_job(execution)
+                    continue
         return None
 
     def set_concurrency_limit(self, job_type: JobType, max_concurrent: int) -> None:
@@ -113,11 +153,14 @@ class PriorityQueue:
             return False  # No slots available
 
     def release_slot(self, job_type: JobType, job_id: UUID) -> None:
-        """Release a concurrency slot."""
+        """Release a concurrency slot and clean up Phase 2 tracking."""
         if job_type in self._semaphores:
             self._semaphores[job_type].release()
         if job_type in self._active_jobs:
             self._active_jobs[job_type].discard(job_id)
+        # Phase 2: Clean up tracking
+        if job_type in self._pending_jobs_by_type:
+            self._pending_jobs_by_type[job_type].discard(job_id)
 
     def get_execution(self, job_id: UUID) -> Optional[JobExecution]:
         """Get job execution by ID."""
@@ -130,6 +173,122 @@ class PriorityQueue:
             for key, value in kwargs.items():
                 if hasattr(execution, key):
                     setattr(execution, key, value)
+
+    async def _should_deduplicate_job(
+        self, job_type: JobType, message: QueueMessage
+    ) -> bool:
+        """Phase 2: Check if job should be deduplicated before enqueuing."""
+        from app.config import config
+
+        # Check if deduplication is enabled
+        if not config.scheduler.job_deduplication_enabled:
+            return False
+
+        async with self._job_type_locks.get(job_type, asyncio.Lock()):
+            job_type_str = str(job_type)
+
+            # For monitoring jobs, be more aggressive with deduplication (configurable)
+            if (
+                config.scheduler.aggressive_deduplication_enabled
+                and job_type_str in config.scheduler.monitoring_job_types
+            ):
+                # Check if there are any active or pending jobs of this type
+                active_count = len(self._active_jobs.get(job_type, set()))
+                pending_count = len(self._pending_jobs_by_type.get(job_type, set()))
+
+                if active_count > 0 or pending_count > 0:
+                    logger.info(
+                        "Deduplicating monitoring job in executor",
+                        extra={
+                            "job_type": job_type_str,
+                            "active_count": active_count,
+                            "pending_count": pending_count,
+                            "reason": "monitoring_job_already_exists",
+                            "aggressive_deduplication": True,
+                            "event_type": "job_deduplicated_executor",
+                        },
+                    )
+                    return True
+
+            return False
+
+    async def _final_execution_check(self, execution: JobExecution) -> bool:
+        """Phase 2: Final check before executing a job."""
+        from app.config import config
+
+        job_type = execution.job_type
+        job_type_str = str(job_type)
+
+        # Skip final check if stacking prevention is disabled
+        if not config.scheduler.job_stacking_prevention_enabled:
+            return True
+
+        # For monitoring jobs, do a final check to ensure we're not running duplicates
+        if (
+            config.scheduler.aggressive_deduplication_enabled
+            and job_type_str in config.scheduler.monitoring_job_types
+        ):
+            active_count = len(self._active_jobs.get(job_type, set()))
+            if active_count > 0:
+                logger.info(
+                    "Final execution check - skipping duplicate monitoring job",
+                    extra={
+                        "job_id": str(execution.id),
+                        "job_type": job_type_str,
+                        "active_count": active_count,
+                        "reason": "concurrent_execution_detected",
+                        "aggressive_deduplication": True,
+                        "stacking_prevention": config.scheduler.job_stacking_prevention_enabled,
+                        "event_type": "job_execution_skipped_final_check",
+                    },
+                )
+                return False
+
+        return True
+
+    def _cleanup_skipped_job(self, execution: JobExecution) -> None:
+        """Phase 2: Clean up a job that was skipped."""
+        job_id = execution.id
+        job_type = execution.job_type
+
+        # Remove from all tracking structures
+        self._executions.pop(job_id, None)
+        if job_type in self._pending_jobs_by_type:
+            self._pending_jobs_by_type[job_type].discard(job_id)
+
+        logger.debug(
+            "Cleaned up skipped job",
+            extra={
+                "job_id": str(job_id),
+                "job_type": str(job_type),
+                "event_type": "job_cleanup",
+            },
+        )
+
+    def get_deduplication_stats(self) -> Dict[str, Any]:
+        """Phase 2: Get deduplication statistics."""
+        from app.config import config
+
+        return {
+            "pending_jobs_by_type": {
+                str(job_type): len(job_ids)
+                for job_type, job_ids in self._pending_jobs_by_type.items()
+            },
+            "active_jobs_by_type": {
+                str(job_type): len(job_ids)
+                for job_type, job_ids in self._active_jobs.items()
+            },
+            "total_pending_jobs": sum(
+                len(jobs) for jobs in self._pending_jobs_by_type.values()
+            ),
+            "total_active_jobs": sum(len(jobs) for jobs in self._active_jobs.values()),
+            "config": {
+                "deduplication_enabled": config.scheduler.job_deduplication_enabled,
+                "aggressive_deduplication": config.scheduler.aggressive_deduplication_enabled,
+                "stacking_prevention": config.scheduler.job_stacking_prevention_enabled,
+                "monitoring_job_types": config.scheduler.monitoring_job_types,
+            },
+        }
 
 
 class RetryManager:
@@ -166,8 +325,14 @@ class RetryManager:
         execution.attempt += 1
 
         logger.info(
-            f"Scheduling retry for job {execution.id} "
-            f"(attempt {execution.attempt}) in {delay} seconds"
+            "Job scheduled for retry",
+            extra={
+                "job_id": str(execution.id),
+                "job_type": str(execution.job_type),
+                "attempt": execution.attempt,
+                "retry_delay_seconds": delay,
+                "event_type": "job_retry_scheduled",
+            },
         )
 
 
@@ -184,8 +349,14 @@ class DeadLetterQueue:
         self._dead_jobs[execution.id] = execution
 
         logger.error(
-            f"Job {execution.id} moved to dead letter queue after "
-            f"{execution.attempt} attempts. Error: {execution.error}"
+            "Job moved to dead letter queue",
+            extra={
+                "job_id": str(execution.id),
+                "job_type": str(execution.job_type),
+                "attempts": execution.attempt,
+                "error": execution.error,
+                "event_type": "job_dead_letter",
+            },
         )
 
     def get_dead_jobs(self) -> List[JobExecution]:
@@ -198,7 +369,7 @@ class DeadLetterQueue:
 
 
 class JobExecutor:
-    """Enhanced job executor with scalability features."""
+    """Enhanced job executor with scalability features and job completion tracking."""
 
     def __init__(self):
         self.priority_queue = PriorityQueue()
@@ -206,11 +377,16 @@ class JobExecutor:
         self.dead_letter_queue = DeadLetterQueue()
         self._running = False
         self._worker_tasks: List[asyncio.Task] = []
+        # Phase 2: Job completion callback for cleanup
+        self._job_completion_callback = None
 
     async def start(self, num_workers: int = 5) -> None:
         """Start the job executor with specified number of workers."""
         if self._running:
-            logger.warning("JobExecutor is already running")
+            logger.warning(
+                "JobExecutor is already running",
+                extra={"event_type": "executor_already_running"},
+            )
             return
 
         self._running = True
@@ -224,7 +400,10 @@ class JobExecutor:
             task = asyncio.create_task(self._worker(f"worker-{i}"))
             self._worker_tasks.append(task)
 
-        logger.info(f"Started JobExecutor with {num_workers} workers")
+        logger.info(
+            "JobExecutor started",
+            extra={"worker_count": num_workers, "event_type": "executor_started"},
+        )
 
     async def stop(self) -> None:
         """Stop the job executor."""
@@ -242,11 +421,14 @@ class JobExecutor:
             await asyncio.gather(*self._worker_tasks, return_exceptions=True)
 
         self._worker_tasks.clear()
-        logger.info("Stopped JobExecutor")
+        logger.info("JobExecutor stopped", extra={"event_type": "executor_stopped"})
 
     async def _worker(self, worker_name: str) -> None:
         """Worker coroutine that processes jobs from the queue."""
-        logger.debug(f"Starting worker: {worker_name}")
+        logger.debug(
+            "Worker starting",
+            extra={"worker_name": worker_name, "event_type": "worker_start"},
+        )
 
         while self._running:
             try:
@@ -280,7 +462,15 @@ class JobExecutor:
                     self.priority_queue.release_slot(execution.job_type, execution.id)
 
             except Exception as e:
-                logger.error(f"Worker {worker_name} error: {str(e)}", exc_info=True)
+                logger.error(
+                    "Worker encountered error",
+                    extra={
+                        "worker_name": worker_name,
+                        "error": str(e),
+                        "event_type": "worker_error",
+                    },
+                    exc_info=True,
+                )
                 await asyncio.sleep(1)  # Pause on error
 
     async def _execute_job(self, execution: JobExecution, worker_name: str) -> None:
@@ -289,7 +479,15 @@ class JobExecutor:
         job_type = execution.job_type
         start_time = time.time()
 
-        logger.debug(f"{worker_name} executing job {job_id} ({job_type})")
+        logger.debug(
+            "Job execution started",
+            extra={
+                "worker_name": worker_name,
+                "job_id": str(job_id),
+                "job_type": str(job_type),
+                "event_type": "job_execution_start",
+            },
+        )
 
         # Record execution start in metrics
         from .monitoring import get_metrics_collector
@@ -349,13 +547,50 @@ class JobExecutor:
                 update_data=QueueMessageBase(is_processed=True),
             )
 
-            logger.info(f"{worker_name} completed job {job_id} in {duration:.2f}s")
+            # Phase 2: Notify job manager of completion for cleanup
+            if self._job_completion_callback:
+                try:
+                    job_type_str = str(job_type)
+                    self._job_completion_callback(
+                        job_type_str, job_id, True
+                    )  # True for success
+                except Exception as callback_error:
+                    logger.warning(
+                        "Job completion callback failed",
+                        extra={
+                            "job_id": str(job_id),
+                            "job_type": str(job_type),
+                            "callback_error": str(callback_error),
+                            "event_type": "callback_error",
+                        },
+                    )
+
+            logger.info(
+                "Job completed successfully",
+                extra={
+                    "worker_name": worker_name,
+                    "job_id": str(job_id),
+                    "job_type": str(job_type),
+                    "duration_seconds": round(duration, 2),
+                    "event_type": "job_completed",
+                },
+            )
 
         except Exception as e:
             error_msg = str(e)
             duration = time.time() - start_time
 
-            logger.error(f"{worker_name} job {job_id} failed: {error_msg}")
+            logger.error(
+                "Job execution failed",
+                extra={
+                    "worker_name": worker_name,
+                    "job_id": str(job_id),
+                    "job_type": str(job_type),
+                    "duration_seconds": round(duration, 2),
+                    "error": error_msg,
+                    "event_type": "job_failed",
+                },
+            )
 
             # Record failed execution in metrics
             metrics.record_execution_failure(execution, error_msg, duration)
@@ -378,6 +613,24 @@ class JobExecutor:
                 metrics.record_dead_letter(execution)
                 self.dead_letter_queue.add_dead_job(execution)
 
+                # Phase 2: Notify job manager of failure for cleanup
+                if self._job_completion_callback:
+                    try:
+                        job_type_str = str(job_type)
+                        self._job_completion_callback(
+                            job_type_str, job_id, False
+                        )  # False for failure
+                    except Exception as callback_error:
+                        logger.warning(
+                            "Job completion callback failed",
+                            extra={
+                                "job_id": str(job_id),
+                                "job_type": str(job_type),
+                                "callback_error": str(callback_error),
+                                "event_type": "callback_error",
+                            },
+                        )
+
     async def enqueue_pending_jobs(self) -> int:
         """Load pending jobs from database and enqueue them."""
         enqueued_count = 0
@@ -394,34 +647,76 @@ class JobExecutor:
                     enqueued_count += 1
 
                 if pending_messages:
-                    logger.debug(f"Enqueued {len(pending_messages)} {job_type} jobs")
+                    logger.debug(
+                        "Pending jobs enqueued",
+                        extra={
+                            "job_type": str(job_type),
+                            "count": len(pending_messages),
+                            "event_type": "pending_jobs_enqueued",
+                        },
+                    )
 
             except Exception as e:
                 logger.error(
-                    f"Error enqueuing jobs for {job_type}: {str(e)}", exc_info=True
+                    "Error enqueuing pending jobs",
+                    extra={
+                        "job_type": str(job_type),
+                        "error": str(e),
+                        "event_type": "enqueue_error",
+                    },
+                    exc_info=True,
                 )
 
         if enqueued_count > 0:
-            logger.info(f"Enqueued {enqueued_count} pending jobs")
+            logger.info(
+                "Pending jobs enqueue complete",
+                extra={
+                    "enqueued_count": enqueued_count,
+                    "event_type": "pending_jobs_complete",
+                },
+            )
 
         return enqueued_count
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get executor statistics."""
+        """Get executor statistics including Phase 2 deduplication info."""
+        dedup_stats = self.priority_queue.get_deduplication_stats()
         stats = {
             "running": self._running,
             "worker_count": len(self._worker_tasks),
             "dead_letter_count": len(self.dead_letter_queue.get_dead_jobs()),
-            "active_jobs": {
-                str(job_type): len(jobs)
-                for job_type, jobs in self.priority_queue._active_jobs.items()
-            },
+            "active_jobs": dedup_stats["active_jobs_by_type"],
+            "pending_jobs": dedup_stats["pending_jobs_by_type"],
+            "total_pending": dedup_stats["total_pending_jobs"],
+            "total_active": dedup_stats["total_active_jobs"],
         }
         return stats
+
+    def set_job_completion_callback(self, callback) -> None:
+        """Phase 2: Set callback function to be called when jobs complete."""
+        self._job_completion_callback = callback
 
 
 # Global executor instance
 _executor: Optional[JobExecutor] = None
+# Phase 2: Global job manager reference for callbacks
+_job_manager_callback = None
+
+
+def set_job_manager_callback(callback) -> None:
+    """Phase 2: Set the job manager callback for cleanup notifications."""
+    global _job_manager_callback
+    _job_manager_callback = callback
+
+    # Update existing executor if it exists
+    global _executor
+    if _executor:
+
+        def job_completion_callback(job_type: str, job_id, success: bool):
+            if _job_manager_callback:
+                _job_manager_callback(job_type)
+
+        _executor.set_job_completion_callback(job_completion_callback)
 
 
 def get_executor() -> JobExecutor:
@@ -429,4 +724,18 @@ def get_executor() -> JobExecutor:
     global _executor
     if _executor is None:
         _executor = JobExecutor()
+        # Phase 2: Setup job completion callback when first created
+        _setup_job_completion_callback(_executor)
     return _executor
+
+
+def _setup_job_completion_callback(executor: JobExecutor) -> None:
+    """Phase 2: Setup the job completion callback to notify job manager."""
+
+    def job_completion_callback(job_type: str, job_id, success: bool):
+        """Callback to notify job manager of job completion."""
+        # We'll need to get the global job manager instance
+        # This will be set up when the job manager calls set_executor_callback
+        pass
+
+    executor.set_job_completion_callback(job_completion_callback)
