@@ -16,6 +16,7 @@ aibtcdev-backend provides real-time chat functionality with AI agents, comprehen
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Usage Examples](#usage-examples)
+- [Repository Structure](#repository-structure)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
@@ -157,6 +158,29 @@ Comprehensive documentation is available in the `docs/` directory:
 - **Authentication**: See [Authentication](docs/authentication.md) for auth methods
 - **Environment Setup**: See [Configuration](docs/configuration.md) for all settings
 - **CLI Commands**: See [CLI Usage](docs/cli-usage.md) for task running instructions
+
+For detailed folder-by-folder technical documentation, see the README files throughout the repository, starting from top-level folders linked below.
+
+## Repository Structure
+
+This repository is organized with modular folders for different components. Each major folder has its own README.md for detailed documentation.
+
+- **Top-Level Folders**:
+  - [app/](./app/README.md): Core application logic and entry points.
+  - [docs/](./docs/README.md): Project guides and references.
+  - [docs-v2/](./docs-v2/README.md): Structured documentation system.
+  - [examples/](./examples/README.md): Usage examples.
+  - [scripts/](./scripts/README.md): Utility scripts.
+  - [services/](./services/README.md): Service executions.
+  - [supabase/](./supabase/README.md): Database configurations.
+
+- **Configuration and Build Files**:
+  - [Dockerfile](Dockerfile): Containerization setup.
+  - [pyproject.toml](pyproject.toml): Project dependencies and settings.
+  - [ruff.toml](ruff.toml): Code style configuration.
+  - [uv.lock](uv.lock): Dependency lock file.
+
+For a complete documentation plan and template, see [docs-v2/README_PLAN.md](./docs-v2/README_PLAN.md) and [docs-v2/README_TEMPLATE.md](./docs-v2/README_TEMPLATE.md).
 
 ## Usage Examples
 
