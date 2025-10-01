@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 
 from app.lib.logger import configure_logger
 
-from .base import BaseTask, JobType
+from .base import BaseTask, JobType, RunnerConfig
 
 logger = configure_logger(__name__)
 
@@ -157,8 +157,10 @@ class JobRegistry:
         """Get or create a task instance for a job type."""
         if job_type not in cls._instances:
             task_class = cls.get_task_class(job_type)
-            if task_class:
-                cls._instances[job_type] = task_class()
+            metadata = cls.get_metadata(job_type)
+            if task_class and metadata:
+                config = RunnerConfig(max_retries=metadata.max_retries)
+                cls._instances[job_type] = task_class(config=config)
         return cls._instances.get(job_type)
 
     @classmethod
