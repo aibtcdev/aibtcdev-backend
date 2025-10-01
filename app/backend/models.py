@@ -561,6 +561,11 @@ class XTweetBase(CustomBaseModel):
     tweet_images_analysis: Optional[List[Dict[str, Any]]] = (
         None  # Bitcoin face analysis for tweet images
     )
+    # Quoted tweet linking fields
+    quoted_tweet_id: Optional[str] = None  # Twitter ID of the quoted tweet
+    quoted_tweet_db_id: Optional[UUID] = (
+        None  # Our database ID of the quoted tweet record
+    )
 
 
 class XTweetCreate(XTweetBase):

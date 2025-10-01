@@ -272,10 +272,45 @@ class TwitterDataService:
                     "public_metrics": getattr(tweet, "public_metrics", {}),
                     "entities": getattr(tweet, "entities", {}),
                     "attachments": getattr(tweet, "attachments", {}),
+                    "referenced_tweets": getattr(tweet, "referenced_tweets", []),
                 }
 
-                # Extract author information from includes if available
+                # Handle quoted posts from referenced_tweets
+                quoted_posts = []
+                referenced_tweets = getattr(tweet, "referenced_tweets", [])
+
+                for ref_tweet in referenced_tweets:
+                    if ref_tweet.type == "quoted":
+                        quoted_posts.append(
+                            {"type": ref_tweet.type, "id": ref_tweet.id}
+                        )
+
+                # Extract quoted post data from includes if available
                 if hasattr(tweet_response, "includes") and tweet_response.includes:
+                    if "tweets" in tweet_response.includes:
+                        for quoted_tweet in tweet_response.includes["tweets"]:
+                            # Find matching quoted posts
+                            for quoted_ref in quoted_posts:
+                                if str(quoted_tweet.id) == str(quoted_ref["id"]):
+                                    quoted_ref["data"] = {
+                                        "id": quoted_tweet.id,
+                                        "text": quoted_tweet.text,
+                                        "author_id": quoted_tweet.author_id,
+                                        "created_at": getattr(
+                                            quoted_tweet, "created_at", None
+                                        ),
+                                        "public_metrics": getattr(
+                                            quoted_tweet, "public_metrics", {}
+                                        ),
+                                        "entities": getattr(
+                                            quoted_tweet, "entities", {}
+                                        ),
+                                        "attachments": getattr(
+                                            quoted_tweet, "attachments", {}
+                                        ),
+                                    }
+                                    break
+
                     if "users" in tweet_response.includes:
                         # Find the author user in the includes
                         for user in tweet_response.includes["users"]:
@@ -300,11 +335,26 @@ class TwitterDataService:
                                     )
                                 break
 
+                            # Add author info to quoted posts
+                            for quoted_ref in quoted_posts:
+                                if "data" in quoted_ref and user_id == str(
+                                    quoted_ref["data"]["author_id"]
+                                ):
+                                    quoted_ref["data"]["author_name"] = getattr(
+                                        user, "name", ""
+                                    )
+                                    quoted_ref["data"]["author_username"] = getattr(
+                                        user, "username", ""
+                                    )
+
                     if "media" in tweet_response.includes:
                         tweet_data["media_objects"] = tweet_response.includes["media"]
                         logger.debug(
                             f"Found {len(tweet_response.includes['media'])} media objects in API v2 response"
                         )
+
+                # Add quoted posts to tweet data
+                tweet_data["quoted_posts"] = quoted_posts
 
                 logger.info(f"Successfully fetched tweet {tweet_id} using API v2")
                 return tweet_data
@@ -646,6 +696,68 @@ class TwitterDataService:
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
 
+            # Handle quoted posts first (store them before the main tweet)
+            quoted_tweet_db_id = None
+            quoted_posts = tweet_data.get("quoted_posts", [])
+
+            for quoted_post in quoted_posts:
+                if "data" in quoted_post:
+                    quoted_data = quoted_post["data"]
+                    quoted_tweet_id = str(quoted_data["id"])
+
+                    # Check if quoted tweet already exists
+                    existing_quoted = backend.list_x_tweets(
+                        XTweetFilter(tweet_id=quoted_tweet_id)
+                    )
+                    if existing_quoted:
+                        quoted_tweet_db_id = existing_quoted[0].id
+                        logger.debug(f"Quoted tweet {quoted_tweet_id} already exists")
+                    else:
+                        # Store the quoted tweet first
+                        quoted_author_id = await self._store_user_if_needed(quoted_data)
+
+                        # Extract images from quoted tweet
+                        quoted_images = self._extract_images_from_tweet_data(
+                            quoted_data
+                        )
+
+                        # Prepare quoted tweet creation data
+                        quoted_created_at = None
+                        if quoted_data.get("created_at"):
+                            try:
+                                if hasattr(quoted_data["created_at"], "strftime"):
+                                    quoted_created_at = quoted_data[
+                                        "created_at"
+                                    ].strftime("%Y-%m-%d %H:%M:%S")
+                                else:
+                                    quoted_created_at = str(quoted_data["created_at"])
+                            except (AttributeError, ValueError, TypeError):
+                                quoted_created_at = str(quoted_data["created_at"])
+
+                        quoted_tweet_create = XTweetCreate(
+                            message=quoted_data.get("text"),
+                            author_id=quoted_author_id,
+                            tweet_id=quoted_tweet_id,
+                            conversation_id=quoted_data.get("conversation_id"),
+                            is_worthy=False,
+                            tweet_type=TweetType.INVALID,
+                            confidence_score=None,
+                            reason=None,
+                            images=quoted_images,
+                            author_name=quoted_data.get("author_name"),
+                            author_username=quoted_data.get("author_username"),
+                            created_at_twitter=quoted_created_at,
+                            public_metrics=quoted_data.get("public_metrics"),
+                            entities=quoted_data.get("entities"),
+                            attachments=quoted_data.get("attachments"),
+                            tweet_images_analysis=[],
+                            # No quoted_tweet_id for the quoted post itself
+                        )
+
+                        quoted_record = backend.create_x_tweet(quoted_tweet_create)
+                        quoted_tweet_db_id = quoted_record.id
+                        logger.info(f"Stored quoted tweet {quoted_tweet_id}")
+
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
             # TODO: Uncomment this when we have a way to analyze images thats faster than the current implementation
@@ -659,7 +771,7 @@ class TwitterDataService:
             #     except Exception as e:
             #         logger.warning(f"Error analyzing tweet image {image_url}: {str(e)}")
 
-            # Create tweet record
+            # Create tweet record with quoted tweet reference
             tweet_create_data = XTweetCreate(
                 message=tweet_data.get("text"),
                 author_id=author_id,
@@ -677,11 +789,17 @@ class TwitterDataService:
                 entities=tweet_data.get("entities"),
                 attachments=tweet_data.get("attachments"),
                 tweet_images_analysis=tweet_images_analysis,
+                # Link to quoted tweet
+                quoted_tweet_id=quoted_posts[0]["id"] if quoted_posts else None,
+                quoted_tweet_db_id=quoted_tweet_db_id,
             )
 
             tweet_record = backend.create_x_tweet(tweet_create_data)
+            quoted_info = (
+                f" and quoted tweet {quoted_tweet_db_id}" if quoted_tweet_db_id else ""
+            )
             logger.info(
-                f"Successfully stored tweet {tweet_id} with {len(image_urls)} images"
+                f"Successfully stored tweet {tweet_id} with {len(image_urls)} images{quoted_info}"
             )
 
             # Fetch and store the author's last 5 tweets
@@ -886,6 +1004,69 @@ class TwitterDataService:
                 f"Error fetching and storing author tweets for {author_id}: {str(e)}"
             )
             return []
+
+    async def fetch_tweet_with_quoted(
+        self, tweet_db_id: UUID
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch tweet with quoted post if available.
+
+        Args:
+            tweet_db_id: Database ID of the tweet to fetch
+
+        Returns:
+            Dictionary containing tweet data with quoted post if available, None if not found
+        """
+        try:
+            # Get main tweet
+            tweet = backend.get_x_tweet(tweet_db_id)
+            if not tweet:
+                logger.warning(f"Tweet not found for ID: {tweet_db_id}")
+                return None
+
+            tweet_data = {
+                "id": tweet.tweet_id,
+                "text": tweet.message,
+                "author_id": tweet.author_id,
+                "author_name": tweet.author_name,
+                "author_username": tweet.author_username,
+                "created_at": tweet.created_at_twitter,
+                "public_metrics": tweet.public_metrics or {},
+                "entities": tweet.entities or {},
+                "attachments": tweet.attachments or {},
+                "images": tweet.images or [],
+                "tweet_images_analysis": tweet.tweet_images_analysis or [],
+            }
+
+            # Get quoted tweet if it exists
+            if tweet.quoted_tweet_db_id:
+                quoted_tweet = backend.get_x_tweet(tweet.quoted_tweet_db_id)
+                if quoted_tweet:
+                    tweet_data["quoted_post"] = {
+                        "id": quoted_tweet.tweet_id,
+                        "text": quoted_tweet.message,
+                        "author_id": quoted_tweet.author_id,
+                        "author_name": quoted_tweet.author_name,
+                        "author_username": quoted_tweet.author_username,
+                        "created_at": quoted_tweet.created_at_twitter,
+                        "public_metrics": quoted_tweet.public_metrics or {},
+                        "entities": quoted_tweet.entities or {},
+                        "attachments": quoted_tweet.attachments or {},
+                        "images": quoted_tweet.images or [],
+                        "tweet_images_analysis": quoted_tweet.tweet_images_analysis
+                        or [],
+                    }
+                    logger.debug(f"Retrieved quoted post for tweet {tweet_db_id}")
+                else:
+                    logger.warning(
+                        f"Quoted tweet {tweet.quoted_tweet_db_id} not found for tweet {tweet_db_id}"
+                    )
+
+            logger.debug(f"Retrieved tweet data with quoted post for ID {tweet_db_id}")
+            return tweet_data
+
+        except Exception as e:
+            logger.error(f"Error retrieving tweet with quoted post: {str(e)}")
+            return None
 
 
 # Global instance for reuse across the application

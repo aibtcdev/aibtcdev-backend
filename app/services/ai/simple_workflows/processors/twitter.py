@@ -120,6 +120,81 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
             else "None"
         )
 
+        # Check if this tweet has a quoted post
+        quoted_tweet_db_id = tweet_data.get("quoted_tweet_db_id")
+        quoted_post_xml = ""
+
+        if quoted_tweet_db_id:
+            try:
+                # Fetch the quoted tweet data
+                quoted_tweet = backend.get_x_tweet(quoted_tweet_db_id)
+                if quoted_tweet:
+                    # Get quoted tweet author info
+                    quoted_author_info = {}
+                    if quoted_tweet.author_id:
+                        quoted_author = backend.get_x_user(quoted_tweet.author_id)
+                        if quoted_author:
+                            quoted_author_info = {
+                                "description": quoted_author.description,
+                                "location": quoted_author.location,
+                                "url": quoted_author.url,
+                                "verified": quoted_author.verified,
+                                "verified_type": quoted_author.verified_type,
+                                "bitcoin_face_score": quoted_author.bitcoin_face_score,
+                            }
+
+                    # Format quoted tweet creation date
+                    quoted_created_str = ""
+                    if quoted_tweet.created_at_twitter:
+                        try:
+                            if hasattr(quoted_tweet.created_at_twitter, "strftime"):
+                                quoted_created_str = (
+                                    quoted_tweet.created_at_twitter.strftime(
+                                        "%Y-%m-%d %H:%M:%S"
+                                    )
+                                )
+                            else:
+                                quoted_created_str = str(
+                                    quoted_tweet.created_at_twitter
+                                )
+                        except (AttributeError, ValueError, TypeError):
+                            quoted_created_str = str(quoted_tweet.created_at_twitter)
+
+                    # Format quoted author bitcoin face score
+                    quoted_bitcoin_face_str = (
+                        f"{quoted_author_info.get('bitcoin_face_score', 0):.4f}"
+                        if quoted_author_info.get("bitcoin_face_score") is not None
+                        else "None"
+                    )
+
+                    # Escape curly braces in quoted tweet text
+                    quoted_text = quoted_tweet.message or ""
+                    quoted_text = quoted_text.replace("{", "{{").replace("}", "}}")
+
+                    quoted_post_xml = f"""
+  <quoted_post>
+    <author>{quoted_tweet.author_name or "Unknown"} (@{quoted_tweet.author_username or "unknown"})</author>
+    <created_at>{quoted_created_str}</created_at>
+    <text>{quoted_text}</text>
+    <author_info>
+      <description>{quoted_author_info.get("description") or "None"}</description>
+      <location>{quoted_author_info.get("location") or "None"}</location>
+      <url>{quoted_author_info.get("url") or "None"}</url>
+      <verified>{quoted_author_info.get("verified", False)}</verified>
+      <verified_type>{quoted_author_info.get("verified_type") or "None"}</verified_type>
+      <bitcoin_face_score>{quoted_bitcoin_face_str}</bitcoin_face_score>
+    </author_info>
+    <tweet_images_analysis>{str(quoted_tweet.tweet_images_analysis) if quoted_tweet.tweet_images_analysis else "None"}</tweet_images_analysis>
+  </quoted_post>"""
+            except Exception as e:
+                logger.warning(
+                    f"Error fetching quoted tweet {quoted_tweet_db_id}: {str(e)}"
+                )
+                quoted_post_xml = f"""
+  <quoted_post>
+    <error>Could not retrieve quoted post: {str(e)}</error>
+  </quoted_post>"""
+
         formatted_tweet = f"""
 <tweet>
   <author>{author_name} (@{author_username})</author>
@@ -133,7 +208,7 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
     <verified_type>{author_verified_type or "None"}</verified_type>
     <bitcoin_face_score>{bitcoin_face_str}</bitcoin_face_score>
   </author_info>
-  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>
+  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>{quoted_post_xml}
 </tweet>
 """
         return formatted_tweet.strip()
