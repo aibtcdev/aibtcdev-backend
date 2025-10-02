@@ -138,4 +138,4 @@ Make useful memes and captions for @elonmusk posts.
 **PAST PROPOSALS:**
 {past_proposals}
 
-Provide detailed reasoning for your evaluation and final decision."""
+Provide detailed reasoning for your evaluation and final decision, strictly following the system guidelines."""
