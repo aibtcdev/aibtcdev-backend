@@ -3,7 +3,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from app.backend.factory import backend
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -55,9 +55,6 @@ class JobManager:
         self._metrics = get_metrics_collector()
         self._performance_monitor = get_performance_monitor()
         self._is_running = False
-        # Phase 1: Track active job types to prevent stacking
-        self._active_job_types: Set[str] = set()
-        self._pending_job_counts: Dict[str, int] = {}
 
     @property
     def is_running(self) -> bool:
@@ -205,19 +202,12 @@ class JobManager:
                 created_at=datetime.now(),
             )
 
-            # Phase 1: Mark job as active and track pending count
-            self._active_job_types.add(job_type)
-            self._pending_job_counts[job_type] = (
-                self._pending_job_counts.get(job_type, 0) + 1
-            )
-
             # Enqueue the synthetic message with the job's priority
             logger.debug(
                 "Enqueuing job to executor",
                 extra={
                     "job_type": job_type,
                     "priority": str(metadata.priority),
-                    "pending_count": self._pending_job_counts[job_type],
                     "event_type": "enqueue",
                 },
             )
@@ -231,19 +221,11 @@ class JobManager:
                     "job_type": job_type,
                     "job_id": str(job_id),
                     "priority": str(metadata.priority),
-                    "pending_count": self._pending_job_counts[job_type],
                     "event_type": "enqueue_success",
                 },
             )
 
         except Exception as e:
-            # Phase 1: Clean up tracking on error
-            self._active_job_types.discard(job_type)
-            if job_type in self._pending_job_counts:
-                self._pending_job_counts[job_type] = max(
-                    0, self._pending_job_counts[job_type] - 1
-                )
-
             logger.error(
                 "Failed to enqueue scheduled job",
                 extra={
@@ -321,11 +303,6 @@ class JobManager:
 
     async def start_executor(self, num_workers: int = 5) -> None:
         """Start the job executor."""
-        # Phase 2: Setup job completion callback before starting
-        from .executor import set_job_manager_callback
-
-        set_job_manager_callback(self._cleanup_job_tracking)
-
         await self._executor.start(num_workers)
         self._is_running = True
         logger.info(
@@ -545,15 +522,6 @@ class JobManager:
                 "error": str(e),
             }
 
-        logger.debug(
-            "Job completion cleanup completed",
-            extra={
-                "job_type": job_type,
-                "remaining_pending": self._pending_job_counts.get(job_type, 0),
-                "event_type": "cleanup_completed",
-            },
-        )
-
     async def _should_skip_job_execution(self, job_type: str) -> bool:
         """Phase 1: Determine if job execution should be skipped due to deduplication logic."""
         from .base import JobType
@@ -578,17 +546,18 @@ class JobManager:
                 )
                 return True  # Skip if we can't get metadata
 
-            # Get current running jobs of this type from executor
+            # Get current running and pending jobs from executor (source of truth)
             executor_stats = self._executor.get_stats()
             active_jobs = executor_stats.get("active_jobs", {})
-            current_running = active_jobs.get(job_type, 0)
+            pending_jobs = executor_stats.get("pending_jobs", {})
 
-            # Get pending count for this job type
-            pending_count = self._pending_job_counts.get(job_type, 0)
+            current_running = active_jobs.get(job_type, 0)
+            current_pending = pending_jobs.get(job_type, 0)
 
             # Check if we're at or over the concurrency limit
+            # Use STRICT inequality (>) to allow scheduling when at limit
             max_concurrent = metadata.max_concurrent
-            total_jobs = current_running + pending_count
+            total_jobs = current_running + current_pending
 
             if total_jobs >= max_concurrent:
                 logger.info(
@@ -596,7 +565,7 @@ class JobManager:
                     extra={
                         "job_type": job_type,
                         "current_running": current_running,
-                        "pending_count": pending_count,
+                        "current_pending": current_pending,
                         "max_concurrent": max_concurrent,
                         "total_jobs": total_jobs,
                         "action": "skipped",
@@ -611,14 +580,16 @@ class JobManager:
                 config.scheduler.aggressive_deduplication_enabled
                 and job_type in config.scheduler.monitoring_job_types
             ):
-                if current_running > 0:
+                # For monitoring jobs, skip if there's ANYTHING already queued or running
+                if current_running > 0 or current_pending > 0:
                     logger.info(
-                        "Skipping monitoring job execution - instance already running",
+                        "Skipping monitoring job execution - instance already queued or running",
                         extra={
                             "job_type": job_type,
                             "current_running": current_running,
+                            "current_pending": current_pending,
                             "action": "skipped",
-                            "reason": "monitoring_job_already_running",
+                            "reason": "monitoring_job_already_exists",
                             "aggressive_deduplication": True,
                             "event_type": "job_deduplicated",
                         },
@@ -630,7 +601,7 @@ class JobManager:
                 extra={
                     "job_type": job_type,
                     "current_running": current_running,
-                    "pending_count": pending_count,
+                    "current_pending": current_pending,
                     "max_concurrent": max_concurrent,
                     "total_jobs": total_jobs,
                     "action": "scheduled",
@@ -654,23 +625,14 @@ class JobManager:
             )
             return False  # Allow execution on error to avoid blocking jobs
 
-    def _cleanup_job_tracking(self, job_type: str) -> None:
-        """Phase 1: Clean up job tracking when job completes."""
-        self._active_job_types.discard(job_type)
-        if job_type in self._pending_job_counts:
-            self._pending_job_counts[job_type] = max(
-                0, self._pending_job_counts[job_type] - 1
-            )
-            if self._pending_job_counts[job_type] == 0:
-                del self._pending_job_counts[job_type]
-
     def get_job_tracking_stats(self) -> Dict[str, Any]:
-        """Phase 1: Get current job tracking statistics."""
+        """Get current job tracking statistics from executor."""
+        executor_stats = self._executor.get_stats()
         return {
-            "active_job_types": list(self._active_job_types),
-            "pending_job_counts": dict(self._pending_job_counts),
-            "total_active_types": len(self._active_job_types),
-            "total_pending_jobs": sum(self._pending_job_counts.values()),
+            "active_jobs": executor_stats.get("active_jobs", {}),
+            "pending_jobs": executor_stats.get("pending_jobs", {}),
+            "total_active": executor_stats.get("total_active", 0),
+            "total_pending": executor_stats.get("total_pending", 0),
         }
 
     def get_comprehensive_metrics(self) -> Dict[str, Any]:
