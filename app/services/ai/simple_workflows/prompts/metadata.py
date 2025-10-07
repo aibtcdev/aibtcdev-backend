@@ -55,12 +55,12 @@ You MUST provide a single, valid JSON object with the following structure and ke
   "tags": ["tag1", "tag2", "tag3"]
 }"""
 
-METADATA_USER_PROMPT_TEMPLATE = """Please analyze the following proposal content and generate a title, summary, and tags:
+METADATA_USER_PROMPT_TEMPLATE = """Analyze the following proposal and generate metadata according to the system prompt instructions.
 
-Proposal Content:
+**DAO Context:**
+- DAO Name: {dao_name}
+- Proposal Type: {proposal_type}
+
+**Proposal Content:**
 {proposal_content}
-
-DAO Name: {dao_name}
-Proposal Type: {proposal_type}
-
-Based on this information, generate appropriate metadata for this proposal."""
+"""
