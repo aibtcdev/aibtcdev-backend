@@ -67,28 +67,17 @@ Return a single, valid JSON object. Do not include any explanatory text before o
   "suggested_action": "Immediate next steps for proposal submission and implementation (string, ASCII only)"
 }"""
 
-RECOMMENDATION_USER_PROMPT_TEMPLATE = """Based on the following DAO information and context, generate a thoughtful recommendation for a new proposal that would benefit the DAO:
+RECOMMENDATION_USER_PROMPT_TEMPLATE = """Generate a single, strategic proposal recommendation based on the provided context. Follow all instructions, protocols, and formatting requirements from the system prompt.
 
-**DAO INFORMATION:**
-Name: {dao_name}
-Mission: {dao_mission}
-Description: {dao_description}
+**DAO PROFILE:**
+- Name: {dao_name}
+- Mission: {dao_mission}
+- Description: {dao_description}
 
-**RECENT PROPOSALS CONTEXT:**
-{recent_proposals}
+**HISTORICAL DATA:**
+- Recent Proposals: {recent_proposals}
 
-**FOCUS AREA:**
-{focus_area}
-
-**SPECIFIC NEEDS:**
-{specific_needs}
-
-**TASK:**
-Generate a strategic proposal recommendation that:
-1. Aligns with the DAO's mission and builds on recent proposal patterns
-2. Addresses identified gaps or opportunities in the current proposal landscape
-3. Provides concrete, implementable actions with clear success metrics
-4. Can be executed within 90 days with realistic resource requirements
-5. Would likely pass the same evaluation criteria used for proposal assessment
-
-Provide your recommendation in the specified JSON format."""
+**STRATEGIC INPUTS:**
+- Focus Area: {focus_area}
+- Specific Needs: {specific_needs}
+"""
