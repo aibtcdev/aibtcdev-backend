@@ -637,6 +637,113 @@ class TwitterDataService:
             logger.error(f"Error storing user data: {str(e)}")
             return None
 
+    async def sync_user_after_oauth_link(
+        self, username: str, provider_id: str, supabase_user_id: Optional[str] = None
+    ) -> Optional[UUID]:
+        """
+        Sync X user data immediately after OAuth linking.
+        Called right after user links their Twitter account.
+
+        Args:
+            username: X username (without @) from OAuth
+            provider_id: X user ID from OAuth provider
+            supabase_user_id: Supabase auth.users.id to link accounts
+
+        Returns:
+            User database ID if successful, None otherwise
+        """
+        try:
+            logger.info(
+                f"Syncing X user after OAuth link: {username} (ID: {provider_id})"
+            )
+
+            # Check if user already exists by provider_id or username
+            existing_users = backend.list_x_users(
+                XUserFilter(user_id=provider_id)
+            ) or backend.list_x_users(XUserFilter(username=username))
+
+            # Always fetch fresh profile data after OAuth link
+            logger.info(f"Fetching fresh profile data for {username}")
+            profile_data = fetch_user_profile(username)
+
+            if profile_data.get("error"):
+                logger.error(
+                    f"Failed to fetch profile for {username}: {profile_data['error']}"
+                )
+                return None
+
+            # Prepare user data with OAuth info
+            user_create_data = {
+                "name": profile_data.get("name"),
+                "username": username,
+                "user_id": provider_id,  # X user ID from OAuth
+                "supabase_user_id": supabase_user_id,  # Link to Supabase auth
+            }
+
+            # Add profile fields (reuse existing logic!)
+            if profile_data.get("profile_image_url"):
+                user_create_data["profile_image_url"] = profile_data[
+                    "profile_image_url"
+                ]
+
+                # Analyze profile image for bitcoin face (reuse existing function!)
+                try:
+                    logger.info(f"Analyzing profile image for {username}")
+                    pfp_analysis = analyze_bitcoin_face(
+                        profile_data["profile_image_url"]
+                    )
+                    if not pfp_analysis.get("error"):
+                        bitcoin_face_score = pfp_analysis.get("bitcoin_face")
+                        if bitcoin_face_score is not None:
+                            user_create_data["bitcoin_face_score"] = bitcoin_face_score
+                            logger.info(
+                                f"Bitcoin face score for {username}: {bitcoin_face_score}"
+                            )
+                except Exception as e:
+                    logger.warning(f"Error analyzing profile image: {str(e)}")
+
+            # Add other profile fields
+            for field in [
+                "description",
+                "location",
+                "url",
+                "verified",
+                "verified_type",
+            ]:
+                if profile_data.get(field) is not None:
+                    user_create_data[field] = profile_data[field]
+
+            # Update or create user
+            if existing_users:
+                existing_user = existing_users[0]
+                logger.info(
+                    f"Updating existing user {username} (ID: {existing_user.id})"
+                )
+
+                # Update the user (you'll need this method in your backend)
+                try:
+                    updated_user = backend.update_x_user(
+                        existing_user.id, XUserCreate(**user_create_data)
+                    )
+                    logger.info(f"Successfully updated user {username}")
+                    return updated_user.id
+                except Exception as e:
+                    logger.error(f"Error updating user: {str(e)}")
+                    return existing_user.id
+            else:
+                # Create new user
+                logger.info(f"Creating new user record for {username}")
+                user_data = XUserCreate(**user_create_data)
+                user = backend.create_x_user(user_data)
+                logger.info(f"Successfully created user {username} with ID: {user.id}")
+                return user.id
+
+        except Exception as e:
+            logger.error(
+                f"Error syncing user after OAuth link: {str(e)}", exc_info=True
+            )
+            return None
+
     async def store_tweet_data(self, tweet_url: str) -> Optional[UUID]:
         """Store tweet data in the database.
 
