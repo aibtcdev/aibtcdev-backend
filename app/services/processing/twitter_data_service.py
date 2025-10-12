@@ -277,7 +277,7 @@ class TwitterDataService:
 
                 # Handle quoted posts from referenced_tweets
                 quoted_posts = []
-                referenced_tweets = getattr(tweet, "referenced_tweets", [])
+                referenced_tweets = getattr(tweet, "referenced_tweets", []) or []
 
                 for ref_tweet in referenced_tweets:
                     if ref_tweet.type == "quoted":
@@ -420,6 +420,7 @@ class TwitterDataService:
                 extended_entities
                 and isinstance(extended_entities, dict)
                 and "media" in extended_entities
+                and extended_entities["media"]
             ):
                 for media in extended_entities["media"]:
                     if media.get("type") == "photo":
@@ -431,7 +432,12 @@ class TwitterDataService:
 
             # Check entities for media (fallback)
             entities = tweet_data.get("entities")
-            if entities and isinstance(entities, dict) and "media" in entities:
+            if (
+                entities
+                and isinstance(entities, dict)
+                and "media" in entities
+                and entities["media"]
+            ):
                 for media in entities["media"]:
                     if media.get("type") == "photo":
                         media_url = media.get("media_url_https") or media.get(
@@ -449,7 +455,7 @@ class TwitterDataService:
             ):
                 # For API v2, we need to check if media objects are in the tweet_data
                 # This happens when the API response includes expanded media
-                media_objects = tweet_data.get("media_objects", [])
+                media_objects = tweet_data.get("media_objects", []) or []
                 for media in media_objects:
                     media_url = None
                     media_type = None
@@ -716,7 +722,7 @@ class TwitterDataService:
 
             # Handle quoted posts first (store them before the main tweet)
             quoted_tweet_db_id = None
-            quoted_posts = tweet_data.get("quoted_posts", [])
+            quoted_posts = tweet_data.get("quoted_posts", []) or []
 
             for quoted_post in quoted_posts:
                 if "data" in quoted_post:
