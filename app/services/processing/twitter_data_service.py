@@ -287,7 +287,10 @@ class TwitterDataService:
 
                 # Extract quoted post data from includes if available
                 if hasattr(tweet_response, "includes") and tweet_response.includes:
-                    if "tweets" in tweet_response.includes:
+                    if (
+                        "tweets" in tweet_response.includes
+                        and tweet_response.includes["tweets"]
+                    ):
                         for quoted_tweet in tweet_response.includes["tweets"]:
                             # Find matching quoted posts
                             for quoted_ref in quoted_posts:
@@ -311,7 +314,10 @@ class TwitterDataService:
                                     }
                                     break
 
-                    if "users" in tweet_response.includes:
+                    if (
+                        "users" in tweet_response.includes
+                        and tweet_response.includes["users"]
+                    ):
                         # Find the author user in the includes
                         for user in tweet_response.includes["users"]:
                             user_id = None
@@ -356,7 +362,10 @@ class TwitterDataService:
                                             user.get("username", "")
                                         )
 
-                    if "media" in tweet_response.includes:
+                    if (
+                        "media" in tweet_response.includes
+                        and tweet_response.includes["media"]
+                    ):
                         tweet_data["media_objects"] = tweet_response.includes["media"]
                         logger.debug(
                             f"Found {len(tweet_response.includes['media'])} media objects in API v2 response"
