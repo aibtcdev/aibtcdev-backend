@@ -340,12 +340,21 @@ class TwitterDataService:
                                 if "data" in quoted_ref and user_id == str(
                                     quoted_ref["data"]["author_id"]
                                 ):
-                                    quoted_ref["data"]["author_name"] = getattr(
-                                        user, "name", ""
-                                    )
-                                    quoted_ref["data"]["author_username"] = getattr(
-                                        user, "username", ""
-                                    )
+                                    if hasattr(user, "name"):
+                                        quoted_ref["data"]["author_name"] = user.name
+                                    elif isinstance(user, dict):
+                                        quoted_ref["data"]["author_name"] = user.get(
+                                            "name", ""
+                                        )
+
+                                    if hasattr(user, "username"):
+                                        quoted_ref["data"]["author_username"] = (
+                                            user.username
+                                        )
+                                    elif isinstance(user, dict):
+                                        quoted_ref["data"]["author_username"] = (
+                                            user.get("username", "")
+                                        )
 
                     if "media" in tweet_response.includes:
                         tweet_data["media_objects"] = tweet_response.includes["media"]
@@ -790,7 +799,7 @@ class TwitterDataService:
                 attachments=tweet_data.get("attachments"),
                 tweet_images_analysis=tweet_images_analysis,
                 # Link to quoted tweet
-                quoted_tweet_id=quoted_posts[0]["id"] if quoted_posts else None,
+                quoted_tweet_id=str(quoted_posts[0]["id"]) if quoted_posts else None,
                 quoted_tweet_db_id=quoted_tweet_db_id,
             )
 
