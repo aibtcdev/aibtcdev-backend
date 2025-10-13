@@ -84,14 +84,24 @@ async def evaluate_proposal_comprehensive(
         prompt_type = "evaluation"  # Default
         if dao_id:
             dao = backend.get_dao(dao_id)
-            if dao and dao.name == "ELONBTC":
-                prompt_type = "evaluation_elonbtc"
-                logger.info(
-                    f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
-                )
+            if dao:
+                if dao.name == "ELONBTC":
+                    prompt_type = "evaluation_elonbtc"
+                    logger.info(
+                        f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
+                    )
+                elif dao.name == "AIBTC":
+                    prompt_type = "evaluation_aibtc"
+                    logger.info(
+                        f"[Orchestrator:{proposal_id_str}] Using AIBTC-specific prompts for DAO {dao.name}"
+                    )
+                else:
+                    logger.debug(
+                        f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name}"
+                    )
             else:
                 logger.debug(
-                    f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name if dao else 'unknown'}"
+                    f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO unknown"
                 )
 
         # Load prompts if not provided
