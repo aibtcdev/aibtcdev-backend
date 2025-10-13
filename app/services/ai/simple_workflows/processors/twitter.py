@@ -120,6 +120,81 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
             else "None"
         )
 
+        # Check if this tweet has a replied-to post
+        replied_tweet_db_id = tweet_data.get("replied_to_tweet_db_id")
+        replied_post_xml = ""
+
+        if replied_tweet_db_id:
+            try:
+                # Fetch the replied-to tweet data
+                replied_tweet = backend.get_x_tweet(replied_tweet_db_id)
+                if replied_tweet:
+                    # Get replied-to tweet author info
+                    replied_author_info = {}
+                    if replied_tweet.author_id:
+                        replied_author = backend.get_x_user(replied_tweet.author_id)
+                        if replied_author:
+                            replied_author_info = {
+                                "description": replied_author.description,
+                                "location": replied_author.location,
+                                "url": replied_author.url,
+                                "verified": replied_author.verified,
+                                "verified_type": replied_author.verified_type,
+                                "bitcoin_face_score": replied_author.bitcoin_face_score,
+                            }
+
+                    # Format replied-to tweet creation date
+                    replied_created_str = ""
+                    if replied_tweet.created_at_twitter:
+                        try:
+                            if hasattr(replied_tweet.created_at_twitter, "strftime"):
+                                replied_created_str = (
+                                    replied_tweet.created_at_twitter.strftime(
+                                        "%Y-%m-%d %H:%M:%S"
+                                    )
+                                )
+                            else:
+                                replied_created_str = str(
+                                    replied_tweet.created_at_twitter
+                                )
+                        except (AttributeError, ValueError, TypeError):
+                            replied_created_str = str(replied_tweet.created_at_twitter)
+
+                    # Format replied-to author bitcoin face score
+                    replied_bitcoin_face_str = (
+                        f"{replied_author_info.get('bitcoin_face_score', 0):.4f}"
+                        if replied_author_info.get("bitcoin_face_score") is not None
+                        else "None"
+                    )
+
+                    # Escape curly braces in replied-to tweet text
+                    replied_text = replied_tweet.message or ""
+                    replied_text = replied_text.replace("{", "{{").replace("}", "}}")
+
+                    replied_post_xml = f"""
+  <replied_to_post>
+    <author>{replied_tweet.author_name or "Unknown"} (@{replied_tweet.author_username or "unknown"})</author>
+    <created_at>{replied_created_str}</created_at>
+    <text>{replied_text}</text>
+    <author_info>
+      <description>{replied_author_info.get("description") or "None"}</description>
+      <location>{replied_author_info.get("location") or "None"}</location>
+      <url>{replied_author_info.get("url") or "None"}</url>
+      <verified>{replied_author_info.get("verified", False)}</verified>
+      <verified_type>{replied_author_info.get("verified_type") or "None"}</verified_type>
+      <bitcoin_face_score>{replied_bitcoin_face_str}</bitcoin_face_score>
+    </author_info>
+    <tweet_images_analysis>{str(replied_tweet.tweet_images_analysis) if replied_tweet.tweet_images_analysis else "None"}</tweet_images_analysis>
+  </replied_to_post>"""
+            except Exception as e:
+                logger.warning(
+                    f"Error fetching replied-to tweet {replied_tweet_db_id}: {str(e)}"
+                )
+                replied_post_xml = f"""
+  <replied_to_post>
+    <error>Could not retrieve replied-to post: {str(e)}</error>
+  </replied_to_post>"""
+
         # Check if this tweet has a quoted post
         quoted_tweet_db_id = tweet_data.get("quoted_tweet_db_id")
         quoted_post_xml = ""
@@ -208,7 +283,7 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
     <verified_type>{author_verified_type or "None"}</verified_type>
     <bitcoin_face_score>{bitcoin_face_str}</bitcoin_face_score>
   </author_info>
-  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>{quoted_post_xml}
+  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>{replied_post_xml}{quoted_post_xml}
 </tweet>
 """
         return formatted_tweet.strip()

@@ -275,13 +275,18 @@ class TwitterDataService:
                     "referenced_tweets": getattr(tweet, "referenced_tweets", []),
                 }
 
-                # Handle quoted posts from referenced_tweets
+                # Handle quoted posts and replied-to posts from referenced_tweets
                 quoted_posts = []
+                replied_posts = []
                 referenced_tweets = getattr(tweet, "referenced_tweets", []) or []
 
                 for ref_tweet in referenced_tweets:
                     if ref_tweet.type == "quoted":
                         quoted_posts.append(
+                            {"type": ref_tweet.type, "id": ref_tweet.id}
+                        )
+                    elif ref_tweet.type == "replied_to":
+                        replied_posts.append(
                             {"type": ref_tweet.type, "id": ref_tweet.id}
                         )
 
@@ -373,6 +378,14 @@ class TwitterDataService:
 
                 # Add quoted posts to tweet data
                 tweet_data["quoted_posts"] = quoted_posts
+
+                # Add replied posts to tweet data
+                tweet_data["replied_posts"] = replied_posts
+
+                # Extract in_reply_to_user_id
+                tweet_data["in_reply_to_user_id"] = getattr(
+                    tweet, "in_reply_to_user_id", None
+                )
 
                 logger.info(f"Successfully fetched tweet {tweet_id} using API v2")
                 return tweet_data
@@ -782,6 +795,92 @@ class TwitterDataService:
                         quoted_tweet_db_id = quoted_record.id
                         logger.info(f"Stored quoted tweet {quoted_tweet_id}")
 
+            # Handle replied-to posts (store parent tweet if needed)
+            replied_tweet_db_id = None
+            replied_posts = tweet_data.get("replied_posts", []) or []
+
+            for replied_post in replied_posts:
+                replied_tweet_id = str(replied_post["id"])
+
+                # Check if parent tweet already exists
+                existing_replied = backend.list_x_tweets(
+                    XTweetFilter(tweet_id=replied_tweet_id)
+                )
+                if existing_replied:
+                    replied_tweet_db_id = existing_replied[0].id
+                    logger.debug(f"Parent tweet {replied_tweet_id} already exists")
+                else:
+                    # Fetch and store the parent tweet
+                    logger.debug(
+                        f"Parent tweet {replied_tweet_id} not in database, fetching..."
+                    )
+                    try:
+                        parent_tweet_data = await self._fetch_tweet_from_api(
+                            replied_tweet_id
+                        )
+                        if parent_tweet_data:
+                            # Store parent tweet (without recursively fetching its parents)
+                            parent_author_id = await self._store_user_if_needed(
+                                parent_tweet_data
+                            )
+                            parent_images = self._extract_images_from_tweet_data(
+                                parent_tweet_data
+                            )
+
+                            # Prepare parent tweet creation data
+                            parent_created_at = None
+                            if parent_tweet_data.get("created_at"):
+                                try:
+                                    if hasattr(
+                                        parent_tweet_data["created_at"], "strftime"
+                                    ):
+                                        parent_created_at = parent_tweet_data[
+                                            "created_at"
+                                        ].strftime("%Y-%m-%d %H:%M:%S")
+                                    else:
+                                        parent_created_at = str(
+                                            parent_tweet_data["created_at"]
+                                        )
+                                except (AttributeError, ValueError, TypeError):
+                                    parent_created_at = str(
+                                        parent_tweet_data["created_at"]
+                                    )
+
+                            parent_tweet_create = XTweetCreate(
+                                message=parent_tweet_data.get("text"),
+                                author_id=parent_author_id,
+                                tweet_id=replied_tweet_id,
+                                conversation_id=parent_tweet_data.get(
+                                    "conversation_id"
+                                ),
+                                is_worthy=False,
+                                tweet_type=TweetType.INVALID,
+                                confidence_score=None,
+                                reason=None,
+                                images=parent_images,
+                                author_name=parent_tweet_data.get("author_name"),
+                                author_username=parent_tweet_data.get(
+                                    "author_username"
+                                ),
+                                created_at_twitter=parent_created_at,
+                                public_metrics=parent_tweet_data.get("public_metrics"),
+                                entities=parent_tweet_data.get("entities"),
+                                attachments=parent_tweet_data.get("attachments"),
+                                tweet_images_analysis=[],
+                                in_reply_to_user_id=parent_tweet_data.get(
+                                    "in_reply_to_user_id"
+                                ),
+                                # Don't recursively store parent's parent
+                            )
+
+                            parent_record = backend.create_x_tweet(parent_tweet_create)
+                            replied_tweet_db_id = parent_record.id
+                            logger.info(f"Stored parent tweet {replied_tweet_id}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not fetch/store parent tweet {replied_tweet_id}: {str(e)}"
+                        )
+
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
             # TODO: Uncomment this when we have a way to analyze images thats faster than the current implementation
@@ -816,6 +915,12 @@ class TwitterDataService:
                 # Link to quoted tweet
                 quoted_tweet_id=str(quoted_posts[0]["id"]) if quoted_posts else None,
                 quoted_tweet_db_id=quoted_tweet_db_id,
+                # Link to replied-to tweet
+                in_reply_to_user_id=tweet_data.get("in_reply_to_user_id"),
+                replied_to_tweet_id=str(replied_posts[0]["id"])
+                if replied_posts
+                else None,
+                replied_to_tweet_db_id=replied_tweet_db_id,
             )
 
             tweet_record = backend.create_x_tweet(tweet_create_data)
