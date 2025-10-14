@@ -286,7 +286,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
             dao_name = dao.name if dao else ""
 
             # Set reward amount based on DAO name
-            if dao_name in ["AIBTC", "AITEST", "AITEST2", "AITEST3"]:
+            if dao_name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
                 reward_amount = "$20 BTC"
             elif dao_name == "ELONBTC":
                 reward_amount = "$50 BTC"
