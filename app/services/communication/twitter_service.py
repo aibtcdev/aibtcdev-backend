@@ -929,6 +929,109 @@ class TwitterService:
             logger.error(f"Failed to get replies for tweet {tweet_id}: {str(e)}")
             return []
 
+    async def get_user_timeline(
+        self,
+        user_id: str,
+        count: int = 5,
+        exclude_replies: bool = True,
+        include_rts: bool = False,
+    ) -> List[tweepy.Tweet]:
+        """
+        Get a user's timeline (recent tweets).
+
+        Args:
+            user_id: Twitter user ID
+            count: Maximum number of tweets to return (default 5, max 100)
+            exclude_replies: Whether to exclude reply tweets (default True)
+            include_rts: Whether to include retweets (default False)
+
+        Returns:
+            List of tweets from the user's timeline
+        """
+        try:
+            if self.client is None:
+                raise Exception("Twitter client is not initialized")
+
+            # Build the exclude parameter for API v2
+            exclude_list = []
+            if exclude_replies:
+                exclude_list.append("replies")
+            if not include_rts:
+                exclude_list.append("retweets")
+
+            response = self.client.get_users_tweets(
+                id=user_id,
+                max_results=min(count, 100),  # API limit
+                exclude=exclude_list if exclude_list else None,
+                tweet_fields=[
+                    "id",
+                    "text",
+                    "created_at",
+                    "author_id",
+                    "conversation_id",
+                    "in_reply_to_user_id",
+                    "referenced_tweets",
+                    "public_metrics",
+                    "entities",
+                    "attachments",
+                    "context_annotations",
+                    "withheld",
+                    "reply_settings",
+                    "lang",
+                ],
+                expansions=[
+                    "author_id",
+                    "referenced_tweets.id",
+                    "referenced_tweets.id.author_id",
+                    "entities.mentions.username",
+                    "attachments.media_keys",
+                    "attachments.poll_ids",
+                    "in_reply_to_user_id",
+                    "geo.place_id",
+                ],
+                user_fields=[
+                    "id",
+                    "name",
+                    "username",
+                    "created_at",
+                    "description",
+                    "entities",
+                    "location",
+                    "pinned_tweet_id",
+                    "profile_image_url",
+                    "protected",
+                    "public_metrics",
+                    "url",
+                    "verified",
+                    "withheld",
+                ],
+                media_fields=[
+                    "duration_ms",
+                    "height",
+                    "media_key",
+                    "preview_image_url",
+                    "type",
+                    "url",
+                    "width",
+                    "public_metrics",
+                    "alt_text",
+                    "variants",
+                ],
+            )
+
+            if response and response.data:
+                logger.info(
+                    f"Successfully retrieved {len(response.data)} tweets from user {user_id}'s timeline"
+                )
+                return response.data
+            else:
+                logger.info(f"No tweets found for user {user_id}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Failed to get timeline for user {user_id}: {str(e)}")
+            return []
+
 
 class UserProfile(TypedDict):
     """Type definition for user profile data."""
