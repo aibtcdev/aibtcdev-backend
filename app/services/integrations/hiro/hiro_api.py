@@ -103,6 +103,9 @@ class HiroApi(BaseHiroApi):
             offset += current_limit
             remaining -= current_limit
 
+            # Space out requests to avoid bursting
+            time.sleep(0.1)
+
         # Create combined response
         return {
             "total_supply": first_page.get("total_supply"),
@@ -182,6 +185,9 @@ class HiroApi(BaseHiroApi):
 
             offset += current_limit
             remaining -= current_limit
+
+            # Space out requests to avoid bursting
+            await asyncio.sleep(0.1)
 
         # Create combined response
         return {
