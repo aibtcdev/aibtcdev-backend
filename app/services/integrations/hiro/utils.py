@@ -13,7 +13,10 @@ class HiroApiError(Exception):
 
 class HiroApiRateLimitError(HiroApiError):
     """Exception for rate limit errors."""
-    def __init__(self, message: str, response: Optional[Any] = None):  # Add response param
+
+    def __init__(
+        self, message: str, response: Optional[Any] = None
+    ):  # Add response param
         super().__init__(message)
         self.response = response  # Store for retry logic
 

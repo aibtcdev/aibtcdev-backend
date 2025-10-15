@@ -151,20 +151,36 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 try:
                     api_info = await hiro_api.aget_info()
                     if not api_info:
-                        logger.error("Cannot connect to Hiro API", extra={"task": "chain_state_monitor"})
+                        logger.error(
+                            "Cannot connect to Hiro API",
+                            extra={"task": "chain_state_monitor"},
+                        )
                         return False
                     return True
-                except HiroApiRateLimitError as e:  # Explicitly handle rate limit with backoff
-                    logger.warning("Rate limit hit during validation, backing off", extra={"error": str(e)})
+                except (
+                    HiroApiRateLimitError
+                ) as e:  # Explicitly handle rate limit with backoff
+                    logger.warning(
+                        "Rate limit hit during validation, backing off",
+                        extra={"error": str(e)},
+                    )
                     await asyncio.sleep(5)  # Add backoff sleep
                     return False  # Fail validation to retry later
                 except TypeError as te:  # Catch invalid exception error
-                    if "catching classes that do not inherit from BaseException" in str(te):
-                        logger.error("Invalid exception configuration detected", extra={"error": str(te)})
+                    if "catching classes that do not inherit from BaseException" in str(
+                        te
+                    ):
+                        logger.error(
+                            "Invalid exception configuration detected",
+                            extra={"error": str(te)},
+                        )
                         return False
                     raise  # Re-raise other TypeErrors
         except Exception as e:
-            logger.error("Resource validation failed", extra={"task": "chain_state_monitor", "error": str(e)})
+            logger.error(
+                "Resource validation failed",
+                extra={"task": "chain_state_monitor", "error": str(e)},
+            )
             return False
 
     async def _validate_task_specific(self, context: JobContext) -> bool:

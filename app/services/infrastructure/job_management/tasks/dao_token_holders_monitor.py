@@ -343,7 +343,10 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     error_msg = "Could not parse token identifier for token"
                     logger.error(
                         error_msg,
-                        extra={"task": "dao_token_holders_monitor", "token_id": token.id},
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "token_id": token.id,
+                        },
                     )
                     result.errors.append(error_msg)
                     return
@@ -617,26 +620,44 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         )
                         continue
 
-                await asyncio.sleep(1)  # Add sleep to space out API calls between tokens
+                await asyncio.sleep(
+                    1
+                )  # Add sleep to space out API calls between tokens
                 return  # Success, exit retry loop
 
             except HiroApiRateLimitError as e:
                 if attempt == max_retries - 1:
-                    error_msg = f"Max retries reached for token after rate limit: {str(e)}"
-                    logger.error(error_msg, extra={"task": "dao_token_holders_monitor", "token_id": token.id, "attempt": attempt})
+                    error_msg = (
+                        f"Max retries reached for token after rate limit: {str(e)}"
+                    )
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "token_id": token.id,
+                            "attempt": attempt,
+                        },
+                    )
                     result.errors.append(error_msg)
                     return
-                backoff = 2 ** attempt  # Exponential backoff (1s, 2s, 4s)
-                logger.warning(f"Rate limit hit for token, retrying after {backoff}s", extra={
-                    "task": "dao_token_holders_monitor",
-                    "token_id": token.id,
-                    "attempt": attempt,
-                })
+                backoff = 2**attempt  # Exponential backoff (1s, 2s, 4s)
+                logger.warning(
+                    f"Rate limit hit for token, retrying after {backoff}s",
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "token_id": token.id,
+                        "attempt": attempt,
+                    },
+                )
                 await asyncio.sleep(backoff)  # Async sleep for retry
 
             except Exception as e:
                 error_msg = f"Error syncing holders for token: {str(e)}"
-                logger.error(error_msg, extra={"task": "dao_token_holders_monitor", "token_id": token.id}, exc_info=True)
+                logger.error(
+                    error_msg,
+                    extra={"task": "dao_token_holders_monitor", "token_id": token.id},
+                    exc_info=True,
+                )
                 result.errors.append(error_msg)
                 return  # Don't retry non-rate-limit errors
 
@@ -679,9 +700,13 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             "token_id": token.id,
                         },
                     )
-                    await self._sync_token_holders(token, result)  # Now async-friendly with sleeps
+                    await self._sync_token_holders(
+                        token, result
+                    )  # Now async-friendly with sleeps
                     result.tokens_processed += 1
-                    await asyncio.sleep(0.5)  # Additional brief sleep between tokens for extra safety
+                    await asyncio.sleep(
+                        0.5
+                    )  # Additional brief sleep between tokens for extra safety
 
                 except Exception as e:
                     error_msg = "Error processing token"
