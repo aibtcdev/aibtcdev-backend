@@ -1,6 +1,8 @@
 """Hiro API client for blockchain data queries and operations."""
 
 import httpx
+import time
+import asyncio
 from typing import Any, Dict
 
 from app.config import config

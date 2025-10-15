@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional
 
 import aiohttp
+import asyncio
 import httpx
 from cachetools import TTLCache
 
