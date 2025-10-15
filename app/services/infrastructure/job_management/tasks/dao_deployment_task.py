@@ -62,34 +62,24 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate DAO deployment task configuration."""
         try:
-            if not self.tools_map_all:
-                logger.error(
-                    "Tools not properly initialized - check config.api or tool imports",
+            if not self.tools_map:
+                logger.debug(
+                    "No DAO deployment tools available",
                     extra={"task": "dao_deployment"},
                 )
-                # Fallback: Try re-initializing
-                self.tools_map_all = initialize_tools(None, None)
-                self.tools_map = filter_tools_by_names(
-                    ["contract_deploy_dao"], self.tools_map_all
-                )
-                if not self.tools_map_all:
-                    return False
+                return False
 
-            if not self.tools_map:
-                logger.error(
-                    "No DAO deployment tools available after re-init",
-                    extra={
-                        "task": "dao_deployment",
-                        "tools_count": len(self.tools_map),
-                    },
+            if not self.tools_map_all:
+                logger.debug(
+                    "Tools not properly initialized", extra={"task": "dao_deployment"}
                 )
                 return False
 
             # Configuration validation passed
             logger.debug(
-                "Configuration validation passed",
-                extra={"task": "dao_deployment", "tools_count": len(self.tools_map)},
+                "Configuration validation passed", extra={"task": "dao_deployment"}
             )
+
             return True
         except Exception as e:
             logger.error(

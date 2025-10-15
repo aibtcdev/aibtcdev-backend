@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 from app.backend.factory import backend
 from app.config import config as main_config
 from app.services.integrations.hiro.hiro_api import HiroApi
-from app.services.integrations.hiro.utils import HiroApiRateLimitError
 from app.lib.logger import configure_logger
 from app.services.infrastructure.job_management.base import (
     BaseTask,
@@ -23,8 +22,6 @@ from app.services.processing.stacks_chainhook_adapter import (
     BlockNotFoundError,
     TransformationError,
 )
-
-import asyncio
 
 logger = configure_logger(__name__)
 
@@ -151,34 +148,15 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         try:
             # Test HiroApi initialization and connectivity using context manager
             async with HiroApi() as hiro_api:
-                try:
-                    api_info = await hiro_api.aget_info()
-                    if not api_info:
-                        logger.error(
-                            "Cannot connect to Hiro API",
-                            extra={"task": "chain_state_monitor"},
-                        )
-                        return False
-                    return True
-                except (
-                    HiroApiRateLimitError
-                ) as e:  # Explicitly handle rate limit with backoff
-                    logger.warning(
-                        "Rate limit hit during validation, backing off",
-                        extra={"error": str(e)},
+                api_info = await hiro_api.aget_info()
+                if not api_info:
+                    logger.error(
+                        "Cannot connect to Hiro API",
+                        extra={"task": "chain_state_monitor"},
                     )
-                    await asyncio.sleep(5)  # Add backoff sleep
-                    return False  # Fail validation to retry later
-                except TypeError as te:  # Catch invalid exception error
-                    if "catching classes that do not inherit from BaseException" in str(
-                        te
-                    ):
-                        logger.error(
-                            "Invalid exception configuration detected",
-                            extra={"error": str(te)},
-                        )
-                        return False
-                    raise  # Re-raise other TypeErrors
+                    return False
+
+                return True
         except Exception as e:
             logger.error(
                 "Resource validation failed",
