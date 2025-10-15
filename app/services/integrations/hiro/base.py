@@ -328,7 +328,9 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}", response=e.response) from e
+                raise HiroApiRateLimitError(
+                    f"Rate limit exceeded: {str(e)}", response=e.response
+                ) from e
 
             logger.error(
                 "API request failed with HTTP error",
@@ -459,7 +461,9 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}", response=e) from e
+                raise HiroApiRateLimitError(
+                    f"Rate limit exceeded: {str(e)}", response=e
+                ) from e
 
             logger.error(
                 "Async API request failed with client error",
