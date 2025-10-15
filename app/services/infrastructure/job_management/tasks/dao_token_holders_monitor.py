@@ -153,7 +153,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
             extra={"task": "dao_token_holders_monitor"},
         )
 
-    def _parse_token_identifier(self, token) -> Optional[str]:
+    async def _parse_token_identifier(self, token) -> Optional[str]:
         """Parse token identifier for Hiro API call.
 
         Constructs the proper token identifier format: {contract_principal}::{symbol}
@@ -176,7 +176,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     "contract_principal": contract_principal,
                 },
             )
-            metadata = self.hiro_api.get_token_metadata(contract_principal)
+            metadata = await self.hiro_api.aget_token_metadata(contract_principal)
 
             # Extract symbol from metadata
             symbol = metadata.get("symbol")
@@ -339,7 +339,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         max_retries = 3  # Add per-token retry limit
         for attempt in range(max_retries):
             try:
-                token_identifier = self._parse_token_identifier(token)
+                token_identifier = await self._parse_token_identifier(token)
                 if not token_identifier:
                     error_msg = "Could not parse token identifier for token"
                     logger.error(
@@ -362,7 +362,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 )
 
                 # Get all current holders from Hiro API (with pagination)
-                api_holders_response = self.hiro_api.get_all_token_holders(
+                api_holders_response = await self.hiro_api.aget_all_token_holders(
                     token_identifier
                 )
                 logger.debug(
@@ -706,7 +706,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                     )  # Now async-friendly with sleeps
                     result.tokens_processed += 1
                     await asyncio.sleep(
-                        0.5
+                        1
                     )  # Additional brief sleep between tokens for extra safety
 
                 except Exception as e:

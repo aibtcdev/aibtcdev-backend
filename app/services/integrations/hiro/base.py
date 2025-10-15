@@ -240,6 +240,7 @@ class BaseHiroApi:
                     retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
                     if (
                         isinstance(e, HiroApiRateLimitError)
+                        and e.response is not None
                         and "retry-after" in e.response.headers
                     ):
                         retry_delay = max(
@@ -327,7 +328,7 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}") from e
+                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}", response=e.response) from e
 
             logger.error(
                 "API request failed with HTTP error",
@@ -378,6 +379,7 @@ class BaseHiroApi:
                     retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
                     if (
                         isinstance(e, HiroApiRateLimitError)
+                        and e.response is not None
                         and "retry-after" in e.response.headers
                     ):
                         retry_delay = max(
@@ -457,7 +459,7 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}") from e
+                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}", response=e) from e
 
             logger.error(
                 "Async API request failed with client error",

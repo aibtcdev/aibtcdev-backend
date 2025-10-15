@@ -106,7 +106,7 @@ class HiroApi(BaseHiroApi):
             remaining -= current_limit
 
             # Space out requests to avoid bursting
-            time.sleep(0.1)
+            time.sleep(1)
 
         # Create combined response
         return {
@@ -189,7 +189,7 @@ class HiroApi(BaseHiroApi):
             remaining -= current_limit
 
             # Space out requests to avoid bursting
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(1)
 
         # Create combined response
         return {
