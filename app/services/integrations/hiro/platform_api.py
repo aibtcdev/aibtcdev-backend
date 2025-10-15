@@ -30,7 +30,7 @@ class PlatformApi(BaseHiroApi):
         """
         return self._make_request(
             "POST",
-            "/v1/chainhooks",
+            f"/v1/ext/{self.api_key}/chainhooks",
             headers={"Content-Type": "application/json"},
             json=cast(Dict[str, Any], predicate),
         )
@@ -39,7 +39,7 @@ class PlatformApi(BaseHiroApi):
         """Async version of create_chainhook."""
         return await self._amake_request(
             "POST",
-            "/v1/chainhooks",
+            f"/v1/ext/{self.api_key}/chainhooks",
             headers={"Content-Type": "application/json"},
             json=cast(Dict[str, Any], predicate),
         )
@@ -353,13 +353,13 @@ class PlatformApi(BaseHiroApi):
             Dict containing the chainhook details
         """
         return self._make_request(
-            "GET", f"/v1/chainhooks/{chainhook_uuid}"
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
         )
 
     async def aget_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
         """Async version of get_chainhook."""
         return await self._amake_request(
-            "GET", f"/v1/chainhooks/{chainhook_uuid}"
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
         )
 
     def list_chainhooks(self) -> List[Dict[str, Any]]:
@@ -368,7 +368,7 @@ class PlatformApi(BaseHiroApi):
         Returns:
             List of chainhook dictionaries
         """
-        result = self._make_request("GET", "/v1/chainhooks")
+        result = self._make_request("GET", f"/v1/ext/{self.api_key}/chainhooks")
         # The API returns a list, but _make_request has Dict return type
         # Cast to list since we know this endpoint returns an array
         if isinstance(result, list):
@@ -377,7 +377,7 @@ class PlatformApi(BaseHiroApi):
 
     async def alist_chainhooks(self) -> List[Dict[str, Any]]:
         """Async version of list_chainhooks."""
-        result = await self._amake_request("GET", "/v1/chainhooks")
+        result = await self._amake_request("GET", f"/v1/ext/{self.api_key}/chainhooks")
         # The API returns a list, but _amake_request has Dict return type
         # Cast to list since we know this endpoint returns an array
         if isinstance(result, list):
@@ -398,7 +398,7 @@ class PlatformApi(BaseHiroApi):
         """
         return self._make_request(
             "PUT",
-            f"/v1/chainhooks/{chainhook_uuid}",
+            f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}",
             headers={"Content-Type": "application/json"},
             json=cast(Dict[str, Any], predicate),
         )
@@ -409,7 +409,7 @@ class PlatformApi(BaseHiroApi):
         """Async version of update_chainhook."""
         return await self._amake_request(
             "PUT",
-            f"/v1/chainhooks/{chainhook_uuid}",
+            f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}",
             headers={"Content-Type": "application/json"},
             json=cast(Dict[str, Any], predicate),
         )
@@ -424,13 +424,13 @@ class PlatformApi(BaseHiroApi):
             Dict containing the response from the API
         """
         return self._make_request(
-            "DELETE", f"/v1/chainhooks/{chainhook_uuid}"
+            "DELETE", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
         )
 
     async def adelete_chainhook(self, chainhook_uuid: str) -> Dict[str, Any]:
         """Async version of delete_chainhook."""
         return await self._amake_request(
-            "DELETE", f"/v1/chainhooks/{chainhook_uuid}"
+            "DELETE", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}"
         )
 
     def get_chainhook_status(self, chainhook_uuid: str) -> Dict[str, Any]:
@@ -443,11 +443,11 @@ class PlatformApi(BaseHiroApi):
             Dict containing the chainhook status information
         """
         return self._make_request(
-            "GET", f"/v1/chainhooks/{chainhook_uuid}/status"
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}/status"
         )
 
     async def aget_chainhook_status(self, chainhook_uuid: str) -> Dict[str, Any]:
         """Async version of get_chainhook_status."""
         return await self._amake_request(
-            "GET", f"/v1/chainhooks/{chainhook_uuid}/status"
+            "GET", f"/v1/ext/{self.api_key}/chainhooks/{chainhook_uuid}/status"
         )
