@@ -159,6 +159,57 @@ class BaseHiroApi:
         self.__class__._second_requests.append(time.time())
         self.__class__._minute_requests.append(time.time())
 
+    async def _arate_limit(self) -> None:
+        """Async version of rate limiting for both second and minute windows."""
+        current_time = time.time()
+
+        # Clean up expired requests from tracking windows
+        self.__class__._second_requests = [
+            t for t in self.__class__._second_requests if current_time - t < 1.0
+        ]
+        self.__class__._minute_requests = [
+            t for t in self.__class__._minute_requests if current_time - t < 60.0
+        ]
+
+        # Check and enforce rate limits
+        second_count = len(self.__class__._second_requests)
+        minute_count = len(self.__class__._minute_requests)
+
+        # Check second limit
+        if second_count >= self.__class__._second_limit:
+            sleep_time = self.__class__._second_requests[0] + 1.0 - current_time
+            if sleep_time > 0:
+                logger.warning(
+                    "Async rate limit reached, waiting before next request",
+                    extra={
+                        "rate_limit_type": "second",
+                        "current_count": second_count,
+                        "limit": self.__class__._second_limit,
+                        "wait_time_seconds": round(sleep_time, 2),
+                    },
+                )
+                await asyncio.sleep(sleep_time)
+                current_time = time.time()
+
+        # Check minute limit
+        if minute_count >= self.__class__._minute_limit:
+            sleep_time = self.__class__._minute_requests[0] + 60.0 - current_time
+            if sleep_time > 0:
+                logger.warning(
+                    "Async rate limit reached, waiting before next request",
+                    extra={
+                        "rate_limit_type": "minute",
+                        "current_count": minute_count,
+                        "limit": self.__class__._minute_limit,
+                        "wait_time_seconds": round(sleep_time, 2),
+                    },
+                )
+                await asyncio.sleep(sleep_time)
+
+        # Record the new request
+        self.__class__._second_requests.append(time.time())
+        self.__class__._minute_requests.append(time.time())
+
     @staticmethod
     def _retry_on_error(func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to retry API calls on transient errors."""
@@ -362,7 +413,7 @@ class BaseHiroApi:
             self._session = aiohttp.ClientSession()
 
         try:
-            self._rate_limit()
+            await self._arate_limit()
             url = f"{self.base_url}{endpoint}"
             headers = headers or {}
 
