@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional
 
 import aiohttp
+import asyncio
 import httpx
 from cachetools import TTLCache
 
@@ -56,15 +57,19 @@ class BaseHiroApi:
         """
         # Update limits if headers are present
         updated_limits = {}
-        if "x-ratelimit-limit-second" in headers:
+        if "x-ratelimit-limit-stacks-second" in headers:
             old_limit = self.__class__._second_limit
-            self.__class__._second_limit = int(headers["x-ratelimit-limit-second"])
+            self.__class__._second_limit = int(
+                headers["x-ratelimit-limit-stacks-second"]
+            )
             if old_limit != self.__class__._second_limit:
                 updated_limits["second"] = self.__class__._second_limit
 
-        if "x-ratelimit-limit-minute" in headers:
+        if "x-ratelimit-limit-stacks-minute" in headers:
             old_limit = self.__class__._minute_limit
-            self.__class__._minute_limit = int(headers["x-ratelimit-limit-minute"])
+            self.__class__._minute_limit = int(
+                headers["x-ratelimit-limit-stacks-minute"]
+            )
             if old_limit != self.__class__._minute_limit:
                 updated_limits["minute"] = self.__class__._minute_limit
 
@@ -73,10 +78,10 @@ class BaseHiroApi:
 
         # Track remaining limits for monitoring
         remaining = {}
-        if "x-ratelimit-remaining-second" in headers:
-            remaining["second"] = int(headers["x-ratelimit-remaining-second"])
-        if "x-ratelimit-remaining-minute" in headers:
-            remaining["minute"] = int(headers["x-ratelimit-remaining-minute"])
+        if "x-ratelimit-remaining-stacks-second" in headers:
+            remaining["second"] = int(headers["x-ratelimit-remaining-stacks-second"])
+        if "x-ratelimit-remaining-stacks-minute" in headers:
+            remaining["minute"] = int(headers["x-ratelimit-remaining-stacks-minute"])
 
         if remaining:
             # Only log if we're getting close to limits (< 20% remaining)
@@ -166,6 +171,7 @@ class BaseHiroApi:
                 except (
                     httpx.TimeoutException,
                     httpx.ConnectError,
+                    HiroApiRateLimitError,
                 ) as e:
                     if attempt == self.MAX_RETRIES - 1:
                         logger.error(
@@ -176,9 +182,18 @@ class BaseHiroApi:
                                 "error": str(e),
                             },
                         )
+                        if isinstance(e, HiroApiRateLimitError):
+                            raise
                         raise HiroApiTimeoutError(f"Max retries reached: {str(e)}")
 
-                    retry_delay = self.RETRY_DELAY * (attempt + 1)
+                    retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
+                    if (
+                        isinstance(e, HiroApiRateLimitError)
+                        and "retry-after" in e.response.headers
+                    ):
+                        retry_delay = max(
+                            retry_delay, int(e.response.headers["retry-after"])
+                        )
                     logger.warning(
                         "Request failed, retrying",
                         extra={
@@ -261,7 +276,7 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}")
+                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}") from e
 
             logger.error(
                 "API request failed with HTTP error",
@@ -282,6 +297,57 @@ class BaseHiroApi:
             )
             raise HiroApiError(f"Unexpected error: {str(e)}")
 
+    @staticmethod
+    async def _aretry_on_error(func):
+        """Async decorator to retry API calls on transient errors."""
+
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            for attempt in range(self.MAX_RETRIES):
+                try:
+                    return await func(self, *args, **kwargs)
+                except (
+                    aiohttp.ClientTimeout,
+                    aiohttp.ClientConnectionError,
+                    HiroApiRateLimitError,
+                ) as e:
+                    if attempt == self.MAX_RETRIES - 1:
+                        logger.error(
+                            "Async request failed after all retry attempts",
+                            extra={
+                                "function": func.__name__,
+                                "max_retries": self.MAX_RETRIES,
+                                "error": str(e),
+                            },
+                        )
+                        if isinstance(e, HiroApiRateLimitError):
+                            raise
+                        raise HiroApiTimeoutError(f"Max retries reached: {str(e)}")
+
+                    retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
+                    if (
+                        isinstance(e, HiroApiRateLimitError)
+                        and "retry-after" in e.response.headers
+                    ):
+                        retry_delay = max(
+                            retry_delay, int(e.response.headers["retry-after"])
+                        )
+                    logger.warning(
+                        "Async request failed, retrying",
+                        extra={
+                            "function": func.__name__,
+                            "attempt": attempt + 1,
+                            "max_retries": self.MAX_RETRIES,
+                            "retry_delay_seconds": retry_delay,
+                            "error": str(e),
+                        },
+                    )
+                    await asyncio.sleep(retry_delay)
+            return None
+
+        return wrapper
+
+    @_aretry_on_error
     async def _amake_request(
         self,
         method: str,
@@ -330,8 +396,8 @@ class BaseHiroApi:
                 )
 
                 return await response.json()
-        except aiohttp.ClientError as e:
-            if isinstance(e, aiohttp.ClientResponseError) and e.status == 429:
+        except aiohttp.ClientResponseError as e:
+            if e.status == 429:
                 logger.error(
                     "Async API rate limit exceeded",
                     extra={
@@ -340,7 +406,7 @@ class BaseHiroApi:
                         "error": str(e),
                     },
                 )
-                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}")
+                raise HiroApiRateLimitError(f"Rate limit exceeded: {str(e)}") from e
 
             logger.error(
                 "Async API request failed with client error",
