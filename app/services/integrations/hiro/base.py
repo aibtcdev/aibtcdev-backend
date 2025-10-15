@@ -298,7 +298,7 @@ class BaseHiroApi:
             raise HiroApiError(f"Unexpected error: {str(e)}")
 
     @staticmethod
-    def _aretry_on_error(func):
+    async def _aretry_on_error(func):
         """Async decorator to retry API calls on transient errors."""
 
         @wraps(func)
