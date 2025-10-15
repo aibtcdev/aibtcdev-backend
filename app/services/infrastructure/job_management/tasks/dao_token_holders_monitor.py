@@ -26,6 +26,8 @@ from app.services.infrastructure.job_management.base import (
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 
+import asyncio
+
 logger = configure_logger(__name__)
 
 
@@ -333,28 +335,29 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
         self, token, result: DaoTokenHoldersMonitorResult
     ) -> None:
         """Sync holders for a specific token."""
-        try:
-            token_identifier = self._parse_token_identifier(token)
-            if not token_identifier:
-                error_msg = "Could not parse token identifier for token"
-                logger.error(
-                    error_msg,
-                    extra={"task": "dao_token_holders_monitor", "token_id": token.id},
-                )
-                result.errors.append(error_msg)
-                return
-
-            logger.info(
-                "Syncing holders for token",
-                extra={
-                    "task": "dao_token_holders_monitor",
-                    "token_name": token.name,
-                    "token_identifier": token_identifier,
-                },
-            )
-
-            # Get all current holders from Hiro API (with pagination)
+        max_retries = 3  # Add per-token retry limit
+        for attempt in range(max_retries):
             try:
+                token_identifier = self._parse_token_identifier(token)
+                if not token_identifier:
+                    error_msg = "Could not parse token identifier for token"
+                    logger.error(
+                        error_msg,
+                        extra={"task": "dao_token_holders_monitor", "token_id": token.id},
+                    )
+                    result.errors.append(error_msg)
+                    return
+
+                logger.info(
+                    "Syncing holders for token",
+                    extra={
+                        "task": "dao_token_holders_monitor",
+                        "token_name": token.name,
+                        "token_identifier": token_identifier,
+                    },
+                )
+
+                # Get all current holders from Hiro API (with pagination)
                 api_holders_response = self.hiro_api.get_all_token_holders(
                     token_identifier
                 )
@@ -366,169 +369,197 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                         "response": str(api_holders_response),
                     },
                 )
-            except Exception as e:
-                error_msg = "Error fetching holders from API for token"
-                logger.error(
-                    error_msg,
+
+                # Parse API response
+                api_holders = []
+                if (
+                    isinstance(api_holders_response, dict)
+                    and "results" in api_holders_response
+                ):
+                    api_holders = api_holders_response["results"]
+                elif isinstance(api_holders_response, list):
+                    api_holders = api_holders_response
+                else:
+                    logger.warning(
+                        "Unexpected API response format for token",
+                        extra={
+                            "task": "dao_token_holders_monitor",
+                            "token_identifier": token_identifier,
+                        },
+                    )
+                    return
+
+                logger.info(
+                    "Found holders from API for token",
                     extra={
                         "task": "dao_token_holders_monitor",
-                        "token_identifier": token_identifier,
-                        "error": str(e),
+                        "holder_count": len(api_holders),
+                        "token_name": token.name,
                     },
                 )
-                result.errors.append(error_msg)
-                return
 
-            # Parse API response
-            api_holders = []
-            if (
-                isinstance(api_holders_response, dict)
-                and "results" in api_holders_response
-            ):
-                api_holders = api_holders_response["results"]
-            elif isinstance(api_holders_response, list):
-                api_holders = api_holders_response
-            else:
-                logger.warning(
-                    "Unexpected API response format for token",
+                # Get current holders from database
+                db_holders = backend.list_holders(HolderFilter(token_id=token.id))
+                logger.info(
+                    "Found existing holders in database for token",
                     extra={
                         "task": "dao_token_holders_monitor",
-                        "token_identifier": token_identifier,
+                        "holder_count": len(db_holders),
+                        "token_name": token.name,
                     },
                 )
-                return
 
-            logger.info(
-                "Found holders from API for token",
-                extra={
-                    "task": "dao_token_holders_monitor",
-                    "holder_count": len(api_holders),
-                    "token_name": token.name,
-                },
-            )
+                # Create lookup maps by address+token_id (composite key for matching)
+                # This allows the same address to hold tokens for multiple DAOs
+                db_holders_by_address_token = {
+                    (holder.address, holder.token_id): holder for holder in db_holders
+                }
+                api_holders_by_contract = {}
 
-            # Get current holders from database
-            db_holders = backend.list_holders(HolderFilter(token_id=token.id))
-            logger.info(
-                "Found existing holders in database for token",
-                extra={
-                    "task": "dao_token_holders_monitor",
-                    "holder_count": len(db_holders),
-                    "token_name": token.name,
-                },
-            )
+                # Process API holders
+                for api_holder in api_holders:
+                    try:
+                        # Parse holder data from Hiro API response format
+                        address = api_holder.get("address")
+                        balance = api_holder.get("balance", "0")
 
-            # Create lookup maps by address+token_id (composite key for matching)
-            # This allows the same address to hold tokens for multiple DAOs
-            db_holders_by_address_token = {
-                (holder.address, holder.token_id): holder for holder in db_holders
-            }
-            api_holders_by_contract = {}
+                        if not address:
+                            logger.warning(
+                                "No address found in API holder data",
+                                extra={
+                                    "task": "dao_token_holders_monitor",
+                                    "api_holder": str(api_holder),
+                                },
+                            )
+                            continue
 
-            # Process API holders
-            for api_holder in api_holders:
-                try:
-                    # Parse holder data from Hiro API response format
-                    address = api_holder.get("address")
-                    balance = api_holder.get("balance", "0")
+                        if not balance:
+                            logger.warning(
+                                "No balance found for address, defaulting to 0",
+                                extra={
+                                    "task": "dao_token_holders_monitor",
+                                    "address": address,
+                                },
+                            )
+                            balance = "0"
 
-                    if not address:
-                        logger.warning(
-                            "No address found in API holder data",
-                            extra={
-                                "task": "dao_token_holders_monitor",
-                                "api_holder": str(api_holder),
-                            },
-                        )
-                        continue
+                        api_holders_by_contract[address] = balance
 
-                    if not balance:
-                        logger.warning(
-                            "No balance found for address, defaulting to 0",
-                            extra={
-                                "task": "dao_token_holders_monitor",
-                                "address": address,
-                            },
-                        )
-                        balance = "0"
+                        # Get existing agent and wallet for this account_contract
+                        agent, wallet = self._get_agent_for_contract(address)
 
-                    api_holders_by_contract[address] = balance
+                        # Check if we already have this holder in the database (by address+token_id)
+                        holder_key = (address, token.id)
+                        if holder_key in db_holders_by_address_token:
+                            # Update existing holder
+                            existing_holder = db_holders_by_address_token[holder_key]
+                            needs_update = False
+                            should_trigger_approval = False
 
-                    # Get existing agent and wallet for this account_contract
-                    agent, wallet = self._get_agent_for_contract(address)
+                            update_data = HolderBase(
+                                amount=str(balance),
+                                updated_at=datetime.now(),
+                                address=address,
+                            )
 
-                    # Check if we already have this holder in the database (by address+token_id)
-                    holder_key = (address, token.id)
-                    if holder_key in db_holders_by_address_token:
-                        # Update existing holder
-                        existing_holder = db_holders_by_address_token[holder_key]
-                        needs_update = False
-                        should_trigger_approval = False
+                            # Check if we need to update agent_id
+                            if agent and existing_holder.agent_id != agent.id:
+                                update_data.agent_id = agent.id
+                                needs_update = True
+                            elif not agent and existing_holder.agent_id is not None:
+                                update_data.agent_id = None
+                                needs_update = True
 
-                        update_data = HolderBase(
-                            amount=str(balance),
-                            updated_at=datetime.now(),
-                            address=address,
-                        )
+                            # Check if we need to update wallet_id
+                            if wallet and existing_holder.wallet_id != wallet.id:
+                                update_data.wallet_id = wallet.id
+                                needs_update = True
+                            elif not wallet and existing_holder.wallet_id is not None:
+                                update_data.wallet_id = None
+                                needs_update = True
 
-                        # Check if we need to update agent_id
-                        if agent and existing_holder.agent_id != agent.id:
-                            update_data.agent_id = agent.id
-                            needs_update = True
-                        elif not agent and existing_holder.agent_id is not None:
-                            update_data.agent_id = None
-                            needs_update = True
+                            # Check if amount changed and if this triggers first meaningful balance
+                            old_balance = float(existing_holder.amount or "0")
+                            new_balance = float(balance)
 
-                        # Check if we need to update wallet_id
-                        if wallet and existing_holder.wallet_id != wallet.id:
-                            update_data.wallet_id = wallet.id
-                            needs_update = True
-                        elif not wallet and existing_holder.wallet_id is not None:
-                            update_data.wallet_id = None
-                            needs_update = True
+                            if existing_holder.amount != str(balance):
+                                needs_update = True
 
-                        # Check if amount changed and if this triggers first meaningful balance
-                        old_balance = float(existing_holder.amount or "0")
-                        new_balance = float(balance)
+                                # Check if this is a first meaningful token receipt for an agent
+                                if agent and old_balance == 0 and new_balance > 0:
+                                    should_trigger_approval = True
+                                    logger.info(
+                                        "First meaningful token receipt detected for agent during sync - will trigger proposal approval",
+                                        extra={
+                                            "task": "dao_token_holders_monitor",
+                                            "agent_id": agent.id,
+                                        },
+                                    )
 
-                        if existing_holder.amount != str(balance):
-                            needs_update = True
+                            # Check if address changed
+                            if existing_holder.address != address:
+                                needs_update = True
 
-                            # Check if this is a first meaningful token receipt for an agent
-                            if agent and old_balance == 0 and new_balance > 0:
-                                should_trigger_approval = True
+                            if needs_update:
                                 logger.info(
-                                    "First meaningful token receipt detected for agent during sync - will trigger proposal approval",
+                                    "Updating holder for token",
+                                    extra={
+                                        "task": "dao_token_holders_monitor",
+                                        "address": address,
+                                        "token_name": token.name,
+                                        "amount_old": existing_holder.amount,
+                                        "amount_new": balance,
+                                        "agent_id_old": existing_holder.agent_id,
+                                        "agent_id_new": agent.id if agent else None,
+                                        "wallet_id_old": existing_holder.wallet_id,
+                                        "wallet_id_new": wallet.id if wallet else None,
+                                    },
+                                )
+                                backend.update_holder(existing_holder.id, update_data)
+                                result.holders_updated += 1
+
+                                # Queue proposal approval if this is a first-time meaningful receipt
+                                if should_trigger_approval:
+                                    approval_queued = (
+                                        await self._queue_proposal_approval_for_agent(
+                                            agent, wallet, token.dao_id, token
+                                        )
+                                    )
+                                    if approval_queued:
+                                        result.approvals_queued += 1
+                        else:
+                            logger.info(
+                                "Creating new holder for token",
+                                extra={
+                                    "task": "dao_token_holders_monitor",
+                                    "address": address,
+                                    "token_name": token.name,
+                                    "balance": balance,
+                                    "agent_id": agent.id if agent else None,
+                                    "wallet_id": wallet.id if wallet else None,
+                                },
+                            )
+                            holder_create = HolderCreate(
+                                agent_id=agent.id if agent else None,
+                                wallet_id=wallet.id if wallet else None,
+                                token_id=token.id,
+                                dao_id=token.dao_id,
+                                amount=str(balance),
+                                updated_at=datetime.now(),
+                                address=address,
+                            )
+                            backend.create_holder(holder_create)
+                            result.holders_created += 1
+
+                            # Queue proposal approval for new agent holders with positive balance
+                            if agent and float(balance) > 0:
+                                logger.info(
+                                    "First token receipt detected for agent during sync - will trigger proposal approval",
                                     extra={
                                         "task": "dao_token_holders_monitor",
                                         "agent_id": agent.id,
                                     },
                                 )
-
-                        # Check if address changed
-                        if existing_holder.address != address:
-                            needs_update = True
-
-                        if needs_update:
-                            logger.info(
-                                "Updating holder for token",
-                                extra={
-                                    "task": "dao_token_holders_monitor",
-                                    "address": address,
-                                    "token_name": token.name,
-                                    "amount_old": existing_holder.amount,
-                                    "amount_new": balance,
-                                    "agent_id_old": existing_holder.agent_id,
-                                    "agent_id_new": agent.id if agent else None,
-                                    "wallet_id_old": existing_holder.wallet_id,
-                                    "wallet_id_new": wallet.id if wallet else None,
-                                },
-                            )
-                            backend.update_holder(existing_holder.id, update_data)
-                            result.holders_updated += 1
-
-                            # Queue proposal approval if this is a first-time meaningful receipt
-                            if should_trigger_approval:
                                 approval_queued = (
                                     await self._queue_proposal_approval_for_agent(
                                         agent, wallet, token.dao_id, token
@@ -536,108 +567,78 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                                 )
                                 if approval_queued:
                                     result.approvals_queued += 1
-                    else:
-                        logger.info(
-                            "Creating new holder for token",
+
+                    except Exception as e:
+                        error_msg = "Error processing API holder"
+                        logger.error(
+                            error_msg,
                             extra={
                                 "task": "dao_token_holders_monitor",
-                                "address": address,
-                                "token_name": token.name,
-                                "balance": balance,
-                                "agent_id": agent.id if agent else None,
-                                "wallet_id": wallet.id if wallet else None,
+                                "api_holder": str(api_holder),
+                                "error": str(e),
                             },
                         )
-                        holder_create = HolderCreate(
-                            agent_id=agent.id if agent else None,
-                            wallet_id=wallet.id if wallet else None,
-                            token_id=token.id,
-                            dao_id=token.dao_id,
-                            amount=str(balance),
-                            updated_at=datetime.now(),
-                            address=address,
-                        )
-                        backend.create_holder(holder_create)
-                        result.holders_created += 1
+                        result.errors.append(error_msg)
 
-                        # Queue proposal approval for new agent holders with positive balance
-                        if agent and float(balance) > 0:
+                # Check for holders that are no longer in the API response (removed holders)
+                # Only check holders for the current token being processed
+                for db_holder in db_holders:
+                    try:
+                        # Only process holders for the current token
+                        if db_holder.token_id != token.id:
+                            continue
+
+                        # Use address for matching since that's what we get from the API
+                        if (
+                            db_holder.address
+                            and db_holder.address not in api_holders_by_contract
+                        ):
+                            # This holder is no longer holding tokens for this specific token, remove from database
                             logger.info(
-                                "First token receipt detected for agent during sync - will trigger proposal approval",
+                                "Removing holder for token (no longer holds tokens)",
                                 extra={
                                     "task": "dao_token_holders_monitor",
-                                    "agent_id": agent.id,
+                                    "address": db_holder.address,
+                                    "token_name": token.name,
                                 },
                             )
-                            approval_queued = (
-                                await self._queue_proposal_approval_for_agent(
-                                    agent, wallet, token.dao_id, token
-                                )
-                            )
-                            if approval_queued:
-                                result.approvals_queued += 1
-
-                except Exception as e:
-                    error_msg = "Error processing API holder"
-                    logger.error(
-                        error_msg,
-                        extra={
-                            "task": "dao_token_holders_monitor",
-                            "api_holder": str(api_holder),
-                            "error": str(e),
-                        },
-                    )
-                    result.errors.append(error_msg)
-
-            # Check for holders that are no longer in the API response (removed holders)
-            # Only check holders for the current token being processed
-            for db_holder in db_holders:
-                try:
-                    # Only process holders for the current token
-                    if db_holder.token_id != token.id:
-                        continue
-
-                    # Use address for matching since that's what we get from the API
-                    if (
-                        db_holder.address
-                        and db_holder.address not in api_holders_by_contract
-                    ):
-                        # This holder is no longer holding tokens for this specific token, remove from database
-                        logger.info(
-                            "Removing holder for token (no longer holds tokens)",
+                            backend.delete_holder(db_holder.id)
+                            result.holders_removed += 1
+                    except Exception as e:
+                        logger.error(
+                            "Error processing holder",
                             extra={
                                 "task": "dao_token_holders_monitor",
+                                "holder_id": db_holder.id,
                                 "address": db_holder.address,
                                 "token_name": token.name,
+                                "error": str(e),
                             },
                         )
-                        backend.delete_holder(db_holder.id)
-                        result.holders_removed += 1
-                except Exception as e:
-                    logger.error(
-                        "Error processing holder",
-                        extra={
-                            "task": "dao_token_holders_monitor",
-                            "holder_id": db_holder.id,
-                            "address": db_holder.address,
-                            "token_name": token.name,
-                            "error": str(e),
-                        },
-                    )
-                    continue
+                        continue
 
-        except Exception as e:
-            error_msg = "Error syncing holders for token"
-            logger.error(
-                error_msg,
-                extra={
+                await asyncio.sleep(1)  # Add sleep to space out API calls between tokens
+                return  # Success, exit retry loop
+
+            except HiroApiRateLimitError as e:
+                if attempt == max_retries - 1:
+                    error_msg = f"Max retries reached for token after rate limit: {str(e)}"
+                    logger.error(error_msg, extra={"task": "dao_token_holders_monitor", "token_id": token.id, "attempt": attempt})
+                    result.errors.append(error_msg)
+                    return
+                backoff = 2 ** attempt  # Exponential backoff (1s, 2s, 4s)
+                logger.warning(f"Rate limit hit for token, retrying after {backoff}s", extra={
                     "task": "dao_token_holders_monitor",
                     "token_id": token.id,
-                    "error": str(e),
-                },
-                exc_info=True,
-            )
-            result.errors.append(error_msg)
+                    "attempt": attempt,
+                })
+                await asyncio.sleep(backoff)  # Async sleep for retry
+
+            except Exception as e:
+                error_msg = f"Error syncing holders for token: {str(e)}"
+                logger.error(error_msg, extra={"task": "dao_token_holders_monitor", "token_id": token.id}, exc_info=True)
+                result.errors.append(error_msg)
+                return  # Don't retry non-rate-limit errors
 
     async def _execute_impl(
         self, context: JobContext
@@ -678,8 +679,9 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                             "token_id": token.id,
                         },
                     )
-                    await self._sync_token_holders(token, result)
+                    await self._sync_token_holders(token, result)  # Now async-friendly with sleeps
                     result.tokens_processed += 1
+                    await asyncio.sleep(0.5)  # Additional brief sleep between tokens for extra safety
 
                 except Exception as e:
                     error_msg = "Error processing token"

@@ -219,16 +219,20 @@ class ChainhookMonitorTask(BaseTask[ChainhookMonitorResult]):
 
             return True, False  # Healthy, no need to recreate
         except Exception as e:
-            # This is likely a temporary failure (network, API timeout, etc.)
-            # Don't recreate the chainhook, just log the error and try again later
-            logger.warning(
-                "Temporary error checking chainhook health",
-                extra={
+            if hasattr(e, 'response') and getattr(e.response, 'status_code', None) == 404:  # Handle 404 explicitly
+                logger.warning("Chainhook not found (404), marking for recreation", extra={
                     "task": "chainhook_monitor",
                     "chainhook_uuid": chainhook_uuid,
                     "error": str(e),
-                },
-            )
+                })
+                return False, True  # Not healthy, recreate
+            # Existing temporary error handling
+            logger.warning("Temporary error checking chainhook health", extra={
+                "task": "chainhook_monitor",
+                "chainhook_uuid": chainhook_uuid,
+                "error": str(e),
+            })
+            time.sleep(1)  # Add brief sleep to ease API load
             return False, False  # Not healthy (unknown), but don't recreate
 
     def _recreate_chainhook_for_chain_state(self, chain_state) -> Optional[str]:
