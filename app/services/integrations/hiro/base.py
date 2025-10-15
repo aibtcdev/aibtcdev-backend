@@ -59,13 +59,17 @@ class BaseHiroApi:
         updated_limits = {}
         if "x-ratelimit-limit-stacks-second" in headers:
             old_limit = self.__class__._second_limit
-            self.__class__._second_limit = int(headers["x-ratelimit-limit-stacks-second"])
+            self.__class__._second_limit = int(
+                headers["x-ratelimit-limit-stacks-second"]
+            )
             if old_limit != self.__class__._second_limit:
                 updated_limits["second"] = self.__class__._second_limit
 
         if "x-ratelimit-limit-stacks-minute" in headers:
             old_limit = self.__class__._minute_limit
-            self.__class__._minute_limit = int(headers["x-ratelimit-limit-stacks-minute"])
+            self.__class__._minute_limit = int(
+                headers["x-ratelimit-limit-stacks-minute"]
+            )
             if old_limit != self.__class__._minute_limit:
                 updated_limits["minute"] = self.__class__._minute_limit
 
@@ -182,9 +186,14 @@ class BaseHiroApi:
                             raise
                         raise HiroApiTimeoutError(f"Max retries reached: {str(e)}")
 
-                    retry_delay = self.RETRY_DELAY * (2 ** attempt)  # Exponential backoff
-                    if isinstance(e, HiroApiRateLimitError) and 'retry-after' in e.response.headers:
-                        retry_delay = max(retry_delay, int(e.response.headers['retry-after']))
+                    retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
+                    if (
+                        isinstance(e, HiroApiRateLimitError)
+                        and "retry-after" in e.response.headers
+                    ):
+                        retry_delay = max(
+                            retry_delay, int(e.response.headers["retry-after"])
+                        )
                     logger.warning(
                         "Request failed, retrying",
                         extra={
@@ -291,6 +300,7 @@ class BaseHiroApi:
     @staticmethod
     async def _aretry_on_error(func):
         """Async decorator to retry API calls on transient errors."""
+
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
             for attempt in range(self.MAX_RETRIES):
@@ -314,9 +324,14 @@ class BaseHiroApi:
                             raise
                         raise HiroApiTimeoutError(f"Max retries reached: {str(e)}")
 
-                    retry_delay = self.RETRY_DELAY * (2 ** attempt)  # Exponential backoff
-                    if isinstance(e, HiroApiRateLimitError) and 'retry-after' in e.response.headers:
-                        retry_delay = max(retry_delay, int(e.response.headers['retry-after']))
+                    retry_delay = self.RETRY_DELAY * (2**attempt)  # Exponential backoff
+                    if (
+                        isinstance(e, HiroApiRateLimitError)
+                        and "retry-after" in e.response.headers
+                    ):
+                        retry_delay = max(
+                            retry_delay, int(e.response.headers["retry-after"])
+                        )
                     logger.warning(
                         "Async request failed, retrying",
                         extra={
