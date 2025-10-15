@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from app.backend.factory import backend
 from app.config import config as main_config
 from app.services.integrations.hiro.hiro_api import HiroApi
+from app.services.integrations.hiro.utils import HiroApiRateLimitError
 from app.lib.logger import configure_logger
 from app.services.infrastructure.job_management.base import (
     BaseTask,
@@ -22,6 +23,8 @@ from app.services.processing.stacks_chainhook_adapter import (
     BlockNotFoundError,
     TransformationError,
 )
+
+import asyncio
 
 logger = configure_logger(__name__)
 

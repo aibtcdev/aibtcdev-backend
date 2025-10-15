@@ -17,6 +17,7 @@ from app.backend.models import (
     QueueMessageType,
 )
 from app.services.integrations.hiro.hiro_api import HiroApi
+from app.services.integrations.hiro.utils import HiroApiRateLimitError
 from app.lib.logger import configure_logger
 from app.services.infrastructure.job_management.base import (
     BaseTask,
