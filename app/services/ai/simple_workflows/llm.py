@@ -261,7 +261,7 @@ async def invoke_structured(
 
     # Pass method and include_raw to with_structured_output
     structured_llm = llm.with_structured_output(
-        output_schema, method=method, include_raw=include_raw
+        output_schema, method=method, include_raw=True
     )
 
     # Handle ChatPromptTemplate
@@ -272,20 +272,38 @@ async def invoke_structured(
             f"Formatted messages for structured LLM invocation: {formatted_messages}"
         )
         result = await structured_llm.ainvoke(formatted_messages)
-        if include_raw:
+        if 'parsing_error' in result and result['parsing_error']:
+            raw_content = result['raw'].content.strip()
+            logger.warning(f"Cleaning malformed JSON output: {raw_content[:100]}...")
+            # Attempt to parse cleaned content
+            try:
+                parsed = output_schema.parse_raw(raw_content)
+                return parsed
+            except Exception as e:
+                raise ValueError(f"Failed to parse cleaned output: {str(e)}")
+        elif include_raw:
             logger.debug(
                 f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
             )
-        return result
+        return result.get('parsed', result)
 
     # Handle list of BaseMessage
     logger.debug(f"Messages for structured LLM invocation: {messages}")
     result = await structured_llm.ainvoke(messages)
-    if include_raw:
+    if 'parsing_error' in result and result['parsing_error']:
+        raw_content = result['raw'].content.strip()
+        logger.warning(f"Cleaning malformed JSON output: {raw_content[:100]}...")
+        # Attempt to parse cleaned content
+        try:
+            parsed = output_schema.parse_raw(raw_content)
+            return parsed
+        except Exception as e:
+            raise ValueError(f"Failed to parse cleaned output: {str(e)}")
+    elif include_raw:
         logger.debug(
             f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
         )
-    return result
+    return result.get('parsed', result)
 
 
 async def invoke_reasoning(
