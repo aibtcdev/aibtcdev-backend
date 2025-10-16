@@ -291,6 +291,7 @@ DECISION REMINDERS:
 OUTPUT FORMAT
 
 Respond with ONLY this JSON structure. No additional text before or after.
+Your output MUST start immediately with '{' on the first line, with NO leading whitespace, newlines, or text. End immediately after '}'.
 
 {
   "current_order": int,
