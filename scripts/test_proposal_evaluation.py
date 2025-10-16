@@ -22,6 +22,7 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
+from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
 
 
@@ -120,8 +121,6 @@ Examples:
     print(f"DAO ID: {args.dao_id}")
     print(f"Debug Level: {args.debug_level}")
     print("=" * 60)
-    print("🧠 Using Comprehensive Proposal Evaluation")
-    print("=" * 60)
 
     try:
         # Convert dao_id to UUID if provided
@@ -132,12 +131,40 @@ Examples:
             except ValueError as e:
                 print(f"❌ Warning: Invalid DAO ID format: {e}")
 
+        # Determine prompt type based on DAO name
+        prompt_type = "evaluation"  # Default
+        custom_system_prompt = None
+        custom_user_prompt = None
+
+        if dao_uuid:
+            backend = get_backend()
+            dao = backend.get_dao(dao_uuid)
+            if dao:
+                if dao.name == "ELONBTC":
+                    prompt_type = "evaluation_elonbtc"
+                    print(f"🎯 Using ELONBTC-specific prompts for DAO {dao.name}")
+                elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                    prompt_type = "evaluation_aibtc"
+                    print(f"🎯 Using AIBTC-specific prompts for DAO {dao.name}")
+                else:
+                    print(f"📝 Using general prompts for DAO {dao.name}")
+            else:
+                print("📝 Using general prompts (DAO not found)")
+        else:
+            print("📝 Using general prompts (no DAO ID provided)")
+
+        # Load prompts based on determined type
+        custom_system_prompt = load_prompt(prompt_type, "system")
+        custom_user_prompt = load_prompt(prompt_type, "user_template")
+
         # Run comprehensive evaluation
         print("🔍 Running comprehensive evaluation...")
         result = await evaluate_proposal(
             proposal_content=proposal_content,
             dao_id=dao_uuid,
             proposal_id=args.proposal_id,
+            custom_system_prompt=custom_system_prompt,
+            custom_user_prompt=custom_user_prompt,
         )
 
         print("\n✅ Comprehensive Evaluation Complete!")

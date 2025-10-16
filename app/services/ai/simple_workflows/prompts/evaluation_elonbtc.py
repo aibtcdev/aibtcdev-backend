@@ -62,16 +62,16 @@ If any hard gate/cap failed or confidence < 0.70 → REJECT.
 Else APPROVE only if Final Score ≥ 72.
 
 STEP 5 — OUTPUT FORMAT (JSON OBJECT)
-{
+{{
   "monarch": int, "mission": int, "value": int, "values": int,
   "originality": int, "clarity": int, "safety": int, "engagement": int,
-  "reasons": {"monarch": "2–3 sentence rationale", ...},  // one for each criterion
-  "evidence": {"value_items": ["item1", "item2", ...]},
+  "reasons": {{"monarch": "2–3 sentence rationale", ...}},  // one for each criterion
+  "evidence": {{"value_items": ["item1", "item2", ...]}},
   "final_score": int,
   "confidence": float,
   "decision": "APPROVE" or "REJECT",
   "failed": ["G1", "H3", ...]  // empty if APPROVE
-}
+}}
 
 All reasoning must be specific, detailed, grounded in proposal content, quoted Elon post, and charter. Never use vague or generic responses. Strictly enforce rules; do not approve speculative, incomplete, or misaligned proposals.
 """
