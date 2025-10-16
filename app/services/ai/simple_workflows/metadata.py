@@ -64,12 +64,61 @@ async def generate_proposal_metadata(
         prompt = ChatPromptTemplate.from_messages(messages)
 
         # Get structured output from the LLM
-        result = await invoke_structured(
-            messages=prompt,
-            output_schema=ProposalMetadataOutput,
-            model="anthropic/claude-haiku-4.5",
-            callbacks=callbacks,
-        )
+        # Try json_mode first as it's more compatible with various models
+        try:
+            logger.debug(
+                "[MetadataProcessor] Attempting structured output with json_mode"
+            )
+            result = await invoke_structured(
+                messages=prompt,
+                output_schema=ProposalMetadataOutput,
+                model="anthropic/claude-haiku-4.5",
+                method="json_mode",
+                include_raw=True,
+                callbacks=callbacks,
+            )
+            logger.debug(
+                f"[MetadataProcessor] Structured output result type: {type(result)}"
+            )
+
+            # Handle include_raw response
+            if isinstance(result, dict) and "parsed" in result:
+                logger.debug(
+                    "[MetadataProcessor] Extracting parsed result from raw response"
+                )
+                result = result["parsed"]
+                if result is None:
+                    logger.warning(
+                        "[MetadataProcessor] Model returned None for parsed result (possible refusal)"
+                    )
+                    raise ValueError("Model refused to generate structured output")
+        except Exception as json_mode_error:
+            logger.warning(
+                f"[MetadataProcessor] json_mode failed: {str(json_mode_error)}, trying function_calling"
+            )
+            # Fallback to function_calling method
+            try:
+                result = await invoke_structured(
+                    messages=prompt,
+                    output_schema=ProposalMetadataOutput,
+                    model="anthropic/claude-haiku-4.5",
+                    method="function_calling",
+                    include_raw=True,
+                    callbacks=callbacks,
+                )
+                # Handle include_raw response
+                if isinstance(result, dict) and "parsed" in result:
+                    result = result["parsed"]
+                    if result is None:
+                        logger.warning(
+                            "[MetadataProcessor] Model returned None for parsed result (possible refusal)"
+                        )
+                        raise ValueError("Model refused to generate structured output")
+            except Exception as function_error:
+                logger.error(
+                    f"[MetadataProcessor] Both methods failed. json_mode: {str(json_mode_error)}, function_calling: {str(function_error)}"
+                )
+                raise
 
         result_dict = result.model_dump()
 
@@ -89,6 +138,7 @@ async def generate_proposal_metadata(
         logger.error(
             f"[MetadataProcessor] Error generating proposal metadata: {str(e)}"
         )
+        logger.debug("[MetadataProcessor] Error details:", exc_info=True)
         return {
             "error": str(e),
             "title": "",
