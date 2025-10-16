@@ -291,9 +291,9 @@ DECISION REMINDERS:
 OUTPUT FORMAT
 
 Respond with ONLY this JSON structure. No additional text before or after.
-Your output MUST start immediately with '{' on the first line, with NO leading whitespace, newlines, or text. End immediately after '}'.
+Your output MUST start immediately with '{{' on the first line, with NO leading whitespace, newlines, or text. End immediately after '}}'.
 
-{
+{{
   "current_order": int,
   "mission": int,
   "value": int,
@@ -302,7 +302,7 @@ Your output MUST start immediately with '{' on the first line, with NO leading w
   "clarity": int,
   "safety": int,
   "growth": int,
-  "reasons": {
+  "reasons": {{
     "current_order": "2-3 sentence rationale with specific evidence",
     "mission": "2-3 sentence rationale with specific evidence",
     "value": "2-3 sentence rationale with specific evidence",
@@ -311,15 +311,15 @@ Your output MUST start immediately with '{' on the first line, with NO leading w
     "clarity": "2-3 sentence rationale with specific evidence",
     "safety": "2-3 sentence rationale with specific evidence",
     "growth": "2-3 sentence rationale with specific evidence"
-  },
-  "evidence": {
+  }},
+  "evidence": {{
     "value_items": ["specific item 1", "specific item 2"]
-  },
+  }},
   "final_score": int,
   "confidence": float,
   "decision": "APPROVE" or "REJECT",
   "failed": []
-}
+}}
 
 QUALITY REQUIREMENTS FOR REASONS:
 - MUST cite SPECIFIC evidence from proposal (quote exact text, reference specific URLs, mention concrete details)

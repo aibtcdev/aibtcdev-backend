@@ -58,14 +58,14 @@ Construct the final proposal recommendation according to the structure below.
 ## FINAL OUTPUT FORMAT (JSON OBJECT)
 Return a single, valid JSON object. Do not include any explanatory text before or after the JSON.
 
-{
+{{
   "title": "Clear, compelling proposal title (string, max 100 chars, ASCII only)",
   "content": "Comprehensive proposal with objectives, deliverables, timeline, and success metrics (string, max 1800 chars, ASCII only)",
   "rationale": "Strategic justification based on your analysis of DAO context, past proposals, and opportunities (string, max 800 chars, ASCII only)",
   "priority": "Priority level ('high', 'medium', or 'low') with a brief justification (string, ASCII only)",
   "estimated_impact": "Specific expected outcomes and community benefits (string, ASCII only)",
   "suggested_action": "Immediate next steps for proposal submission and implementation (string, ASCII only)"
-}"""
+}}"""
 
 RECOMMENDATION_USER_PROMPT_TEMPLATE = """Generate a single, strategic proposal recommendation based on the provided context. Follow all instructions, protocols, and formatting requirements from the system prompt.
 
