@@ -67,7 +67,7 @@ async def generate_proposal_metadata(
         result = await invoke_structured(
             messages=prompt,
             output_schema=ProposalMetadataOutput,
-            model="google/gemini-2.5-flash-lite",
+            model="anthropic/claude-haiku-4.5",
             callbacks=callbacks,
         )
 
