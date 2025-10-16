@@ -274,8 +274,13 @@ async def invoke_structured(
         result = await structured_llm.ainvoke(formatted_messages)
         if "parsing_error" in result and result["parsing_error"]:
             raw_content = result["raw"].content.strip()
-            logger.error(f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)")
-            logger.error(f"[LLM Parsing Error] Input messages: {formatted_messages}", exc_info=True)
+            logger.error(
+                f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)"
+            )
+            logger.error(
+                f"[LLM Parsing Error] Input messages: {formatted_messages}",
+                exc_info=True,
+            )
             # Attempt to parse cleaned content
             try:
                 parsed = output_schema.parse_raw(raw_content)
@@ -293,7 +298,9 @@ async def invoke_structured(
     result = await structured_llm.ainvoke(messages)
     if "parsing_error" in result and result["parsing_error"]:
         raw_content = result["raw"].content.strip()
-        logger.error(f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)")
+        logger.error(
+            f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)"
+        )
         logger.error(f"[LLM Parsing Error] Input messages: {messages}", exc_info=True)
         # Attempt to parse cleaned content
         try:
