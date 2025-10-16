@@ -272,8 +272,8 @@ async def invoke_structured(
             f"Formatted messages for structured LLM invocation: {formatted_messages}"
         )
         result = await structured_llm.ainvoke(formatted_messages)
-        if 'parsing_error' in result and result['parsing_error']:
-            raw_content = result['raw'].content.strip()
+        if "parsing_error" in result and result["parsing_error"]:
+            raw_content = result["raw"].content.strip()
             logger.warning(f"Cleaning malformed JSON output: {raw_content[:100]}...")
             # Attempt to parse cleaned content
             try:
@@ -285,13 +285,13 @@ async def invoke_structured(
             logger.debug(
                 f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
             )
-        return result.get('parsed', result)
+        return result.get("parsed", result)
 
     # Handle list of BaseMessage
     logger.debug(f"Messages for structured LLM invocation: {messages}")
     result = await structured_llm.ainvoke(messages)
-    if 'parsing_error' in result and result['parsing_error']:
-        raw_content = result['raw'].content.strip()
+    if "parsing_error" in result and result["parsing_error"]:
+        raw_content = result["raw"].content.strip()
         logger.warning(f"Cleaning malformed JSON output: {raw_content[:100]}...")
         # Attempt to parse cleaned content
         try:
@@ -303,7 +303,7 @@ async def invoke_structured(
         logger.debug(
             f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
         )
-    return result.get('parsed', result)
+    return result.get("parsed", result)
 
 
 async def invoke_reasoning(
