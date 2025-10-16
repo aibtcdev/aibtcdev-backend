@@ -233,6 +233,8 @@ async def invoke_structured(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     callbacks: Optional[List[Any]] = None,
+    include_raw: bool = False,
+    method: str = "function_calling",
     **kwargs,
 ) -> BaseModel:
     """Invoke an LLM with structured output.
@@ -243,7 +245,9 @@ async def invoke_structured(
         model: Model name (defaults to configured default)
         temperature: Temperature (defaults to configured default)
         callbacks: Optional callback handlers
-        **kwargs: Additional arguments
+        include_raw: Whether to include raw response (for debugging)
+        method: Method to use for structured output (function_calling or json_mode)
+        **kwargs: Additional arguments passed to create_llm
 
     Returns:
         Structured output as instance of output_schema
@@ -255,7 +259,10 @@ async def invoke_structured(
         **kwargs,
     )
 
-    structured_llm = llm.with_structured_output(output_schema)
+    # Pass method and include_raw to with_structured_output
+    structured_llm = llm.with_structured_output(
+        output_schema, method=method, include_raw=include_raw
+    )
 
     # Handle ChatPromptTemplate
     if isinstance(messages, ChatPromptTemplate):
@@ -264,11 +271,21 @@ async def invoke_structured(
         logger.debug(
             f"Formatted messages for structured LLM invocation: {formatted_messages}"
         )
-        return await structured_llm.ainvoke(formatted_messages)
+        result = await structured_llm.ainvoke(formatted_messages)
+        if include_raw:
+            logger.debug(
+                f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
+            )
+        return result
 
     # Handle list of BaseMessage
     logger.debug(f"Messages for structured LLM invocation: {messages}")
-    return await structured_llm.ainvoke(messages)
+    result = await structured_llm.ainvoke(messages)
+    if include_raw:
+        logger.debug(
+            f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
+        )
+    return result
 
 
 async def invoke_reasoning(
