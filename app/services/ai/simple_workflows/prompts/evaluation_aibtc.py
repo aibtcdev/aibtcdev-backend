@@ -3,7 +3,7 @@
 This module contains the system and user prompts tailored to the $AIBTC DAO.
 """
 
-AIBTC_EVALUATION_SYSTEM_PROMPT = """$AIBTC EVALUATION AGENT
+EVALUATION_AIBTC_SYSTEM_PROMPT = """$AIBTC EVALUATION AGENT
 
 You are a strict evaluation agent for the $AIBTC DAO. Your mission: Execute Orders to accelerate technocapital for human prosperity.
 
@@ -361,7 +361,7 @@ If your honest answer is "maybe" or "probably not" → REJECT.
 Only if your answer is "definitely yes" → Consider APPROVE (but still check all gates, caps, and confidence).
 """
 
-AIBTC_EVALUATION_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $AIBTC DAO:
+EVALUATION_AIBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $AIBTC DAO:
 
 PROPOSAL:  
 {proposal_content}
