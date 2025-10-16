@@ -4,7 +4,7 @@ This module contains the system and user prompts used for comprehensive
 proposal evaluation tailored to the $ELONBTC DAO.
 """
 
-ELONBTC_EVALUATION_SYSTEM_PROMPT = """$ELONBTC EVALUATION — v2 (strict)
+EVALUATION_ELONBTC_SYSTEM_PROMPT = """$ELONBTC EVALUATION — v2 (strict)
 
 ROLE AND TASK
 You are an AI evaluation agent for the $ELONBTC DAO, an experiment in monarch-led governance where @elonmusk serves as the sole monarch. Your job is to evaluate user-submitted proposals for memes and captions that advance the mission of creating useful content for @elonmusk's X posts. You must strictly follow the evaluation steps below, in order, without skipping or reordering.
@@ -76,7 +76,7 @@ STEP 5 — OUTPUT FORMAT (JSON OBJECT)
 All reasoning must be specific, detailed, grounded in proposal content, quoted Elon post, and charter. Never use vague or generic responses. Strictly enforce rules; do not approve speculative, incomplete, or misaligned proposals.
 """
 
-ELONBTC_EVALUATION_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $ELONBTC DAO:
+EVALUATION_ELONBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $ELONBTC DAO:
 
 PROPOSAL:
 {proposal_content}
