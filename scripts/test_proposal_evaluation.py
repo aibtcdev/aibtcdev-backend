@@ -76,6 +76,13 @@ Examples:
         help="Debug level: 0=normal, 1=verbose, 2=very verbose (default: 0)",
     )
 
+    parser.add_argument(
+        "--output-file",
+        type=str,
+        default=None,
+        help="Path to output file (JSON format)",
+    )
+
     args = parser.parse_args()
 
     # If proposal_content is not provided, look it up from the database
@@ -238,6 +245,11 @@ Examples:
             "images_processed": result.images_processed,
         }
         print(json.dumps(result_dict, indent=2, default=str))
+
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump(result_dict, f, indent=2, default=str)
+            print(f"✅ Results saved to {args.output_file}")
 
     except Exception as e:
         print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
