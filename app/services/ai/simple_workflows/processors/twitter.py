@@ -64,6 +64,16 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
             "tweet_images_analysis": tweet.tweet_images_analysis or [],
+            "quoted_tweet_db_id": tweet.quoted_tweet_db_id,
+            "quoted_tweet_id": tweet.quoted_tweet_id,
+            "replied_to_tweet_db_id": tweet.replied_to_tweet_db_id,
+            "replied_to_tweet_id": tweet.replied_to_tweet_id,
+            "in_reply_to_user_id": tweet.in_reply_to_user_id,
+            "conversation_id": tweet.conversation_id,
+            "is_worthy": tweet.is_worthy,
+            "tweet_type": tweet.tweet_type,
+            "confidence_score": tweet.confidence_score,
+            "reason": tweet.reason,
             **author_info,  # Include author information
         }
 
