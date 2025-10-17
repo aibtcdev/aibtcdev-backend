@@ -109,7 +109,7 @@ def create_chat_openai(
         "X-Title": "AIBTC",
     }
 
-    logger.debug(f"Creating ChatOpenAI with config: {config_dict}")
+    logger.info(f"Creating ChatOpenAI with config: {config_dict}")
     return ChatOpenAI(**config_dict)
 
 
@@ -233,6 +233,8 @@ async def invoke_structured(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     callbacks: Optional[List[Any]] = None,
+    include_raw: bool = False,
+    method: str = "function_calling",
     **kwargs,
 ) -> BaseModel:
     """Invoke an LLM with structured output.
@@ -243,7 +245,9 @@ async def invoke_structured(
         model: Model name (defaults to configured default)
         temperature: Temperature (defaults to configured default)
         callbacks: Optional callback handlers
-        **kwargs: Additional arguments
+        include_raw: Whether to include raw response (for debugging)
+        method: Method to use for structured output (function_calling or json_mode)
+        **kwargs: Additional arguments passed to create_llm
 
     Returns:
         Structured output as instance of output_schema
@@ -255,7 +259,10 @@ async def invoke_structured(
         **kwargs,
     )
 
-    structured_llm = llm.with_structured_output(output_schema)
+    # Pass method and include_raw to with_structured_output
+    structured_llm = llm.with_structured_output(
+        output_schema, method=method, include_raw=True
+    )
 
     # Handle ChatPromptTemplate
     if isinstance(messages, ChatPromptTemplate):
@@ -264,11 +271,48 @@ async def invoke_structured(
         logger.debug(
             f"Formatted messages for structured LLM invocation: {formatted_messages}"
         )
-        return await structured_llm.ainvoke(formatted_messages)
+        result = await structured_llm.ainvoke(formatted_messages)
+        if "parsing_error" in result and result["parsing_error"]:
+            raw_content = result["raw"].content.strip()
+            logger.error(
+                f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)"
+            )
+            logger.error(
+                f"[LLM Parsing Error] Input messages: {formatted_messages}",
+                exc_info=True,
+            )
+            # Attempt to parse cleaned content
+            try:
+                parsed = output_schema.parse_raw(raw_content)
+                return parsed
+            except Exception as e:
+                raise ValueError(f"Failed to parse cleaned output: {str(e)}")
+        elif include_raw:
+            logger.debug(
+                f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
+            )
+        return result.get("parsed", result)
 
     # Handle list of BaseMessage
     logger.debug(f"Messages for structured LLM invocation: {messages}")
-    return await structured_llm.ainvoke(messages)
+    result = await structured_llm.ainvoke(messages)
+    if "parsing_error" in result and result["parsing_error"]:
+        raw_content = result["raw"].content.strip()
+        logger.error(
+            f"[LLM Parsing Error] Full raw LLM response: {raw_content[:1000]}... (truncated if longer)"
+        )
+        logger.error(f"[LLM Parsing Error] Input messages: {messages}", exc_info=True)
+        # Attempt to parse cleaned content
+        try:
+            parsed = output_schema.parse_raw(raw_content)
+            return parsed
+        except Exception as e:
+            raise ValueError(f"Failed to parse cleaned output: {str(e)}")
+    elif include_raw:
+        logger.debug(
+            f"Raw response: {result.get('raw') if isinstance(result, dict) else 'N/A'}"
+        )
+    return result.get("parsed", result)
 
 
 async def invoke_reasoning(

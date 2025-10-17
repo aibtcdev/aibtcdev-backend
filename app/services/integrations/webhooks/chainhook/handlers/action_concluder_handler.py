@@ -281,12 +281,26 @@ class ActionConcluderHandler(ChainhookEventHandler):
         proposal_passed = proposal.passed or False
 
         if proposal_passed:
+            # Get DAO information to include the name in the post
+            dao = backend.get_dao(proposal.dao_id) if proposal.dao_id else None
+            dao_name = dao.name if dao else ""
+
+            # Set reward amount based on DAO name
+            if dao_name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                reward_amount = "$20 BTC"
+            elif dao_name == "ELONBTC":
+                reward_amount = "$50 BTC"
+            elif dao_name:
+                reward_amount = f"1,000 ${dao_name}"
+            else:
+                reward_amount = "1,000 $FACES"
+
             # Create the new post format for approved proposals
             proposal_url = f"{config.api.base_url}/proposals/{proposal.id}"
             follow_up_message = f"View contribution details: {proposal_url}"
 
             # Create the first post with the approved contribution format
-            first_post = f"✅ Approved: Contribution #{proposal.proposal_id} (testnet)\n💰 Reward: $5 BTC"
+            first_post = f"✅ Approved: Contribution #{proposal.proposal_id} {dao_name} (testnet)\n💰 Reward: {reward_amount}"
 
             # Add x_url if available (will be implemented soon)
             if proposal.x_url:
@@ -329,8 +343,16 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Format the Discord message with new structured format for passed proposal
             formatted_message = "\n=======================================\n\n"
             formatted_message += f"✅ Approved: Contribution #{proposal.proposal_id}\n"
-            formatted_message += f"💬 {proposal.title}\n"
-            formatted_message += "⭐️ Reward: 1,000 $FACES\n\n"
+            # Set reward amount based on DAO name for Discord
+            if dao_name == "AIBTC":
+                discord_reward = "💰 Reward: $10 BTC"
+            if dao_name == "ELONBTC":
+                discord_reward = "💰 Reward: $50 BTC"
+            elif dao_name:
+                discord_reward = f"⭐️ Reward: 1,000 ${dao_name}"
+            else:
+                discord_reward = "⭐️ Reward: 1,000 $FACES"
+            formatted_message += f"{discord_reward}\n\n"
 
             # Add URL section if x_url is available
             if proposal.x_url:
@@ -377,7 +399,6 @@ class ActionConcluderHandler(ChainhookEventHandler):
             # Format the Discord message with new structured format for failed proposal
             formatted_message = "\n=======================================\n\n"
             formatted_message += f"🛑 Rejected: Contribution #{proposal.proposal_id}\n"
-            formatted_message += f"💬 {proposal.title}\n\n"
 
             # Add URL section if x_url is available
             if proposal.x_url:

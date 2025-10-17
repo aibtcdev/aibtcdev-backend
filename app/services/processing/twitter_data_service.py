@@ -272,11 +272,52 @@ class TwitterDataService:
                     "public_metrics": getattr(tweet, "public_metrics", {}),
                     "entities": getattr(tweet, "entities", {}),
                     "attachments": getattr(tweet, "attachments", {}),
+                    "referenced_tweets": getattr(tweet, "referenced_tweets", []),
                 }
 
-                # Extract author information from includes if available
+                # Handle quoted posts from referenced_tweets
+                quoted_posts = []
+                referenced_tweets = getattr(tweet, "referenced_tweets", []) or []
+
+                for ref_tweet in referenced_tweets:
+                    if ref_tweet.type == "quoted":
+                        quoted_posts.append(
+                            {"type": ref_tweet.type, "id": ref_tweet.id}
+                        )
+
+                # Extract quoted post data from includes if available
                 if hasattr(tweet_response, "includes") and tweet_response.includes:
-                    if "users" in tweet_response.includes:
+                    if (
+                        "tweets" in tweet_response.includes
+                        and tweet_response.includes["tweets"]
+                    ):
+                        for quoted_tweet in tweet_response.includes["tweets"]:
+                            # Find matching quoted posts
+                            for quoted_ref in quoted_posts:
+                                if str(quoted_tweet.id) == str(quoted_ref["id"]):
+                                    quoted_ref["data"] = {
+                                        "id": quoted_tweet.id,
+                                        "text": quoted_tweet.text,
+                                        "author_id": quoted_tweet.author_id,
+                                        "created_at": getattr(
+                                            quoted_tweet, "created_at", None
+                                        ),
+                                        "public_metrics": getattr(
+                                            quoted_tweet, "public_metrics", {}
+                                        ),
+                                        "entities": getattr(
+                                            quoted_tweet, "entities", {}
+                                        ),
+                                        "attachments": getattr(
+                                            quoted_tweet, "attachments", {}
+                                        ),
+                                    }
+                                    break
+
+                    if (
+                        "users" in tweet_response.includes
+                        and tweet_response.includes["users"]
+                    ):
                         # Find the author user in the includes
                         for user in tweet_response.includes["users"]:
                             user_id = None
@@ -300,11 +341,38 @@ class TwitterDataService:
                                     )
                                 break
 
-                    if "media" in tweet_response.includes:
+                            # Add author info to quoted posts
+                            for quoted_ref in quoted_posts:
+                                if "data" in quoted_ref and user_id == str(
+                                    quoted_ref["data"]["author_id"]
+                                ):
+                                    if hasattr(user, "name"):
+                                        quoted_ref["data"]["author_name"] = user.name
+                                    elif isinstance(user, dict):
+                                        quoted_ref["data"]["author_name"] = user.get(
+                                            "name", ""
+                                        )
+
+                                    if hasattr(user, "username"):
+                                        quoted_ref["data"]["author_username"] = (
+                                            user.username
+                                        )
+                                    elif isinstance(user, dict):
+                                        quoted_ref["data"]["author_username"] = (
+                                            user.get("username", "")
+                                        )
+
+                    if (
+                        "media" in tweet_response.includes
+                        and tweet_response.includes["media"]
+                    ):
                         tweet_data["media_objects"] = tweet_response.includes["media"]
                         logger.debug(
                             f"Found {len(tweet_response.includes['media'])} media objects in API v2 response"
                         )
+
+                # Add quoted posts to tweet data
+                tweet_data["quoted_posts"] = quoted_posts
 
                 logger.info(f"Successfully fetched tweet {tweet_id} using API v2")
                 return tweet_data
@@ -352,6 +420,7 @@ class TwitterDataService:
                 extended_entities
                 and isinstance(extended_entities, dict)
                 and "media" in extended_entities
+                and extended_entities["media"]
             ):
                 for media in extended_entities["media"]:
                     if media.get("type") == "photo":
@@ -363,7 +432,12 @@ class TwitterDataService:
 
             # Check entities for media (fallback)
             entities = tweet_data.get("entities")
-            if entities and isinstance(entities, dict) and "media" in entities:
+            if (
+                entities
+                and isinstance(entities, dict)
+                and "media" in entities
+                and entities["media"]
+            ):
                 for media in entities["media"]:
                     if media.get("type") == "photo":
                         media_url = media.get("media_url_https") or media.get(
@@ -381,7 +455,7 @@ class TwitterDataService:
             ):
                 # For API v2, we need to check if media objects are in the tweet_data
                 # This happens when the API response includes expanded media
-                media_objects = tweet_data.get("media_objects", [])
+                media_objects = tweet_data.get("media_objects", []) or []
                 for media in media_objects:
                     media_url = None
                     media_type = None
@@ -450,14 +524,14 @@ class TwitterDataService:
     async def _store_user_if_needed(
         self, tweet_data: Dict[str, Any], profile_data: Optional[Dict[str, Any]] = None
     ) -> Optional[UUID]:
-        """Store user data if not already exists.
+        """Store user data if not already exists, or update existing user with fresh profile data.
 
         Args:
             tweet_data: Tweet data containing user information
             profile_data: Optional profile data from fetch_user_profile
 
         Returns:
-            User ID if stored/found, None otherwise
+            User ID if stored/found/updated, None otherwise
         """
         try:
             author_username = tweet_data.get("author_username")
@@ -470,24 +544,26 @@ class TwitterDataService:
             if existing_users:
                 existing_user = existing_users[0]
 
-                # Update existing user with profile data if provided and missing
+                # Always update existing user with fresh profile data if available
                 if profile_data and not profile_data.get("error"):
-                    needs_update = False
                     update_data = {}
 
-                    # Check if profile_image_url needs updating
+                    # Update all available profile fields with fresh data
+                    for field in [
+                        "profile_image_url",
+                        "description",
+                        "location",
+                        "url",
+                        "verified",
+                        "verified_type",
+                    ]:
+                        if profile_data.get(field) is not None:
+                            update_data[field] = profile_data[field]
+
+                    # Always analyze bitcoin face if we have a profile image and no existing score
                     if (
                         profile_data.get("profile_image_url")
-                        and not existing_user.profile_image_url
-                    ):
-                        update_data["profile_image_url"] = profile_data[
-                            "profile_image_url"
-                        ]
-                        needs_update = True
-
-                    # Check if bitcoin_face_score needs analyzing
-                    if existing_user.bitcoin_face_score is None and profile_data.get(
-                        "profile_image_url"
+                        and existing_user.bitcoin_face_score is None
                     ):
                         try:
                             pfp_analysis = analyze_bitcoin_face(
@@ -499,33 +575,37 @@ class TwitterDataService:
                                     update_data["bitcoin_face_score"] = (
                                         bitcoin_face_score
                                     )
-                                    needs_update = True
+                                    logger.info(
+                                        f"Analyzed profile image for existing user {author_username}, bitcoin_face_score: {bitcoin_face_score}"
+                                    )
                         except Exception as e:
                             logger.warning(
                                 f"Error analyzing profile image for existing user {author_username}: {str(e)}"
                             )
 
-                    # Check other fields that might need updating
-                    for field in [
-                        "description",
-                        "location",
-                        "url",
-                        "verified",
-                        "verified_type",
-                    ]:
-                        if (
-                            profile_data.get(field) is not None
-                            and getattr(existing_user, field, None) is None
-                        ):
-                            update_data[field] = profile_data[field]
-                            needs_update = True
+                    # Perform the update if we have data to update
+                    if update_data:
+                        from app.backend.models import XUserBase
 
-                    if needs_update:
-                        # Note: This would require an update method in the backend
-                        # For now, just log that an update would be beneficial
-                        logger.info(
-                            f"User {author_username} exists but could be updated with profile data: {list(update_data.keys())}"
+                        update_payload = XUserBase(**update_data)
+                        updated_user = backend.update_x_user(
+                            existing_user.id, update_payload
                         )
+
+                        if updated_user:
+                            logger.info(
+                                f"Updated user {author_username} with fresh profile data: {list(update_data.keys())}"
+                            )
+                        else:
+                            logger.warning(f"Failed to update user {author_username}")
+                    else:
+                        logger.debug(
+                            f"No profile data to update for user {author_username}"
+                        )
+                else:
+                    logger.debug(
+                        f"No fresh profile data available for user {author_username}"
+                    )
 
                 logger.debug(f"User {author_username} already exists in database")
                 return existing_user.id
@@ -646,6 +726,68 @@ class TwitterDataService:
                 except (AttributeError, ValueError, TypeError):
                     created_at_twitter = str(tweet_data["created_at"])
 
+            # Handle quoted posts first (store them before the main tweet)
+            quoted_tweet_db_id = None
+            quoted_posts = tweet_data.get("quoted_posts", []) or []
+
+            for quoted_post in quoted_posts:
+                if "data" in quoted_post:
+                    quoted_data = quoted_post["data"]
+                    quoted_tweet_id = str(quoted_data["id"])
+
+                    # Check if quoted tweet already exists
+                    existing_quoted = backend.list_x_tweets(
+                        XTweetFilter(tweet_id=quoted_tweet_id)
+                    )
+                    if existing_quoted:
+                        quoted_tweet_db_id = existing_quoted[0].id
+                        logger.debug(f"Quoted tweet {quoted_tweet_id} already exists")
+                    else:
+                        # Store the quoted tweet first
+                        quoted_author_id = await self._store_user_if_needed(quoted_data)
+
+                        # Extract images from quoted tweet
+                        quoted_images = self._extract_images_from_tweet_data(
+                            quoted_data
+                        )
+
+                        # Prepare quoted tweet creation data
+                        quoted_created_at = None
+                        if quoted_data.get("created_at"):
+                            try:
+                                if hasattr(quoted_data["created_at"], "strftime"):
+                                    quoted_created_at = quoted_data[
+                                        "created_at"
+                                    ].strftime("%Y-%m-%d %H:%M:%S")
+                                else:
+                                    quoted_created_at = str(quoted_data["created_at"])
+                            except (AttributeError, ValueError, TypeError):
+                                quoted_created_at = str(quoted_data["created_at"])
+
+                        quoted_tweet_create = XTweetCreate(
+                            message=quoted_data.get("text"),
+                            author_id=quoted_author_id,
+                            tweet_id=quoted_tweet_id,
+                            conversation_id=quoted_data.get("conversation_id"),
+                            is_worthy=False,
+                            tweet_type=TweetType.INVALID,
+                            confidence_score=None,
+                            reason=None,
+                            images=quoted_images,
+                            author_name=quoted_data.get("author_name"),
+                            author_username=quoted_data.get("author_username"),
+                            created_at_twitter=quoted_created_at,
+                            public_metrics=quoted_data.get("public_metrics"),
+                            entities=quoted_data.get("entities"),
+                            attachments=quoted_data.get("attachments"),
+                            tweet_images_analysis=[],
+                            # No quoted_tweet_id for the quoted post itself
+                        )
+
+                        quoted_record = backend.create_x_tweet(quoted_tweet_create)
+                        quoted_tweet_db_id = quoted_record.id
+                        logger.info(f"Stored quoted tweet {quoted_tweet_id}")
+
             # Analyze tweet images for Bitcoin faces
             tweet_images_analysis = []
             # TODO: Uncomment this when we have a way to analyze images thats faster than the current implementation
@@ -659,7 +801,7 @@ class TwitterDataService:
             #     except Exception as e:
             #         logger.warning(f"Error analyzing tweet image {image_url}: {str(e)}")
 
-            # Create tweet record
+            # Create tweet record with quoted tweet reference
             tweet_create_data = XTweetCreate(
                 message=tweet_data.get("text"),
                 author_id=author_id,
@@ -677,11 +819,17 @@ class TwitterDataService:
                 entities=tweet_data.get("entities"),
                 attachments=tweet_data.get("attachments"),
                 tweet_images_analysis=tweet_images_analysis,
+                # Link to quoted tweet
+                quoted_tweet_id=str(quoted_posts[0]["id"]) if quoted_posts else None,
+                quoted_tweet_db_id=quoted_tweet_db_id,
             )
 
             tweet_record = backend.create_x_tweet(tweet_create_data)
+            quoted_info = (
+                f" and quoted tweet {quoted_tweet_db_id}" if quoted_tweet_db_id else ""
+            )
             logger.info(
-                f"Successfully stored tweet {tweet_id} with {len(image_urls)} images"
+                f"Successfully stored tweet {tweet_id} with {len(image_urls)} images{quoted_info}"
             )
 
             # Fetch and store the author's last 5 tweets
@@ -886,6 +1034,69 @@ class TwitterDataService:
                 f"Error fetching and storing author tweets for {author_id}: {str(e)}"
             )
             return []
+
+    async def fetch_tweet_with_quoted(
+        self, tweet_db_id: UUID
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch tweet with quoted post if available.
+
+        Args:
+            tweet_db_id: Database ID of the tweet to fetch
+
+        Returns:
+            Dictionary containing tweet data with quoted post if available, None if not found
+        """
+        try:
+            # Get main tweet
+            tweet = backend.get_x_tweet(tweet_db_id)
+            if not tweet:
+                logger.warning(f"Tweet not found for ID: {tweet_db_id}")
+                return None
+
+            tweet_data = {
+                "id": tweet.tweet_id,
+                "text": tweet.message,
+                "author_id": tweet.author_id,
+                "author_name": tweet.author_name,
+                "author_username": tweet.author_username,
+                "created_at": tweet.created_at_twitter,
+                "public_metrics": tweet.public_metrics or {},
+                "entities": tweet.entities or {},
+                "attachments": tweet.attachments or {},
+                "images": tweet.images or [],
+                "tweet_images_analysis": tweet.tweet_images_analysis or [],
+            }
+
+            # Get quoted tweet if it exists
+            if tweet.quoted_tweet_db_id:
+                quoted_tweet = backend.get_x_tweet(tweet.quoted_tweet_db_id)
+                if quoted_tweet:
+                    tweet_data["quoted_post"] = {
+                        "id": quoted_tweet.tweet_id,
+                        "text": quoted_tweet.message,
+                        "author_id": quoted_tweet.author_id,
+                        "author_name": quoted_tweet.author_name,
+                        "author_username": quoted_tweet.author_username,
+                        "created_at": quoted_tweet.created_at_twitter,
+                        "public_metrics": quoted_tweet.public_metrics or {},
+                        "entities": quoted_tweet.entities or {},
+                        "attachments": quoted_tweet.attachments or {},
+                        "images": quoted_tweet.images or [],
+                        "tweet_images_analysis": quoted_tweet.tweet_images_analysis
+                        or [],
+                    }
+                    logger.debug(f"Retrieved quoted post for tweet {tweet_db_id}")
+                else:
+                    logger.warning(
+                        f"Quoted tweet {tweet.quoted_tweet_db_id} not found for tweet {tweet_db_id}"
+                    )
+
+            logger.debug(f"Retrieved tweet data with quoted post for ID {tweet_db_id}")
+            return tweet_data
+
+        except Exception as e:
+            logger.error(f"Error retrieving tweet with quoted post: {str(e)}")
+            return None
 
 
 # Global instance for reuse across the application
