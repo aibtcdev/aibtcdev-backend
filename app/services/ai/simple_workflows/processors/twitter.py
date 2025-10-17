@@ -32,17 +32,56 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
         author_info = {}
         if tweet.author_id:
             try:
+                # Get x_users data (primary source for Twitter verification)
                 author = backend.get_x_user(tweet.author_id)
                 if author:
                     author_info = {
                         "author_description": author.description,
                         "author_location": author.location,
                         "author_url": author.url,
-                        "author_verified": author.verified,
-                        "author_verified_type": author.verified_type,
+                        "author_verified": author.verified,  # Twitter verification
+                        "author_verified_type": author.verified_type,  # Twitter verification type
                         "author_bitcoin_face_score": author.bitcoin_face_score,
                         "author_profile_image_url": author.profile_image_url,
+                        "author_name": author.name,  # Use x_users.name as fallback
+                        "author_username": author.username,  # Use x_users.username as fallback
                     }
+
+                    # Try to get additional profile data by username match
+                    if author.username:
+                        try:
+                            logger.debug(
+                                f"Looking up profile for username: {author.username}"
+                            )
+                            profiles = backend.list_profiles_by_username(
+                                author.username
+                            )
+                            logger.debug(
+                                f"Found {len(profiles)} profiles for username: {author.username}"
+                            )
+                            if profiles:
+                                profile = profiles[0]
+                                # Add profile-specific data and override verified with platform verification
+                                author_info.update(
+                                    {
+                                        "author_profile_email": profile.email,
+                                        "author_profile_image": profile.profile_image,
+                                        "author_verified": profile.is_verified,  # Use platform verification instead of Twitter verification
+                                        "author_verified_type": author.verified_type,  # Use x_users.verified_type
+                                    }
+                                )
+                                logger.debug(
+                                    f"Retrieved profile info for user {author.username}, platform_verified: {profile.is_verified}, user_type: {profile.user_type}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"No profile found for username: {author.username}"
+                                )
+                        except Exception as e:
+                            logger.debug(
+                                f"Could not fetch profile data for {author.username}: {str(e)}"
+                            )
+
                     logger.debug(
                         f"Retrieved author info for user {author.username}, bitcoin_face_score: {author.bitcoin_face_score}"
                     )
@@ -101,6 +140,8 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
         author_verified = tweet_data.get("author_verified", False)
         author_verified_type = tweet_data.get("author_verified_type", "")
         author_bitcoin_face_score = tweet_data.get("author_bitcoin_face_score")
+
+        # Extract enhanced profile information (removed user_type)
 
         # Format creation date
         created_str = ""

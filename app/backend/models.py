@@ -357,10 +357,14 @@ class KeyFilter(CustomBaseModel):
 #
 class ProfileBase(CustomBaseModel):
     email: Optional[str] = None
+    username: Optional[str] = None
+    is_verified: Optional[bool] = None
     has_dao_agent: Optional[bool] = False
     has_completed_guide: Optional[bool] = False
     mainnet_address: Optional[str] = None
     testnet_address: Optional[str] = None
+    user_type: Optional[str] = None
+    profile_image: Optional[str] = None
 
 
 class ProfileCreate(ProfileBase):
@@ -651,6 +655,7 @@ class DAOFilter(CustomBaseModel):
 
 class ProfileFilter(CustomBaseModel):
     email: Optional[str] = None
+    username: Optional[str] = None
     has_dao_agent: Optional[bool] = None
     has_completed_guide: Optional[bool] = None
 
