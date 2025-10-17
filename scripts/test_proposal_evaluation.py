@@ -126,6 +126,15 @@ Examples:
         # Optionally re-run setup_uvicorn_logging() to patch any framework loggers
         setup_uvicorn_logging()
 
+        # Enforce level on all existing loggers to prevent propagation leaks
+        for logger_name, logger in logging.Logger.manager.loggerDict.items():
+            if isinstance(logger, logging.Logger):
+                logger.setLevel(root_logger.level)  # Sync to root's level (INFO or DEBUG)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)  # Remove any child-specific handlers
+                logger.addHandler(new_handler)  # Share the tee'd handler
+                logger.propagate = True  # Ensure propagation to root
+
     # If proposal_content is not provided, look it up from the database
     proposal_content = args.proposal_data
     if not proposal_content:
