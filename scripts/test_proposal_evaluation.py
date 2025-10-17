@@ -14,6 +14,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 from datetime import datetime
@@ -22,6 +23,7 @@ from uuid import UUID
 # Add the parent directory (root) to the path to import from app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
@@ -109,6 +111,30 @@ Examples:
         log_f = open(log_filename, "w")
         sys.stdout = Tee(original_stdout, log_f)
         sys.stderr = Tee(original_stderr, log_f)
+
+        # Update root logger: Remove old handlers, add new one using the tee'd stderr
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:  # Copy to avoid modification issues
+            root_logger.removeHandler(handler)
+
+        new_handler = logging.StreamHandler(sys.stderr)  # Now points to Tee
+        new_handler.setFormatter(StructuredFormatter())
+        new_handler.setLevel(logging.DEBUG if args.debug_level >= 2 else logging.INFO)
+        root_logger.addHandler(new_handler)
+        root_logger.setLevel(new_handler.level)  # Sync level
+
+        # Optionally re-run setup_uvicorn_logging() to patch any framework loggers
+        setup_uvicorn_logging()
+
+        # Enforce level on all existing loggers to prevent propagation leaks
+        for logger_name, logger in logging.Logger.manager.loggerDict.items():
+            if isinstance(logger, logging.Logger):
+                logger.setLevel(
+                    root_logger.level
+                )  # Sync to root's level (INFO or DEBUG)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)  # Remove any child-specific handlers
+                logger.propagate = True  # Ensure propagation to root
 
     # If proposal_content is not provided, look it up from the database
     proposal_content = args.proposal_data
