@@ -537,14 +537,14 @@ class TwitterDataService:
     async def _store_user_if_needed(
         self, tweet_data: Dict[str, Any], profile_data: Optional[Dict[str, Any]] = None
     ) -> Optional[UUID]:
-        """Store user data if not already exists.
+        """Store user data if not already exists, or update existing user with fresh profile data.
 
         Args:
             tweet_data: Tweet data containing user information
             profile_data: Optional profile data from fetch_user_profile
 
         Returns:
-            User ID if stored/found, None otherwise
+            User ID if stored/found/updated, None otherwise
         """
         try:
             author_username = tweet_data.get("author_username")
@@ -557,24 +557,26 @@ class TwitterDataService:
             if existing_users:
                 existing_user = existing_users[0]
 
-                # Update existing user with profile data if provided and missing
+                # Always update existing user with fresh profile data if available
                 if profile_data and not profile_data.get("error"):
-                    needs_update = False
                     update_data = {}
 
-                    # Check if profile_image_url needs updating
+                    # Update all available profile fields with fresh data
+                    for field in [
+                        "profile_image_url",
+                        "description",
+                        "location",
+                        "url",
+                        "verified",
+                        "verified_type",
+                    ]:
+                        if profile_data.get(field) is not None:
+                            update_data[field] = profile_data[field]
+
+                    # Always analyze bitcoin face if we have a profile image and no existing score
                     if (
                         profile_data.get("profile_image_url")
-                        and not existing_user.profile_image_url
-                    ):
-                        update_data["profile_image_url"] = profile_data[
-                            "profile_image_url"
-                        ]
-                        needs_update = True
-
-                    # Check if bitcoin_face_score needs analyzing
-                    if existing_user.bitcoin_face_score is None and profile_data.get(
-                        "profile_image_url"
+                        and existing_user.bitcoin_face_score is None
                     ):
                         try:
                             pfp_analysis = analyze_bitcoin_face(
@@ -586,33 +588,37 @@ class TwitterDataService:
                                     update_data["bitcoin_face_score"] = (
                                         bitcoin_face_score
                                     )
-                                    needs_update = True
+                                    logger.info(
+                                        f"Analyzed profile image for existing user {author_username}, bitcoin_face_score: {bitcoin_face_score}"
+                                    )
                         except Exception as e:
                             logger.warning(
                                 f"Error analyzing profile image for existing user {author_username}: {str(e)}"
                             )
 
-                    # Check other fields that might need updating
-                    for field in [
-                        "description",
-                        "location",
-                        "url",
-                        "verified",
-                        "verified_type",
-                    ]:
-                        if (
-                            profile_data.get(field) is not None
-                            and getattr(existing_user, field, None) is None
-                        ):
-                            update_data[field] = profile_data[field]
-                            needs_update = True
+                    # Perform the update if we have data to update
+                    if update_data:
+                        from app.backend.models import XUserBase
 
-                    if needs_update:
-                        # Note: This would require an update method in the backend
-                        # For now, just log that an update would be beneficial
-                        logger.info(
-                            f"User {author_username} exists but could be updated with profile data: {list(update_data.keys())}"
+                        update_payload = XUserBase(**update_data)
+                        updated_user = backend.update_x_user(
+                            existing_user.id, update_payload
                         )
+
+                        if updated_user:
+                            logger.info(
+                                f"Updated user {author_username} with fresh profile data: {list(update_data.keys())}"
+                            )
+                        else:
+                            logger.warning(f"Failed to update user {author_username}")
+                    else:
+                        logger.debug(
+                            f"No profile data to update for user {author_username}"
+                        )
+                else:
+                    logger.debug(
+                        f"No fresh profile data available for user {author_username}"
+                    )
 
                 logger.debug(f"User {author_username} already exists in database")
                 return existing_user.id

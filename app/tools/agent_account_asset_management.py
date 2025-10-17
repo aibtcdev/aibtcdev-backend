@@ -266,6 +266,7 @@ class AgentAccountIsApprovedContractTool(BaseTool):
             "is-approved-contract.ts",
             agent_account_contract,
             contract_principal,
+            "VOTING",
         )
 
     def _run(
