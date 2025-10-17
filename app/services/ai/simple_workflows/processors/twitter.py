@@ -64,6 +64,7 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
             "tweet_images_analysis": tweet.tweet_images_analysis or [],
+            "quoted_tweet_db_id": tweet.quoted_tweet_db_id,  # Include quoted tweet reference
             **author_info,  # Include author information
         }
 
@@ -129,7 +130,7 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
                 # Fetch the quoted tweet data
                 quoted_tweet = backend.get_x_tweet(quoted_tweet_db_id)
                 if quoted_tweet:
-                    # Get quoted tweet author info
+                    # Get quoted tweet author info with enhanced profile data
                     quoted_author_info = {}
                     if quoted_tweet.author_id:
                         quoted_author = backend.get_x_user(quoted_tweet.author_id)
@@ -142,6 +143,32 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
                                 "verified_type": quoted_author.verified_type,
                                 "bitcoin_face_score": quoted_author.bitcoin_face_score,
                             }
+
+                            # Try to get additional profile data by username match
+                            if quoted_author.username:
+                                try:
+                                    logger.debug(
+                                        f"Looking up profile for quoted author username: {quoted_author.username}"
+                                    )
+                                    quoted_profiles = backend.list_profiles_by_username(
+                                        quoted_author.username
+                                    )
+                                    if quoted_profiles:
+                                        quoted_profile = quoted_profiles[0]
+                                        # Override verified with platform verification
+                                        quoted_author_info.update(
+                                            {
+                                                "verified": quoted_profile.is_verified,  # Use platform verification
+                                                "verified_type": quoted_author.verified_type,  # Keep Twitter verification type
+                                            }
+                                        )
+                                        logger.debug(
+                                            f"Retrieved quoted author profile info for {quoted_author.username}, platform_verified: {quoted_profile.is_verified}"
+                                        )
+                                except Exception as e:
+                                    logger.debug(
+                                        f"Could not fetch profile data for quoted author {quoted_author.username}: {str(e)}"
+                                    )
 
                     # Format quoted tweet creation date
                     quoted_created_str = ""

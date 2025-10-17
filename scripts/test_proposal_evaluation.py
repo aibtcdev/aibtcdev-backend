@@ -217,6 +217,28 @@ Examples:
         if result.images_processed > 0:
             print(f"   • Images Processed: {result.images_processed}")
 
+        # Show Twitter data if available
+        if hasattr(result, "twitter_data") and result.twitter_data:
+            print("   • Twitter Data Processed:")
+            for i, tweet_data in enumerate(result.twitter_data, 1):
+                print(f"     Tweet {i}:")
+                print(
+                    f"       - Author: {tweet_data.get('author_name', 'Unknown')} (@{tweet_data.get('author_username', 'unknown')})"
+                )
+                print(f"       - Verified: {tweet_data.get('author_verified', False)}")
+                print(
+                    f"       - Verified Type: {tweet_data.get('author_verified_type', 'None')}"
+                )
+                print(
+                    f"       - Platform Verified: {tweet_data.get('author_is_verified', False)}"
+                )
+                print(
+                    f"       - User Type: {tweet_data.get('author_profile_user_type', 'None')}"
+                )
+                print(
+                    f"       - Bitcoin Face Score: {tweet_data.get('author_bitcoin_face_score', 'None')}"
+                )
+
         print("\n📄 Full Result JSON:")
         # Convert result to dictionary for JSON serialization
         result_dict = {
@@ -236,6 +258,7 @@ Examples:
             "flags": result.flags or [],
             "token_usage": result.token_usage or {},
             "images_processed": result.images_processed,
+            "twitter_data": getattr(result, "twitter_data", None),
         }
         print(json.dumps(result_dict, indent=2, default=str))
 

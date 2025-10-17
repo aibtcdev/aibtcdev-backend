@@ -433,6 +433,7 @@ async def evaluate_proposal(
 
     # Fetch tweet content from the proposal's linked tweet if available
     linked_tweet_images = []
+    twitter_data_collected = []  # Collect Twitter data for result
     if proposal_id and not tweet_content:
         try:
             logger.debug(
@@ -446,6 +447,9 @@ async def evaluate_proposal(
                 # Use twitter processor to fetch and format tweet content
                 tweet_data = await fetch_tweet(proposal.tweet_id)
                 if tweet_data:
+                    # Collect Twitter data for result
+                    twitter_data_collected.append(tweet_data)
+
                     # Format tweet content using twitter processor
                     tweet_content = format_tweet(tweet_data)
                     logger.debug(
@@ -656,6 +660,7 @@ Recent Community Sentiment: Positive
             summary=result.summary,
             token_usage={},  # Token usage tracking would need to be implemented
             images_processed=len(all_proposal_images),
+            twitter_data=twitter_data_collected if twitter_data_collected else None,
         )
     except Exception as e:
         logger.error(
@@ -678,4 +683,5 @@ Recent Community Sentiment: Positive
             summary="Evaluation failed due to error",
             token_usage={},
             images_processed=total_images,
+            twitter_data=twitter_data_collected if twitter_data_collected else None,
         )
