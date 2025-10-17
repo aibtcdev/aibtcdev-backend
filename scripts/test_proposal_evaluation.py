@@ -106,7 +106,7 @@ Examples:
         log_filename = f"proposal_evaluation_full_{timestamp}.txt"
         original_stdout = sys.stdout
         original_stderr = sys.stderr
-        log_f = open(log_filename, 'w')
+        log_f = open(log_filename, "w")
         sys.stdout = Tee(original_stdout, log_f)
         sys.stderr = Tee(original_stderr, log_f)
 
@@ -272,7 +272,7 @@ Examples:
         print(json.dumps(result_dict, indent=2, default=str))
 
         if args.save_output:
-            with open(json_filename, 'w') as f:
+            with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
             print(f"✅ Results saved to {json_filename}")
             print(f"✅ Full output captured in {log_filename}")
