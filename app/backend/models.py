@@ -566,6 +566,12 @@ class XTweetBase(CustomBaseModel):
     quoted_tweet_db_id: Optional[UUID] = (
         None  # Our database ID of the quoted tweet record
     )
+    # Reply tweet linking fields
+    in_reply_to_user_id: Optional[str] = None  # Twitter user ID being replied to
+    replied_to_tweet_id: Optional[str] = None  # Twitter ID of the parent tweet
+    replied_to_tweet_db_id: Optional[UUID] = (
+        None  # Our database ID of the parent tweet record
+    )
 
 
 class XTweetCreate(XTweetBase):
