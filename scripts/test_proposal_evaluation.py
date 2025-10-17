@@ -26,6 +26,20 @@ from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
 
 
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
 async def main():
     parser = argparse.ArgumentParser(
         description="Test comprehensive proposal evaluation workflow",
@@ -83,7 +97,21 @@ Examples:
         help="Path to output file (JSON format)",
     )
 
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default=None,
+        help="Path to log file to capture all console output (plaintext)",
+    )
+
     args = parser.parse_args()
+
+    if args.log_file:
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        log_f = open(args.log_file, 'w')
+        sys.stdout = Tee(original_stdout, log_f)
+        sys.stderr = Tee(original_stderr, log_f)
 
     # If proposal_content is not provided, look it up from the database
     proposal_content = args.proposal_data
