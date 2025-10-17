@@ -96,7 +96,7 @@ Scoring anchors:
 
 Scoring anchors:
 - 90-100: Exceptional past work (major projects, significant impact, industry recognition). Insightful statement showing deep understanding. Unique valuable perspective.
-- 80-89: Strong past work with clear value. Good insights. Above-average contribution.
+- 80-89: Strong past work with clear value. Good insights. Above-average contribution (e.g., novel meme metaphor = 80-85 if distinct from past).
 - 75-79: Meets basic requirements, nothing more. This is the MAXIMUM for "just adequate" proposals.
 - Below 75: Fails to exceed basics. → Likely REJECT
 
@@ -112,7 +112,7 @@ Scoring anchors:
 
 Scoring anchors:
 - 90-100: Completely unique approach. Novel perspective. First of its kind in past proposals.
-- 80-89: Mostly original with some fresh elements.
+- 80-89: Mostly original with some fresh elements (e.g., novel meme metaphor = 80-85 if distinct from past).
 - 75-79: Somewhat original but follows common patterns.
 - Below 75: Template-like, formulaic, or derivative. → Contributes to REJECT
 
