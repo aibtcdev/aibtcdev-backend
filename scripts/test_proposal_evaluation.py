@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime
 from uuid import UUID
 
 # Add the parent directory (root) to the path to import from app
@@ -24,6 +25,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
+
+
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 async def main():
@@ -76,7 +91,24 @@ Examples:
         help="Debug level: 0=normal, 1=verbose, 2=very verbose (default: 0)",
     )
 
+    parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save output to timestamped JSON and TXT files",
+    )
+
     args = parser.parse_args()
+
+    if args.save_output:
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        json_filename = f"proposal_evaluation_output_{timestamp}.json"
+        log_filename = f"proposal_evaluation_full_{timestamp}.txt"
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        log_f = open(log_filename, "w")
+        sys.stdout = Tee(original_stdout, log_f)
+        sys.stderr = Tee(original_stderr, log_f)
 
     # If proposal_content is not provided, look it up from the database
     proposal_content = args.proposal_data
@@ -238,6 +270,12 @@ Examples:
             "images_processed": result.images_processed,
         }
         print(json.dumps(result_dict, indent=2, default=str))
+
+        if args.save_output:
+            with open(json_filename, "w") as f:
+                json.dump(result_dict, f, indent=2, default=str)
+            print(f"✅ Results saved to {json_filename}")
+            print(f"✅ Full output captured in {log_filename}")
 
     except Exception as e:
         print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
