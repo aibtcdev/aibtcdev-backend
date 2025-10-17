@@ -317,12 +317,15 @@ PROPOSAL:
 {proposal_content}
 
 PROTOCOL MISSION:  
-Recruit productive citizens to execute Orders and accelerate technocapital for human prosperity.
+{dao_mission}
 
 PROTOCOL VALUES:  
 - Technocapitalism leads to abundance.  
 - Deceleration leads to impoverishment.  
 - It is morally sound to accelerate technocapital.
+
+COMMUNITY INFO:
+{community_info}
 
 PAST PROPOSALS:  
 {past_proposals}
