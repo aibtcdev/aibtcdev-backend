@@ -132,7 +132,6 @@ Examples:
                 logger.setLevel(root_logger.level)  # Sync to root's level (INFO or DEBUG)
                 for handler in logger.handlers[:]:
                     logger.removeHandler(handler)  # Remove any child-specific handlers
-                logger.addHandler(new_handler)  # Share the tee'd handler
                 logger.propagate = True  # Ensure propagation to root
 
     # If proposal_content is not provided, look it up from the database
