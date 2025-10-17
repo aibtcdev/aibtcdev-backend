@@ -383,8 +383,11 @@ class TwitterDataService:
                 tweet_data["replied_posts"] = replied_posts
 
                 # Extract in_reply_to_user_id
-                tweet_data["in_reply_to_user_id"] = getattr(
-                    tweet, "in_reply_to_user_id", None
+                in_reply_to_user_id = getattr(tweet, "in_reply_to_user_id", None)
+                tweet_data["in_reply_to_user_id"] = (
+                    str(in_reply_to_user_id)
+                    if in_reply_to_user_id is not None
+                    else None
                 )
 
                 logger.info(f"Successfully fetched tweet {tweet_id} using API v2")
@@ -873,9 +876,12 @@ class TwitterDataService:
                                 entities=parent_tweet_data.get("entities"),
                                 attachments=parent_tweet_data.get("attachments"),
                                 tweet_images_analysis=[],
-                                in_reply_to_user_id=parent_tweet_data.get(
-                                    "in_reply_to_user_id"
-                                ),
+                                in_reply_to_user_id=str(
+                                    parent_tweet_data.get("in_reply_to_user_id")
+                                )
+                                if parent_tweet_data.get("in_reply_to_user_id")
+                                is not None
+                                else None,
                                 # Don't recursively store parent's parent
                             )
 
@@ -922,7 +928,9 @@ class TwitterDataService:
                 quoted_tweet_id=str(quoted_posts[0]["id"]) if quoted_posts else None,
                 quoted_tweet_db_id=quoted_tweet_db_id,
                 # Link to replied-to tweet
-                in_reply_to_user_id=tweet_data.get("in_reply_to_user_id"),
+                in_reply_to_user_id=str(tweet_data.get("in_reply_to_user_id"))
+                if tweet_data.get("in_reply_to_user_id") is not None
+                else None,
                 replied_to_tweet_id=str(replied_posts[0]["id"])
                 if replied_posts
                 else None,
