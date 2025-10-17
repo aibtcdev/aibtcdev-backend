@@ -116,20 +116,22 @@ Examples:
         root_logger = logging.getLogger()
         for handler in root_logger.handlers[:]:  # Copy to avoid modification issues
             root_logger.removeHandler(handler)
-        
+
         new_handler = logging.StreamHandler(sys.stderr)  # Now points to Tee
         new_handler.setFormatter(StructuredFormatter())
         new_handler.setLevel(logging.DEBUG if args.debug_level >= 2 else logging.INFO)
         root_logger.addHandler(new_handler)
         root_logger.setLevel(new_handler.level)  # Sync level
-        
+
         # Optionally re-run setup_uvicorn_logging() to patch any framework loggers
         setup_uvicorn_logging()
 
         # Enforce level on all existing loggers to prevent propagation leaks
         for logger_name, logger in logging.Logger.manager.loggerDict.items():
             if isinstance(logger, logging.Logger):
-                logger.setLevel(root_logger.level)  # Sync to root's level (INFO or DEBUG)
+                logger.setLevel(
+                    root_logger.level
+                )  # Sync to root's level (INFO or DEBUG)
                 for handler in logger.handlers[:]:
                     logger.removeHandler(handler)  # Remove any child-specific handlers
                 logger.propagate = True  # Ensure propagation to root
