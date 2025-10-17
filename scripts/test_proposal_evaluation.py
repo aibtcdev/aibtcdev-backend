@@ -14,16 +14,33 @@ Usage:
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
+from datetime import datetime
 from uuid import UUID
 
 # Add the parent directory (root) to the path to import from app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
+
+
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 async def main():
@@ -76,7 +93,48 @@ Examples:
         help="Debug level: 0=normal, 1=verbose, 2=very verbose (default: 0)",
     )
 
+    parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save output to timestamped JSON and TXT files",
+    )
+
     args = parser.parse_args()
+
+    if args.save_output:
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        json_filename = f"proposal_evaluation_output_{timestamp}.json"
+        log_filename = f"proposal_evaluation_full_{timestamp}.txt"
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        log_f = open(log_filename, "w")
+        sys.stdout = Tee(original_stdout, log_f)
+        sys.stderr = Tee(original_stderr, log_f)
+
+        # Update root logger: Remove old handlers, add new one using the tee'd stderr
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:  # Copy to avoid modification issues
+            root_logger.removeHandler(handler)
+
+        new_handler = logging.StreamHandler(sys.stderr)  # Now points to Tee
+        new_handler.setFormatter(StructuredFormatter())
+        new_handler.setLevel(logging.DEBUG if args.debug_level >= 2 else logging.INFO)
+        root_logger.addHandler(new_handler)
+        root_logger.setLevel(new_handler.level)  # Sync level
+
+        # Optionally re-run setup_uvicorn_logging() to patch any framework loggers
+        setup_uvicorn_logging()
+
+        # Enforce level on all existing loggers to prevent propagation leaks
+        for logger_name, logger in logging.Logger.manager.loggerDict.items():
+            if isinstance(logger, logging.Logger):
+                logger.setLevel(
+                    root_logger.level
+                )  # Sync to root's level (INFO or DEBUG)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)  # Remove any child-specific handlers
+                logger.propagate = True  # Ensure propagation to root
 
     # If proposal_content is not provided, look it up from the database
     proposal_content = args.proposal_data
@@ -238,6 +296,12 @@ Examples:
             "images_processed": result.images_processed,
         }
         print(json.dumps(result_dict, indent=2, default=str))
+
+        if args.save_output:
+            with open(json_filename, "w") as f:
+                json.dump(result_dict, f, indent=2, default=str)
+            print(f"✅ Results saved to {json_filename}")
+            print(f"✅ Full output captured in {log_filename}")
 
     except Exception as e:
         print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
