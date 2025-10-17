@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime
 from uuid import UUID
 
 # Add the parent directory (root) to the path to import from app
@@ -91,25 +92,21 @@ Examples:
     )
 
     parser.add_argument(
-        "--output-file",
-        type=str,
-        default=None,
-        help="Path to output file (JSON format)",
-    )
-
-    parser.add_argument(
-        "--log-file",
-        type=str,
-        default=None,
-        help="Path to log file to capture all console output (plaintext)",
+        "--save-output",
+        action="store_true",
+        help="Save output to timestamped JSON and TXT files",
     )
 
     args = parser.parse_args()
 
-    if args.log_file:
+    if args.save_output:
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        json_filename = f"proposal_evaluation_output_{timestamp}.json"
+        log_filename = f"proposal_evaluation_full_{timestamp}.txt"
         original_stdout = sys.stdout
         original_stderr = sys.stderr
-        log_f = open(args.log_file, 'w')
+        log_f = open(log_filename, 'w')
         sys.stdout = Tee(original_stdout, log_f)
         sys.stderr = Tee(original_stderr, log_f)
 
@@ -274,10 +271,11 @@ Examples:
         }
         print(json.dumps(result_dict, indent=2, default=str))
 
-        if args.output_file:
-            with open(args.output_file, 'w') as f:
+        if args.save_output:
+            with open(json_filename, 'w') as f:
                 json.dump(result_dict, f, indent=2, default=str)
-            print(f"✅ Results saved to {args.output_file}")
+            print(f"✅ Results saved to {json_filename}")
+            print(f"✅ Full output captured in {log_filename}")
 
     except Exception as e:
         print(f"\n❌ Error during comprehensive evaluation: {str(e)}")
