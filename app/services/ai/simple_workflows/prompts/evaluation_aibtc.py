@@ -38,23 +38,14 @@ G2: Canonical Post Verification
 - MUST be a post that quote-tweets OR replies to official @aibtcdev Current Order post
 - REJECT if: wrong post type, or unverifiable relationship to @aibtcdev
 
-G3: Originality Check
-- Compare proposal content against past_proposals for similarity
-- Check for: 
-  - Duplicate text (>70% similarity to any past proposal; limit to last 50 past_proposals)
-  - Reused URLs (same work links as previous submissions)
-  - Template patterns (formulaic structure matching multiple past proposals)
-  - Recycled statements (copy-pasted technocapitalism statements)
-- REJECT if: Substantial overlap detected, obvious copy-paste, or template abuse
-
-G4: Safety & Compliance
+G3: Safety & Compliance
 Zero tolerance policy. REJECT if ANY detected:
 - Plagiarism or uncredited content (claiming others' work)
 - Doxxing or unauthorized personal information about others
 - Illegal content or activities (scams, fraud, illegal services)
 - Spam indicators: repetitive text, excessive links (>5), promotional content, low-effort submissions, mass-produced content
 
-G5: Completed Work Requirement
+G4: Completed Work Requirement
 - Referenced work should be finished and publicly accessible NOW where possible
 - ALLOW: Concise future plans if past work is thin, with a first task deliverable
 - REJECT if proposal contains ONLY:
@@ -83,7 +74,7 @@ SCORING PHILOSOPHY:
 
 Scoring Criteria (0-100 scale):
 
-1. Current Order Alignment (20%) — Does this DIRECTLY advance the Talent Ledger with a valid, unique, high-quality entry?
+1. Current Order Alignment (20%) — Does this DIRECTLY advance the Current Order with a valid, unique, high-quality entry?
 
 Scoring anchors:
 - 90-100: Exceptional entry that sets new standard. Outstanding past work (e.g., major open source project, significant publications, proven track record). Unique perspective. Would be showcase example.
@@ -150,7 +141,7 @@ Scoring anchors:
 - Below 75: Poor example. Might attract low-quality submissions. → Contributes to REJECT
 
 CRITICAL SCORING RULES:
-- If you cannot cite SPECIFIC evidence from the proposal, score MUST be ≤75
+- If you cannot cite SPECIFIC evidence from the proposal, score MUST be <=75
 - Generic or vague reasoning = lower the score appropriately
 - When uncertain about a score, round to fair value
 - Borderline scores should trend toward approval if qualified
@@ -332,11 +323,6 @@ PROTOCOL VALUES:
 - Technocapitalism leads to abundance.  
 - Deceleration leads to impoverishment.  
 - It is morally sound to accelerate technocapital.
-
-CURRENT ORDER:  
-Build the AIBTC Talent Ledger: A public, onchain census of people contributing to technocapital acceleration.  
-
-Add yourself to the AIBTC Talent Ledger by quote posting the latest Current Order post from @aibtcdev (or equivalent platform) with your location, a link to past work (or referral/bond), and a short statement on how you'll accelerate technocapitalism.
 
 PAST PROPOSALS:  
 {past_proposals}
