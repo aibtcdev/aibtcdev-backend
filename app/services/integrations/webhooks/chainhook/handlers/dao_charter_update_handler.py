@@ -29,6 +29,9 @@ class DAOCharterUpdateHandler(ChainhookEventHandler):
         if not hasattr(tx_metadata, "kind") or tx_metadata.kind.type != "ContractCall":
             return False
 
+        if not tx_metadata.success:
+            return False
+
         contract_data = tx_metadata.kind.data
         method = getattr(contract_data, "method", "")
         contract_id = getattr(contract_data, "contract_identifier", "")
@@ -38,6 +41,11 @@ class DAOCharterUpdateHandler(ChainhookEventHandler):
     async def handle_transaction(self, transaction: TransactionWithReceipt) -> None:
         """Handle the charter update transaction."""
         tx_data = self.extract_transaction_data(transaction)
+
+        if not tx_data["tx_metadata"].success:
+            self.logger.warning("Transaction failed, skipping charter update")
+            return
+
         # Find the print event (smart_contract_log)
         print_events = [
             event for event in tx_data["tx_metadata"].receipt.events
