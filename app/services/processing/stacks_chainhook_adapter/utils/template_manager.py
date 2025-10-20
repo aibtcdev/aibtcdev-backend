@@ -121,6 +121,7 @@ class ChainhookTemplateManager:
             "coinbase": "coinbase",  # Use coinbase template for tenure change + coinbase blocks
             "multi-vote-on-action-proposal": "vote-on-action-proposal",  # Use single vote template
             "governance-and-airdrop-multi-tx": "send-many-governance-airdrop",  # Use airdrop template
+            "set-dao-charter": "conclude-action-proposal",  # Use conclude template as fallback for charter updates
         }
 
         template_name = type_mapping.get(transaction_type)

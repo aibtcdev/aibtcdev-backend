@@ -318,6 +318,7 @@ class DAOBase(CustomBaseModel):
     description: Optional[str] = None
     is_deployed: Optional[bool] = False
     is_broadcasted: Optional[bool] = False
+    charter: Optional[str] = None  # New field for storing DAO charter text
 
 
 class DAOCreate(DAOBase):
