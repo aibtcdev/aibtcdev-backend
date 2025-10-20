@@ -189,6 +189,24 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
         "=" * 60,
     ])
 
+    # Collect successful results for examples
+    successful_results = [r for r in results if "error" not in r]
+    sorted_results = sorted(successful_results, key=lambda x: x.get("final_score", 0), reverse=True)
+
+    # Good examples: top 3 highest scores
+    good_examples = sorted_results[:3]
+    summary_lines.append("Good Examples (Top Scores):")
+    for ex in good_examples:
+        summary_lines.append(f"  Proposal {ex['proposal_id']}: Score {ex['final_score']} - {ex['summary'][:100]}...")
+    summary_lines.append("")
+
+    # Bad examples: bottom 3 lowest scores
+    bad_examples = sorted_results[-3:] if len(sorted_results) >= 3 else sorted_results[::-1][:3]
+    summary_lines.append("Bad Examples (Low Scores):")
+    for ex in bad_examples:
+        summary_lines.append(f"  Proposal {ex['proposal_id']}: Score {ex['final_score']} - {ex['summary'][:100]}...")
+    summary_lines.append("=" * 60)
+
     for idx, result in enumerate(results, 1):
         if "error" in result:
             summary_lines.append(f"Proposal {idx} ({result['proposal_id']}): ERROR - {result['error']}")
@@ -214,8 +232,38 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
         with open(summary_txt, "w") as f:
             f.write(summary_text)
         summary_json = f"{timestamp}_summary.json"
+
+        # Prepare JSON with good/bad examples
+        json_data = {
+            "timestamp": timestamp,
+            "overall_stats": {
+                "total_proposals": total_proposals,
+                "passed": passed,
+                "failed": failed,
+                "avg_score": avg_score,
+            },
+            "good_examples": [
+                {
+                    "proposal_id": ex["proposal_id"],
+                    "score": ex["final_score"],
+                    "summary": ex["summary"],
+                    "explanation": ex["explanation"],
+                }
+                for ex in good_examples
+            ],
+            "bad_examples": [
+                {
+                    "proposal_id": ex["proposal_id"],
+                    "score": ex["final_score"],
+                    "summary": ex["summary"],
+                    "explanation": ex["explanation"],
+                }
+                for ex in bad_examples
+            ],
+            "results": results,
+        }
         with open(summary_json, "w") as f:
-            json.dump({"timestamp": timestamp, "results": results}, f, indent=2, default=str)
+            json.dump(json_data, f, indent=2, default=str)
         print(f"✅ Summary saved to {summary_txt} and {summary_json}")
 
     return summary_text
