@@ -189,40 +189,18 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
         "=" * 60,
     ])
 
-    # Collect successful results for examples
-    successful_results = [r for r in results if "error" not in r]
-    sorted_results = sorted(successful_results, key=lambda x: x.get("final_score", 0), reverse=True)
-
-    # Good examples: top 3 highest scores
-    good_examples = sorted_results[:3]
-    summary_lines.append("Good Examples (Top Scores):")
-    for ex in good_examples:
-        summary_lines.append(f"  Proposal {ex['proposal_id']}: Score {ex['final_score']} - {ex['summary'][:100]}...")
-    summary_lines.append("")
-
-    # Bad examples: bottom 3 lowest scores
-    bad_examples = sorted_results[-3:] if len(sorted_results) >= 3 else sorted_results[::-1][:3]
-    summary_lines.append("Bad Examples (Low Scores):")
-    for ex in bad_examples:
-        summary_lines.append(f"  Proposal {ex['proposal_id']}: Score {ex['final_score']} - {ex['summary'][:100]}...")
-    summary_lines.append("=" * 60)
-
-    for idx, result in enumerate(results, 1):
+    summary_lines.append("Compact Scores Overview:")
+    summary_lines.append("Proposal ID | Score | Decision | Truncated Explanation")
+    summary_lines.append("-" * 60)
+    for result in results:
         if "error" in result:
-            summary_lines.append(f"Proposal {idx} ({result['proposal_id']}): ERROR - {result['error']}")
+            summary_lines.append(f"{result['proposal_id'][:8]}... | ERROR | N/A | {result['error'][:50]}...")
         else:
-            summary_lines.append(f"Proposal {idx} ({result['proposal_id']}):")
-            summary_lines.append(f"  Decision: {'APPROVE' if result['decision'] else 'REJECT'}")
-            summary_lines.append(f"  Final Score: {result['final_score']}")
-            summary_lines.append("  Categories:")
-            for cat in result["categories"]:
-                summary_lines.append(f"    - {cat['category']}: {cat['score']} (Weight: {cat['weight']:.1%})")
-                if cat["reasoning"]:
-                    summary_lines.append(f"      Reasoning: {'; '.join(cat['reasoning'][:2])}...")
-            summary_lines.append(f"  Explanation: {result['explanation'][:200]}..." if result['explanation'] else "  Explanation: N/A")
-            summary_lines.append(f"  Flags: {', '.join(result['flags'][:5])}" if result['flags'] else "  Flags: None")
-            summary_lines.append(f"  Token Usage: {result['token_usage'].get('total_tokens', 0):,}")
-        summary_lines.append("-" * 60)
+            decision = 'APPROVE' if result['decision'] else 'REJECT'
+            expl = result['explanation'][:50] + '...' if result['explanation'] else 'N/A'
+            summary_lines.append(f"{result['proposal_id'][:8]}... | {result['final_score']:.2f} | {decision} | {expl}")
+    summary_lines.append("=" * 60)
+    summary_lines.append("For full reasoning and categories, see per-proposal JSON files or summary JSON.")
 
     summary_text = "\n".join(summary_lines)
     print(summary_text)
@@ -233,7 +211,6 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
             f.write(summary_text)
         summary_json = f"{timestamp}_summary.json"
 
-        # Prepare JSON with good/bad examples
         json_data = {
             "timestamp": timestamp,
             "overall_stats": {
@@ -242,25 +219,17 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
                 "failed": failed,
                 "avg_score": avg_score,
             },
-            "good_examples": [
+            "compact_scores": [
                 {
-                    "proposal_id": ex["proposal_id"],
-                    "score": ex["final_score"],
-                    "summary": ex["summary"],
-                    "explanation": ex["explanation"],
+                    "proposal_id": r["proposal_id"],
+                    "final_score": r.get("final_score"),
+                    "decision": r.get("decision"),
+                    "explanation": r.get("explanation"),
+                    "error": r.get("error")
                 }
-                for ex in good_examples
+                for r in results
             ],
-            "bad_examples": [
-                {
-                    "proposal_id": ex["proposal_id"],
-                    "score": ex["final_score"],
-                    "summary": ex["summary"],
-                    "explanation": ex["explanation"],
-                }
-                for ex in bad_examples
-            ],
-            "results": results,
+            "full_results": results,
         }
         with open(summary_json, "w") as f:
             json.dump(json_data, f, indent=2, default=str)
