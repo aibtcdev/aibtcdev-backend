@@ -27,6 +27,7 @@ from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation import evaluate_proposal
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.backend.factory import get_backend
+from app.backend.models import ProposalFilter
 
 
 class Tee(object):
@@ -106,6 +107,18 @@ async def evaluate_single_proposal(
             effective_dao_id = dao_id or str(proposal.dao_id) if proposal.dao_id else None
             dao_uuid = UUID(effective_dao_id) if effective_dao_id else None
 
+            # Determine proposal number
+            proposal_number = index  # Default to run index
+            if dao_uuid:
+                proposals = backend.list_proposals(filters=ProposalFilter(dao_id=dao_uuid))
+                if proposals:
+                    # Sort by created_at assuming it exists
+                    sorted_proposals = sorted(proposals, key=lambda p: p.created_at)
+                    for num, prop in enumerate(sorted_proposals, 1):
+                        if prop.id == proposal_uuid:
+                            proposal_number = num
+                            break
+
             # Determine prompt type
             prompt_type = "evaluation"
             if dao_uuid:
@@ -131,6 +144,7 @@ async def evaluate_single_proposal(
             # Convert to dict
             result_dict = {
                 "proposal_id": proposal_id,
+                "proposal_number": proposal_number,
                 "decision": result.decision,
                 "final_score": result.final_score,
                 "explanation": result.explanation,
@@ -193,12 +207,13 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
     summary_lines.append("Proposal Num | Score | Decision | Explanation")
     summary_lines.append("-" * 60)
     for idx, result in enumerate(results, 1):
+        prop_num = result.get("proposal_number", idx)
         if "error" in result:
-            summary_lines.append(f"Prop {idx} | ERROR | N/A | {result['error']}")
+            summary_lines.append(f"Prop {prop_num} | ERROR | N/A | {result['error']}")
         else:
             decision = 'APPROVE' if result['decision'] else 'REJECT'
             expl = result['explanation'] if result['explanation'] else 'N/A'
-            summary_lines.append(f"Prop {idx} | {result['final_score']:.2f} | {decision} | {expl}")
+            summary_lines.append(f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl}")
     summary_lines.append("=" * 60)
     summary_lines.append("For full reasoning and categories, see per-proposal JSON files or summary JSON.")
 
@@ -222,6 +237,7 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
             "compact_scores": [
                 {
                     "proposal_id": r["proposal_id"],
+                    "proposal_number": r.get("proposal_number"),
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
