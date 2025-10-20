@@ -190,15 +190,15 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
     ])
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append("Proposal ID | Score | Decision | Truncated Explanation")
+    summary_lines.append("Proposal Num | Score | Decision | Explanation")
     summary_lines.append("-" * 60)
-    for result in results:
+    for idx, result in enumerate(results, 1):
         if "error" in result:
-            summary_lines.append(f"{result['proposal_id'][:8]}... | ERROR | N/A | {result['error'][:50]}...")
+            summary_lines.append(f"Prop {idx} | ERROR | N/A | {result['error']}")
         else:
             decision = 'APPROVE' if result['decision'] else 'REJECT'
-            expl = result['explanation'][:50] + '...' if result['explanation'] else 'N/A'
-            summary_lines.append(f"{result['proposal_id'][:8]}... | {result['final_score']:.2f} | {decision} | {expl}")
+            expl = result['explanation'] if result['explanation'] else 'N/A'
+            summary_lines.append(f"Prop {idx} | {result['final_score']:.2f} | {decision} | {expl}")
     summary_lines.append("=" * 60)
     summary_lines.append("For full reasoning and categories, see per-proposal JSON files or summary JSON.")
 
