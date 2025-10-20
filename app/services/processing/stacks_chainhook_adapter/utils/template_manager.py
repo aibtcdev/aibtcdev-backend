@@ -83,6 +83,7 @@ class ChainhookTemplateManager:
             "send-many-stx-airdrop": "send-many-stx-airdrop.json",
             "vote-on-action-proposal": "vote-on-action-proposal.json",
             "coinbase": "coinbase-block.json",
+            "set-dao-charter": "set-dao-charter.json",
         }
 
         for template_name, filename in template_files.items():
@@ -121,16 +122,12 @@ class ChainhookTemplateManager:
             "coinbase": "coinbase",  # Use coinbase template for tenure change + coinbase blocks
             "multi-vote-on-action-proposal": "vote-on-action-proposal",  # Use single vote template
             "governance-and-airdrop-multi-tx": "send-many-governance-airdrop",  # Use airdrop template
-            "set-dao-charter": "conclude-action-proposal",  # Use conclude template as fallback for charter updates
+            "set-dao-charter": "set-dao-charter",
         }
 
         template_name = type_mapping.get(transaction_type)
         if template_name and template_name in self.templates:
             return deepcopy(self.templates[template_name])
-
-        # Fallback to a generic template (use conclude-action-proposal as base)
-        if "conclude-action-proposal" in self.templates:
-            return deepcopy(self.templates["conclude-action-proposal"])
 
         return None
 
