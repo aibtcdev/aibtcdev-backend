@@ -1,0 +1,119 @@
+{
+  "apply": [
+    {
+      "block_identifier": {
+        "hash": "0xbd3d9e5acea30fdedeea3a7ed6730c8aa774b42e0cc61700f883a8754ad46df0",
+        "index": 3608542
+      },
+      "metadata": {
+        "bitcoin_anchor_block_identifier": {
+          "hash": "0x1cd55ccc77a67c9e146a2011e59e0809f0f5f6aa2b0f48e0b2024f15a805a1dd",
+          "index": 102928
+        },
+        "block_time": 1760769017,
+        "confirm_microblock_identifier": null,
+        "cycle_number": null,
+        "pox_cycle_index": 4751,
+        "pox_cycle_length": 20,
+        "pox_cycle_position": 8,
+        "reward_set": null,
+        "signer_bitvec": "013500000027ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+        "signer_public_keys": [
+          "0x02e8620935d58ebffa23c260f6917cbd0915ea17d7a46df17e131540237d335504",
+          "0x036a44f61d85efa844b42475f107b106dc8fb209ae27813893c3269c59821e0333"
+        ],
+        "signer_signature": [
+          "00108b3efa3a9f72631f5a9e1f7de9f9995f8b00117385bcd54e931fa9875ab78d599f33c1300fe49199e3cbc854130d68fe10ec26748e92c7bc10fe8d7d3de631",
+          "0015c9a9fab6329b2c4f407c490a3c7ba02f2db8d418608e3e268482a5cf332b2e031f02dd881f3891e6ae941ad78b76cc8163cc484e8426868001cc433d1698d8"
+        ],
+        "stacks_block_hash": "0xbd3d9e5acea30fdedeea3a7ed6730c8aa774b42e0cc61700f883a8754ad46df0",
+        "tenure_height": 92146
+      },
+      "parent_block_identifier": {
+        "hash": "0x51ecee55299a282deef7351659ea37ce28b5975710f54b1c153b2f8f9595d758",
+        "index": 3608541
+      },
+      "timestamp": 1760769017,
+      "transactions": [
+        {
+          "metadata": {
+            "description": "invoked: ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aitest4-dao-charter::set-dao-charter(u\"aibtc is technocapital acceleration\")",
+            "execution_cost": {
+              "read_count": 18,
+              "read_length": 13091,
+              "runtime": 481904,
+              "write_count": 2,
+              "write_length": 203
+            },
+            "fee": 217,
+            "kind": {
+              "data": {
+                "args": [
+                  "u\"aibtc is technocapital acceleration\""
+                ],
+                "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aitest4-dao-charter",
+                "method": "set-dao-charter"
+              },
+              "type": "ContractCall"
+            },
+            "nonce": 780,
+            "position": {
+              "index": 0
+            },
+            "raw_tx": "0x80800000000400ae73c4b18e8e994c8918a4c7b7a4df8dd50fc1790000000000000212000000000000031f00016a5ab57ed3a3ea199fcc2e56cd7a86298da86243b109183be6aca465d0961f8d2fceea826875ac56d2906388efa39135833b1268ab3f745a83f0a2728aa81d66030100000000021aa372c8d8b2239bb9339c38c8f136d273b7134d821d6661636573332d616374696f6e2d70726f706f73616c2d766f74696e6718636f6e636c7564652d616374696f6e2d70726f706f73616c000000020100000000000000000000000000000021061aa372c8d8b2239bb9339c38c8f136d273b7134d821a6661636573332d616374696f6e2d73656e642d6d657373616765",
+            "receipt": {
+              "contract_calls_stack": [],
+              "events": [
+                {
+                  "data": {
+                    "contract_identifier": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aitest4-dao-charter",
+                    "topic": "print",
+                    "value": {
+                      "notification": "aitest4-dao-charter/set-dao-charter",
+                      "payload": {
+                        "burnHeight": 102928,
+                        "charter": "aibtc is technocapital acceleration",
+                        "contractCaller": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+                        "createdAt": 3608542,
+                        "dao": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aitest4-dao-charter",
+                        "previousCharter": "#  CHARTER\\n\\n## MISSION\\n\\nAccelerate technocapitalism for human prosperity.\\n\\n## VALUES\\n\\nOur network believes that:\\n\\n- Technocapitalism leads to abundance.\\n- Deceleration leads to impoverishment.\\n- It is morally sound to accelerate technocapital.\\n\\n## COLLECTIVE ACTION\\n\\nThe AIBTC network collectively works towards a Current Task; a single, measurable directive. All contributions, evaluations, and payouts must advance the Current Task.\\n\\n## THE CURRENT TASK\\n\\nCreate engaging technocapital acceleration memes.\\n\\nQuote post the canonical Current Task from @aibtcdev on X with original technocapital acceleration memes that tastefully include an AIBTC watermark.\\n\\nAIBTC watermarks: https://github.com/aibtcdev/branding/tree/main/watermarks\\n\\n## GUIDELINES\\n\\nIn pursuit of our Mission and the Current Task, we adhere to the following Guidelines:\\n\\n- **Presidential Rule:** A President may be appointed and holds sole authority to issue a new Current Task and apply changes to this Charter.\\n- **Canonical Task Post:** All contributions must directly quote post or reply to the canonical X post that established the Current Task and clearly advance its directive.\\n- **Eligibility:** Only verified members holding  and blue-check verified on X.com may submit contributions or receive rewards.\\n- **Completed Work:** Only finished, publicly verifiable work is eligible; drafts or promises are rejected.\\n- **Approval & Reward:** Agent approval is required; approved work earns BTC with onchain payouts and receipts.\\n- **Anti-Spam:** A small submission bond is required; failed entries forfeit it.\\n- **Block Rhythm:** Maximum one contribution approval per Bitcoin block.\\n- **Composability:** Smart contracts / extensions, if any, must execute via contribution approvals or rejections.\\n- **Safety:** No plagiarism, doxxing, or illegal content.\\n\\n## BENCHMARKS\\n\\nWe measure ongoing network health with the following benchmarks:\\n\\n- **Adoption:** >= 75% of circulating tokens cast votes per 12,000 BTC blocks.\\n- **Growth:** + >=10% unique contribution earners per 12,000 BTC blocks.\\n- **Retention:** >= 40% of monthly contribution earners return every 4,000 BTC block period.\\n- **Throughput:** 30-90 per contribution approvals per every 144 contributions submitted.\\n- **Credibility:** >= 99% of contribution approvals committed within 3 BTC blocks.",
+                        "txSender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+                        "version": 2
+                      }
+                    }
+                  },
+                  "position": {
+                    "index": 0
+                  },
+                  "type": "SmartContractEvent"
+                }
+              ],
+              "mutated_assets_radius": [],
+              "mutated_contracts_radius": [
+                "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aitest4-dao-charter"
+              ]
+            },
+            "result": "(ok true)",
+            "sender": "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD",
+            "sponsor": null,
+            "success": true
+          },
+          "operations": [],
+          "transaction_identifier": {
+            "hash": "0xd34eacbd93c614c1ee6e5dc1f1331ea731d90e9113a441bc3e00e9b51ae11fb7"
+          }
+        }
+      ]
+    }
+  ],
+  "chainhook": {
+    "is_streaming_blocks": false,
+    "predicate": {
+      "equals": 3608542,
+      "scope": "block_height"
+    },
+    "uuid": "778568f2-2a7f-4b58-a52c-9b1810abeb0a"
+  },
+  "events": [],
+  "rollback": []
+}
