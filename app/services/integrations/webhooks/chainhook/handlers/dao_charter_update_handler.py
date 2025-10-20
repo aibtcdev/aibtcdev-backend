@@ -3,8 +3,11 @@
 import logging
 from typing import Any, Dict
 
+from app.backend.factory import backend
+from app.backend.models import DAOBase, ExtensionFilter, ContractStatus
 from app.services.integrations.webhooks.chainhook.handlers.base import ChainhookEventHandler
 from app.services.integrations.webhooks.chainhook.models import TransactionWithReceipt
+from app.services.integrations.webhooks.dao.models import ContractType, ExtensionsSubtype
 from app.services.processing.stacks_chainhook_adapter.parsers.clarity import ClarityParser
 
 
@@ -58,8 +61,30 @@ class DAOCharterUpdateHandler(ChainhookEventHandler):
                     f"New charter length: {len(new_charter)}"
                 )
 
-                # TODO: Update the DAO charter in the backend database.
-                # Example: Use backend.update_dao(dao_id, DAOBase(charter=new_charter))
-                # We'd need to map dao_principal to dao_id (e.g., via backend.get_dao_by_principal)
-                # Stub for now:
-                pass  # Replace with actual backend update call
+                # Query for DAO ID via extensions
+                ext_filter = ExtensionFilter(
+                    contract_principal=dao_principal,
+                    type=ContractType.EXTENSIONS.value,
+                    subtype=ExtensionsSubtype.DAO_CHARTER.value,
+                    status=ContractStatus.DEPLOYED
+                )
+                extensions = backend.list_extensions(ext_filter)
+                if not extensions or not extensions[0].dao_id:
+                    self.logger.error(f"No matching DAO found for principal {dao_principal}")
+                    return
+
+                dao_id = extensions[0].dao_id
+
+                # Optional: Validate previous_charter
+                current_dao = backend.get_dao(dao_id)
+                if current_dao and current_dao.charter != previous_charter:
+                    self.logger.warning("Charter mismatch, possible race condition - skipping")
+                    return
+
+                # Update the DAO
+                update_data = DAOBase(charter=new_charter)
+                updated_dao = backend.update_dao(dao_id, update_data)
+                if updated_dao:
+                    self.logger.info(f"Successfully updated DAO {dao_id} with new charter")
+                else:
+                    self.logger.error(f"Failed to update DAO {dao_id}")
