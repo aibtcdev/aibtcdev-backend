@@ -67,7 +67,7 @@ async def evaluate_single_proposal(
             # Setup per-proposal output if saving
             if save_output:
                 prop_short_id = short_uuid(proposal_id)
-                log_filename = f"proposal_eval_v2_{timestamp}_prop{index}_{prop_short_id}.txt"
+                log_filename = f"{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
                 log_f = open(log_filename, "w")
                 sys.stdout = Tee(original_stdout, log_f)
                 sys.stderr = Tee(original_stderr, log_f)
@@ -151,7 +151,7 @@ async def evaluate_single_proposal(
 
             # Save JSON if requested
             if save_output:
-                json_filename = f"proposal_eval_v2_{timestamp}_prop{index}_{prop_short_id}.json"
+                json_filename = f"{timestamp}_prop{index:02d}_{prop_short_id}_summary.json"
                 with open(json_filename, "w") as f:
                     json.dump(result_dict, f, indent=2, default=str)
                 print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -210,10 +210,10 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
     print(summary_text)
 
     if save_output:
-        summary_txt = f"proposal_eval_v2_summary_{timestamp}.txt"
+        summary_txt = f"{timestamp}_summary.txt"
         with open(summary_txt, "w") as f:
             f.write(summary_text)
-        summary_json = f"proposal_eval_v2_summary_{timestamp}.json"
+        summary_json = f"{timestamp}_summary.json"
         with open(summary_json, "w") as f:
             json.dump({"timestamp": timestamp, "results": results}, f, indent=2, default=str)
         print(f"✅ Summary saved to {summary_txt} and {summary_json}")
