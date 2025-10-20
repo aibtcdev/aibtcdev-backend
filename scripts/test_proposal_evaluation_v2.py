@@ -68,7 +68,7 @@ async def evaluate_single_proposal(
             # Setup per-proposal output if saving
             if save_output:
                 prop_short_id = short_uuid(proposal_id)
-                log_filename = f"{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+                log_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
                 log_f = open(log_filename, "w")
                 sys.stdout = Tee(original_stdout, log_f)
                 sys.stderr = Tee(original_stderr, log_f)
@@ -165,7 +165,7 @@ async def evaluate_single_proposal(
 
             # Save JSON if requested
             if save_output:
-                json_filename = f"{timestamp}_prop{index:02d}_{prop_short_id}_summary.json"
+                json_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_summary.json"
                 with open(json_filename, "w") as f:
                     json.dump(result_dict, f, indent=2, default=str)
                 print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -221,10 +221,10 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
     print(summary_text)
 
     if save_output:
-        summary_txt = f"{timestamp}_summary.txt"
+        summary_txt = f"evals/{timestamp}_summary.txt"
         with open(summary_txt, "w") as f:
             f.write(summary_text)
-        summary_json = f"{timestamp}_summary.json"
+        summary_json = f"evals/{timestamp}_summary.json"
 
         json_data = {
             "timestamp": timestamp,
@@ -317,6 +317,9 @@ Examples:
 
     original_stdout = sys.stdout
     original_stderr = sys.stderr
+
+    if args.save_output:
+        os.makedirs("evals", exist_ok=True)
 
     print("🚀 Starting Multi-Proposal Evaluation Test V2")
     print("=" * 60)
