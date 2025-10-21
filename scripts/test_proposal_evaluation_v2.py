@@ -62,37 +62,41 @@ async def evaluate_single_proposal(
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
     async with semaphore:
+        log_f = None
+        tee_stdout = original_stdout
+        tee_stderr = original_stderr
+        if save_output:
+            prop_short_id = short_uuid(proposal_id)
+            log_filename = (
+                f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+            )
+            log_f = open(log_filename, "w")
+            tee_stdout = Tee(original_stdout, log_f)
+            tee_stderr = Tee(original_stderr, log_f)
+        sys.stdout = tee_stdout
+        sys.stderr = tee_stderr
+
+        # Update logger for this proposal
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+        new_handler = logging.StreamHandler(sys.stderr)
+        new_handler.setFormatter(StructuredFormatter())
+        new_handler.setLevel(
+            logging.DEBUG if debug_level >= 2 else logging.INFO
+        )
+        root_logger.addHandler(new_handler)
+        root_logger.setLevel(new_handler.level)
+        setup_uvicorn_logging()
+        for logger_name, logger in logging.Logger.manager.loggerDict.items():
+            if isinstance(logger, logging.Logger):
+                logger.setLevel(root_logger.level)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)
+                logger.propagate = True
+
         try:
             proposal_uuid = UUID(proposal_id)
-
-            # Setup per-proposal output if saving
-            if save_output:
-                prop_short_id = short_uuid(proposal_id)
-                log_filename = (
-                    f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
-                )
-                log_f = open(log_filename, "w")
-                sys.stdout = Tee(original_stdout, log_f)
-                sys.stderr = Tee(original_stderr, log_f)
-
-                # Update logger for this proposal
-                root_logger = logging.getLogger()
-                for handler in root_logger.handlers[:]:
-                    root_logger.removeHandler(handler)
-                new_handler = logging.StreamHandler(sys.stderr)
-                new_handler.setFormatter(StructuredFormatter())
-                new_handler.setLevel(
-                    logging.DEBUG if debug_level >= 2 else logging.INFO
-                )
-                root_logger.addHandler(new_handler)
-                root_logger.setLevel(new_handler.level)
-                setup_uvicorn_logging()
-                for logger_name, logger in logging.Logger.manager.loggerDict.items():
-                    if isinstance(logger, logging.Logger):
-                        logger.setLevel(root_logger.level)
-                        for handler in logger.handlers[:]:
-                            logger.removeHandler(handler)
-                        logger.propagate = True
 
             print(f"📋 Evaluating proposal {index}: {proposal_id}")
             backend = get_backend()
@@ -223,22 +227,19 @@ async def evaluate_single_proposal(
                 with open(json_filename, "w") as f:
                     json.dump(result_dict, f, indent=2, default=str)
                 print(f"✅ Results saved to {json_filename} and {log_filename}")
-                log_f.close()
-
-            # Restore original outputs
-            sys.stdout = original_stdout
-            sys.stderr = original_stderr
 
             return result_dict
 
         except Exception as e:
             error_msg = f"Error evaluating proposal {proposal_id}: {str(e)}"
             print(error_msg)
-            if save_output:
+            return {"proposal_id": proposal_id, "error": error_msg}
+
+        finally:
+            if log_f:
                 log_f.close()
             sys.stdout = original_stdout
             sys.stderr = original_stderr
-            return {"proposal_id": proposal_id, "error": error_msg}
 
 
 def generate_summary(
@@ -250,8 +251,10 @@ def generate_summary(
     total_proposals = len(results)
     passed = sum(1 for r in results if r.get("decision", False) and "error" not in r)
     failed = total_proposals - passed
+
+    successful_count = sum(1 for r in results if "error" not in r)
     avg_score = sum(r.get("final_score", 0) for r in results if "error" not in r) / max(
-        1, passed + failed - sum(1 for r in results if "error" in r)
+        1, successful_count
     )
 
     summary_lines.extend(
@@ -276,15 +279,9 @@ def generate_summary(
             )
         else:
             decision = "APPROVE" if result["decision"] else "REJECT"
-            expl = result["explanation"] if result["explanation"] else "N/A"
-            tweet_snippet = (
-                (
-                    result.get("proposal_metadata", {}).get("tweet_content", "")[:50]
-                    + "..."
-                )
-                if result.get("proposal_metadata", {}).get("tweet_content")
-                else "N/A"
-            )
+            expl = result.get("explanation") or "N/A"
+            content = result.get("proposal_metadata", {}).get("tweet_content", "")
+            tweet_snippet = content and f"{content[:50]}..." or "N/A"
             summary_lines.append(
                 f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
             )
@@ -318,12 +315,7 @@ def generate_summary(
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
-                    "tweet_snippet": (
-                        r.get("proposal_metadata", {}).get("tweet_content", "")[:50]
-                        + "..."
-                    )
-                    if r.get("proposal_metadata", {}).get("tweet_content")
-                    else "N/A",
+                    "tweet_snippet": (content := r.get("proposal_metadata", {}).get("tweet_content", "")) and f"{content[:50]}..." or "N/A",
                 }
                 for r in results
             ],
