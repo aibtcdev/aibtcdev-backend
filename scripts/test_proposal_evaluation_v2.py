@@ -68,7 +68,9 @@ async def evaluate_single_proposal(
             # Setup per-proposal output if saving
             if save_output:
                 prop_short_id = short_uuid(proposal_id)
-                log_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+                log_filename = (
+                    f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+                )
                 log_f = open(log_filename, "w")
                 sys.stdout = Tee(original_stdout, log_f)
                 sys.stderr = Tee(original_stderr, log_f)
@@ -79,7 +81,9 @@ async def evaluate_single_proposal(
                     root_logger.removeHandler(handler)
                 new_handler = logging.StreamHandler(sys.stderr)
                 new_handler.setFormatter(StructuredFormatter())
-                new_handler.setLevel(logging.DEBUG if debug_level >= 2 else logging.INFO)
+                new_handler.setLevel(
+                    logging.DEBUG if debug_level >= 2 else logging.INFO
+                )
                 root_logger.addHandler(new_handler)
                 root_logger.setLevel(new_handler.level)
                 setup_uvicorn_logging()
@@ -103,22 +107,30 @@ async def evaluate_single_proposal(
             proposal_content = proposal.content
             print(f"✅ Found proposal: {proposal.title or 'Untitled'}")
 
-            tweet = backend.get_x_tweet(proposal.tweet_id) if hasattr(proposal, 'tweet_id') and proposal.tweet_id else None
+            tweet = (
+                backend.get_x_tweet(proposal.tweet_id)
+                if hasattr(proposal, "tweet_id") and proposal.tweet_id
+                else None
+            )
 
             proposal_metadata = {
                 "title": proposal.title or "Untitled",
                 "content": proposal_content,
-                "tweet_content": getattr(tweet, 'content', None) if tweet else None,
+                "tweet_content": getattr(tweet, "content", None) if tweet else None,
             }
 
             # Use DAO ID from args or proposal
-            effective_dao_id = dao_id or str(proposal.dao_id) if proposal.dao_id else None
+            effective_dao_id = (
+                dao_id or str(proposal.dao_id) if proposal.dao_id else None
+            )
             dao_uuid = UUID(effective_dao_id) if effective_dao_id else None
 
             # Determine proposal number
             proposal_number = index  # Default to run index
             if dao_uuid:
-                proposals = backend.list_proposals(filters=ProposalFilter(dao_id=dao_uuid))
+                proposals = backend.list_proposals(
+                    filters=ProposalFilter(dao_id=dao_uuid)
+                )
                 if proposals:
                     # Sort by created_at assuming it exists
                     sorted_proposals = sorted(proposals, key=lambda p: p.created_at)
@@ -145,12 +157,20 @@ async def evaluate_single_proposal(
             past_proposals = "No past proposals"
             if dao:
                 if dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
-                    dao_mission = "Make AI and Bitcoin work together for human prosperity"
+                    dao_mission = (
+                        "Make AI and Bitcoin work together for human prosperity"
+                    )
                 community_info = f"DAO Name: {dao.name}\nDescription: {getattr(dao, 'description', 'N/A')}\n"
 
             if proposals:
-                sorted_proposals = sorted(proposals, key=lambda p: p.created_at or datetime.min)
-                past_proposals_list = [f"Prop {num}: {p.title or 'Untitled'} - {p.content[:100]}..." for num, p in enumerate(sorted_proposals, 1) if p.id != proposal_uuid]
+                sorted_proposals = sorted(
+                    proposals, key=lambda p: p.created_at or datetime.min
+                )
+                past_proposals_list = [
+                    f"Prop {num}: {p.title or 'Untitled'} - {p.content[:100]}..."
+                    for num, p in enumerate(sorted_proposals, 1)
+                    if p.id != proposal_uuid
+                ]
                 past_proposals = "\n".join(past_proposals_list)
 
             full_user_prompt = custom_user_prompt.format(
@@ -176,7 +196,7 @@ async def evaluate_single_proposal(
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
-                "raw_ai_response": getattr(result, 'raw_response', 'Not available'),
+                "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
                 "explanation": result.explanation,
@@ -197,7 +217,9 @@ async def evaluate_single_proposal(
 
             # Save JSON if requested
             if save_output:
-                json_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_summary.json"
+                json_filename = (
+                    f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_summary.json"
+                )
                 with open(json_filename, "w") as f:
                     json.dump(result_dict, f, indent=2, default=str)
                 print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -219,36 +241,57 @@ async def evaluate_single_proposal(
             return {"proposal_id": proposal_id, "error": error_msg}
 
 
-def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output: bool) -> str:
+def generate_summary(
+    results: List[Dict[str, Any]], timestamp: str, save_output: bool
+) -> str:
     """Generate and save a readable summary of all evaluations."""
     summary_lines = [f"Evaluation Summary - {timestamp}", "=" * 60]
 
     total_proposals = len(results)
     passed = sum(1 for r in results if r.get("decision", False) and "error" not in r)
     failed = total_proposals - passed
-    avg_score = sum(r.get("final_score", 0) for r in results if "error" not in r) / max(1, passed + failed - sum(1 for r in results if "error" in r))
+    avg_score = sum(r.get("final_score", 0) for r in results if "error" not in r) / max(
+        1, passed + failed - sum(1 for r in results if "error" in r)
+    )
 
-    summary_lines.extend([
-        f"Total Proposals: {total_proposals}",
-        f"Passed: {passed} | Rejected/Failed: {failed}",
-        f"Average Score: {avg_score:.2f}",
-        "=" * 60,
-    ])
+    summary_lines.extend(
+        [
+            f"Total Proposals: {total_proposals}",
+            f"Passed: {passed} | Rejected/Failed: {failed}",
+            f"Average Score: {avg_score:.2f}",
+            "=" * 60,
+        ]
+    )
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append("Proposal Num | Score | Decision | Explanation | Tweet Snippet")
+    summary_lines.append(
+        "Proposal Num | Score | Decision | Explanation | Tweet Snippet"
+    )
     summary_lines.append("-" * 80)
     for idx, result in enumerate(results, 1):
         prop_num = result.get("proposal_number", idx)
         if "error" in result:
-            summary_lines.append(f"Prop {prop_num} | ERROR | N/A | {result['error']} | N/A")
+            summary_lines.append(
+                f"Prop {prop_num} | ERROR | N/A | {result['error']} | N/A"
+            )
         else:
-            decision = 'APPROVE' if result['decision'] else 'REJECT'
-            expl = result['explanation'] if result['explanation'] else 'N/A'
-            tweet_snippet = (result.get("proposal_metadata", {}).get("tweet_content", "")[:50] + "...") if result.get("proposal_metadata", {}).get("tweet_content") else "N/A"
-            summary_lines.append(f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}")
+            decision = "APPROVE" if result["decision"] else "REJECT"
+            expl = result["explanation"] if result["explanation"] else "N/A"
+            tweet_snippet = (
+                (
+                    result.get("proposal_metadata", {}).get("tweet_content", "")[:50]
+                    + "..."
+                )
+                if result.get("proposal_metadata", {}).get("tweet_content")
+                else "N/A"
+            )
+            summary_lines.append(
+                f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
+            )
     summary_lines.append("=" * 60)
-    summary_lines.append("For full reasoning and categories, see per-proposal JSON files or summary JSON.")
+    summary_lines.append(
+        "For full reasoning and categories, see per-proposal JSON files or summary JSON."
+    )
 
     summary_text = "\n".join(summary_lines)
     print(summary_text)
@@ -275,7 +318,12 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
-                    "tweet_snippet": (r.get("proposal_metadata", {}).get("tweet_content", "")[:50] + "...") if r.get("proposal_metadata", {}).get("tweet_content") else "N/A"
+                    "tweet_snippet": (
+                        r.get("proposal_metadata", {}).get("tweet_content", "")[:50]
+                        + "..."
+                    )
+                    if r.get("proposal_metadata", {}).get("tweet_content")
+                    else "N/A",
                 }
                 for r in results
             ],
