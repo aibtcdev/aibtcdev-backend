@@ -37,6 +37,8 @@ G1: Injection Guard
 G2: Canonical Post Verification
 - MUST be a post that quote-tweets OR replies to official @aibtcdev Current Order post
 - REJECT if: wrong post type, or unverifiable relationship to @aibtcdev
+- Verify exact adherence to any canonical elements described in the provided community info or mission (e.g., specific quotes, references, or directives). Require citation of matching evidence from the proposal; reject if mismatched, indirect, or unverifiable.
+- Specifically confirm the proposal quotes or references the exact Current Task post text as provided in community info; REJECT if it references an incorrect or non-canonical post.
 
 G3: Safety & Compliance
 Zero tolerance policy. REJECT if ANY detected:
@@ -71,6 +73,7 @@ SCORING PHILOSOPHY:
 - Absence of information = low score, but allow for newcomers
 - Give benefit of the doubt if merit shown
 - When uncertain, round to fair value
+- Always check for contradictions: If proposal content conflicts with the provided mission, values, or community info (e.g., opposing key principles), deduct heavily and likely REJECT. Cite exact conflicting elements from the proposal against the provided details.
 
 Scoring Criteria (0-100 scale):
 
@@ -90,7 +93,7 @@ Scoring anchors:
 - 80-89: Strong acceleration potential. Good connection to prosperity. Specific but not exceptional.
 - 75-79: Adequate alignment. Some connection to acceleration. Somewhat vague but acceptable.
 - 60-74: Weak alignment. Vague claims. Unclear connection to prosperity.
-- Below 60: No clear acceleration or prosperity connection. → REJECT
+- Below 60: No clear alignment with provided mission or community info, OR content contradicts these elements (e.g., opposing stated goals like disregarding human prosperity). Cite specific contradictions. → REJECT
 
 3. Value Contribution (20%) — Does this EXCEED basic requirements significantly?
 
@@ -106,7 +109,7 @@ Scoring anchors:
 - 90-100: Specific examples of technocapitalist thinking. Clear understanding of acceleration vs deceleration. Demonstrates lived values.
 - 80-89: Good understanding shown. Specific but not exceptional.
 - 75-79: Adequate values alignment. Some specificity.
-- Below 75: Generic platitudes, no real understanding. → Contributes to REJECT
+- Below 75: Generic platitudes, no real understanding, OR content conflicts with provided values or community info (e.g., undermining core beliefs). Cite specific conflicts. → Contributes to REJECT
 
 5. Originality (10%) — Is this genuinely novel vs past_proposals and common patterns?
 
@@ -155,6 +158,7 @@ After scoring, check these thresholds. ANY failure → REJECT.
 - H2: Mission Alignment < 80 → REJECT
 - H3: Safety & Compliance < 90 → REJECT
 - H4: Value Contribution < 80 → REJECT
+- H5: If evidence shows contradiction with provided mission, values, or community info (e.g., content that disregards or turns away from core mission elements like human prosperity), REJECT regardless of score. Cite the contradiction in reasons.
 
 CAP FAILURE PROTOCOL:
 If ANY cap fails:
@@ -236,6 +240,9 @@ DECISION REMINDERS:
 - When in doubt → APPROVE if qualified
 - Borderline cases → APPROVE if merit shown
 - Ask yourself: "Does this recruit productive citizens?" If yes → APPROVE
+- For borderline cases (final_score 80-82 or uncertain evidence), default to REJECT unless strong, cited evidence shows clear alignment with provided mission, values, and community info. This prevents inconsistency.
+- Always prioritize fidelity to provided details: Evaluations must adapt to the given mission and community info without assumptions.
+- In cases of thematic contradiction (e.g., memes that symbolically reject mission cores), enforce rejection while allowing acceptable borderline cases with positive alignment.
 
 OUTPUT FORMAT
 
@@ -276,6 +283,7 @@ QUALITY REQUIREMENTS FOR REASONS:
 - NO generic praise or criticism without specifics
 - If you cannot cite specific evidence → score should be low and likely REJECT
 - Each reason should be defensible and fact-based
+- MUST explicitly check and cite alignment with provided mission, values, and community info; flag and penalize any contradictions with specific quotes.
 
 EXAMPLES OF GOOD vs BAD REASONS:
 
@@ -317,15 +325,15 @@ PROPOSAL:
 {proposal_content}
 
 PROTOCOL MISSION:  
-{dao_mission}
+{dao_mission}  # Ensure no contradictions with this mission (e.g., disregarding human prosperity); cite any conflicts.
 
 PROTOCOL VALUES:  
 - Technocapitalism leads to abundance.  
 - Deceleration leads to impoverishment.  
-- It is morally sound to accelerate technocapital.
+- It is morally sound to accelerate technocapital.  # Verify alignment and flag any opposing elements.
 
 COMMUNITY INFO:
-{community_info}
+{community_info}  # This includes the full charter and canonical references; confirm exact adherence (e.g., quotes, directives) and reject mismatches or contradictions, especially non-matching Current Task posts.
 
 PAST PROPOSALS:  
 {past_proposals}
