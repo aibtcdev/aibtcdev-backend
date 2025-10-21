@@ -103,6 +103,14 @@ async def evaluate_single_proposal(
             proposal_content = proposal.content
             print(f"✅ Found proposal: {proposal.title or 'Untitled'}")
 
+            tweet = backend.get_x_tweet(proposal.tweet_id) if hasattr(proposal, 'tweet_id') and proposal.tweet_id else None
+
+            proposal_metadata = {
+                "title": proposal.title or "Untitled",
+                "content": proposal_content,
+                "tweet_content": getattr(tweet, 'content', None) if tweet else None,
+            }
+
             # Use DAO ID from args or proposal
             effective_dao_id = dao_id or str(proposal.dao_id) if proposal.dao_id else None
             dao_uuid = UUID(effective_dao_id) if effective_dao_id else None
@@ -121,16 +129,36 @@ async def evaluate_single_proposal(
 
             # Determine prompt type
             prompt_type = "evaluation"
-            if dao_uuid:
-                dao = backend.get_dao(dao_uuid)
-                if dao:
-                    if dao.name == "ELONBTC":
-                        prompt_type = "evaluation_elonbtc"
-                    elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
-                        prompt_type = "evaluation_aibtc"
+            dao = backend.get_dao(dao_uuid) if dao_uuid else None
+            if dao:
+                if dao.name == "ELONBTC":
+                    prompt_type = "evaluation_elonbtc"
+                elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                    prompt_type = "evaluation_aibtc"
 
             custom_system_prompt = load_prompt(prompt_type, "system")
             custom_user_prompt = load_prompt(prompt_type, "user_template")
+
+            # Capture full prompts for logging
+            dao_mission = ""
+            community_info = ""
+            past_proposals = "No past proposals"
+            if dao:
+                if dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                    dao_mission = "Make AI and Bitcoin work together for human prosperity"
+                community_info = f"DAO Name: {dao.name}\nDescription: {getattr(dao, 'description', 'N/A')}\n"
+
+            if proposals:
+                sorted_proposals = sorted(proposals, key=lambda p: p.created_at or datetime.min)
+                past_proposals_list = [f"Prop {num}: {p.title or 'Untitled'} - {p.content[:100]}..." for num, p in enumerate(sorted_proposals, 1) if p.id != proposal_uuid]
+                past_proposals = "\n".join(past_proposals_list)
+
+            full_user_prompt = custom_user_prompt.format(
+                proposal_content=proposal_content,
+                dao_mission=dao_mission,
+                community_info=community_info,
+                past_proposals=past_proposals,
+            )
 
             # Run evaluation
             result = await evaluate_proposal(
@@ -145,6 +173,10 @@ async def evaluate_single_proposal(
             result_dict = {
                 "proposal_id": proposal_id,
                 "proposal_number": proposal_number,
+                "proposal_metadata": proposal_metadata,
+                "full_system_prompt": custom_system_prompt,
+                "full_user_prompt": full_user_prompt,
+                "raw_ai_response": getattr(result, 'raw_response', 'Not available'),
                 "decision": result.decision,
                 "final_score": result.final_score,
                 "explanation": result.explanation,
@@ -204,16 +236,17 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
     ])
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append("Proposal Num | Score | Decision | Explanation")
-    summary_lines.append("-" * 60)
+    summary_lines.append("Proposal Num | Score | Decision | Explanation | Tweet Snippet")
+    summary_lines.append("-" * 80)
     for idx, result in enumerate(results, 1):
         prop_num = result.get("proposal_number", idx)
         if "error" in result:
-            summary_lines.append(f"Prop {prop_num} | ERROR | N/A | {result['error']}")
+            summary_lines.append(f"Prop {prop_num} | ERROR | N/A | {result['error']} | N/A")
         else:
             decision = 'APPROVE' if result['decision'] else 'REJECT'
             expl = result['explanation'] if result['explanation'] else 'N/A'
-            summary_lines.append(f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl}")
+            tweet_snippet = (result.get("proposal_metadata", {}).get("tweet_content", "")[:50] + "...") if result.get("proposal_metadata", {}).get("tweet_content") else "N/A"
+            summary_lines.append(f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}")
     summary_lines.append("=" * 60)
     summary_lines.append("For full reasoning and categories, see per-proposal JSON files or summary JSON.")
 
@@ -241,7 +274,8 @@ def generate_summary(results: List[Dict[str, Any]], timestamp: str, save_output:
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
-                    "error": r.get("error")
+                    "error": r.get("error"),
+                    "tweet_snippet": (r.get("proposal_metadata", {}).get("tweet_content", "")[:50] + "...") if r.get("proposal_metadata", {}).get("tweet_content") else "N/A"
                 }
                 for r in results
             ],
