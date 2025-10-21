@@ -67,9 +67,7 @@ async def evaluate_single_proposal(
         tee_stderr = original_stderr
         if save_output:
             prop_short_id = short_uuid(proposal_id)
-            log_filename = (
-                f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
-            )
+            log_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
             log_f = open(log_filename, "w")
             tee_stdout = Tee(original_stdout, log_f)
             tee_stderr = Tee(original_stderr, log_f)
@@ -82,9 +80,7 @@ async def evaluate_single_proposal(
             root_logger.removeHandler(handler)
         new_handler = logging.StreamHandler(sys.stderr)
         new_handler.setFormatter(StructuredFormatter())
-        new_handler.setLevel(
-            logging.DEBUG if debug_level >= 2 else logging.INFO
-        )
+        new_handler.setLevel(logging.DEBUG if debug_level >= 2 else logging.INFO)
         root_logger.addHandler(new_handler)
         root_logger.setLevel(new_handler.level)
         setup_uvicorn_logging()
@@ -316,7 +312,13 @@ def generate_summary(
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
-                    "tweet_snippet": (content := r.get("proposal_metadata", {}).get("tweet_content", "")) and f"{content[:50]}..." or "N/A",
+                    "tweet_snippet": (
+                        content := r.get("proposal_metadata", {}).get(
+                            "tweet_content", ""
+                        )
+                    )
+                    and f"{content[:50]}..."
+                    or "N/A",
                 }
                 for r in results
             ],
