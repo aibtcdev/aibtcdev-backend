@@ -177,6 +177,7 @@ async def evaluate_single_proposal(
                 ]
                 past_proposals = "\n".join(past_proposals_list)
 
+            # Explicitly format the user prompt template with the gathered information
             full_user_prompt = custom_user_prompt.format(
                 proposal_content=proposal_content,
                 dao_mission=dao_mission,
