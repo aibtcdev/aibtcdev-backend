@@ -235,3 +235,6 @@ docker-compose.override.yml
 
 # Kubernetes
 *.kubeconfig
+
+# AI Evaluations
+evals/
