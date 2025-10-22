@@ -659,7 +659,7 @@
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(2)}</td>
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">
                       <div class="text-gray-600 whitespace-pre-wrap">
-                        ${cat.reasoning.map(r => escapeHtml(r.trim())).join('<br><br>')}
+                        ${cat.reasoning.map(r => escapeHtml(r.split('\n').map(line => line.trim()).filter(line => line.length > 0).join('\n'))).join('<br><br>')}
                       </div>
                     </td>
                   </tr>
