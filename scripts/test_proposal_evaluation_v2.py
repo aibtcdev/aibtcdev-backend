@@ -156,7 +156,15 @@ Recent Community Sentiment: Positive
                         tweet_data, proposal.tweet_id
                     )
 
-            print(f"DEBUG: Passing {len(linked_tweet_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in linked_tweet_images]}")
+            cleaned_images = [
+                {
+                    "type": img["type"],
+                    "image_url": img["image_url"]
+                }
+                for img in linked_tweet_images
+            ]
+
+            print(f"DEBUG: Passing {len(cleaned_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in cleaned_images]}")
 
             # Fetch and format airdrop content
             airdrop_content = None
@@ -251,7 +259,7 @@ Recent Community Sentiment: Positive
                 proposal_content=proposal_content,
                 dao_id=dao_uuid,
                 proposal_id=proposal_id,
-                images=linked_tweet_images,  # Pass linked images if any
+                images=cleaned_images,  # Pass cleaned images
                 tweet_content=tweet_content,
                 airdrop_content=airdrop_content,
                 custom_system_prompt=custom_system_prompt,
