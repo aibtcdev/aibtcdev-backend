@@ -337,7 +337,7 @@
           ...item,
           categories: item.categories || [],
           expected_decision: item.expected_decision || null,
-          mismatch: item.expected_decision !== null && item.expected_decision !== (item.decision === "APPROVE"),
+          mismatch: item.expected_decision !== null && item.expected_decision !== item.decision,
         }));
 
         // Compute aggregates
@@ -476,7 +476,7 @@
                   ${createRows(
                     "Mismatches",
                     mismatches,
-                    (prop) => `Expected: ${prop.expected_decision} | Actual: ${prop.decision}`
+                    (prop) => `Expected: ${prop.expected_decision ? "APPROVE" : "REJECT"} | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
                   )}
                 </tbody>
               </table>
@@ -572,9 +572,18 @@
         `;
         wrapper.appendChild(mainTitle);
 
-        const promptInfo = document.createElement("p");
-        promptInfo.className = "text-sm text-gray-600 mb-4";
-        promptInfo.textContent = `Full Prompts: System - ${currentEvals.full_system_prompt.slice(0, 50)}... | User - ${currentEvals.full_user_prompt.slice(0, 50)}...`;
+        const promptInfo = document.createElement("div");
+        promptInfo.className = "space-y-2 mb-4";
+        promptInfo.innerHTML = `
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_system_prompt}</pre>
+          </details>
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_user_prompt}</pre>
+          </details>
+        `;
         wrapper.appendChild(promptInfo);
 
         const contentDiv = document.createElement("div");
