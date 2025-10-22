@@ -200,17 +200,7 @@ Recent Community Sentiment: Positive
                 past_proposals = "<no_proposals>No past proposals available.</no_proposals>"
 
             # Determine proposal number based on descending sort (newest first)
-            proposal_number = index  # Default
-            if dao_proposals:
-                sorted_proposals = sorted(
-                    dao_proposals,  # Already includes current
-                    key=lambda p: p.created_at if p.created_at else datetime.min,
-                    reverse=True
-                )
-                for num, prop in enumerate(sorted_proposals, 1):
-                    if prop.id == proposal_uuid:
-                        proposal_number = num
-                        break
+            proposal_number = None
 
             # Determine prompt type
             prompt_type = "evaluation"
@@ -345,14 +335,14 @@ def generate_summary(
 
     summary_lines.append("Compact Scores Overview:")
     summary_lines.append(
-        "Proposal Num | Score | Decision | Explanation | Tweet Snippet"
+        "Proposal ID | Score | Decision | Explanation | Tweet Snippet"
     )
     summary_lines.append("-" * 80)
     for idx, result in enumerate(results, 1):
-        prop_num = result.get("proposal_number", idx)
+        prop_id = short_uuid(result["proposal_id"])
         if "error" in result:
             summary_lines.append(
-                f"Prop {prop_num} | ERROR | N/A | {result['error']} | N/A"
+                f"Prop {prop_id} | ERROR | N/A | {result['error']} | N/A"
             )
         else:
             decision = "APPROVE" if result["decision"] else "REJECT"
@@ -360,7 +350,7 @@ def generate_summary(
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
             summary_lines.append(
-                f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
+                f"Prop {prop_id} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
             )
     summary_lines.append("=" * 60)
     summary_lines.append(
@@ -387,7 +377,6 @@ def generate_summary(
             "compact_scores": [
                 {
                     "proposal_id": r["proposal_id"],
-                    "proposal_number": r.get("proposal_number"),
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),

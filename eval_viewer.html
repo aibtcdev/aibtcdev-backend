@@ -608,7 +608,7 @@
           "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
         const outcomeColor = prop.decision ? "text-green-600 border-green-600" : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span class="${outcomeColor} border-b-2 pb-1">Prop ${prop.proposal_number}: ${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
+          <span class="${outcomeColor}"> ${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         card.appendChild(title);
@@ -624,12 +624,20 @@
         });
 
         // Outcome and explanation
+        let outcomeText = `Outcome: ${prop.decision ? "APPROVE" : "REJECT"}`;
+        if (prop.expected_decision !== null) {
+          const expected = prop.expected_decision ? "APPROVE" : "REJECT";
+          const actual = prop.decision ? "APPROVE" : "REJECT";
+          outcomeText += ` (Expected: ${expected})`;
+          if (prop.mismatch) {
+            outcomeText += ` - Mismatch`;
+          }
+        }
         const outcomeClass = prop.decision ? "border-green-600" : "border-red-600";
         details.innerHTML = `
           <div class="p-4 rounded-md border ${outcomeClass}">
-            <p class="font-bold ${outcomeColor}">Outcome: ${prop.decision ? "APPROVE" : "REJECT"}</p>
+            <p class="font-bold ${outcomeColor}">${outcomeText}</p>
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
-            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + ' | Actual ' + (prop.decision ? "APPROVE" : "REJECT") + '</p>' : ''}
           </div>
           <div class="border-t border-gray-200 pt-4 overflow-x-auto">
             <table class="min-w-full table-striped">
@@ -650,12 +658,9 @@
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(2)}</td>
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(2)}</td>
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">
-                      <details>
-                        <summary class="cursor-pointer text-blue-600 hover:text-blue-800">${cat.reasoning[0].slice(0, 100)}...</summary>
-                        <div class="mt-2 text-gray-600 whitespace-pre-wrap">
-                          ${cat.reasoning.map(r => escapeHtml(r)).join('<br><br>')}
-                        </div>
-                      </details>
+                      <div class="text-gray-600 whitespace-pre-wrap">
+                        ${cat.reasoning.map(r => escapeHtml(r)).join('<br><br>')}
+                      </div>
                     </td>
                   </tr>
                 `
