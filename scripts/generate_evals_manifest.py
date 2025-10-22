@@ -14,7 +14,6 @@ def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest
     manifest = []
     for filename in os.listdir(evals_dir):
         if filename.endswith("_summary.json"):
-            filepath = os.path.join(evals_dir, filename)
             timestamp_str = filename.split("_")[0]  # Extract YYYYMMDD_HHMMSS
             try:
                 timestamp = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
@@ -30,7 +29,9 @@ def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
 
-    print(f"✅ Manifest generated/updated at {manifest_path} with {len(manifest)} entries.")
+    print(
+        f"✅ Manifest generated/updated at {manifest_path} with {len(manifest)} entries."
+    )
 
 
 if __name__ == "__main__":

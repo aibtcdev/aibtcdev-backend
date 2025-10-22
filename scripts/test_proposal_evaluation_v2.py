@@ -215,7 +215,11 @@ async def evaluate_single_proposal(
                 "flags": result.flags or [],
                 "token_usage": result.token_usage or {},
                 "images_processed": result.images_processed,
-                "expected_decision": True if expected_decision == "true" else False if expected_decision == "false" else None,
+                "expected_decision": True
+                if expected_decision == "true"
+                else False
+                if expected_decision == "false"
+                else None,
             }
 
             # Save JSON if requested
@@ -451,6 +455,7 @@ Examples:
     # Generate or update manifest after run if saving output
     if args.save_output:
         from scripts.generate_evals_manifest import generate_manifest
+
         generate_manifest()
 
 
