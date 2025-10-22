@@ -72,7 +72,6 @@ async def evaluate_single_proposal(
     original_stderr,
     expected_decision: str | None,
     no_vector_store: bool,
-    no_proposal_content: bool,
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
     async with semaphore:
@@ -115,15 +114,9 @@ async def evaluate_single_proposal(
             if not proposal:
                 raise ValueError(f"Proposal {proposal_id} not found")
 
-            # Conditionally skip proposal content if flag is set
             proposal_content = proposal.content
-            if no_proposal_content:
-                proposal_content = ""  # Empty string to omit text description
-                print(
-                    f"⚠️ Skipping user-provided proposal content for {proposal_id} (testing meme/image-only evaluation)"
-                )
 
-            if not proposal_content and not no_proposal_content:
+            if not proposal_content:
                 raise ValueError(f"Proposal {proposal_id} has no content")
 
             print(f"✅ Found proposal: {proposal.title or 'Untitled'}")
@@ -490,12 +483,6 @@ Examples:
         help="Skip vector store retrieval for past proposals",
     )
 
-    parser.add_argument(
-        "--no-proposal-content",
-        action="store_true",
-        help="Skip passing the user-provided proposal content (text description) to the evaluation, to test LLM judgment on memes/images alone",
-    )
-
     args = parser.parse_args()
 
     if args.expected_decision and len(args.expected_decision) != len(args.proposal_id):
@@ -540,7 +527,6 @@ Examples:
             original_stderr,
             args.expected_decision[idx] if args.expected_decision else None,
             args.no_vector_store,
-            args.no_proposal_content,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
