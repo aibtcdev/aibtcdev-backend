@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import multiprocessing as mp
 import os
 import sys
 from datetime import datetime
@@ -61,22 +62,22 @@ def short_uuid(uuid_str: str) -> str:
     return uuid_str[:8]
 
 
-async def evaluate_single_proposal(
+def evaluate_single_proposal(
     proposal_id: str,
     index: int,
     dao_id: str | None,
     debug_level: int,
     timestamp: str,
     save_output: bool,
-    semaphore: asyncio.Semaphore,
-    original_stdout,
-    original_stderr,
     expected_decision: str | None,
     no_vector_store: bool,
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
-    async with semaphore:
+
+    async def inner() -> Dict[str, Any]:
         log_f = None
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
         tee_stdout = original_stdout
         tee_stderr = original_stderr
         if save_output:
@@ -343,6 +344,8 @@ Recent Community Sentiment: Positive
             if log_f:
                 log_f.close()
 
+    return await inner()
+
 
 def generate_summary(
     results: List[Dict[str, Any]], timestamp: str, save_output: bool
@@ -433,7 +436,7 @@ def generate_summary(
     return summary_text
 
 
-async def main():
+def main():
     parser = argparse.ArgumentParser(
         description="Test comprehensive proposal evaluation workflow (V2 - Multi-proposal)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -515,9 +518,6 @@ Examples:
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-
     if args.save_output:
         os.makedirs("evals", exist_ok=True)
 
@@ -531,26 +531,22 @@ Examples:
     print(f"No Vector Store: {args.no_vector_store}")
     print("=" * 60)
 
-    semaphore = asyncio.Semaphore(args.max_concurrent)
-
-    tasks = [
-        evaluate_single_proposal(
+    args_list = [
+        (
             pid,
             idx + 1,
             args.dao_id,
             args.debug_level,
             timestamp,
             args.save_output,
-            semaphore,
-            original_stdout,
-            original_stderr,
             args.expected_decision[idx] if args.expected_decision else None,
             args.no_vector_store,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
 
-    results = await asyncio.gather(*tasks)
+    with mp.Pool(args.max_concurrent) as pool:
+        results = pool.starmap(evaluate_single_proposal, args_list)
 
     generate_summary(results, timestamp, args.save_output)
 
@@ -564,4 +560,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
