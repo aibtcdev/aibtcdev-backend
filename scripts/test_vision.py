@@ -2,6 +2,12 @@
 """Standalone script to test LLM vision capabilities with a specific image URL."""
 
 import asyncio
+import os
+import sys
+
+# Add the parent directory (root) to the path to import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.services.ai.simple_workflows.llm import create_chat_openai
 from langchain.schema import HumanMessage
 
