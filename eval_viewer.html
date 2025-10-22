@@ -651,7 +651,7 @@
           "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
         const outcomeColor = prop.decision ? "text-green-600 border-green-600" : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span class="${outcomeColor} border-b-2 pb-1">${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
+          <span class="${outcomeColor} border-b-2 pb-1">Prop ${prop.proposal_number}: ${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         card.appendChild(title);
@@ -672,7 +672,7 @@
           <div class="p-4 rounded-md border ${outcomeClass}">
             <p class="font-bold ${outcomeColor}">Outcome: ${prop.decision ? "APPROVE" : "REJECT"}</p>
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
-            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + '</p>' : ''}
+            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + ' | Actual ' + (prop.decision ? "APPROVE" : "REJECT") + '</p>' : ''}
           </div>
           <div class="space-y-2 border-t border-gray-200 pt-4">
             ${prop.categories
