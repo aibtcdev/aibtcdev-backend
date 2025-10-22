@@ -215,7 +215,7 @@ async def evaluate_single_proposal(
                 "flags": result.flags or [],
                 "token_usage": result.token_usage or {},
                 "images_processed": result.images_processed,
-                "expected_decision": expected_decision === "true" ? true : (expected_decision === "false" ? false : null),
+                "expected_decision": True if expected_decision == "true" else False if expected_decision == "false" else None,
             }
 
             # Save JSON if requested
