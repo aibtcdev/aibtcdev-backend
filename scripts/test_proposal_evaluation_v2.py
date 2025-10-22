@@ -344,7 +344,7 @@ Recent Community Sentiment: Positive
             if log_f:
                 log_f.close()
 
-    return await inner()
+    return asyncio.run(inner())
 
 
 def generate_summary(
