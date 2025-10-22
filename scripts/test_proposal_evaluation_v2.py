@@ -199,8 +199,18 @@ Recent Community Sentiment: Positive
             elif not past_proposals:
                 past_proposals = "<no_proposals>No past proposals available.</no_proposals>"
 
-            # Determine proposal number as total count including current
-            proposal_number = len(past_proposals_list) + 1 if past_proposals_list is not None else 1
+            # Determine proposal number based on descending sort (newest first)
+            proposal_number = index  # Default
+            if dao_proposals:
+                sorted_proposals = sorted(
+                    dao_proposals,  # Already includes current
+                    key=lambda p: p.created_at if p.created_at else datetime.min,
+                    reverse=True
+                )
+                for num, prop in enumerate(sorted_proposals, 1):
+                    if prop.id == proposal_uuid:
+                        proposal_number = num
+                        break
 
             # Determine prompt type
             prompt_type = "evaluation"
