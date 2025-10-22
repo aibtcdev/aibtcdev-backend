@@ -337,7 +337,7 @@
           ...item,
           categories: item.categories || [],
           expected_decision: item.expected_decision || null,
-          mismatch: item.expected_decision !== null && item.expected_decision !== item.decision,
+          mismatch: item.expected_decision !== null && item.expected_decision !== (item.decision === "APPROVE"),
         }));
 
         // Compute aggregates
@@ -567,10 +567,15 @@
         const mainTitle = document.createElement("h2");
         mainTitle.className = "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
         mainTitle.innerHTML = `
-          <span>Proposals (Full Prompts: System - ${currentEvals.full_system_prompt.slice(0, 50)}... | User - ${currentEvals.full_user_prompt.slice(0, 50)}...)</span>
+          <span>Proposals</span>
           <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         wrapper.appendChild(mainTitle);
+
+        const promptInfo = document.createElement("p");
+        promptInfo.className = "text-sm text-gray-600 mb-4";
+        promptInfo.textContent = `Full Prompts: System - ${currentEvals.full_system_prompt.slice(0, 50)}... | User - ${currentEvals.full_user_prompt.slice(0, 50)}...`;
+        wrapper.appendChild(promptInfo);
 
         const contentDiv = document.createElement("div");
         contentDiv.className = "space-y-8 pt-4";
@@ -635,8 +640,9 @@
         const title = document.createElement("h2");
         title.className =
           "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
+        const outcomeColor = prop.decision ? "text-green-600 border-green-600" : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span>${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
+          <span class="${outcomeColor} border-b-2 pb-1">${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         card.appendChild(title);
@@ -652,12 +658,12 @@
         });
 
         // Outcome and explanation
-        const outcomeClass = prop.decision ? "pass-highlight" : "fail-highlight";
+        const outcomeClass = prop.decision ? "border-green-600" : "border-red-600";
         details.innerHTML = `
-          <div class="p-4 rounded-md ${outcomeClass}">
-            <p class="font-bold">Outcome: ${prop.decision ? "APPROVE" : "REJECT"}</p>
+          <div class="p-4 rounded-md border ${outcomeClass}">
+            <p class="font-bold ${outcomeColor}">Outcome: ${prop.decision ? "APPROVE" : "REJECT"}</p>
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
-            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + prop.expected_decision + '</p>' : ''}
+            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + '</p>' : ''}
           </div>
           <div class="space-y-2 border-t border-gray-200 pt-4">
             ${prop.categories
