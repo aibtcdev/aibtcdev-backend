@@ -335,10 +335,18 @@
 
         const proposals = data.compact_scores.map((item) => ({
           ...item,
-          categories: item.categories || [],
+          categories: [],
           expected_decision: item.expected_decision || null,
           mismatch: item.expected_decision !== null && item.expected_decision !== item.decision,
         }));
+
+        // Merge categories from full_results
+        data.full_results.forEach((full) => {
+          const prop = proposals.find((p) => p.proposal_id === full.proposal_id);
+          if (prop) {
+            prop.categories = full.categories || [];
+          }
+        });
 
         // Compute aggregates
         const total = data.overall_stats.total_proposals;
@@ -356,14 +364,15 @@
           categoryAverages[key].avg = categoryAverages[key].sum / categoryAverages[key].count;
         });
 
+        const firstFull = data.full_results[0] || {};
         return {
           timestamp: data.timestamp,
           overall_stats: { ...data.overall_stats, passRate },
           proposals,
           categoryAverages,
           full_results: data.full_results || [],
-          full_system_prompt: data.full_results[0]?.full_system_prompt || "N/A",
-          full_user_prompt: data.full_results[0]?.full_user_prompt || "N/A",
+          full_system_prompt: firstFull.full_system_prompt || "N/A",
+          full_user_prompt: firstFull.full_user_prompt || "N/A",
         };
       }
 
