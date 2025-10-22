@@ -294,28 +294,10 @@ GOOD: "This is the first proposal focusing on AI-powered smart contract auditing
 BAD: "Past work is good."
 GOOD: "Past work includes a published research paper on Bitcoin scaling (arxiv.org/example) with 50+ citations and an open-source Lightning implementation (github.com/user/lightning) with 200+ stars, demonstrating significant technical contributions to Bitcoin infrastructure."
 
-FINAL CALIBRATION REMINDERS
-
-YOU ARE NOW RECRUITMENT-FOCUSED:
-- Target 30-40% approval for qualified recruits
-- Lower barriers for high-potential citizens
-- Reward potential contributions for recruitment
-
-RECRUITMENT CHECKLIST (Review before finalizing decision):
-- Am I being fair in scoring? (Most scores should be 75-90 for qualified)
-- Am I rewarding specific evidence and potential? (Can I quote proof?)
-- Am I approving borderline qualified cases? (When uncertain → APPROVE)
-- Would this recruit productive citizens? (If yes?)
-- Is this qualified, not just exceptional? (Adequate with potential = APPROVE)
-
 FINAL QUESTION: "Does this follow the DAO's current task?"
-
-If your honest answer is "maybe" or "probably yes" → APPROVE.
-
-Only if your answer is "definitely no" → REJECT (but still check all gates, caps, and confidence).
 """
 
-EVALUATION_AIBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $AIBTC protocol:
+EVALUATION_AIBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the AIBTC protocol:
 
 PROPOSAL is provided as X post / tweet content.
 
