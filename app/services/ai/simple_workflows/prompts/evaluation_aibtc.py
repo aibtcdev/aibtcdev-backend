@@ -320,21 +320,13 @@ Only if your answer is "definitely no" → REJECT (but still check all gates, ca
 
 EVALUATION_AIBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the $AIBTC protocol:
 
-PROPOSAL:  
+PROPOSAL:
 {proposal_content}
 
-PROTOCOL MISSION:  
-{dao_mission}  # Ensure no contradictions with this mission (e.g., disregarding human prosperity); cite any conflicts.
+AIBTC CURRENT ORDER:
+{dao_mission}
 
-PROTOCOL VALUES:  
-- Technocapitalism leads to abundance.  
-- Deceleration leads to impoverishment.  
-- It is morally sound to accelerate technocapital.  # Verify alignment and flag any opposing elements.
-
-COMMUNITY INFO:
-{community_info}  # This includes the full charter and canonical references; confirm exact adherence (e.g., quotes, directives) and reject mismatches or contradictions, especially non-matching Current Task posts.
-
-PAST PROPOSALS:  
+PAST PROPOSALS:
 {past_proposals}
 
 Output the evaluation as a JSON object, strictly following the system guidelines."""
