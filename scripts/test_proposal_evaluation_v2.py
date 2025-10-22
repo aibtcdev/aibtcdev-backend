@@ -59,6 +59,7 @@ async def evaluate_single_proposal(
     semaphore: asyncio.Semaphore,
     original_stdout,
     original_stderr,
+    expected_decision: str | None,
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
     async with semaphore:
@@ -214,6 +215,11 @@ async def evaluate_single_proposal(
                 "flags": result.flags or [],
                 "token_usage": result.token_usage or {},
                 "images_processed": result.images_processed,
+                "expected_decision": True
+                if expected_decision == "true"
+                else False
+                if expected_decision == "false"
+                else None,
             }
 
             # Save JSON if requested
@@ -345,6 +351,9 @@ Examples:
   
   # With DAO ID for all
   python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --dao-id "DAO_ID" --save-output
+  
+  # With expected decisions (true/false, matching proposal order)
+  python test_proposal_evaluation_v2.py --proposal-id "ID1" --expected-decision true --proposal-id "ID2" --expected-decision false
         """,
     )
 
@@ -354,6 +363,14 @@ Examples:
         type=str,
         required=True,
         help="ID of the proposal to evaluate (can be specified multiple times)",
+    )
+
+    parser.add_argument(
+        "--expected-decision",
+        action="append",
+        type=str,
+        choices=["true", "false"],
+        help="Expected decision for the corresponding proposal (true=APPROVE, false=REJECT; must match proposal-id count and order)",
     )
 
     parser.add_argument(
@@ -384,6 +401,10 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    if args.expected_decision and len(args.expected_decision) != len(args.proposal_id):
+        print("❌ Number of --expected-decision must match --proposal-id")
+        sys.exit(1)
 
     if not args.proposal_id:
         print("❌ At least one proposal ID is required")
@@ -420,6 +441,7 @@ Examples:
             semaphore,
             original_stdout,
             original_stderr,
+            args.expected_decision[idx] if args.expected_decision else None,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
@@ -429,6 +451,12 @@ Examples:
     generate_summary(results, timestamp, args.save_output)
 
     print("\n🎉 Multi-proposal evaluation test completed successfully!")
+
+    # Generate or update manifest after run if saving output
+    if args.save_output:
+        from scripts.generate_evals_manifest import generate_manifest
+
+        generate_manifest()
 
 
 if __name__ == "__main__":
