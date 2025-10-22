@@ -281,9 +281,10 @@ Recent Community Sentiment: Positive
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
-                "full_messages": [msg.to_dict() for msg in full_messages]
-                if isinstance(full_messages, list)
-                else full_messages,
+                "full_messages": [
+                    msg if isinstance(msg, dict) else (msg.dict() if hasattr(msg, 'dict') else msg.to_dict())
+                    for msg in full_messages
+                ] if isinstance(full_messages, list) else full_messages,
                 "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
