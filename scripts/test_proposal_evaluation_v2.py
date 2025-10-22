@@ -220,7 +220,7 @@ Recent Community Sentiment: Positive
                 )
 
             # Determine proposal number based on descending sort (newest first)
-            proposal_number = None
+            proposal_number = proposal.proposal_id if proposal.proposal_id is not None else None
 
             # Determine prompt type
             prompt_type = "evaluation"
