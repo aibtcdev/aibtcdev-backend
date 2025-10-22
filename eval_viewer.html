@@ -674,20 +674,38 @@
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
             ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + ' | Actual ' + (prop.decision ? "APPROVE" : "REJECT") + '</p>' : ''}
           </div>
-          <div class="space-y-2 border-t border-gray-200 pt-4">
-            ${prop.categories
-              .map(
-                (cat) => `
-              <div class="flex justify-between items-center py-2.5 px-3 rounded-md bg-gray-50">
-                <span class="text-sm font-medium">${cat.category}</span>
-                <div class="text-right">
-                  <span class="text-sm font-semibold">${cat.score.toFixed(2)}</span>
-                  <span class="text-xs text-gray-500 ml-2">(${cat.reasoning[0].slice(0, 50)}...)</span>
-                </div>
-              </div>
-            `
-              )
-              .join("")}
+          <div class="border-t border-gray-200 pt-4 overflow-x-auto">
+            <table class="min-w-full table-striped">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reasoning</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${prop.categories
+                  .map(
+                    (cat) => `
+                  <tr>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm font-medium">${cat.category}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(2)}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(2)}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">
+                      <details>
+                        <summary class="cursor-pointer text-blue-600 hover:text-blue-800">${cat.reasoning[0].slice(0, 100)}...</summary>
+                        <div class="mt-2 text-gray-600 whitespace-pre-wrap">
+                          ${cat.reasoning.map(r => r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br><br>')}
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
           </div>
         `;
         card.appendChild(details);
