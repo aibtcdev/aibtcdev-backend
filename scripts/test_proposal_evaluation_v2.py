@@ -30,6 +30,7 @@ from app.services.ai.simple_workflows.evaluation import (
     format_proposals_for_context,
     retrieve_from_vector_store,
     create_embedding_model,
+    create_chat_messages,
 )
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.ai.simple_workflows.processors.twitter import (
@@ -249,6 +250,19 @@ Recent Community Sentiment: Positive
                 custom_user_prompt=custom_user_prompt,
             )
 
+            # Reconstruct full messages for logging
+            full_messages = create_chat_messages(
+                proposal_content=proposal_content,
+                dao_mission=dao_mission,
+                community_info=community_info,
+                past_proposals=past_proposals,
+                proposal_images=linked_tweet_images,
+                tweet_content=tweet_content,
+                airdrop_content=airdrop_content,
+                custom_system_prompt=custom_system_prompt,
+                custom_user_prompt=custom_user_prompt,
+            )
+
             # Convert to dict
             result_dict = {
                 "proposal_id": proposal_id,
@@ -256,6 +270,7 @@ Recent Community Sentiment: Positive
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
+                "full_messages": full_messages,
                 "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
