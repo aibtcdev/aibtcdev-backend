@@ -31,6 +31,7 @@ from app.services.ai.simple_workflows.evaluation import (
     retrieve_from_vector_store,
     create_chat_messages,
 )
+from app.lib.tokenizer import Trimmer
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.ai.simple_workflows.processors.twitter import (
     fetch_tweet,
@@ -271,6 +272,15 @@ Recent Community Sentiment: Positive
                 custom_user_prompt=custom_user_prompt,
             )
 
+            trimmer = Trimmer()
+            input_tokens = trimmer.count_tokens(full_messages)
+            output_tokens = len(trimmer.tokenizer.encode(getattr(result, "raw_response", "")))
+            computed_token_usage = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": input_tokens + output_tokens,
+            }
+
             # Convert to dict
             result_dict = {
                 "proposal_id": proposal_id,
@@ -297,7 +307,7 @@ Recent Community Sentiment: Positive
                     for cat in (result.categories or [])
                 ],
                 "flags": result.flags or [],
-                "token_usage": result.token_usage or {},
+                "token_usage": result.token_usage or computed_token_usage,
                 "images_processed": result.images_processed,
                 "expected_decision": True
                 if expected_decision == "true"
@@ -323,10 +333,12 @@ Recent Community Sentiment: Positive
             return {"proposal_id": proposal_id, "error": error_msg}
 
         finally:
-            if log_f:
-                log_f.close()
+            sys.stdout.flush()
+            sys.stderr.flush()
             sys.stdout = original_stdout
             sys.stderr = original_stderr
+            if log_f:
+                log_f.close()
 
 
 def generate_summary(
