@@ -166,9 +166,11 @@ Recent Community Sentiment: Positive
             try:
                 if dao_uuid:
                     dao_proposals = await fetch_dao_proposals(
-                        dao_uuid, exclude_proposal_id=proposal_id
+                        dao_uuid, exclude_proposal_id=None
                     )
-                    past_proposals_db_text = format_proposals_for_context(dao_proposals)
+                    # Exclude current for past_proposals
+                    past_proposals_list = [p for p in dao_proposals if p.id != proposal_uuid]
+                    past_proposals_db_text = format_proposals_for_context(past_proposals_list)
             except Exception as e:
                 print(f"Error fetching DAO proposals: {str(e)}")
                 past_proposals_db_text = "<no_proposals>No past proposals available due to error.</no_proposals>"
@@ -197,14 +199,13 @@ Recent Community Sentiment: Positive
             elif not past_proposals:
                 past_proposals = "<no_proposals>No past proposals available.</no_proposals>"
 
-            # Determine proposal number based on descending sort (like backend)
+            # Determine proposal number based on ascending sort (oldest first)
             proposal_number = index  # Default
             if dao_proposals:
-                # Backend sorts descending, so newest first - current would be #1 if newest
                 sorted_proposals = sorted(
-                    dao_proposals + [proposal],  # Include current for full count
+                    dao_proposals,  # Already includes current
                     key=lambda p: p.created_at if p.created_at else datetime.min,
-                    reverse=True
+                    reverse=False
                 )
                 for num, prop in enumerate(sorted_proposals, 1):
                     if prop.id == proposal_uuid:
