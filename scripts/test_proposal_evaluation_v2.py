@@ -272,8 +272,14 @@ Recent Community Sentiment: Positive
                 custom_user_prompt=custom_user_prompt,
             )
 
+            # Convert messages to dicts for consistent handling
+            full_messages_dict = [
+                msg if isinstance(msg, dict) else (msg.dict() if hasattr(msg, 'dict') else msg.to_dict())
+                for msg in full_messages
+            ] if isinstance(full_messages, list) else (full_messages.dict() if hasattr(full_messages, 'dict') else full_messages.to_dict())
+
             trimmer = Trimmer()
-            input_tokens = trimmer.count_tokens(full_messages)
+            input_tokens = trimmer.count_tokens(full_messages_dict)
             output_tokens = len(trimmer.tokenizer.encode(getattr(result, "raw_response", "")))
             computed_token_usage = {
                 "input_tokens": input_tokens,
@@ -288,10 +294,7 @@ Recent Community Sentiment: Positive
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
-                "full_messages": [
-                    msg if isinstance(msg, dict) else (msg.dict() if hasattr(msg, 'dict') else msg.to_dict())
-                    for msg in full_messages
-                ] if isinstance(full_messages, list) else full_messages,
+                "full_messages": full_messages_dict,
                 "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
