@@ -154,6 +154,8 @@ Recent Community Sentiment: Positive
                         tweet_data, proposal.tweet_id
                     )
 
+            print(f"DEBUG: Passing {len(linked_tweet_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in linked_tweet_images]}")
+
             # Fetch and format airdrop content
             airdrop_content = None
             if hasattr(proposal, "airdrop_id") and proposal.airdrop_id:
@@ -253,6 +255,8 @@ Recent Community Sentiment: Positive
                 custom_system_prompt=custom_system_prompt,
                 custom_user_prompt=custom_user_prompt,
             )
+
+            print(f"DEBUG: Evaluation completed. Images processed in result: {result.images_processed}")
 
             # Reconstruct full messages for logging
             full_messages = create_chat_messages(
