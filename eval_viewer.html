@@ -577,11 +577,11 @@
         promptInfo.innerHTML = `
           <details class="bg-gray-50 p-3 rounded-md">
             <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_system_prompt}</pre>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(currentEvals.full_system_prompt)}</pre>
           </details>
           <details class="bg-gray-50 p-3 rounded-md">
             <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_user_prompt}</pre>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(currentEvals.full_user_prompt)}</pre>
           </details>
         `;
         wrapper.appendChild(promptInfo);
@@ -622,6 +622,15 @@
       /**
        * Expand or collapse all proposal sections.
        */
+      function escapeHtml(unsafe) {
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+      }
+
       function toggleAll(expand) {
         const container = document.getElementById("eval-container");
         container.querySelectorAll("section > h2").forEach((title) => {
@@ -685,7 +694,7 @@
                 </tr>
               </thead>
               <tbody>
-                ${prop.categories
+                ${prop.categories && prop.categories.length > 0 ? prop.categories
                   .map(
                     (cat) => `
                   <tr>
@@ -696,14 +705,14 @@
                       <details>
                         <summary class="cursor-pointer text-blue-600 hover:text-blue-800">${cat.reasoning[0].slice(0, 100)}...</summary>
                         <div class="mt-2 text-gray-600 whitespace-pre-wrap">
-                          ${cat.reasoning.map(r => r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br><br>')}
+                          ${cat.reasoning.map(r => escapeHtml(r)).join('<br><br>')}
                         </div>
                       </details>
                     </td>
                   </tr>
                 `
                   )
-                  .join("")}
+                  .join("") : '<tr><td colspan="4" class="py-2 px-4 text-center text-sm text-gray-500">No categories available</td></tr>'}
               </tbody>
             </table>
           </div>
