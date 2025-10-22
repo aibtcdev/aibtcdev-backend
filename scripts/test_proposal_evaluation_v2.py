@@ -29,7 +29,6 @@ from app.services.ai.simple_workflows.evaluation import (
     fetch_dao_proposals,
     format_proposals_for_context,
     retrieve_from_vector_store,
-    create_embedding_model,
     create_chat_messages,
 )
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
@@ -40,7 +39,6 @@ from app.services.ai.simple_workflows.processors.twitter import (
 )
 from app.services.ai.simple_workflows.processors.airdrop import process_airdrop
 from app.backend.factory import get_backend
-from app.backend.models import ProposalFilter
 
 
 class Tee(object):
@@ -121,7 +119,9 @@ async def evaluate_single_proposal(
             proposal_content = proposal.content
             if no_proposal_content:
                 proposal_content = ""  # Empty string to omit text description
-                print(f"⚠️ Skipping user-provided proposal content for {proposal_id} (testing meme/image-only evaluation)")
+                print(
+                    f"⚠️ Skipping user-provided proposal content for {proposal_id} (testing meme/image-only evaluation)"
+                )
 
             if not proposal_content and not no_proposal_content:
                 raise ValueError(f"Proposal {proposal_id} has no content")
@@ -136,7 +136,11 @@ async def evaluate_single_proposal(
 
             # Fetch DAO for mission
             dao = backend.get_dao(dao_uuid) if dao_uuid else None
-            dao_mission = dao.mission if dao and dao.mission else "Elevate human potential through AI on Bitcoin"
+            dao_mission = (
+                dao.mission
+                if dao and dao.mission
+                else "Elevate human potential through AI on Bitcoin"
+            )
 
             # Align community info with backend
             community_info = """
@@ -153,12 +157,16 @@ Recent Community Sentiment: Positive
                 tweet_data = await fetch_tweet(proposal.tweet_id)
                 if tweet_data:
                     tweet_content = format_tweet(tweet_data)
-                    linked_tweet_images = format_tweet_images(tweet_data, proposal.tweet_id)
+                    linked_tweet_images = format_tweet_images(
+                        tweet_data, proposal.tweet_id
+                    )
 
             # Fetch and format airdrop content
             airdrop_content = None
             if hasattr(proposal, "airdrop_id") and proposal.airdrop_id:
-                airdrop_content = await process_airdrop(proposal.airdrop_id, proposal_id)
+                airdrop_content = await process_airdrop(
+                    proposal.airdrop_id, proposal_id
+                )
 
             # Aligned past proposals gathering (mimics backend)
             dao_proposals = []
@@ -169,8 +177,12 @@ Recent Community Sentiment: Positive
                         dao_uuid, exclude_proposal_id=None
                     )
                     # Exclude current for past_proposals
-                    past_proposals_list = [p for p in dao_proposals if p.id != proposal_uuid]
-                    past_proposals_db_text = format_proposals_for_context(past_proposals_list)
+                    past_proposals_list = [
+                        p for p in dao_proposals if p.id != proposal_uuid
+                    ]
+                    past_proposals_db_text = format_proposals_for_context(
+                        past_proposals_list
+                    )
             except Exception as e:
                 print(f"Error fetching DAO proposals: {str(e)}")
                 past_proposals_db_text = "<no_proposals>No past proposals available due to error.</no_proposals>"
@@ -185,8 +197,10 @@ Recent Community Sentiment: Positive
                         limit=3,
                     )
                     past_proposals_vector_text = "\n\n".join(
-                        [f'<similar_proposal id="{i + 1}">\n{doc.page_content}\n</similar_proposal>'
-                         for i, doc in enumerate(similar_proposals)]
+                        [
+                            f'<similar_proposal id="{i + 1}">\n{doc.page_content}\n</similar_proposal>'
+                            for i, doc in enumerate(similar_proposals)
+                        ]
                     )
                 except Exception as e:
                     print(f"Error retrieving from vector store: {str(e)}")
@@ -195,9 +209,15 @@ Recent Community Sentiment: Positive
             # Combine like backend
             past_proposals = past_proposals_db_text
             if past_proposals_vector_text:
-                past_proposals += ("\n\n" + past_proposals_vector_text if past_proposals else past_proposals_vector_text)
+                past_proposals += (
+                    "\n\n" + past_proposals_vector_text
+                    if past_proposals
+                    else past_proposals_vector_text
+                )
             elif not past_proposals:
-                past_proposals = "<no_proposals>No past proposals available.</no_proposals>"
+                past_proposals = (
+                    "<no_proposals>No past proposals available.</no_proposals>"
+                )
 
             # Determine proposal number based on descending sort (newest first)
             proposal_number = None
@@ -261,7 +281,9 @@ Recent Community Sentiment: Positive
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
-                "full_messages": [msg.to_dict() for msg in full_messages] if isinstance(full_messages, list) else full_messages,
+                "full_messages": [msg.to_dict() for msg in full_messages]
+                if isinstance(full_messages, list)
+                else full_messages,
                 "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
@@ -334,9 +356,7 @@ def generate_summary(
     )
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append(
-        "Proposal ID | Score | Decision | Explanation | Tweet Snippet"
-    )
+    summary_lines.append("Proposal ID | Score | Decision | Explanation | Tweet Snippet")
     summary_lines.append("-" * 80)
     for idx, result in enumerate(results, 1):
         prop_id = short_uuid(result["proposal_id"])
