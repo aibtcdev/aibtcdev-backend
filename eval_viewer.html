@@ -50,11 +50,11 @@
     <div class="container mx-auto p-4 md:p-8">
       <!-- Page header -->
       <header class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">
-          Eval Viewer
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900">Eval Viewer</h1>
         <p class="mt-2 text-lg text-gray-600">
-          Browse and analyze proposal evaluations from JSON reports in ./evals/. View per-proposal details, full prompts, scores, reasoning, and outcomes, with aggregated stats for prompt improvement.
+          Browse and analyze proposal evaluations from JSON reports in ./evals/.
+          View per-proposal details, full prompts, scores, reasoning, and
+          outcomes, with aggregated stats for prompt improvement.
         </p>
       </header>
 
@@ -66,7 +66,11 @@
         class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-4 md:flex-row md:items-end sticky top-0 z-10"
       >
         <!-- Baseline eval selector -->
-        <div class="flex-1" id="baseline-selector-container" style="display:none">
+        <div
+          class="flex-1"
+          id="baseline-selector-container"
+          style="display: none"
+        >
           <label
             for="eval-select"
             class="block text-sm font-medium text-gray-700 mb-1"
@@ -221,8 +225,10 @@
 
         // Show selectors if reports available.
         if (manifest.length > 0) {
-          document.getElementById("baseline-selector-container").style.display = "block";
-          document.getElementById("view-controls-container").style.display = "block";
+          document.getElementById("baseline-selector-container").style.display =
+            "block";
+          document.getElementById("view-controls-container").style.display =
+            "block";
         }
 
         // Preload all reports.
@@ -271,12 +277,16 @@
           ...item,
           categories: [],
           expected_decision: item.expected_decision || null,
-          mismatch: item.expected_decision !== null && item.expected_decision !== item.decision,
+          mismatch:
+            item.expected_decision !== null &&
+            item.expected_decision !== item.decision,
         }));
 
         // Merge categories from full_results
         data.full_results.forEach((full) => {
-          const prop = proposals.find((p) => p.proposal_id === full.proposal_id);
+          const prop = proposals.find(
+            (p) => p.proposal_id === full.proposal_id
+          );
           if (prop) {
             prop.categories = full.categories || [];
           }
@@ -289,13 +299,17 @@
         const categoryAverages = {};
         proposals.forEach((prop) => {
           prop.categories.forEach((cat) => {
-            categoryAverages[cat.category] = categoryAverages[cat.category] || { sum: 0, count: 0 };
+            categoryAverages[cat.category] = categoryAverages[cat.category] || {
+              sum: 0,
+              count: 0,
+            };
             categoryAverages[cat.category].sum += cat.score;
             categoryAverages[cat.category].count++;
           });
         });
         Object.keys(categoryAverages).forEach((key) => {
-          categoryAverages[key].avg = categoryAverages[key].sum / categoryAverages[key].count;
+          categoryAverages[key].avg =
+            categoryAverages[key].sum / categoryAverages[key].count;
         });
 
         const firstFull = data.full_results[0] || {};
@@ -322,12 +336,10 @@
       /**
        * When the baseline eval changes, load its data and re-render the view.
        */
-      document
-        .getElementById("eval-select")
-        .addEventListener("change", (e) => {
-          const path = e.target.value;
-          updateViewForEval(path);
-        });
+      document.getElementById("eval-select").addEventListener("change", (e) => {
+        const path = e.target.value;
+        updateViewForEval(path);
+      });
 
       /**
        * Update both the summary and detailed view when switching evals.
@@ -362,7 +374,9 @@
         const byScoreAsc = [...evals.proposals]
           .sort((a, b) => a.final_score - b.final_score)
           .slice(0, 3);
-        const mismatches = evals.proposals.filter((p) => p.mismatch).slice(0, 3);
+        const mismatches = evals.proposals
+          .filter((p) => p.mismatch)
+          .slice(0, 3);
 
         // Helper to build grouped rows
         const createRows = (label, arr, formatFn) => {
@@ -394,8 +408,12 @@
             </h2>
             <div id="summary-content" class="overflow-x-auto">
               <div class="mb-4 text-sm text-gray-600">
-                <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(2)}%</span>
-                <span class="mr-4"><strong>Avg Score:</strong> ${evals.overall_stats.avg_score.toFixed(2)}</span>
+                <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(
+                  2
+                )}%</span>
+                <span class="mr-4"><strong>Avg Score:</strong> ${evals.overall_stats.avg_score.toFixed(
+                  2
+                )}</span>
                 <span><strong>Mismatches:</strong> ${mismatches.length}</span>
               </div>
               <table class="min-w-full table-striped">
@@ -410,17 +428,26 @@
                   ${createRows(
                     "Highest Scores",
                     byScoreDesc,
-                    (prop) => `${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})`
+                    (prop) =>
+                      `${prop.final_score.toFixed(2)} (${
+                        prop.decision ? "PASS" : "FAIL"
+                      })`
                   )}
                   ${createRows(
                     "Lowest Scores",
                     byScoreAsc,
-                    (prop) => `${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})`
+                    (prop) =>
+                      `${prop.final_score.toFixed(2)} (${
+                        prop.decision ? "PASS" : "FAIL"
+                      })`
                   )}
                   ${createRows(
                     "Mismatches",
                     mismatches,
-                    (prop) => `Expected: ${prop.expected_decision ? "APPROVE" : "REJECT"} | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
+                    (prop) =>
+                      `Expected: ${
+                        prop.expected_decision ? "APPROVE" : "REJECT"
+                      } | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
                   )}
                 </tbody>
               </table>
@@ -428,7 +455,9 @@
                 <h3 class="font-bold">Category Averages</h3>
                 <ul class="list-disc pl-5 text-sm">
                   ${Object.entries(evals.categoryAverages)
-                    .map(([key, val]) => `<li>${key}: ${val.avg.toFixed(2)}</li>`)
+                    .map(
+                      ([key, val]) => `<li>${key}: ${val.avg.toFixed(2)}</li>`
+                    )
                     .join("")}
                 </ul>
               </div>
@@ -456,7 +485,9 @@
       function populateProposalFilter(evals) {
         const select = document.getElementById("proposal-filter-select");
         select.innerHTML = `<option value="all">All Proposals</option>`;
-        const uniqueProposals = [...new Set(evals.proposals.map((p) => p.proposal_id))].sort();
+        const uniqueProposals = [
+          ...new Set(evals.proposals.map((p) => p.proposal_id)),
+        ].sort();
         uniqueProposals.forEach((pid) => {
           const opt = document.createElement("option");
           opt.value = pid;
@@ -471,31 +502,45 @@
       function updateEvalView() {
         const container = document.getElementById("eval-container");
         const expansionState = new Map();
-        container.querySelectorAll("section[data-proposal-id]").forEach(section => {
-          const pid = section.dataset.proposalId;
-          const details = section.querySelector(".details");
-          if (pid && details) {
-            expansionState.set(pid, details.style.display !== "none");
-          }
-        });
+        container
+          .querySelectorAll("section[data-proposal-id]")
+          .forEach((section) => {
+            const pid = section.dataset.proposalId;
+            const details = section.querySelector(".details");
+            if (pid && details) {
+              expansionState.set(pid, details.style.display !== "none");
+            }
+          });
         if (!currentEvals || currentEvals.proposals.length === 0) {
           container.innerHTML = "";
           return;
         }
         // Filter by proposal.
-        const selectedProposal = document.getElementById("proposal-filter-select").value;
+        const selectedProposal = document.getElementById(
+          "proposal-filter-select"
+        ).value;
         let proposals = currentEvals.proposals;
         if (selectedProposal !== "all") {
-          proposals = proposals.filter((p) => p.proposal_id === selectedProposal);
+          proposals = proposals.filter(
+            (p) => p.proposal_id === selectedProposal
+          );
         }
         // Determine sort order.
         const sortValue = document.getElementById("sort-select").value;
         let sortField, sortDir;
         [sortField, sortDir] = sortValue.split("-");
         proposals.sort((a, b) => {
-          let valA = sortField === "final-score" ? a.final_score : a.proposal_id;
-          let valB = sortField === "final-score" ? b.final_score : b.proposal_id;
-          return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+          let valA =
+            sortField === "final-score" ? a.final_score : a.proposal_id;
+          let valB =
+            sortField === "final-score" ? b.final_score : b.proposal_id;
+          return sortDir === "asc"
+            ? valA > valB
+              ? 1
+              : -1
+            : valA < valB
+            ? 1
+            : -1;
         });
 
         container.innerHTML = "";
@@ -509,7 +554,8 @@
           "bg-white p-6 rounded-xl shadow-sm border border-gray-200";
 
         const mainTitle = document.createElement("h2");
-        mainTitle.className = "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
+        mainTitle.className =
+          "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
         mainTitle.innerHTML = `
           <span>Proposals</span>
           <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -521,15 +567,21 @@
         promptInfo.innerHTML = `
           <details class="bg-gray-50 p-3 rounded-md">
             <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(currentEvals.full_system_prompt)}</pre>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              currentEvals.full_system_prompt
+            )}</pre>
           </details>
           <details class="bg-gray-50 p-3 rounded-md">
             <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(currentEvals.full_user_prompt)}</pre>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              currentEvals.full_user_prompt
+            )}</pre>
           </details>
           <details class="bg-gray-50 p-3 rounded-md">
             <summary class="font-medium text-gray-700 cursor-pointer">Full LLM Message</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(JSON.stringify(currentEvals.full_messages, null, 2))}</pre>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              JSON.stringify(currentEvals.full_messages, null, 2)
+            )}</pre>
           </details>
         `;
         wrapper.appendChild(promptInfo);
@@ -540,7 +592,9 @@
         mainTitle.addEventListener("click", () => {
           const isCollapsed = contentDiv.style.display === "none";
           contentDiv.style.display = isCollapsed ? "block" : "none";
-          mainTitle.querySelector(".chevron").classList.toggle("rotate-90", isCollapsed);
+          mainTitle
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
         });
 
         // Render each proposal card.
@@ -554,7 +608,9 @@
         // Re-apply expansion state
         expansionState.forEach((isExpanded, pid) => {
           if (isExpanded) {
-            const section = wrapper.querySelector(`section[data-proposal-id="${pid}"]`);
+            const section = wrapper.querySelector(
+              `section[data-proposal-id="${pid}"]`
+            );
             if (section) {
               const title = section.querySelector("h2");
               const details = section.querySelector(".details");
@@ -572,11 +628,11 @@
        */
       function escapeHtml(unsafe) {
         return unsafe
-             .replace(/&/g, "&amp;")
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")
-             .replace(/"/g, "&quot;")
-             .replace(/'/g, "&#039;");
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
       }
 
       function toggleAll(expand) {
@@ -606,9 +662,13 @@
         const title = document.createElement("h2");
         title.className =
           "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
-        const outcomeColor = prop.decision ? "text-green-600 border-green-600" : "text-red-600 border-red-600";
+        const outcomeColor = prop.decision
+          ? "text-green-600 border-green-600"
+          : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span class="${outcomeColor}"> ${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
+          <span class="${outcomeColor}"> ${shortId} - Score: ${prop.final_score.toFixed(
+          2
+        )} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         card.appendChild(title);
@@ -620,7 +680,9 @@
         title.addEventListener("click", () => {
           const isCollapsed = details.style.display === "none";
           details.style.display = isCollapsed ? "block" : "none";
-          title.querySelector(".chevron").classList.toggle("rotate-90", isCollapsed);
+          title
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
         });
 
         // Outcome and explanation
@@ -633,7 +695,9 @@
             outcomeText += ` - Mismatch`;
           }
         }
-        const outcomeClass = prop.decision ? "border-green-600" : "border-red-600";
+        const outcomeClass = prop.decision
+          ? "border-green-600"
+          : "border-red-600";
         details.innerHTML = `
           <div class="p-4 rounded-md border ${outcomeClass}">
             <p class="font-bold ${outcomeColor}">${outcomeText}</p>
@@ -650,22 +714,37 @@
                 </tr>
               </thead>
               <tbody>
-                ${prop.categories && prop.categories.length > 0 ? prop.categories
-                  .map(
-                    (cat) => `
+                ${
+                  prop.categories && prop.categories.length > 0
+                    ? prop.categories
+                        .map(
+                          (cat) => `
                   <tr>
-                    <td class="py-2 px-4 border-b border-gray-200 text-sm font-medium">${cat.category}</td>
-                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(2)}</td>
-                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(2)}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm font-medium">${
+                      cat.category
+                    }</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(
+                      2
+                    )}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(
+                      2
+                    )}</td>
                     <td class="py-2 px-4 border-b border-gray-200 text-sm">
                       <div class="text-gray-600 whitespace-pre-wrap">
-                        ${cat.reasoning.map(r => escapeHtml(r.split('\n').map(line => line.trim()).filter(line => line.length > 0).join('\n').trim())).join('<br><br>')}
+                        ${cat.reasoning
+                          .map((r) => {
+                            const escaped = escapeHtml(r);
+                            return `<div class="mb-2">- ${escaped}</div>`;
+                          })
+                          .join("")}
                       </div>
                     </td>
                   </tr>
                 `
-                  )
-                  .join("") : '<tr><td colspan="4" class="py-2 px-4 text-center text-sm text-gray-500">No categories available</td></tr>'}
+                        )
+                        .join("")
+                    : '<tr><td colspan="4" class="py-2 px-4 text-center text-sm text-gray-500">No categories available</td></tr>'
+                }
               </tbody>
             </table>
           </div>
