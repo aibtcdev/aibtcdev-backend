@@ -564,20 +564,26 @@ Examples:
         for idx, pid in enumerate(args.proposal_id)
     ]
 
-    results = []
-    for arg_tuple in args_list:
-        result = evaluate_single_proposal(*arg_tuple)
-        results.append(result)
+    try:
+        results = []
+        for arg_tuple in args_list:
+            result = evaluate_single_proposal(*arg_tuple)
+            results.append(result)
 
-    generate_summary(results, timestamp, args.save_output)
+        generate_summary(results, timestamp, args.save_output)
 
-    print("\n🎉 Sequential proposal evaluation test completed successfully!")
+        print("\n🎉 Sequential proposal evaluation test completed successfully!")
 
-    # Generate or update manifest after run if saving output
-    if args.save_output:
-        from scripts.generate_evals_manifest import generate_manifest
+        # Generate or update manifest after run if saving output
+        if args.save_output:
+            from scripts.generate_evals_manifest import generate_manifest
 
-        generate_manifest()
+            generate_manifest()
+    finally:
+        # Clean up backend connections
+        backend.sqlalchemy_engine.dispose()
+        if backend.vecs_client:
+            backend.vecs_client.close()
 
 
 if __name__ == "__main__":
