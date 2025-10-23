@@ -14,7 +14,6 @@ import argparse
 import asyncio
 import json
 import logging
-import multiprocessing as mp
 import os
 import sys
 from datetime import datetime
@@ -386,8 +385,18 @@ def generate_summary(
     )
 
     # Expected outcomes
-    total_with_expected = sum(1 for r in results if r.get("expected_decision") is not None and "error" not in r)
-    matched = sum(1 for r in results if r.get("expected_decision") is not None and r.get("decision") == r.get("expected_decision") and "error" not in r)
+    total_with_expected = sum(
+        1
+        for r in results
+        if r.get("expected_decision") is not None and "error" not in r
+    )
+    matched = sum(
+        1
+        for r in results
+        if r.get("expected_decision") is not None
+        and r.get("decision") == r.get("expected_decision")
+        and "error" not in r
+    )
 
     summary_lines.extend(
         [
@@ -400,7 +409,9 @@ def generate_summary(
     )
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append("Proposal ID | Score | Decision | Expected | Match | Explanation | Tweet Snippet")
+    summary_lines.append(
+        "Proposal ID | Score | Decision | Expected | Match | Explanation | Tweet Snippet"
+    )
     summary_lines.append("-" * 100)
     for idx, result in enumerate(results, 1):
         prop_id = short_uuid(result["proposal_id"])
@@ -410,8 +421,17 @@ def generate_summary(
             )
         else:
             decision = "APPROVE" if result["decision"] else "REJECT"
-            expected = "APPROVE" if result.get("expected_decision") else ("REJECT" if result.get("expected_decision") is False else "N/A")
-            match = "Yes" if result.get("expected_decision") is not None and result["decision"] == result["expected_decision"] else ("No" if result.get("expected_decision") is not None else "N/A")
+            expected = (
+                "APPROVE"
+                if result.get("expected_decision")
+                else ("REJECT" if result.get("expected_decision") is False else "N/A")
+            )
+            match = (
+                "Yes"
+                if result.get("expected_decision") is not None
+                and result["decision"] == result["expected_decision"]
+                else ("No" if result.get("expected_decision") is not None else "N/A")
+            )
             expl = result.get("explanation") or "N/A"
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
@@ -448,7 +468,8 @@ def generate_summary(
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
                     "expected_decision": r.get("expected_decision"),
-                    "match": r.get("expected_decision") is not None and r.get("decision") == r.get("expected_decision"),
+                    "match": r.get("expected_decision") is not None
+                    and r.get("decision") == r.get("expected_decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
                     "tweet_snippet": (
