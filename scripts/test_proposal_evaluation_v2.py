@@ -2,12 +2,12 @@
 """
 Enhanced CLI test script for comprehensive proposal evaluations (V2).
 
-This version supports evaluating multiple proposals concurrently,
+This version supports evaluating multiple proposals sequentially,
 with per-proposal logging and JSON outputs, plus a consolidated summary.
 
 Usage:
     python test_proposal_evaluation_v2.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2
-    python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --max-concurrent 3 --save-output
+    python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --save-output
 """
 
 import argparse
@@ -222,7 +222,7 @@ Recent Community Sentiment: Positive
                     "<no_proposals>No past proposals available.</no_proposals>"
                 )
 
-            # Determine proposal number based on descending sort (newest first)
+            # Get proposal number from database
             proposal_number = (
                 proposal.proposal_id if proposal.proposal_id is not None else None
             )
@@ -420,23 +420,15 @@ def generate_summary(
                 f"Prop {prop_id} | ERROR | N/A | N/A | N/A | {result['error']} | N/A"
             )
         else:
-            decision = "APPROVE" if result["decision"] else "REJECT"
-            expected = (
-                "APPROVE"
-                if result.get("expected_decision")
-                else ("REJECT" if result.get("expected_decision") is False else "N/A")
-            )
-            match = (
-                "Yes"
-                if result.get("expected_decision") is not None
-                and result["decision"] == result["expected_decision"]
-                else ("No" if result.get("expected_decision") is not None else "N/A")
-            )
+            expected_dec = result.get("expected_decision")
+            decision_str = "APPROVE" if result["decision"] else "REJECT"
+            expected_str = "APPROVE" if expected_dec is True else ("REJECT" if expected_dec is False else "N/A")
+            match_str = "Yes" if expected_dec is not None and result["decision"] == expected_dec else ("No" if expected_dec is not None else "N/A")
             expl = result.get("explanation") or "N/A"
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
             summary_lines.append(
-                f"Prop {prop_id} | {result['final_score']:.2f} | {decision} | {expected} | {match} | {expl} | {tweet_snippet}"
+                f"Prop {prop_id} | {result['final_score']:.2f} | {decision_str} | {expected_str} | {match_str} | {expl} | {tweet_snippet}"
             )
     summary_lines.append("=" * 60)
     summary_lines.append(
@@ -508,6 +500,9 @@ Examples:
   
   # With expected decisions (true/false, matching proposal order)
   python test_proposal_evaluation_v2.py --proposal-id "ID1" --expected-decision true --proposal-id "ID2" --expected-decision false
+  
+  # Skip vector store
+  python test_proposal_evaluation_v2.py --proposal-id "ID1" --no-vector-store
         """,
     )
 
@@ -611,6 +606,9 @@ Examples:
             from scripts.generate_evals_manifest import generate_manifest
 
             generate_manifest()
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        sys.exit(1)
     finally:
         # Clean up backend connections
         backend.sqlalchemy_engine.dispose()
