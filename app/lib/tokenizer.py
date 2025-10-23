@@ -13,7 +13,20 @@ class Trimmer:
         self.tokenizer = tiktoken.encoding_for_model(token_model)
 
     def count_tokens(self, messages: List[Dict[str, Any]]) -> int:
-        text = "".join([msg["content"] for msg in messages if msg["content"]])
+        def get_content_text(content: Any) -> str:
+            if isinstance(content, str):
+                return content
+            elif isinstance(content, list):
+                return "".join(
+                    item["text"]
+                    for item in content
+                    if isinstance(item, dict)
+                    and item.get("type") == "text"
+                    and "text" in item
+                )
+            return ""
+
+        text = "".join(get_content_text(msg.get("content", "")) for msg in messages)
         return len(self.tokenizer.encode(text))
 
     def trim_messages(self, messages: List[Dict[str, Any]]) -> None:

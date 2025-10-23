@@ -267,7 +267,7 @@ async def invoke_structured(
     # Handle ChatPromptTemplate
     if isinstance(messages, ChatPromptTemplate):
         logger.debug(f"Original ChatPromptTemplate for structured output: {messages}")
-        formatted_messages = messages.format()
+        formatted_messages = messages.format_messages()
         logger.debug(
             f"Formatted messages for structured LLM invocation: {formatted_messages}"
         )

@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import multiprocessing as mp
 import os
 import sys
 from datetime import datetime
@@ -24,10 +25,22 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
-from app.services.ai.simple_workflows.evaluation import evaluate_proposal
+from app.services.ai.simple_workflows.evaluation import (
+    evaluate_proposal,
+    fetch_dao_proposals,
+    format_proposals_for_context,
+    retrieve_from_vector_store,
+    create_chat_messages,
+)
+from app.lib.tokenizer import Trimmer
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
+from app.services.ai.simple_workflows.processors.twitter import (
+    fetch_tweet,
+    format_tweet,
+    format_tweet_images,
+)
+from app.services.ai.simple_workflows.processors.airdrop import process_airdrop
 from app.backend.factory import get_backend
-from app.backend.models import ProposalFilter
 
 
 class Tee(object):
@@ -49,21 +62,22 @@ def short_uuid(uuid_str: str) -> str:
     return uuid_str[:8]
 
 
-async def evaluate_single_proposal(
+def evaluate_single_proposal(
     proposal_id: str,
     index: int,
     dao_id: str | None,
     debug_level: int,
     timestamp: str,
     save_output: bool,
-    semaphore: asyncio.Semaphore,
-    original_stdout,
-    original_stderr,
     expected_decision: str | None,
+    no_vector_store: bool,
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
-    async with semaphore:
+
+    async def inner() -> Dict[str, Any]:
         log_f = None
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
         tee_stdout = original_stdout
         tee_stderr = original_stderr
         if save_output:
@@ -102,23 +116,12 @@ async def evaluate_single_proposal(
             if not proposal:
                 raise ValueError(f"Proposal {proposal_id} not found")
 
-            if not proposal.content:
+            proposal_content = proposal.content
+
+            if not proposal_content:
                 raise ValueError(f"Proposal {proposal_id} has no content")
 
-            proposal_content = proposal.content
             print(f"✅ Found proposal: {proposal.title or 'Untitled'}")
-
-            tweet = (
-                backend.get_x_tweet(proposal.tweet_id)
-                if hasattr(proposal, "tweet_id") and proposal.tweet_id
-                else None
-            )
-
-            proposal_metadata = {
-                "title": proposal.title or "Untitled",
-                "content": proposal_content,
-                "tweet_content": getattr(tweet, "content", None) if tweet else None,
-            }
 
             # Use DAO ID from args or proposal
             effective_dao_id = (
@@ -126,23 +129,107 @@ async def evaluate_single_proposal(
             )
             dao_uuid = UUID(effective_dao_id) if effective_dao_id else None
 
-            # Determine proposal number
-            proposal_number = index  # Default to run index
-            if dao_uuid:
-                proposals = backend.list_proposals(
-                    filters=ProposalFilter(dao_id=dao_uuid)
+            # Fetch DAO for mission
+            dao = backend.get_dao(dao_uuid) if dao_uuid else None
+            dao_mission = (
+                dao.mission
+                if dao and dao.mission
+                else "Elevate human potential through AI on Bitcoin"
+            )
+
+            # Align community info with backend
+            community_info = """
+Community Size: Growing
+Active Members: Active
+Governance Participation: Moderate
+Recent Community Sentiment: Positive
+"""
+
+            # Fetch and format tweet content
+            tweet_content = None
+            linked_tweet_images = []
+            if hasattr(proposal, "tweet_id") and proposal.tweet_id:
+                tweet_data = await fetch_tweet(proposal.tweet_id)
+                if tweet_data:
+                    tweet_content = format_tweet(tweet_data)
+                    linked_tweet_images = format_tweet_images(
+                        tweet_data, proposal.tweet_id
+                    )
+
+            cleaned_images = [
+                {"type": img["type"], "image_url": img["image_url"]}
+                for img in linked_tweet_images
+            ]
+
+            print(
+                f"DEBUG: Passing {len(cleaned_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in cleaned_images]}"
+            )
+
+            # Fetch and format airdrop content
+            airdrop_content = None
+            if hasattr(proposal, "airdrop_id") and proposal.airdrop_id:
+                airdrop_content = await process_airdrop(
+                    proposal.airdrop_id, proposal_id
                 )
-                if proposals:
-                    # Sort by created_at assuming it exists
-                    sorted_proposals = sorted(proposals, key=lambda p: p.created_at)
-                    for num, prop in enumerate(sorted_proposals, 1):
-                        if prop.id == proposal_uuid:
-                            proposal_number = num
-                            break
+
+            # Aligned past proposals gathering (mimics backend)
+            dao_proposals = []
+            past_proposals_db_text = ""
+            try:
+                if dao_uuid:
+                    dao_proposals = await fetch_dao_proposals(
+                        dao_uuid, exclude_proposal_id=None
+                    )
+                    # Exclude current for past_proposals
+                    past_proposals_list = [
+                        p for p in dao_proposals if p.id != proposal_uuid
+                    ]
+                    past_proposals_db_text = format_proposals_for_context(
+                        past_proposals_list
+                    )
+            except Exception as e:
+                print(f"Error fetching DAO proposals: {str(e)}")
+                past_proposals_db_text = "<no_proposals>No past proposals available due to error.</no_proposals>"
+
+            # Vector store retrieval (optional)
+            past_proposals_vector_text = ""
+            if not no_vector_store:
+                try:
+                    similar_proposals = await retrieve_from_vector_store(
+                        query=proposal_content[:1000],
+                        collection_name="past_proposals",
+                        limit=3,
+                    )
+                    past_proposals_vector_text = "\n\n".join(
+                        [
+                            f'<similar_proposal id="{i + 1}">\n{doc.page_content}\n</similar_proposal>'
+                            for i, doc in enumerate(similar_proposals)
+                        ]
+                    )
+                except Exception as e:
+                    print(f"Error retrieving from vector store: {str(e)}")
+                    past_proposals_vector_text = "<no_similar_proposals>No similar past proposals available in vector store.</no_similar_proposals>"
+
+            # Combine like backend
+            past_proposals = past_proposals_db_text
+            if past_proposals_vector_text:
+                past_proposals += (
+                    "\n\n" + past_proposals_vector_text
+                    if past_proposals
+                    else past_proposals_vector_text
+                )
+            elif not past_proposals:
+                past_proposals = (
+                    "<no_proposals>No past proposals available.</no_proposals>"
+                )
+
+            # Determine proposal number based on descending sort (newest first)
+            proposal_number = (
+                proposal.proposal_id if proposal.proposal_id is not None else None
+            )
 
             # Determine prompt type
             prompt_type = "evaluation"
-            dao = backend.get_dao(dao_uuid) if dao_uuid else None
             if dao:
                 if dao.name == "ELONBTC":
                     prompt_type = "evaluation_elonbtc"
@@ -152,29 +239,15 @@ async def evaluate_single_proposal(
             custom_system_prompt = load_prompt(prompt_type, "system")
             custom_user_prompt = load_prompt(prompt_type, "user_template")
 
-            # Capture full prompts for logging
-            dao_mission = ""
-            community_info = ""
-            past_proposals = "No past proposals"
-            if dao:
-                if dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
-                    dao_mission = (
-                        "Make AI and Bitcoin work together for human prosperity"
-                    )
-                community_info = f"DAO Name: {dao.name}\nDescription: {getattr(dao, 'description', 'N/A')}\n"
+            # Proposal metadata for logging
+            proposal_metadata = {
+                "title": proposal.title or "Untitled",
+                "content": proposal_content,
+                "tweet_content": tweet_content,
+                "airdrop_content": airdrop_content,
+            }
 
-            if proposals:
-                sorted_proposals = sorted(
-                    proposals, key=lambda p: p.created_at or datetime.min
-                )
-                past_proposals_list = [
-                    f"Prop {num}: {p.title or 'Untitled'} - {p.content[:100]}..."
-                    for num, p in enumerate(sorted_proposals, 1)
-                    if p.id != proposal_uuid
-                ]
-                past_proposals = "\n".join(past_proposals_list)
-
-            # Explicitly format the user prompt template with the gathered information
+            # Format full_user_prompt for logging using aligned data
             full_user_prompt = custom_user_prompt.format(
                 proposal_content=proposal_content,
                 dao_mission=dao_mission,
@@ -182,14 +255,61 @@ async def evaluate_single_proposal(
                 past_proposals=past_proposals,
             )
 
-            # Run evaluation
+            # Run evaluation, passing fetched content
             result = await evaluate_proposal(
                 proposal_content=proposal_content,
                 dao_id=dao_uuid,
                 proposal_id=proposal_id,
+                images=cleaned_images,  # Pass cleaned images
+                tweet_content=tweet_content,
+                airdrop_content=airdrop_content,
                 custom_system_prompt=custom_system_prompt,
                 custom_user_prompt=custom_user_prompt,
             )
+
+            print(
+                f"DEBUG: Evaluation completed. Images processed in result: {result.images_processed}"
+            )
+
+            # Reconstruct full messages for logging
+            full_messages = create_chat_messages(
+                proposal_content=proposal_content,
+                dao_mission=dao_mission,
+                community_info=community_info,
+                past_proposals=past_proposals,
+                proposal_images=linked_tweet_images,
+                tweet_content=tweet_content,
+                airdrop_content=airdrop_content,
+                custom_system_prompt=custom_system_prompt,
+                custom_user_prompt=custom_user_prompt,
+            )
+
+            # Convert messages to dicts for consistent handling
+            full_messages_dict = (
+                [
+                    msg
+                    if isinstance(msg, dict)
+                    else (msg.dict() if hasattr(msg, "dict") else msg.to_dict())
+                    for msg in full_messages
+                ]
+                if isinstance(full_messages, list)
+                else (
+                    full_messages.dict()
+                    if hasattr(full_messages, "dict")
+                    else full_messages.to_dict()
+                )
+            )
+
+            trimmer = Trimmer()
+            input_tokens = trimmer.count_tokens(full_messages_dict)
+            output_tokens = len(
+                trimmer.tokenizer.encode(getattr(result, "raw_response", ""))
+            )
+            computed_token_usage = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": input_tokens + output_tokens,
+            }
 
             # Convert to dict
             result_dict = {
@@ -198,6 +318,7 @@ async def evaluate_single_proposal(
                 "proposal_metadata": proposal_metadata,
                 "full_system_prompt": custom_system_prompt,
                 "full_user_prompt": full_user_prompt,
+                "full_messages": full_messages_dict,
                 "raw_ai_response": getattr(result, "raw_response", "Not available"),
                 "decision": result.decision,
                 "final_score": result.final_score,
@@ -213,7 +334,7 @@ async def evaluate_single_proposal(
                     for cat in (result.categories or [])
                 ],
                 "flags": result.flags or [],
-                "token_usage": result.token_usage or {},
+                "token_usage": result.token_usage or computed_token_usage,
                 "images_processed": result.images_processed,
                 "expected_decision": True
                 if expected_decision == "true"
@@ -239,10 +360,14 @@ async def evaluate_single_proposal(
             return {"proposal_id": proposal_id, "error": error_msg}
 
         finally:
-            if log_f:
-                log_f.close()
+            sys.stdout.flush()
+            sys.stderr.flush()
             sys.stdout = original_stdout
             sys.stderr = original_stderr
+            if log_f:
+                log_f.close()
+
+    return asyncio.run(inner())
 
 
 def generate_summary(
@@ -270,15 +395,13 @@ def generate_summary(
     )
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append(
-        "Proposal Num | Score | Decision | Explanation | Tweet Snippet"
-    )
+    summary_lines.append("Proposal ID | Score | Decision | Explanation | Tweet Snippet")
     summary_lines.append("-" * 80)
     for idx, result in enumerate(results, 1):
-        prop_num = result.get("proposal_number", idx)
+        prop_id = short_uuid(result["proposal_id"])
         if "error" in result:
             summary_lines.append(
-                f"Prop {prop_num} | ERROR | N/A | {result['error']} | N/A"
+                f"Prop {prop_id} | ERROR | N/A | {result['error']} | N/A"
             )
         else:
             decision = "APPROVE" if result["decision"] else "REJECT"
@@ -286,7 +409,7 @@ def generate_summary(
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
             summary_lines.append(
-                f"Prop {prop_num} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
+                f"Prop {prop_id} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
             )
     summary_lines.append("=" * 60)
     summary_lines.append(
@@ -313,7 +436,6 @@ def generate_summary(
             "compact_scores": [
                 {
                     "proposal_id": r["proposal_id"],
-                    "proposal_number": r.get("proposal_number"),
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
                     "explanation": r.get("explanation"),
@@ -337,7 +459,7 @@ def generate_summary(
     return summary_text
 
 
-async def main():
+def main():
     parser = argparse.ArgumentParser(
         description="Test comprehensive proposal evaluation workflow (V2 - Multi-proposal)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -400,6 +522,12 @@ Examples:
         help="Maximum concurrent evaluations (default: 5)",
     )
 
+    parser.add_argument(
+        "--no-vector-store",
+        action="store_true",
+        help="Skip vector store retrieval for past proposals",
+    )
+
     args = parser.parse_args()
 
     if args.expected_decision and len(args.expected_decision) != len(args.proposal_id):
@@ -413,9 +541,6 @@ Examples:
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-
     if args.save_output:
         os.makedirs("evals", exist_ok=True)
 
@@ -426,27 +551,25 @@ Examples:
     print(f"Debug Level: {args.debug_level}")
     print(f"Max Concurrent: {args.max_concurrent}")
     print(f"Save Output: {args.save_output}")
+    print(f"No Vector Store: {args.no_vector_store}")
     print("=" * 60)
 
-    semaphore = asyncio.Semaphore(args.max_concurrent)
-
-    tasks = [
-        evaluate_single_proposal(
+    args_list = [
+        (
             pid,
             idx + 1,
             args.dao_id,
             args.debug_level,
             timestamp,
             args.save_output,
-            semaphore,
-            original_stdout,
-            original_stderr,
             args.expected_decision[idx] if args.expected_decision else None,
+            args.no_vector_store,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
 
-    results = await asyncio.gather(*tasks)
+    with mp.Pool(args.max_concurrent) as pool:
+        results = pool.starmap(evaluate_single_proposal, args_list)
 
     generate_summary(results, timestamp, args.save_output)
 
@@ -460,4 +583,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

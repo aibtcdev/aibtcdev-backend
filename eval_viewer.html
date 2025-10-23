@@ -50,64 +50,13 @@
     <div class="container mx-auto p-4 md:p-8">
       <!-- Page header -->
       <header class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">
-          Eval Viewer
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900">Eval Viewer</h1>
         <p class="mt-2 text-lg text-gray-600">
-          Browse and analyze proposal evaluations from JSON reports in ./evals/. View per-proposal details, full prompts, scores, reasoning, and outcomes, with aggregated stats for prompt improvement.
+          Browse and analyze proposal evaluations from JSON reports in ./evals/.
+          View per-proposal details, full prompts, scores, reasoning, and
+          outcomes, with aggregated stats for prompt improvement.
         </p>
       </header>
-
-      <!-- Legend describing the eval structure -->
-      <section
-        class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8"
-      >
-        <h2
-          id="metrics-explainer-title"
-          class="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center"
-        >
-          <span>Understanding the Eval Structure</span>
-          <svg
-            class="w-6 h-6 transform transition-transform chevron"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            ></path>
-          </svg>
-        </h2>
-        <div id="metrics-explainer-content" style="display: none">
-          <div
-            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm"
-          >
-            <div class="p-3 bg-gray-100 rounded-lg">
-              <h3 class="font-bold">Final Score</h3>
-              <p class="text-gray-600">Weighted average of category scores (0-100).</p>
-            </div>
-            <div class="p-3 bg-gray-100 rounded-lg">
-              <h3 class="font-bold">Decision</h3>
-              <p class="text-gray-600">APPROVE or REJECT based on thresholds.</p>
-            </div>
-            <div class="p-3 bg-gray-100 rounded-lg">
-              <h3 class="font-bold">Categories</h3>
-              <p class="text-gray-600">Breakdown of scores and reasoning per eval criterion.</p>
-            </div>
-            <div class="p-3 bg-gray-100 rounded-lg">
-              <h3 class="font-bold">Flags</h3>
-              <p class="text-gray-600">Hard cap failures (e.g., H1 for alignment).</p>
-            </div>
-          </div>
-          <p class="mt-4 text-sm text-gray-500">
-            Each eval includes full system/user prompts used, per-proposal reasoning, and outcomes. Aggregates show pass rates and averages for analysis.
-          </p>
-        </div>
-      </section>
 
       <!-- Summary of key insights will be injected here -->
       <section id="summary-container" class="mb-8"></section>
@@ -117,7 +66,11 @@
         class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-4 md:flex-row md:items-end sticky top-0 z-10"
       >
         <!-- Baseline eval selector -->
-        <div class="flex-1" id="baseline-selector-container" style="display:none">
+        <div
+          class="flex-1"
+          id="baseline-selector-container"
+          style="display: none"
+        >
           <label
             for="eval-select"
             class="block text-sm font-medium text-gray-700 mb-1"
@@ -248,21 +201,6 @@
           .getElementById("collapse-all-btn")
           .addEventListener("click", () => toggleAll(false));
 
-        // Add click listener for collapsible metrics explainer.
-        const metricsTitle = document.getElementById("metrics-explainer-title");
-        const metricsContent = document.getElementById(
-          "metrics-explainer-content"
-        );
-        if (metricsTitle && metricsContent) {
-          metricsTitle.addEventListener("click", () => {
-            const isCollapsed = metricsContent.style.display === "none";
-            metricsContent.style.display = isCollapsed ? "block" : "none";
-            metricsTitle
-              .querySelector(".chevron")
-              .classList.toggle("rotate-90", isCollapsed);
-          });
-        }
-
         // Load manifest of reports. This should be a JSON array of
         // objects with `path` and `name` fields.
         let manifest = [];
@@ -287,8 +225,10 @@
 
         // Show selectors if reports available.
         if (manifest.length > 0) {
-          document.getElementById("baseline-selector-container").style.display = "block";
-          document.getElementById("view-controls-container").style.display = "block";
+          document.getElementById("baseline-selector-container").style.display =
+            "block";
+          document.getElementById("view-controls-container").style.display =
+            "block";
         }
 
         // Preload all reports.
@@ -335,10 +275,25 @@
 
         const proposals = data.compact_scores.map((item) => ({
           ...item,
-          categories: item.categories || [],
+          categories: [],
           expected_decision: item.expected_decision || null,
-          mismatch: item.expected_decision !== null && item.expected_decision !== item.decision,
+          mismatch:
+            item.expected_decision !== null &&
+            item.expected_decision !== item.decision,
         }));
+
+        // Merge categories and prompts from full_results
+        data.full_results.forEach((full) => {
+          const prop = proposals.find(
+            (p) => p.proposal_id === full.proposal_id
+          );
+          if (prop) {
+            prop.categories = full.categories || [];
+            prop.full_system_prompt = full.full_system_prompt || "N/A";
+            prop.full_user_prompt = full.full_user_prompt || "N/A";
+            prop.full_messages = full.full_messages || [];
+          }
+        });
 
         // Compute aggregates
         const total = data.overall_stats.total_proposals;
@@ -347,13 +302,17 @@
         const categoryAverages = {};
         proposals.forEach((prop) => {
           prop.categories.forEach((cat) => {
-            categoryAverages[cat.category] = categoryAverages[cat.category] || { sum: 0, count: 0 };
+            categoryAverages[cat.category] = categoryAverages[cat.category] || {
+              sum: 0,
+              count: 0,
+            };
             categoryAverages[cat.category].sum += cat.score;
             categoryAverages[cat.category].count++;
           });
         });
         Object.keys(categoryAverages).forEach((key) => {
-          categoryAverages[key].avg = categoryAverages[key].sum / categoryAverages[key].count;
+          categoryAverages[key].avg =
+            categoryAverages[key].sum / categoryAverages[key].count;
         });
 
         return {
@@ -362,8 +321,6 @@
           proposals,
           categoryAverages,
           full_results: data.full_results || [],
-          full_system_prompt: data.full_results[0]?.full_system_prompt || "N/A",
-          full_user_prompt: data.full_results[0]?.full_user_prompt || "N/A",
         };
       }
 
@@ -378,12 +335,10 @@
       /**
        * When the baseline eval changes, load its data and re-render the view.
        */
-      document
-        .getElementById("eval-select")
-        .addEventListener("change", (e) => {
-          const path = e.target.value;
-          updateViewForEval(path);
-        });
+      document.getElementById("eval-select").addEventListener("change", (e) => {
+        const path = e.target.value;
+        updateViewForEval(path);
+      });
 
       /**
        * Update both the summary and detailed view when switching evals.
@@ -418,7 +373,9 @@
         const byScoreAsc = [...evals.proposals]
           .sort((a, b) => a.final_score - b.final_score)
           .slice(0, 3);
-        const mismatches = evals.proposals.filter((p) => p.mismatch).slice(0, 3);
+        const mismatches = evals.proposals
+          .filter((p) => p.mismatch)
+          .slice(0, 3);
 
         // Helper to build grouped rows
         const createRows = (label, arr, formatFn) => {
@@ -450,8 +407,12 @@
             </h2>
             <div id="summary-content" class="overflow-x-auto">
               <div class="mb-4 text-sm text-gray-600">
-                <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(2)}%</span>
-                <span class="mr-4"><strong>Avg Score:</strong> ${evals.overall_stats.avg_score.toFixed(2)}</span>
+                <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(
+                  2
+                )}%</span>
+                <span class="mr-4"><strong>Avg Score:</strong> ${evals.overall_stats.avg_score.toFixed(
+                  2
+                )}</span>
                 <span><strong>Mismatches:</strong> ${mismatches.length}</span>
               </div>
               <table class="min-w-full table-striped">
@@ -466,17 +427,26 @@
                   ${createRows(
                     "Highest Scores",
                     byScoreDesc,
-                    (prop) => `${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})`
+                    (prop) =>
+                      `${prop.final_score.toFixed(2)} (${
+                        prop.decision ? "PASS" : "FAIL"
+                      })`
                   )}
                   ${createRows(
                     "Lowest Scores",
                     byScoreAsc,
-                    (prop) => `${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})`
+                    (prop) =>
+                      `${prop.final_score.toFixed(2)} (${
+                        prop.decision ? "PASS" : "FAIL"
+                      })`
                   )}
                   ${createRows(
                     "Mismatches",
                     mismatches,
-                    (prop) => `Expected: ${prop.expected_decision ? "APPROVE" : "REJECT"} | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
+                    (prop) =>
+                      `Expected: ${
+                        prop.expected_decision ? "APPROVE" : "REJECT"
+                      } | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
                   )}
                 </tbody>
               </table>
@@ -484,7 +454,9 @@
                 <h3 class="font-bold">Category Averages</h3>
                 <ul class="list-disc pl-5 text-sm">
                   ${Object.entries(evals.categoryAverages)
-                    .map(([key, val]) => `<li>${key}: ${val.avg.toFixed(2)}</li>`)
+                    .map(
+                      ([key, val]) => `<li>${key}: ${val.avg.toFixed(2)}</li>`
+                    )
                     .join("")}
                 </ul>
               </div>
@@ -512,7 +484,9 @@
       function populateProposalFilter(evals) {
         const select = document.getElementById("proposal-filter-select");
         select.innerHTML = `<option value="all">All Proposals</option>`;
-        const uniqueProposals = [...new Set(evals.proposals.map((p) => p.proposal_id))].sort();
+        const uniqueProposals = [
+          ...new Set(evals.proposals.map((p) => p.proposal_id)),
+        ].sort();
         uniqueProposals.forEach((pid) => {
           const opt = document.createElement("option");
           opt.value = pid;
@@ -527,31 +501,45 @@
       function updateEvalView() {
         const container = document.getElementById("eval-container");
         const expansionState = new Map();
-        container.querySelectorAll("section[data-proposal-id]").forEach(section => {
-          const pid = section.dataset.proposalId;
-          const details = section.querySelector(".details");
-          if (pid && details) {
-            expansionState.set(pid, details.style.display !== "none");
-          }
-        });
+        container
+          .querySelectorAll("section[data-proposal-id]")
+          .forEach((section) => {
+            const pid = section.dataset.proposalId;
+            const details = section.querySelector(".details");
+            if (pid && details) {
+              expansionState.set(pid, details.style.display !== "none");
+            }
+          });
         if (!currentEvals || currentEvals.proposals.length === 0) {
           container.innerHTML = "";
           return;
         }
         // Filter by proposal.
-        const selectedProposal = document.getElementById("proposal-filter-select").value;
+        const selectedProposal = document.getElementById(
+          "proposal-filter-select"
+        ).value;
         let proposals = currentEvals.proposals;
         if (selectedProposal !== "all") {
-          proposals = proposals.filter((p) => p.proposal_id === selectedProposal);
+          proposals = proposals.filter(
+            (p) => p.proposal_id === selectedProposal
+          );
         }
         // Determine sort order.
         const sortValue = document.getElementById("sort-select").value;
         let sortField, sortDir;
         [sortField, sortDir] = sortValue.split("-");
         proposals.sort((a, b) => {
-          let valA = sortField === "final-score" ? a.final_score : a.proposal_id;
-          let valB = sortField === "final-score" ? b.final_score : b.proposal_id;
-          return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+          let valA =
+            sortField === "final-score" ? a.final_score : a.proposal_id;
+          let valB =
+            sortField === "final-score" ? b.final_score : b.proposal_id;
+          return sortDir === "asc"
+            ? valA > valB
+              ? 1
+              : -1
+            : valA < valB
+            ? 1
+            : -1;
         });
 
         container.innerHTML = "";
@@ -565,26 +553,14 @@
           "bg-white p-6 rounded-xl shadow-sm border border-gray-200";
 
         const mainTitle = document.createElement("h2");
-        mainTitle.className = "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
+        mainTitle.className =
+          "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
         mainTitle.innerHTML = `
           <span>Proposals</span>
           <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
-        wrapper.appendChild(mainTitle);
 
-        const promptInfo = document.createElement("div");
-        promptInfo.className = "space-y-2 mb-4";
-        promptInfo.innerHTML = `
-          <details class="bg-gray-50 p-3 rounded-md">
-            <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_system_prompt}</pre>
-          </details>
-          <details class="bg-gray-50 p-3 rounded-md">
-            <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
-            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${currentEvals.full_user_prompt}</pre>
-          </details>
-        `;
-        wrapper.appendChild(promptInfo);
+        wrapper.appendChild(mainTitle);
 
         const contentDiv = document.createElement("div");
         contentDiv.className = "space-y-8 pt-4";
@@ -592,7 +568,9 @@
         mainTitle.addEventListener("click", () => {
           const isCollapsed = contentDiv.style.display === "none";
           contentDiv.style.display = isCollapsed ? "block" : "none";
-          mainTitle.querySelector(".chevron").classList.toggle("rotate-90", isCollapsed);
+          mainTitle
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
         });
 
         // Render each proposal card.
@@ -606,7 +584,9 @@
         // Re-apply expansion state
         expansionState.forEach((isExpanded, pid) => {
           if (isExpanded) {
-            const section = wrapper.querySelector(`section[data-proposal-id="${pid}"]`);
+            const section = wrapper.querySelector(
+              `section[data-proposal-id="${pid}"]`
+            );
             if (section) {
               const title = section.querySelector("h2");
               const details = section.querySelector(".details");
@@ -622,6 +602,15 @@
       /**
        * Expand or collapse all proposal sections.
        */
+      function escapeHtml(unsafe) {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
       function toggleAll(expand) {
         const container = document.getElementById("eval-container");
         container.querySelectorAll("section > h2").forEach((title) => {
@@ -649,9 +638,13 @@
         const title = document.createElement("h2");
         title.className =
           "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
-        const outcomeColor = prop.decision ? "text-green-600 border-green-600" : "text-red-600 border-red-600";
+        const outcomeColor = prop.decision
+          ? "text-green-600 border-green-600"
+          : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span class="${outcomeColor} border-b-2 pb-1">Prop ${prop.proposal_number}: ${shortId} - Score: ${prop.final_score.toFixed(2)} (${prop.decision ? "PASS" : "FAIL"})</span>
+          <span class="${outcomeColor}"> ${shortId} - Score: ${prop.final_score.toFixed(
+          2
+        )} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         card.appendChild(title);
@@ -663,31 +656,102 @@
         title.addEventListener("click", () => {
           const isCollapsed = details.style.display === "none";
           details.style.display = isCollapsed ? "block" : "none";
-          title.querySelector(".chevron").classList.toggle("rotate-90", isCollapsed);
+          title
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
         });
 
         // Outcome and explanation
-        const outcomeClass = prop.decision ? "border-green-600" : "border-red-600";
+        let outcomeText = `Outcome: ${prop.decision ? "APPROVE" : "REJECT"}`;
+        if (prop.expected_decision !== null) {
+          const expected = prop.expected_decision ? "APPROVE" : "REJECT";
+          const actual = prop.decision ? "APPROVE" : "REJECT";
+          outcomeText += ` (Expected: ${expected})`;
+          if (prop.mismatch) {
+            outcomeText += ` - Mismatch`;
+          }
+        }
+        const outcomeClass = prop.decision
+          ? "border-green-600"
+          : "border-red-600";
         details.innerHTML = `
           <div class="p-4 rounded-md border ${outcomeClass}">
-            <p class="font-bold ${outcomeColor}">Outcome: ${prop.decision ? "APPROVE" : "REJECT"}</p>
+            <p class="font-bold ${outcomeColor}">${outcomeText}</p>
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
-            ${prop.mismatch ? '<p class="font-semibold text-yellow-800">Mismatch: Expected ' + (prop.expected_decision ? "APPROVE" : "REJECT") + ' | Actual ' + (prop.decision ? "APPROVE" : "REJECT") + '</p>' : ''}
           </div>
-          <div class="space-y-2 border-t border-gray-200 pt-4">
-            ${prop.categories
-              .map(
-                (cat) => `
-              <div class="flex justify-between items-center py-2.5 px-3 rounded-md bg-gray-50">
-                <span class="text-sm font-medium">${cat.category}</span>
-                <div class="text-right">
-                  <span class="text-sm font-semibold">${cat.score.toFixed(2)}</span>
-                  <span class="text-xs text-gray-500 ml-2">(${cat.reasoning[0].slice(0, 50)}...)</span>
-                </div>
-              </div>
-            `
-              )
-              .join("")}
+        `;
+
+        // Prompt info
+        const promptInfo = document.createElement("div");
+        promptInfo.className = "space-y-2 mb-4";
+        promptInfo.innerHTML = `
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              prop.full_system_prompt
+            )}</pre>
+          </details>
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              prop.full_user_prompt
+            )}</pre>
+          </details>
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full LLM Messages</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+              JSON.stringify(prop.full_messages, null, 2)
+            )}</pre>
+          </details>
+        `;
+        details.appendChild(promptInfo);
+
+        // Categories table
+        details.innerHTML += `
+          <div class="border-t border-gray-200 pt-4 overflow-x-auto">
+            <table class="min-w-full table-striped">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reasoning</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  prop.categories && prop.categories.length > 0
+                    ? prop.categories
+                        .map(
+                          (cat) => `
+                  <tr>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm font-medium">${
+                      cat.category
+                    }</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(
+                      2
+                    )}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.weight.toFixed(
+                      2
+                    )}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">
+                      <div class="text-gray-600 whitespace-pre-wrap">
+                        ${cat.reasoning
+                          .map((r) => {
+                            const escaped = escapeHtml(r);
+                            return `<div class="mb-2">- ${escaped}</div>`;
+                          })
+                          .join("")}
+                      </div>
+                    </td>
+                  </tr>
+                `
+                        )
+                        .join("")
+                    : '<tr><td colspan="4" class="py-2 px-4 text-center text-sm text-gray-500">No categories available</td></tr>'
+                }
+              </tbody>
+            </table>
           </div>
         `;
         card.appendChild(details);
