@@ -620,8 +620,8 @@ Examples:
     finally:
         # Clean up backend connections
         backend.sqlalchemy_engine.dispose()
-        if backend.vecs_client:
-            backend.vecs_client.close()
+        #if backend.vecs_client:
+        #    backend.vecs_client.close()
 
 
 if __name__ == "__main__":
