@@ -422,8 +422,16 @@ def generate_summary(
         else:
             expected_dec = result.get("expected_decision")
             decision_str = "APPROVE" if result["decision"] else "REJECT"
-            expected_str = "APPROVE" if expected_dec is True else ("REJECT" if expected_dec is False else "N/A")
-            match_str = "Yes" if expected_dec is not None and result["decision"] == expected_dec else ("No" if expected_dec is not None else "N/A")
+            expected_str = (
+                "APPROVE"
+                if expected_dec is True
+                else ("REJECT" if expected_dec is False else "N/A")
+            )
+            match_str = (
+                "Yes"
+                if expected_dec is not None and result["decision"] == expected_dec
+                else ("No" if expected_dec is not None else "N/A")
+            )
             expl = result.get("explanation") or "N/A"
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
