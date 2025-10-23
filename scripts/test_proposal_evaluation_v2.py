@@ -2,19 +2,18 @@
 """
 Enhanced CLI test script for comprehensive proposal evaluations (V2).
 
-This version supports evaluating multiple proposals concurrently,
+This version supports evaluating multiple proposals sequentially,
 with per-proposal logging and JSON outputs, plus a consolidated summary.
 
 Usage:
     python test_proposal_evaluation_v2.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2
-    python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --max-concurrent 3 --save-output
+    python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --save-output
 """
 
 import argparse
 import asyncio
 import json
 import logging
-import multiprocessing as mp
 import os
 import sys
 from datetime import datetime
@@ -57,6 +56,27 @@ class Tee(object):
             f.flush()
 
 
+def reset_logging():
+    """Reset logging to a clean state with a handler to original sys.stderr."""
+    root_logger = logging.getLogger()
+    # Remove all existing handlers to clear any references to Tee/closed files
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    # Add a fresh handler to the current (original) sys.stderr
+    clean_handler = logging.StreamHandler(sys.stderr)
+    clean_handler.setFormatter(StructuredFormatter())
+    clean_handler.setLevel(logging.INFO)  # Or match your default level
+    root_logger.addHandler(clean_handler)
+    root_logger.setLevel(clean_handler.level)
+    # Propagate changes to other loggers if needed
+    for logger_name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            logger.setLevel(root_logger.level)
+            logger.handlers.clear()  # Clear per-logger handlers
+            logger.propagate = True
+    setup_uvicorn_logging()  # Re-apply any custom setup
+
+
 def short_uuid(uuid_str: str) -> str:
     """Get first 8 characters of UUID for file naming."""
     return uuid_str[:8]
@@ -71,6 +91,7 @@ def evaluate_single_proposal(
     save_output: bool,
     expected_decision: str | None,
     no_vector_store: bool,
+    backend,  # Shared backend instance
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
 
@@ -110,7 +131,6 @@ def evaluate_single_proposal(
             proposal_uuid = UUID(proposal_id)
 
             print(f"📋 Evaluating proposal {index}: {proposal_id}")
-            backend = get_backend()
             proposal = backend.get_proposal(proposal_uuid)
 
             if not proposal:
@@ -223,7 +243,7 @@ Recent Community Sentiment: Positive
                     "<no_proposals>No past proposals available.</no_proposals>"
                 )
 
-            # Determine proposal number based on descending sort (newest first)
+            # Get proposal number from database
             proposal_number = (
                 proposal.proposal_id if proposal.proposal_id is not None else None
             )
@@ -385,31 +405,59 @@ def generate_summary(
         1, successful_count
     )
 
+    # Expected outcomes
+    total_with_expected = sum(
+        1
+        for r in results
+        if r.get("expected_decision") is not None and "error" not in r
+    )
+    matched = sum(
+        1
+        for r in results
+        if r.get("expected_decision") is not None
+        and r.get("decision") == r.get("expected_decision")
+        and "error" not in r
+    )
+
     summary_lines.extend(
         [
             f"Total Proposals: {total_proposals}",
             f"Passed: {passed} | Rejected/Failed: {failed}",
             f"Average Score: {avg_score:.2f}",
+            f"Expected Outcomes: {matched}/{total_with_expected} matched",
             "=" * 60,
         ]
     )
 
     summary_lines.append("Compact Scores Overview:")
-    summary_lines.append("Proposal ID | Score | Decision | Explanation | Tweet Snippet")
-    summary_lines.append("-" * 80)
+    summary_lines.append(
+        "Proposal ID | Score | Decision | Expected | Match | Explanation | Tweet Snippet"
+    )
+    summary_lines.append("-" * 100)
     for idx, result in enumerate(results, 1):
         prop_id = short_uuid(result["proposal_id"])
         if "error" in result:
             summary_lines.append(
-                f"Prop {prop_id} | ERROR | N/A | {result['error']} | N/A"
+                f"Prop {prop_id} | ERROR | N/A | N/A | N/A | {result['error']} | N/A"
             )
         else:
-            decision = "APPROVE" if result["decision"] else "REJECT"
+            expected_dec = result.get("expected_decision")
+            decision_str = "APPROVE" if result["decision"] else "REJECT"
+            expected_str = (
+                "APPROVE"
+                if expected_dec is True
+                else ("REJECT" if expected_dec is False else "N/A")
+            )
+            match_str = (
+                "Yes"
+                if expected_dec is not None and result["decision"] == expected_dec
+                else ("No" if expected_dec is not None else "N/A")
+            )
             expl = result.get("explanation") or "N/A"
             content = result.get("proposal_metadata", {}).get("tweet_content", "")
             tweet_snippet = content and f"{content[:50]}..." or "N/A"
             summary_lines.append(
-                f"Prop {prop_id} | {result['final_score']:.2f} | {decision} | {expl} | {tweet_snippet}"
+                f"Prop {prop_id} | {result['final_score']:.2f} | {decision_str} | {expected_str} | {match_str} | {expl} | {tweet_snippet}"
             )
     summary_lines.append("=" * 60)
     summary_lines.append(
@@ -432,12 +480,17 @@ def generate_summary(
                 "passed": passed,
                 "failed": failed,
                 "avg_score": avg_score,
+                "matched_expected": matched,
+                "total_with_expected": total_with_expected,
             },
             "compact_scores": [
                 {
                     "proposal_id": r["proposal_id"],
                     "final_score": r.get("final_score"),
                     "decision": r.get("decision"),
+                    "expected_decision": r.get("expected_decision"),
+                    "match": r.get("expected_decision") is not None
+                    and r.get("decision") == r.get("expected_decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
                     "tweet_snippet": (
@@ -461,7 +514,7 @@ def generate_summary(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Test comprehensive proposal evaluation workflow (V2 - Multi-proposal)",
+        description="Test comprehensive proposal evaluation workflow (V2 - Sequential)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -469,13 +522,16 @@ Examples:
   python test_proposal_evaluation_v2.py --proposal-id "12345678-1234-5678-9012-123456789abc" --debug-level 2
   
   # Multiple proposals
-  python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --max-concurrent 3 --save-output
+  python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --save-output
   
   # With DAO ID for all
   python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --dao-id "DAO_ID" --save-output
   
   # With expected decisions (true/false, matching proposal order)
   python test_proposal_evaluation_v2.py --proposal-id "ID1" --expected-decision true --proposal-id "ID2" --expected-decision false
+  
+  # Skip vector store
+  python test_proposal_evaluation_v2.py --proposal-id "ID1" --no-vector-store
         """,
     )
 
@@ -516,13 +572,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--max-concurrent",
-        type=int,
-        default=5,
-        help="Maximum concurrent evaluations (default: 5)",
-    )
-
-    parser.add_argument(
         "--no-vector-store",
         action="store_true",
         help="Skip vector store retrieval for past proposals",
@@ -544,15 +593,17 @@ Examples:
     if args.save_output:
         os.makedirs("evals", exist_ok=True)
 
-    print("🚀 Starting Multi-Proposal Evaluation Test V2")
+    print("🚀 Starting Sequential Proposal Evaluation Test V2")
     print("=" * 60)
     print(f"Proposals: {len(args.proposal_id)}")
     print(f"DAO ID: {args.dao_id or 'Auto-detect per proposal'}")
     print(f"Debug Level: {args.debug_level}")
-    print(f"Max Concurrent: {args.max_concurrent}")
     print(f"Save Output: {args.save_output}")
     print(f"No Vector Store: {args.no_vector_store}")
     print("=" * 60)
+
+    # Create single backend instance
+    backend = get_backend()
 
     args_list = [
         (
@@ -564,22 +615,36 @@ Examples:
             args.save_output,
             args.expected_decision[idx] if args.expected_decision else None,
             args.no_vector_store,
+            backend,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
 
-    with mp.Pool(args.max_concurrent) as pool:
-        results = pool.starmap(evaluate_single_proposal, args_list)
+    try:
+        results = []
+        for arg_tuple in args_list:
+            result = evaluate_single_proposal(*arg_tuple)
+            results.append(result)
 
-    generate_summary(results, timestamp, args.save_output)
+        # Reset logging to avoid writing to closed Tee files
+        reset_logging()
 
-    print("\n🎉 Multi-proposal evaluation test completed successfully!")
+        generate_summary(results, timestamp, args.save_output)
 
-    # Generate or update manifest after run if saving output
-    if args.save_output:
-        from scripts.generate_evals_manifest import generate_manifest
+        print("\n🎉 Sequential proposal evaluation test completed successfully!")
 
-        generate_manifest()
+        # Generate or update manifest after run if saving output
+        if args.save_output:
+            from scripts.generate_evals_manifest import generate_manifest
+
+            generate_manifest()
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Clean up backend connections
+        backend.sqlalchemy_engine.dispose()
+        # Removed: backend.vecs_client.close()  # Not supported by vecs_client; unnecessary for cleanup
 
 
 if __name__ == "__main__":
