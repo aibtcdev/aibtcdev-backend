@@ -20,7 +20,9 @@ class Trimmer:
                 return "".join(
                     item["text"]
                     for item in content
-                    if isinstance(item, dict) and item.get("type") == "text" and "text" in item
+                    if isinstance(item, dict)
+                    and item.get("type") == "text"
+                    and "text" in item
                 )
             return ""
 

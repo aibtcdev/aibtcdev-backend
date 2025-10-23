@@ -70,7 +70,9 @@ async def test_vision():
 
 
 from langchain_core.prompts import ChatPromptTemplate
-from app.services.ai.simple_workflows.prompts.evaluation_aibtc import EVALUATION_AIBTC_SYSTEM_PROMPT
+from app.services.ai.simple_workflows.prompts.evaluation_aibtc import (
+    EVALUATION_AIBTC_SYSTEM_PROMPT,
+)
 from app.services.ai.simple_workflows.models import ComprehensiveEvaluationOutput
 from app.services.ai.simple_workflows.llm import invoke_structured
 
@@ -112,21 +114,21 @@ async def test_vision_with_system_prompt():
                 "- **Credibility:** >= 99% of contribution approvals committed within 3 BTC blocks.\n\n"
                 "PAST PROPOSALS:\n[Sample past proposals here - paste from your logs or a test case]\n\n"
                 "Output the evaluation as a JSON object, strictly following the system guidelines."
-            )
+            ),
         },
         {
             "type": "image_url",
             "image_url": {
                 "url": "https://pbs.twimg.com/media/G30q05GWEAAvHjR.jpg",
                 "detail": "auto",
-            }
-        }
+            },
+        },
     ]
 
     # Create messages list (system + user)
     messages_list = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_content}
+        {"role": "user", "content": user_content},
     ]
 
     # Wrap in ChatPromptTemplate
@@ -137,7 +139,7 @@ async def test_vision_with_system_prompt():
         response = await invoke_structured(
             messages=prompt,
             output_schema=ComprehensiveEvaluationOutput,
-            model="gpt-4o"  # Use a known vision model
+            model="gpt-4o",  # Use a known vision model
         )
         print("LLM Structured Response:")
         print(response)  # Check if explanation/categories reference the image

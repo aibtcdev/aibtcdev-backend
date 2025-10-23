@@ -157,14 +157,13 @@ Recent Community Sentiment: Positive
                     )
 
             cleaned_images = [
-                {
-                    "type": img["type"],
-                    "image_url": img["image_url"]
-                }
+                {"type": img["type"], "image_url": img["image_url"]}
                 for img in linked_tweet_images
             ]
 
-            print(f"DEBUG: Passing {len(cleaned_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in cleaned_images]}")
+            print(
+                f"DEBUG: Passing {len(cleaned_images)} images to evaluate_proposal: {[img['image_url']['url'] for img in cleaned_images]}"
+            )
 
             # Fetch and format airdrop content
             airdrop_content = None
@@ -225,7 +224,9 @@ Recent Community Sentiment: Positive
                 )
 
             # Determine proposal number based on descending sort (newest first)
-            proposal_number = proposal.proposal_id if proposal.proposal_id is not None else None
+            proposal_number = (
+                proposal.proposal_id if proposal.proposal_id is not None else None
+            )
 
             # Determine prompt type
             prompt_type = "evaluation"
@@ -266,7 +267,9 @@ Recent Community Sentiment: Positive
                 custom_user_prompt=custom_user_prompt,
             )
 
-            print(f"DEBUG: Evaluation completed. Images processed in result: {result.images_processed}")
+            print(
+                f"DEBUG: Evaluation completed. Images processed in result: {result.images_processed}"
+            )
 
             # Reconstruct full messages for logging
             full_messages = create_chat_messages(
@@ -282,14 +285,26 @@ Recent Community Sentiment: Positive
             )
 
             # Convert messages to dicts for consistent handling
-            full_messages_dict = [
-                msg if isinstance(msg, dict) else (msg.dict() if hasattr(msg, 'dict') else msg.to_dict())
-                for msg in full_messages
-            ] if isinstance(full_messages, list) else (full_messages.dict() if hasattr(full_messages, 'dict') else full_messages.to_dict())
+            full_messages_dict = (
+                [
+                    msg
+                    if isinstance(msg, dict)
+                    else (msg.dict() if hasattr(msg, "dict") else msg.to_dict())
+                    for msg in full_messages
+                ]
+                if isinstance(full_messages, list)
+                else (
+                    full_messages.dict()
+                    if hasattr(full_messages, "dict")
+                    else full_messages.to_dict()
+                )
+            )
 
             trimmer = Trimmer()
             input_tokens = trimmer.count_tokens(full_messages_dict)
-            output_tokens = len(trimmer.tokenizer.encode(getattr(result, "raw_response", "")))
+            output_tokens = len(
+                trimmer.tokenizer.encode(getattr(result, "raw_response", ""))
+            )
             computed_token_usage = {
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
