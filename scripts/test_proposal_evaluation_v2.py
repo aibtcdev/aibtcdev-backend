@@ -71,6 +71,7 @@ def evaluate_single_proposal(
     save_output: bool,
     expected_decision: str | None,
     no_vector_store: bool,
+    backend,  # Shared backend instance
 ) -> Dict[str, Any]:
     """Evaluate a single proposal with output redirection."""
 
@@ -110,7 +111,6 @@ def evaluate_single_proposal(
             proposal_uuid = UUID(proposal_id)
 
             print(f"📋 Evaluating proposal {index}: {proposal_id}")
-            backend = get_backend()
             proposal = backend.get_proposal(proposal_uuid)
 
             if not proposal:
@@ -461,7 +461,7 @@ def generate_summary(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Test comprehensive proposal evaluation workflow (V2 - Multi-proposal)",
+        description="Test comprehensive proposal evaluation workflow (V2 - Sequential)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -469,7 +469,7 @@ Examples:
   python test_proposal_evaluation_v2.py --proposal-id "12345678-1234-5678-9012-123456789abc" --debug-level 2
   
   # Multiple proposals
-  python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --max-concurrent 3 --save-output
+  python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --save-output
   
   # With DAO ID for all
   python test_proposal_evaluation_v2.py --proposal-id "ID1" --proposal-id "ID2" --dao-id "DAO_ID" --save-output
@@ -516,13 +516,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--max-concurrent",
-        type=int,
-        default=5,
-        help="Maximum concurrent evaluations (default: 5)",
-    )
-
-    parser.add_argument(
         "--no-vector-store",
         action="store_true",
         help="Skip vector store retrieval for past proposals",
@@ -544,15 +537,17 @@ Examples:
     if args.save_output:
         os.makedirs("evals", exist_ok=True)
 
-    print("🚀 Starting Multi-Proposal Evaluation Test V2")
+    print("🚀 Starting Sequential Proposal Evaluation Test V2")
     print("=" * 60)
     print(f"Proposals: {len(args.proposal_id)}")
     print(f"DAO ID: {args.dao_id or 'Auto-detect per proposal'}")
     print(f"Debug Level: {args.debug_level}")
-    print(f"Max Concurrent: {args.max_concurrent}")
     print(f"Save Output: {args.save_output}")
     print(f"No Vector Store: {args.no_vector_store}")
     print("=" * 60)
+
+    # Create single backend instance
+    backend = get_backend()
 
     args_list = [
         (
@@ -564,16 +559,19 @@ Examples:
             args.save_output,
             args.expected_decision[idx] if args.expected_decision else None,
             args.no_vector_store,
+            backend,
         )
         for idx, pid in enumerate(args.proposal_id)
     ]
 
-    with mp.Pool(args.max_concurrent) as pool:
-        results = pool.starmap(evaluate_single_proposal, args_list)
+    results = []
+    for arg_tuple in args_list:
+        result = evaluate_single_proposal(*arg_tuple)
+        results.append(result)
 
     generate_summary(results, timestamp, args.save_output)
 
-    print("\n🎉 Multi-proposal evaluation test completed successfully!")
+    print("\n🎉 Sequential proposal evaluation test completed successfully!")
 
     # Generate or update manifest after run if saving output
     if args.save_output:
