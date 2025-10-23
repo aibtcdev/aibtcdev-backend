@@ -69,5 +69,81 @@ async def test_vision():
         print(f"Error: {str(e)}")
 
 
+from langchain_core.prompts import ChatPromptTemplate
+from app.services.ai.simple_workflows.prompts.evaluation_aibtc import EVALUATION_AIBTC_SYSTEM_PROMPT
+from app.services.ai.simple_workflows.models import ComprehensiveEvaluationOutput
+from app.services.ai.simple_workflows.llm import invoke_structured
+
+
+async def test_vision_with_system_prompt():
+    # Use the imported system prompt
+    system_prompt = EVALUATION_AIBTC_SYSTEM_PROMPT
+
+    # Mimic the full user content (text + image)
+    user_content = [
+        {
+            "type": "text",
+            "text": (
+                "Evaluate this proposal for the AIBTC protocol:\n\n"
+                "PROPOSAL is provided as the X post / tweet content. If an image is provided, analyze its content for originality and relevance to the current task.\n\n"
+                "AIBTC CURRENT TASK:\n# $AIBTC CHARTER\n\n## MISSION\n\nAccelerate technocapitalism for human prosperity.\n\n"
+                "## VALUES\n\nOur network believes that:\n\n- Technocapitalism leads to abundance.\n- Deceleration leads to impoverishment.\n"
+                "- It is morally sound to accelerate technocapital.\n\n## COLLECTIVE ACTION\n\nThe AIBTC network collectively works towards a Current Task; "
+                "a single, measurable directive. All contributions, evaluations, and payouts must advance the Current Task.\n\n"
+                "## THE CURRENT TASK\n\nQuote post the canonical Current Task from @aibtcdev on X and follow the instructions.\n\n"
+                "### THE CURRENT TASK POST ON X\n\n$AIBTC current task: create technocapital acceleration memes\n\n"
+                "quote post with an original technocapital acceleration meme that tastefully includes an aibtc watermark\n\n"
+                "then submit it to $AIBTC for agent evaluation (instructions in next post)\n\nif approved, earn $20 in btc\n\n"
+                "## GUIDELINES\n\nIn pursuit of our Mission and the Current Task, we adhere to the following Guidelines:\n\n"
+                "- **Presidential Rule:** A President may be appointed and holds sole authority to issue a new Current Task and apply changes to this Charter.\n"
+                "- **Canonical Task Post:** All contributions must directly quote post or reply to the canonical X post that established the Current Task and clearly advance its directive.\n"
+                "- **Eligibility:** Only verified members holding $AIBTC and blue-check verified on X.com may submit contributions or receive rewards.\n"
+                "- **Completed Work:** Only finished, publicly verifiable work is eligible; drafts or promises are rejected.\n"
+                "- **Approval & Reward:** Agent approval is required; approved work earns BTC with onchain payouts and receipts.\n"
+                "- **Anti-Spam:** A small submission bond is required; failed entries forfeit it.\n"
+                "- **Block Rhythm:** Maximum one contribution approval per Bitcoin block.\n"
+                "- **Composability:** Smart contracts / extensions, if any, must execute via contribution approvals or rejections.\n"
+                "- **Safety:** No plagiarism, doxxing, or illegal content.\n\n"
+                "## BENCHMARKS\n\nWe measure ongoing network health with the following benchmarks:\n\n"
+                "- **Adoption:** >= 75% of circulating tokens cast votes per 12,000 BTC blocks.\n"
+                "- **Growth:** + >=10% unique contribution earners per 12,000 BTC blocks.\n"
+                "- **Retention:** >= 40% of monthly contribution earners return every 4,000 BTC block period.\n"
+                "- **Throughput:** 30-90 per contribution approvals per every 144 contributions submitted.\n"
+                "- **Credibility:** >= 99% of contribution approvals committed within 3 BTC blocks.\n\n"
+                "PAST PROPOSALS:\n[Sample past proposals here - paste from your logs or a test case]\n\n"
+                "Output the evaluation as a JSON object, strictly following the system guidelines."
+            )
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://pbs.twimg.com/media/G30q05GWEAAvHjR.jpg",
+                "detail": "auto",
+            }
+        }
+    ]
+
+    # Create messages list (system + user)
+    messages_list = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content}
+    ]
+
+    # Wrap in ChatPromptTemplate
+    prompt = ChatPromptTemplate.from_messages(messages_list)
+
+    try:
+        # Call invoke_structured to mimic the full pipeline
+        response = await invoke_structured(
+            messages=prompt,
+            output_schema=ComprehensiveEvaluationOutput,
+            model="gpt-4o"  # Use a known vision model
+        )
+        print("LLM Structured Response:")
+        print(response)  # Check if explanation/categories reference the image
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
 if __name__ == "__main__":
-    asyncio.run(test_vision())
+    asyncio.run(test_vision_with_system_prompt())
