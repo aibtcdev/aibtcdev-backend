@@ -56,6 +56,27 @@ class Tee(object):
             f.flush()
 
 
+def reset_logging():
+    """Reset logging to a clean state with a handler to original sys.stderr."""
+    root_logger = logging.getLogger()
+    # Remove all existing handlers to clear any references to Tee/closed files
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    # Add a fresh handler to the current (original) sys.stderr
+    clean_handler = logging.StreamHandler(sys.stderr)
+    clean_handler.setFormatter(StructuredFormatter())
+    clean_handler.setLevel(logging.INFO)  # Or match your default level
+    root_logger.addHandler(clean_handler)
+    root_logger.setLevel(clean_handler.level)
+    # Propagate changes to other loggers if needed
+    for logger_name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            logger.setLevel(root_logger.level)
+            logger.handlers.clear()  # Clear per-logger handlers
+            logger.propagate = True
+    setup_uvicorn_logging()  # Re-apply any custom setup
+
+
 def short_uuid(uuid_str: str) -> str:
     """Get first 8 characters of UUID for file naming."""
     return uuid_str[:8]
@@ -605,6 +626,9 @@ Examples:
             result = evaluate_single_proposal(*arg_tuple)
             results.append(result)
 
+        # Reset logging to avoid writing to closed Tee files
+        reset_logging()
+
         generate_summary(results, timestamp, args.save_output)
 
         print("\n🎉 Sequential proposal evaluation test completed successfully!")
@@ -620,8 +644,7 @@ Examples:
     finally:
         # Clean up backend connections
         backend.sqlalchemy_engine.dispose()
-        #if backend.vecs_client:
-        #    backend.vecs_client.close()
+        # Removed: backend.vecs_client.close()  # Not supported by vecs_client; unnecessary for cleanup
 
 
 if __name__ == "__main__":
