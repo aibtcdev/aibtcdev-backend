@@ -20,18 +20,19 @@ EVALUATION PROCESS
    - G2: Canonical Post – Must quote-tweet/reply to official @aibtcdev current task post. Verify exact match to provided task text; reject if mismatched or unverifiable.
    - G3: Safety – Reject for plagiarism, doxxing, illegal content, spam (e.g., repetitive text, >5 links, low-effort).
    - G4: Completed Work – Must show finished, public work (e.g., via URLs). Allow concise future plans if past work is thin; reject pure hypotheticals or broken links.
+   - G5: Holistic Quality – Reject if meme lacks potency, taste, or deep understanding (e.g., generic without novel insight; cite evidence).
    On failure: Set decision="REJECT", scores=0, confidence=0.0. List failed gates in "failed" array with 1-sentence reasons.
 
 2. SCORING (Only if all checks pass; 0-100 scale)
    - Current Task Alignment (20%): Direct advancement of task with unique, high-quality entry. 90-100: Exceptional; 80-89: Strong; 75-79: Adequate; <75: Weak → Reject.
    - Mission Alignment (20%): Accelerates technocapital with prosperity impact. 90-100: Concrete; <80: Vague/contradictory → Reject.
-   - Value Contribution (20%): Exceeds basics significantly. 90-100: Exceptional past work; <80: Basic → Reject.
+   - Value Contribution (20%): Exceeds basics with potent, insightful content (deep technocapital understanding, viral humor). 90-100: Exceptional (memetic impact, cited examples); <80: Basic or superficial → Reject.
    - Values Alignment (10%): Demonstrates technocapitalism beliefs. 90-100: Specific examples; <75: Generic/contradictory → Reject.
    - Originality (10%): Novel vs past proposals. 90-100: Unique; <75: Derivative → Reject.
-   - Clarity & Execution (10%): Well-structured and professional. 90-100: Exceptional; <75: Confusing → Reject.
+   - Clarity & Execution (10%): Well-structured, professional, and tasteful (subtle humor, seamless watermark, high aesthetic quality). 90-100: Exceptional (potent, visually compelling); 80-89: Strong; <80: Lacks taste or polish → Reject. Cite image analysis for deductions.
    - Safety & Compliance (10%): Adherence to policies. 90-100: Perfect; <90: Concerns → Reject.
-   - Growth Potential (15%): Attracts quality contributors. 90-100: Inspiring; <75: Poor example → Reject.
-   Rules: Cite specific evidence (quotes, URLs). No vague reasoning. Max 75-79 for "adequate."
+   - Growth Potential (15%): Attracts contributors via inspiring potency (shareable, thought-provoking). 90-100: Highly viral; <80: Mediocre example → Reject.
+   Rules: Cite specific evidence (quotes, URLs). No vague reasoning. Max 70-74 for "adequate"; <75 always Weak → Reject.
 
 3. HARD THRESHOLDS (After scoring; fail any → REJECT)
    - H1: Current Task Alignment <80
@@ -39,11 +40,14 @@ EVALUATION PROCESS
    - H3: Safety & Compliance <90
    - H4: Value Contribution <80
    - H5: Any contradiction with mission/values/community info
+   - H6: Clarity & Execution <85
+   - H7: Growth Potential <85
+   - H8: Lacks potency (e.g., generic phrasing without deep insight)
    On failure: Keep scores, list failed caps in "failed" array with reasons.
 
 4. FINAL SCORE: Weighted sum, rounded to integer. (Formula unchanged from original.)
 
-5. CONFIDENCE (0.0-1.0): Start at 1.0; subtract for vagueness (-0.05-0.15), incompleteness (-0.05-0.10), poor clarity (-0.05-0.10), verification issues (-0.05-0.15). <0.70 → Reject (add "LOW_CONFIDENCE" to failed).
+5. CONFIDENCE (0.0-1.0): Start at 1.0; subtract for vagueness (-0.05-0.15), incompleteness (-0.05-0.10), poor clarity (-0.05-0.10), verification issues (-0.05-0.15). Subtract -0.15 for lack of potency/taste (e.g., superficial phrases); -0.10 for poor understanding. <0.70 → Reject (add "LOW_CONFIDENCE" to failed).
 
 6. DECISION: REJECT if any check/threshold/confidence fails or final_score <80; else APPROVE.
 
