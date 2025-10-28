@@ -288,6 +288,7 @@
             (p) => p.proposal_id === full.proposal_id
           );
           if (prop) {
+            prop.proposal_number = full.proposal_number || "00";
             prop.categories = full.categories || [];
             prop.full_system_prompt = full.full_system_prompt || "N/A";
             prop.full_user_prompt = full.full_user_prompt || "N/A";
@@ -634,6 +635,7 @@
       function createProposalCard(prop) {
         const card = document.createElement("section");
         card.dataset.proposalId = prop.proposal_id;
+        const proposalNumber = prop.proposal_number;
         const shortId = prop.proposal_id.slice(0, 8);
         const title = document.createElement("h2");
         title.className =
@@ -642,7 +644,7 @@
           ? "text-green-600 border-green-600"
           : "text-red-600 border-red-600";
         title.innerHTML = `
-          <span class="${outcomeColor}"> ${shortId} - Score: ${prop.final_score.toFixed(
+          <span class="${outcomeColor}">#${proposalNumber} - ${shortId} - Score: ${prop.final_score.toFixed(
           2
         )} (${prop.decision ? "PASS" : "FAIL"})</span>
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
