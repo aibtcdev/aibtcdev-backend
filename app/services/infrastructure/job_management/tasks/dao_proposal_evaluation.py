@@ -370,7 +370,10 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
 
             # Determine prompt type based on DAO name
             prompt_type = "evaluation"  # Default
-            if dao.name == "ELONBTC":
+            if dao.name == "AIBTC-BREW":
+                prompt_type = "evaluation_aibtc_brew"
+                logger.info(f"Using AIBTC-BREW-specific prompts for DAO {dao.name}")
+            elif dao.name == "ELONBTC":
                 prompt_type = "evaluation_elonbtc"
                 logger.info(f"Using ELONBTC-specific prompts for DAO {dao.name}")
             elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:

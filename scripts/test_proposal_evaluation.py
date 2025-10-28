@@ -198,7 +198,10 @@ Examples:
             backend = get_backend()
             dao = backend.get_dao(dao_uuid)
             if dao:
-                if dao.name == "ELONBTC":
+                if dao.name == "AIBTC-BREW":
+                    prompt_type = "evaluation_aibtc_brew"
+                    print(f"🎯 Using AIBTC-BREW-specific prompts for DAO {dao.name}")
+                elif dao.name == "ELONBTC":
                     prompt_type = "evaluation_elonbtc"
                     print(f"🎯 Using ELONBTC-specific prompts for DAO {dao.name}")
                 elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
