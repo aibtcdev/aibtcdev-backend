@@ -498,7 +498,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                     )
 
                                     # 2025/10 ADDED TO SUPPORT AIBTC-BREW
-                                    if config.network.network == "testnet":
+                                    if (
+                                        config.auto_voting_approval.enabled
+                                        and config.network.network == "testnet"
+                                    ):
                                         await self._approve_aibtc_brew_contract(
                                             wallet, full_contract_principal
                                         )
