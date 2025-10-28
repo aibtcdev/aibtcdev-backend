@@ -220,6 +220,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     "task": "agent_account_deploy",
                     "wallet_id": str(wallet.id),
                     "success": result.get("success", False),
+                    "result": result,
                 },
             )
         except Exception as e:
@@ -231,6 +232,47 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     "agent_account_contract": agent_account_contract,
                     "aibtc_brew_contract": aibtc_brew_contract,
                     "approval_type": approval_type,
+                    "error": str(e),
+                },
+            )
+
+    async def _seed_agent_wallet_with_stx(
+        self, recipient: str, amount: int = 1000000, fee: int = 4000
+    ):
+        """Seed an agent wallet with STX from the backend wallet."""
+        memo = "Initial funding for agent wallet operations"
+        try:
+            from app.tools.bun import BunScriptRunner
+
+            result = BunScriptRunner.bun_run_with_seed_phrase(
+                config.backend_wallet.seed_phrase,
+                "stacks-wallet",
+                "transfer-my-stx.ts",
+                recipient,
+                str(amount),
+                str(fee),
+                memo,
+            )
+
+            if result.get("success"):
+                logger.info(
+                    "Seeded agent wallet with STX",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "recipient": recipient,
+                        "amount": amount,
+                        "fee": fee,
+                        "result": result,
+                    },
+                )
+        except Exception as e:
+            logger.error(
+                "Error seeding agent wallet with STX",
+                extra={
+                    "task": "agent_account_deploy",
+                    "recipient": recipient,
+                    "amount": amount,
+                    "fee": fee,
                     "error": str(e),
                 },
             )
@@ -303,6 +345,14 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 return result
 
             wallet = wallets[0]
+
+            # 2025/10 ADDED TO SUPPORT AIBTC-BREW
+            if (
+                config.auto_voting_approval.enabled
+                and config.network.network == "testnet"
+            ):
+                if wallet.testnet_address is not None:
+                    await self._seed_agent_wallet_with_stx(wallet.testnet_address)
 
             # Get the profile associated with this wallet
             if not wallet.profile_id:
@@ -502,9 +552,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                         config.auto_voting_approval.enabled
                                         and config.network.network == "testnet"
                                     ):
-                                        await self._approve_aibtc_brew_contract(
-                                            wallet, full_contract_principal
-                                        )
+                                        if wallet.testnet_address is not None:
+                                            await self._approve_aibtc_brew_contract(
+                                                wallet, full_contract_principal
+                                            )
 
                                     # Update the agent with the deployed contract address
                                     try:
