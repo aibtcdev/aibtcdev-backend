@@ -240,16 +240,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         self, recipient: str, amount: int = 1000000, fee: int = 4000
     ):
         """Seed an agent wallet with STX from the backend wallet."""
-        memo = "initial funding"
-
-        # Validate and truncate memo to ensure it doesn't exceed 34 bytes
-        memo_bytes = memo.encode("utf-8")
-        if len(memo_bytes) > 34:
-            memo = memo_bytes[:31].decode("utf-8", errors="ignore") + "..."
-            logger.warning(
-                f"Memo truncated from {len(memo_bytes)} bytes to fit 34-byte limit: '{memo}'"
-            )
-
         try:
             from app.tools.bun import BunScriptRunner
 
@@ -260,7 +250,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 recipient,
                 str(amount),
                 str(fee),
-                memo,
+                "",
             )
 
             if result.get("success"):
