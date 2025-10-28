@@ -277,6 +277,13 @@ class NetworkConfig:
 
 
 @dataclass
+class AutoVotingApprovalConfig:
+    enabled: bool = (
+        os.getenv("AIBTC_AUTO_VOTING_APPROVAL_ENABLED", "false").lower() == "true"
+    )
+
+
+@dataclass
 class Config:
     db: DatabaseConfig = field(default_factory=DatabaseConfig)
     twitter: TwitterConfig = field(default_factory=TwitterConfig)
@@ -292,6 +299,9 @@ class Config:
     chat_llm: ChatLLMConfig = field(default_factory=ChatLLMConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     huggingface: HuggingFaceConfig = field(default_factory=HuggingFaceConfig)
+    auto_voting_approval: AutoVotingApprovalConfig = field(
+        default_factory=AutoVotingApprovalConfig
+    )
 
     @classmethod
     def load(cls) -> "Config":
