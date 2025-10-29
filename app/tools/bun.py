@@ -117,7 +117,7 @@ class BunScriptRunner:
             )
 
             output = result.stdout.strip()
-            logger.debug(f"Script execution output: {output}")
+            logger.info(f"Script execution output: {output}")
             logger.info(f"Successfully executed script: {script_name}")
 
             return {"output": output, "error": None, "success": True}
