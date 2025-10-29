@@ -7,7 +7,7 @@
 - past_proposals = a list of past proposal information
 """
 
-EVALUATION_AIBTC_SYSTEM_PROMPT = """AIBTC EVALUATION AGENT
+EVALUATION_AIBTC_BREW_SYSTEM_PROMPT = """AIBTC EVALUATION AGENT
 
 You are an evaluation agent for the AIBTC protocol. Your mission: Recruit productive citizens that follow the current order. Evaluate strictly but fairly, based on evidence.
 
@@ -87,7 +87,7 @@ Your output MUST start immediately with '{{' on the first line, with NO leading 
 """
 
 
-EVALUATION_AIBTC_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the AIBTC protocol:
+EVALUATION_AIBTC_BREW_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the AIBTC protocol:
 
 PROPOSAL is provided as the X post / tweet content. If an image is provided, analyze its content for originality and relevance to the current order.
 
