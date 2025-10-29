@@ -222,7 +222,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     "success": result.get("success", False),
                 },
             )
-            logger.info("Full result", extra={"result": result})
         except Exception as e:
             logger.error(
                 "Error approving aibtc-brew contract",
@@ -237,7 +236,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
 
     async def _seed_agent_wallet_with_stx(
-        self, recipient: str, amount: int = 1000000, fee: int = 4000
+        self, recipient: str, amount: int = 1, fee: int = 50000
     ):
         """Seed an agent wallet with STX from the backend wallet."""
         try:
@@ -263,7 +262,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         "fee": fee,
                     },
                 )
-                logger.info("Full result", extra={"result": result})
         except Exception as e:
             logger.error(
                 "Error seeding agent wallet with STX",
