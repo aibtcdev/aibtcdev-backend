@@ -95,7 +95,7 @@ async def evaluate_proposal_comprehensive(
                     logger.info(
                         f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
                     )
-                elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                elif dao.name == "AIBTC":
                     prompt_type = "evaluation_aibtc"
                     logger.info(
                         f"[Orchestrator:{proposal_id_str}] Using AIBTC-specific prompts for DAO {dao.name}"

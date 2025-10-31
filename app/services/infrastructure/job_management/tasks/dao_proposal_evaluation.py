@@ -376,7 +376,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             elif dao.name == "ELONBTC":
                 prompt_type = "evaluation_elonbtc"
                 logger.info(f"Using ELONBTC-specific prompts for DAO {dao.name}")
-            elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+            elif dao.name == "AIBTC":
                 prompt_type = "evaluation_aibtc"
                 logger.info(f"Using AIBTC-specific prompts for DAO {dao.name}")
             else:
