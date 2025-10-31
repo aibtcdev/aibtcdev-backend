@@ -603,7 +603,7 @@ Recent Community Sentiment: Positive
             dao_proposals = await fetch_dao_proposals(
                 dao_id, exclude_proposal_id=proposal_id_str
             )
-            past_proposals_db_text = format_proposals_for_context(dao_proposals)
+            past_proposals_db_text = format_proposals_for_context_v2(dao_proposals)
     except Exception as e:
         logger.error(
             f"[EvaluationProcessor:{proposal_id_str}] Error fetching/formatting DAO proposals: {str(e)}"
