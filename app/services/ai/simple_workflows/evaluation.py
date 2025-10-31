@@ -262,6 +262,7 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
             
             creator = str(getattr(proposal, "creator", "Unknown"))
             passed = str(getattr(proposal, "passed", False)).upper()  # "TRUE" or "FALSE"
+            created_btc = str(getattr(proposal, "created_btc", "Unknown"))
             tags = ", ".join(str(tag) for tag in getattr(proposal, "tags", []) or []) or "None"
             x_url = str(getattr(proposal, "x_url", "None"))
             
@@ -271,6 +272,7 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
                 f"  Summary: {summary}\n"
                 f"  Creator: {creator}\n"
                 f"  Passed: {passed}\n"
+                f"  Created_BTC: {created_btc}\n"
                 f"  Tags: {tags}\n"
                 f"  X_URL: {x_url}"
             )
