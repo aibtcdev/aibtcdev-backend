@@ -238,7 +238,7 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
 
     # Filter to only DEPLOYED or FAILED status
     filtered_proposals = [
-        p for p in proposals if getattr(p, "status", None) in ["DEPLOYED", "FAILED"]
+        p for p in proposals if getattr(p, "status", None) and p.status.value in ["DEPLOYED", "FAILED"]
     ]
     if not filtered_proposals:
         return "<no_proposals>No qualifying past proposals (DEPLOYED or FAILED) available.</no_proposals>"
