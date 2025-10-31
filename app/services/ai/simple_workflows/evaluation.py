@@ -238,8 +238,7 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
 
     # Filter to only DEPLOYED or FAILED status
     filtered_proposals = [
-        p for p in proposals
-        if getattr(p, "status", None) in ["DEPLOYED", "FAILED"]
+        p for p in proposals if getattr(p, "status", None) in ["DEPLOYED", "FAILED"]
     ]
     if not filtered_proposals:
         return "<no_proposals>No qualifying past proposals (DEPLOYED or FAILED) available.</no_proposals>"
@@ -248,26 +247,36 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
     sorted_proposals = sorted(
         filtered_proposals,
         key=lambda p: p.created_at if p.created_at else 0,
-        reverse=True
+        reverse=True,
     )
 
     formatted = []
     for i, proposal in enumerate(sorted_proposals[:limit]):
         try:
             title = str(getattr(proposal, "title", "Untitled"))[:100]
-            summary = str(getattr(proposal, "summary", getattr(proposal, "content", "No summary")))[:250]
-            summary = "".join(char for char in summary if ord(char) >= 32 or char in "\n\r\t")  # Remove control chars
+            summary = str(
+                getattr(proposal, "summary", getattr(proposal, "content", "No summary"))
+            )[:250]
+            summary = "".join(
+                char for char in summary if ord(char) >= 32 or char in "\n\r\t"
+            )  # Remove control chars
             summary = summary.replace("{", "{{").replace("}", "}}")  # Escape braces
-            if len(summary) == 250: summary += "..."
-            
+            if len(summary) == 250:
+                summary += "..."
+
             creator = str(getattr(proposal, "creator", "Unknown"))
-            passed = str(getattr(proposal, "passed", False)).upper()  # "TRUE" or "FALSE"
+            passed = str(
+                getattr(proposal, "passed", False)
+            ).upper()  # "TRUE" or "FALSE"
             created_btc = str(getattr(proposal, "created_btc", "Unknown"))
-            tags = ", ".join(str(tag) for tag in getattr(proposal, "tags", []) or []) or "None"
+            tags = (
+                ", ".join(str(tag) for tag in getattr(proposal, "tags", []) or [])
+                or "None"
+            )
             x_url = str(getattr(proposal, "x_url", "None"))
-            
+
             prop_text = (
-                f"- Proposal {i+1}\n"
+                f"- Proposal {i + 1}\n"
                 f"  Title: {title}\n"
                 f"  Summary: {summary}\n"
                 f"  Creator: {creator}\n"
@@ -278,9 +287,13 @@ def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) 
             )
             formatted.append(prop_text)
         except Exception as e:
-            formatted.append(f"- Proposal {i+1}: Error loading data ({str(e)})")
-    
-    return "\n\n".join(formatted) if formatted else "<no_proposals>No past proposals available.</no_proposals>"
+            formatted.append(f"- Proposal {i + 1}: Error loading data ({str(e)})")
+
+    return (
+        "\n\n".join(formatted)
+        if formatted
+        else "<no_proposals>No past proposals available.</no_proposals>"
+    )
 
 
 async def retrieve_from_vector_store(
