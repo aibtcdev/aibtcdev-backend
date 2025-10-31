@@ -255,7 +255,7 @@ Recent Community Sentiment: Positive
                     prompt_type = "evaluation_aibtc_brew"
                 elif dao.name == "ELONBTC":
                     prompt_type = "evaluation_elonbtc"
-                elif dao.name in ["AIBTC", "AITEST", "AITEST2", "AITEST3", "AITEST4"]:
+                elif dao.name == "AIBTC":
                     prompt_type = "evaluation_aibtc"
 
             custom_system_prompt = load_prompt(prompt_type, "system")

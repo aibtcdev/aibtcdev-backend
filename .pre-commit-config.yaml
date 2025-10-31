@@ -1,13 +1,20 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.12.2
+- repo: local
   hooks:
     # Run the linter.
     - id: ruff-check
-      args: [ --fix ]
+      name: Ruff check
+      entry: uv run ruff check
+      args: [--fix]
+      language: system
+      files: \.py$
+      # Optional: Add types_or: [python] if you want to stage fixed files automatically.
     # Run the formatter.
     - id: ruff-format
+      name: Ruff format
+      entry: uv run ruff format
+      language: system
+      files: \.py$
 - repo: https://github.com/astral-sh/uv-pre-commit
   # uv version.
   rev: 0.7.19 
