@@ -27,7 +27,7 @@ from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation import (
     evaluate_proposal,
     fetch_dao_proposals,
-    format_proposals_for_context,
+    format_proposals_for_context_v2,
     retrieve_from_vector_store,
     create_chat_messages,
 )
@@ -204,7 +204,7 @@ Recent Community Sentiment: Positive
                     past_proposals_list = [
                         p for p in dao_proposals if p.id != proposal_uuid
                     ]
-                    past_proposals_db_text = format_proposals_for_context(
+                    past_proposals_db_text = format_proposals_for_context_v2(
                         past_proposals_list
                     )
             except Exception as e:

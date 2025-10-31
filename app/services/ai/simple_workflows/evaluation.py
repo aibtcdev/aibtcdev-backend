@@ -4,8 +4,10 @@ This module provides a functional approach to proposal evaluation, converting
 the complex class-based evaluator into a simple async function.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
+from urllib.parse import urlparse
 
 from langchain_core.documents import Document
 from langchain_core.prompts.chat import ChatPromptTemplate
@@ -230,6 +232,112 @@ def format_proposals_for_context(proposals: List[Proposal]) -> str:
         if formatted_proposals
         else "<no_proposals>No past proposals available.</no_proposals>"
     )
+
+
+def format_proposals_for_context_v2(proposals: List[Proposal], limit: int = 50) -> str:
+    no_proposals_available = "<no_proposals>No past proposals available.</no_proposals>"
+
+    if not proposals:
+        return no_proposals_available
+
+    # Filter to only DEPLOYED or FAILED status
+    filtered_proposals = [
+        p
+        for p in proposals
+        if hasattr(p, "status")
+        and p.status is not None
+        and p.status.value in ["DEPLOYED"]  # , "FAILED"
+    ]
+    if not filtered_proposals:
+        return f"{no_proposals_available} (filtered)"
+
+    # Sort by created_at descending (newest first)
+    sorted_proposals = sorted(
+        filtered_proposals,
+        key=lambda p: getattr(p, "created_at", datetime.min),
+        reverse=True,
+    )
+
+    formatted = []
+    for i, proposal in enumerate(sorted_proposals[:limit]):
+        try:
+            # extract proposal number from status and ID
+            proposal_status = getattr(proposal, "status", None)
+            proposal_id = getattr(proposal, "proposal_id", None)
+            if proposal_status and proposal_status.value == "FAILED":
+                proposal_number = "n/a (failed tx)"
+            elif proposal_id is not None:
+                proposal_number = f"#{proposal_id}"
+            else:
+                proposal_number = "unknown"
+
+            # extract x_handle from x_url
+            x_url = getattr(proposal, "x_url", None)
+            x_handle = "unknown"
+            if x_url:
+                try:
+                    parsed_path = urlparse(x_url).path.split("/")
+                    if len(parsed_path) > 1:
+                        x_handle = parsed_path[1]
+                except (AttributeError, IndexError):
+                    pass  # Fallback to "unknown"
+
+            # get proposal creation info
+            created_at_btc = getattr(proposal, "created_btc", None)
+            created_at_timestamp = getattr(proposal, "created_at", None)
+            if created_at_btc and created_at_timestamp:
+                created_at = f"BTC Block {created_at_btc} (at {created_at_timestamp.strftime('%Y-%m-%d')})"
+            elif created_at_btc:
+                created_at = f"BTC Block {created_at_btc}"
+            elif created_at_timestamp:
+                created_at = created_at_timestamp.strftime("%Y-%m-%d")
+            else:
+                created_at = "unknown"
+
+            # compute proposal state
+            passed = getattr(proposal, "passed", False)
+            concluded = getattr(proposal, "concluded_by", None) is not None
+            if proposal_status and proposal_status.value == "FAILED":
+                proposal_passed = "n/a (failed tx)"
+            elif passed:
+                proposal_passed = "yes"
+            elif concluded:
+                proposal_passed = "no"
+            else:
+                proposal_passed = "pending review"
+
+            # generate proposal info
+            title = str(getattr(proposal, "title", "Untitled"))[:100]
+
+            tags_raw = getattr(proposal, "tags", [])
+            if not isinstance(tags_raw, (list, tuple)):
+                tags_raw = [] if tags_raw is None else [str(tags_raw)]
+            tags = ", ".join(str(tag).strip() for tag in tags_raw if tag) or "None"
+
+            summary_raw = str(
+                getattr(proposal, "summary", getattr(proposal, "content", "No summary"))
+            )[:250]
+            # clean control chars
+            summary = "".join(
+                char for char in summary_raw if ord(char) >= 32 or char in "\n\r\t"
+            )
+            summary = summary.replace("{", "{{").replace("}", "}}")  # Escape braces
+            if len(summary_raw) == 250:
+                summary += "..."
+
+            prop_text = (
+                f"- {proposal_number} by @{x_handle}\n"
+                f"  Created: {created_at}\n"
+                f"  Passed: {proposal_passed}\n"
+                f"  Title: {title}\n"
+                f"  Tags: {tags}\n"
+                f"  Summary: {summary}\n"
+            )
+            formatted.append(prop_text)
+        except Exception as e:
+            formatted.append(f"- Proposal {i + 1}: Error loading data ({str(e)})")
+
+    return "\n\n".join(formatted) if formatted else no_proposals_available
 
 
 async def retrieve_from_vector_store(
@@ -554,7 +662,7 @@ Recent Community Sentiment: Positive
             dao_proposals = await fetch_dao_proposals(
                 dao_id, exclude_proposal_id=proposal_id_str
             )
-            past_proposals_db_text = format_proposals_for_context(dao_proposals)
+            past_proposals_db_text = format_proposals_for_context_v2(dao_proposals)
     except Exception as e:
         logger.error(
             f"[EvaluationProcessor:{proposal_id_str}] Error fetching/formatting DAO proposals: {str(e)}"
