@@ -27,7 +27,6 @@ from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation import (
     evaluate_proposal,
     fetch_dao_proposals,
-    format_proposals_for_context,
     format_proposals_for_context_v2,
     retrieve_from_vector_store,
     create_chat_messages,
