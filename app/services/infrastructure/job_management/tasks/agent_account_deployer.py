@@ -202,6 +202,39 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
             return None
 
+    def _parse_deployment_tool_output(self, output: str) -> Optional[Dict[str, Any]]:
+        """Parse deployment tool output JSON."""
+        try:
+            # full object: result, success, deployed
+            #   result: error, output, success
+            #     output: success, message, data
+
+            # example successful: {"result": {"error": null, "output": "{\n  \"success\": true,\n  \"message\": \"Transaction broadcasted successfully: 0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n  \"data\": {\n    \"name\": \"aibtc-agent-account\",\n    \"displayName\": \"aibtc-acct-STQM5-8WDPB-ST39Z-SN4CB\",\n    \"type\": \"AGENT\",\n    \"subtype\": \"AGENT_ACCOUNT\",\n    \"source\": \";; title: aibtc-agent-account\\n;; version: 3.3.3\\n;; summary: A special account contract between a ...\",\n    \"deploymentOrder\": 1,\n    \"txid\": \"a2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n    \"link\": \"https://explorer.hiro.so/txid/0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1?chain=testnet\"\n  }\n}", "success": true}, "success": true, "deployed": true}
+            # example error:{"result": {"error": "Unknown error occurred", "output": "{\n  \"success\": false,\n  \"message\": \"\\\"Invalid owner address: SP1ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789\\\\nUsage: bun run deploy-agent-account.ts <ownerAddress> <agentAddress> [network] [saveToFile]\\\\nExample: bun run deploy-agent-account.ts ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM \\\\\\\"testnet\\\\\\\" true\\\"\",\n  \"data\": {}\n}", "success": false}, "success": true, "deployed": false}
+
+            # try to load the output object as json
+            full_output_json = json.loads(output)
+            print(full_output_json)
+
+            # show warning if fields are missing
+
+            # try to load the result
+
+            # try to load the output object
+
+            # derive and return state w/ info
+
+        except (json.JSONDecodeError, IndexError) as e:
+            logger.error(
+                "Failed to parse deployment tool output",
+                extra={
+                    "task": "agent_account_deploy",
+                    "error": str(e),
+                    "output_length": len(output),
+                },
+            )
+            return None
+
     async def _approve_aibtc_brew_contract(
         self, wallet: Wallet, agent_account_contract: str
     ):
