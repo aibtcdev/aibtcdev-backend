@@ -2,7 +2,6 @@
 
 import json
 from dataclasses import dataclass
-import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -202,38 +201,109 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             )
             return None
 
-    def _parse_deployment_tool_output(self, output: str) -> Optional[Dict[str, Any]]:
+    def _parse_deployment_tool_output(
+        self, deployment_result: Dict
+    ) -> Optional[Dict[str, Any]]:
         """Parse deployment tool output JSON."""
+
+        # full object: result, success, deployed
+        #   result: error, output, success
+        #     output: success, message, data
+
+        # example successful: {"result": {"error": null, "output": "{\n  \"success\": true,\n  \"message\": \"Transaction broadcasted successfully: 0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n  \"data\": {\n    \"name\": \"aibtc-agent-account\",\n    \"displayName\": \"aibtc-acct-STQM5-8WDPB-ST39Z-SN4CB\",\n    \"type\": \"AGENT\",\n    \"subtype\": \"AGENT_ACCOUNT\",\n    \"source\": \";; title: aibtc-agent-account\\n;; version: 3.3.3\\n;; summary: A special account contract between a ...\",\n    \"deploymentOrder\": 1,\n    \"txid\": \"a2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n    \"link\": \"https://explorer.hiro.so/txid/0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1?chain=testnet\"\n  }\n}", "success": true}, "success": true, "deployed": true}
+        # example error:{"result": {"error": "Unknown error occurred", "output": "{\n  \"success\": false,\n  \"message\": \"\\\"Invalid owner address: SP1ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789\\\\nUsage: bun run deploy-agent-account.ts <ownerAddress> <agentAddress> [network] [saveToFile]\\\\nExample: bun run deploy-agent-account.ts ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM \\\\\\\"testnet\\\\\\\" true\\\"\",\n  \"data\": {}\n}", "success": false}, "success": true, "deployed": false}
+
+        # evaluate outer fields
+        outer_fields = {
+            "result": deployment_result.get("result", None),
+            "success": deployment_result.get("success", None),
+            "deployed": deployment_result.get("deployed", None),
+        }
+        missing_outer_fields = [
+            field for field, value in outer_fields.items() if value is None
+        ]
+        if missing_outer_fields:
+            logger.warning(
+                "Deployment result missing outer fields",
+                extra={
+                    "task": "agent_account_deploy",
+                    "missing_fields": missing_outer_fields,
+                },
+            )
+
+        # evaluate inner fields
+        inner_fields = {
+            "success": outer_fields["result"].get("success", None),
+            "error": outer_fields["result"].get("error", None),
+            "output": outer_fields["result"].get("output", None),
+        }
+        missing_inner_fields = [
+            field for field, value in inner_fields.items() if value is None
+        ]
+        if missing_inner_fields:
+            logger.warning(
+                "Deployment result missing inner fields",
+                extra={
+                    "task": "agent_account_deploy",
+                    "missing_fields": missing_inner_fields,
+                },
+            )
+
+        # get the tool output as a string
+        tool_output_str = inner_fields.get("output", "")
+        tool_output_fields = {}
+        tool_output_parse_error = None
+
         try:
-            # full object: result, success, deployed
-            #   result: error, output, success
-            #     output: success, message, data
-
-            # example successful: {"result": {"error": null, "output": "{\n  \"success\": true,\n  \"message\": \"Transaction broadcasted successfully: 0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n  \"data\": {\n    \"name\": \"aibtc-agent-account\",\n    \"displayName\": \"aibtc-acct-STQM5-8WDPB-ST39Z-SN4CB\",\n    \"type\": \"AGENT\",\n    \"subtype\": \"AGENT_ACCOUNT\",\n    \"source\": \";; title: aibtc-agent-account\\n;; version: 3.3.3\\n;; summary: A special account contract between a ...\",\n    \"deploymentOrder\": 1,\n    \"txid\": \"a2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n    \"link\": \"https://explorer.hiro.so/txid/0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1?chain=testnet\"\n  }\n}", "success": true}, "success": true, "deployed": true}
-            # example error:{"result": {"error": "Unknown error occurred", "output": "{\n  \"success\": false,\n  \"message\": \"\\\"Invalid owner address: SP1ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789\\\\nUsage: bun run deploy-agent-account.ts <ownerAddress> <agentAddress> [network] [saveToFile]\\\\nExample: bun run deploy-agent-account.ts ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM \\\\\\\"testnet\\\\\\\" true\\\"\",\n  \"data\": {}\n}", "success": false}, "success": true, "deployed": false}
-
-            # try to load the output object as json
-            full_output_json = json.loads(output)
-            print(full_output_json)
-
-            # show warning if fields are missing
-
-            # try to load the result
-
-            # try to load the output object
-
-            # derive and return state w/ info
-
+            if tool_output_str:
+                tool_output = json.loads(tool_output_str)
+                tool_output_fields = {
+                    "success": tool_output.get("success", None),
+                    "message": tool_output.get("message", None),
+                    "data": tool_output.get("data", None),
+                }
+                missing_tool_output_fields = [
+                    field
+                    for field, value in tool_output_fields.items()
+                    if value is None
+                ]
+                if missing_tool_output_fields:
+                    logger.warning(
+                        "Deployment tool output missing fields",
+                        extra={
+                            "task": "agent_account_deploy",
+                            "missing_fields": missing_tool_output_fields,
+                        },
+                    )
+                if tool_output_fields["data"]:
+                    tool_output_data = json.loads(tool_output_fields["data"])
+                else:
+                    tool_output_data = None
+                tool_output_fields["data"] = tool_output_data
+            else:
+                raise json.JSONDecodeError("Empty tool output", "", 0)
         except (json.JSONDecodeError, IndexError) as e:
-            logger.error(
-                "Failed to parse deployment tool output",
+            logger.warning(
+                "Tool output not valid JSON; treating as error with synthetic structure",
                 extra={
                     "task": "agent_account_deploy",
                     "error": str(e),
-                    "output_length": len(output),
+                    "output_preview": tool_output_str[:100],  # truncate for logs
                 },
             )
-            return None
+            tool_output_parse_error = str(e)
+            tool_output_fields = {
+                "success": False,
+                "message": tool_output_str,
+                "data": {},
+            }
+
+        return {
+            "outer_fields": outer_fields,
+            "inner_fields": inner_fields,
+            "tool_output": tool_output_fields,
+            "tool_output_parse_error": tool_output_parse_error,
+        }
 
     async def _approve_aibtc_brew_contract(
         self, wallet: Wallet, agent_account_contract: str
@@ -472,466 +542,192 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 },
             )
 
-            # Check if this is a ContractAlreadyExists case first
-            is_contract_already_exists = (
-                deployment_result.get("success") is False
-                and deployment_result.get("output")
-                and "ContractAlreadyExists" in deployment_result.get("output", "")
-            )
+            # get parsed output from tool run
+            parsed_output = self._parse_deployment_tool_output(deployment_result)
 
-            if is_contract_already_exists:
-                logger.info(
-                    "Contract already exists",
+            # handle empty output or parsing error
+            if parsed_output is None or parsed_output["parsed_tool_output_error"]:
+                error_msg = "Unable to parse deployer tool result"
+                logger.error(
+                    error_msg,
                     extra={
-                        "task": "agent_account_deploy",
-                        "agent_address": agent_address,
+                        "parsed_output": parsed_output,
+                        "deployment_result": deployment_result,
                     },
                 )
+                result = {"success": False, "error": error_msg}
+                return result
 
-            # Extract contract information from deployment result and update agent record
-            if deployment_result.get("success") and deployment_result.get("output"):
-                data = self._parse_deployment_output(deployment_result["output"])
-
-                if data:
-                    # Try to extract contract information from different possible fields
-                    contract_name = None
-                    deployer_address = None
-
-                    # Check for displayName first (this is what we see in the logs)
-                    if data.get("displayName"):
-                        contract_name = data["displayName"]
-                        logger.debug(
-                            "Found contract name in displayName",
-                            extra={
-                                "task": "agent_account_deploy",
-                                "contract_name": contract_name,
-                            },
-                        )
-
-                    # Fallback to name field
-                    elif data.get("name"):
-                        contract_name = data["name"]
-                        logger.debug(
-                            "Found contract name in name field",
-                            extra={
-                                "task": "agent_account_deploy",
-                                "contract_name": contract_name,
-                            },
-                        )
-
-                    # If we have a contract name, we need to derive the deployer address
-                    if contract_name:
-                        # The deployer address should be derived from the backend wallet seed phrase
-                        # For now, we'll use a simple approach to get the address
-                        try:
-                            # Use the BunScriptRunner to get the deployer address
-                            from app.tools.bun import BunScriptRunner
-
-                            address_result = BunScriptRunner.bun_run_with_seed_phrase(
-                                config.backend_wallet.seed_phrase,
-                                "stacks-wallet",
-                                "get-my-wallet-address.ts",
-                            )
-
-                            if address_result.get("success") and address_result.get(
-                                "output"
-                            ):
-                                deployer_address = address_result["output"].strip()
-
-                                # Validate that we got a proper Stacks address
-                                if not deployer_address:
-                                    logger.error(
-                                        "Empty deployer address returned",
-                                        extra={"task": "agent_account_deploy"},
-                                    )
-                                elif not (
-                                    deployer_address.startswith("ST")
-                                    or deployer_address.startswith("SP")
-                                ):
-                                    logger.error(
-                                        "Invalid Stacks address format",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "address": deployer_address,
-                                        },
-                                    )
-                                else:
-                                    logger.debug(
-                                        "Derived deployer address",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "deployer_address": deployer_address,
-                                        },
-                                    )
-
-                                    # Construct the full contract principal
-                                    full_contract_principal = (
-                                        f"{deployer_address}.{contract_name}"
-                                    )
-
-                                    logger.info(
-                                        "Agent account deployed with contract",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "contract_principal": full_contract_principal,
-                                        },
-                                    )
-
-                                    # 2025/10 ADDED TO SUPPORT AIBTC-BREW
-                                    if (
-                                        config.auto_voting_approval.enabled
-                                        and config.network.network == "testnet"
-                                    ):
-                                        if wallet.testnet_address is not None:
-                                            await self._approve_aibtc_brew_contract(
-                                                wallet, full_contract_principal
-                                            )
-
-                                    # Update the agent with the deployed contract address
-                                    try:
-                                        if wallet.agent_id:
-                                            # Update the agent with the deployed contract address
-                                            agent_update = AgentBase(
-                                                account_contract=full_contract_principal
-                                            )
-                                            backend.update_agent(
-                                                wallet.agent_id, agent_update
-                                            )
-                                            logger.info(
-                                                "Updated agent with contract address",
-                                                extra={
-                                                    "task": "agent_account_deploy",
-                                                    "agent_id": wallet.agent_id,
-                                                    "contract_principal": full_contract_principal,
-                                                },
-                                            )
-
-                                        else:
-                                            logger.warning(
-                                                "Wallet has no associated agent_id",
-                                                extra={
-                                                    "task": "agent_account_deploy",
-                                                    "wallet_id": wallet.id,
-                                                    "agent_address": agent_address,
-                                                },
-                                            )
-
-                                    except Exception as e:
-                                        logger.error(
-                                            "Failed to update agent with contract address",
-                                            extra={
-                                                "task": "agent_account_deploy",
-                                                "error": str(e),
-                                                "agent_id": wallet.agent_id,
-                                            },
-                                            exc_info=True,
-                                        )
-                                # Don't fail the entire deployment if agent update fails
-                            else:
-                                logger.error(
-                                    "Failed to derive deployer address",
-                                    extra={
-                                        "task": "agent_account_deploy",
-                                        "result": str(address_result),
-                                    },
-                                )
-
-                        except Exception as e:
-                            logger.error(
-                                "Error deriving deployer address",
-                                extra={"task": "agent_account_deploy", "error": str(e)},
-                                exc_info=True,
-                            )
-                    else:
-                        logger.warning(
-                            "No contract name found in deployment result",
-                            extra={"task": "agent_account_deploy"},
-                        )
+            # check if tool succeeded
+            tool_succeeded = bool(parsed_output["tool_output"]["success"])
+            if not tool_succeeded:
+                if "ContractAlreadyExists" in parsed_output["tool_output"]["data"]:
+                    error_msg = "Deployer tool failed because contract already exists"
                 else:
-                    logger.warning(
-                        "No data found in deployment result",
-                        extra={"task": "agent_account_deploy"},
+                    error_msg = "Deployer tool failed with error(s)"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "parsed_output": parsed_output,
+                        "deployment_result": deployment_result,
+                    },
+                )
+                result = {"success": False, "error": error_msg}
+                return result
+
+            # check if we have data from the tool
+            tool_output_data = parsed_output["tool_output"]["data"]
+            if tool_output_data is None:
+                error_msg = "Unable to extract data from tool output"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "parsed_output": parsed_output,
+                        "deployment_result": deployment_result,
+                    },
+                )
+                result = {"success": False, "error": error_msg}
+                return result
+
+            # get the contract name from tool data
+            contract_name = tool_output_data.get("displayName", None)
+            if contract_name is None:
+                error_msg = "Unable to find contract name in tool output"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "parsed_output": parsed_output,
+                        "deployment_result": deployment_result,
+                    },
+                )
+                result = {"success": False, "error": error_msg}
+                return result
+
+            # get deployer account address using script
+            try:
+                # Use the BunScriptRunner to get the deployer address
+                from app.tools.bun import BunScriptRunner
+
+                address_result = BunScriptRunner.bun_run_with_seed_phrase(
+                    config.backend_wallet.seed_phrase,
+                    "stacks-wallet",
+                    "get-my-wallet-address.ts",
+                )
+
+                # verify we actually got the values
+                address_result_success = address_result.get("success", False)
+                address_result_output = address_result.get("output", None)
+                if not address_result_success or address_result_output is None:
+                    error_msg = "Unable to get deployer address from script"
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "address_result_success": address_result_success,
+                            "address_result_output": address_result_output,
+                        },
                     )
-            else:
-                logger.warning(
-                    "Deployment result missing required fields",
+                    result = {"success": False, "error": error_msg}
+                    return result
+
+                deployer_address = address_result_output.strip()
+
+                if (
+                    not deployer_address
+                    or not deployer_address.startsWith("ST")
+                    or not deployer_address.startsWith("SP")
+                ):
+                    error_msg = "Invalid Stacks address format"
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "address_result_success": address_result_success,
+                            "address_result_output": address_result_output,
+                        },
+                    )
+                    result = {"success": False, "error": error_msg}
+                    return result
+
+                logger.debug(
+                    "Derived deployer address",
                     extra={
                         "task": "agent_account_deploy",
-                        "has_success": bool(deployment_result.get("success")),
-                        "has_output": bool(deployment_result.get("output")),
+                        "deployer_address": deployer_address,
                     },
                 )
 
-            # Also check for failed deployments with ContractAlreadyExists error
-            if deployment_result.get("success") is False and deployment_result.get(
-                "output"
-            ):
+                # Construct the full contract principal
+                full_contract_principal = f"{deployer_address}.{contract_name}"
+
+                logger.info(
+                    "Agent account contract deployed",
+                    extra={
+                        "task": "agent_account_deploy",
+                        "contract_principal": full_contract_principal,
+                    },
+                )
+
+                # 2025/10 ADDED TO SUPPORT AIBTC-BREW
+                if (
+                    config.auto_voting_approval.enabled
+                    and config.network.network == "testnet"
+                ):
+                    if wallet.testnet_address is not None:
+                        await self._approve_aibtc_brew_contract(
+                            wallet, full_contract_principal
+                        )
+
+                # verify we have the agent_id before continuing
+                if wallet.agent_id is None:
+                    error_msg = "Unable to get agent id from wallet to update info"
+                    logger.warning(
+                        error_msg,
+                        extra={"wallet_id": wallet.id, "agent_id": wallet.agent_id},
+                    )
+                    result = {"success": False, "error": error_msg}
+                    return result
+
+                # update the agent with the deployed contract address
                 try:
-                    # Try to parse JSON from the output, handling multiple possible formats
-                    output_lines = deployment_result["output"].split("\n")
-                    output_data = None
-
-                    # Try to find a line that contains valid JSON
-                    for line in reversed(output_lines):  # Start from the end
-                        line = line.strip()
-                        if line and line.startswith("{") and line.endswith("}"):
-                            try:
-                                output_data = json.loads(line)
-                                break
-                            except json.JSONDecodeError:
-                                continue
-
-                    # If no valid JSON found, try to extract from the raw output string
-                    if (
-                        not output_data
-                        and "ContractAlreadyExists" in deployment_result["output"]
-                    ):
-                        # Create a synthetic output_data structure for processing
-                        output_data = {
-                            "success": False,
-                            "message": deployment_result["output"],
-                        }
-
-                    if output_data and (
-                        output_data.get("success") is False
-                        and "ContractAlreadyExists"
-                        in str(output_data.get("message", ""))
-                    ):
-                        logger.info(
-                            "Contract already exists - extracting contract info",
-                            extra={"task": "agent_account_deploy"},
-                        )
-
-                        # Initialize variables
-                        contract_name = None
-                        deployer_address = None
-
-                        # Method 1: Extract aibtc-acct pattern directly from the message
-                        message = output_data.get("message", "")
-                        aibtc_acct_match = re.search(
-                            r"aibtc-acct-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}",
-                            message,
-                        )
-                        if aibtc_acct_match:
-                            contract_name = aibtc_acct_match.group(0)
-                            logger.debug(
-                                "Found aibtc-acct pattern in error",
-                                extra={
-                                    "task": "agent_account_deploy",
-                                    "contract_name": contract_name,
-                                },
-                            )
-
-                        # Method 2: Try to extract from contract_identifier if available
-                        if not contract_name and "contract_identifier" in message:
-                            contract_id_match = re.search(
-                                r'"contract_identifier":"([^"]+)"', message
-                            )
-                            if contract_id_match:
-                                contract_identifier = contract_id_match.group(1)
-                                # Extract deployer address and contract name from identifier
-                                if "." in contract_identifier:
-                                    deployer_address, contract_name = (
-                                        contract_identifier.split(".", 1)
-                                    )
-                                    logger.debug(
-                                        "Found contract identifier",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "contract_identifier": contract_identifier,
-                                            "deployer": deployer_address,
-                                            "contract": contract_name,
-                                        },
-                                    )
-
-                        # Method 2b: Also try to extract deployer address from contract_identifier even if we already have contract_name
-                        if (
-                            contract_name
-                            and not deployer_address
-                            and "contract_identifier" in message
-                        ):
-                            contract_id_match = re.search(
-                                r'"contract_identifier":"([^"]+)"', message
-                            )
-                            if contract_id_match:
-                                contract_identifier = contract_id_match.group(1)
-                                if "." in contract_identifier:
-                                    deployer_address, _ = contract_identifier.split(
-                                        ".", 1
-                                    )
-                                    logger.debug(
-                                        "Extracted deployer from contract_identifier",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "deployer_address": deployer_address,
-                                        },
-                                    )
-
-                        # Method 3: Try to extract from reason_data if available
-                        if not contract_name and "reason_data" in message:
-                            reason_data_match = re.search(
-                                r'"reason_data":{[^}]*"contract_identifier":"([^"]+)"',
-                                message,
-                            )
-                            if reason_data_match:
-                                contract_identifier = reason_data_match.group(1)
-                                if "." in contract_identifier:
-                                    deployer_address, contract_name = (
-                                        contract_identifier.split(".", 1)
-                                    )
-                                    logger.debug(
-                                        "Found contract identifier in reason_data",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "contract_identifier": contract_identifier,
-                                            "deployer": deployer_address,
-                                            "contract": contract_name,
-                                        },
-                                    )
-
-                        # Method 3b: Also try to extract deployer address from reason_data even if we already have contract_name
-                        if (
-                            contract_name
-                            and not deployer_address
-                            and "reason_data" in message
-                        ):
-                            reason_data_match = re.search(
-                                r'"reason_data":{[^}]*"contract_identifier":"([^"]+)"',
-                                message,
-                            )
-                            if reason_data_match:
-                                contract_identifier = reason_data_match.group(1)
-                                if "." in contract_identifier:
-                                    deployer_address, _ = contract_identifier.split(
-                                        ".", 1
-                                    )
-                                    logger.debug(
-                                        "Extracted deployer from reason_data",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "deployer_address": deployer_address,
-                                        },
-                                    )
-
-                        # If we still don't have a deployer address, derive it from seed phrase
-                        if contract_name and not deployer_address:
-                            try:
-                                from app.tools.bun import BunScriptRunner
-
-                                address_result = (
-                                    BunScriptRunner.bun_run_with_seed_phrase(
-                                        config.backend_wallet.seed_phrase,
-                                        "stacks-wallet",
-                                        "get-my-wallet-address.ts",
-                                    )
-                                )
-
-                                if address_result.get("success") and address_result.get(
-                                    "output"
-                                ):
-                                    deployer_address = address_result["output"].strip()
-                                    logger.debug(
-                                        "Derived deployer address from seed",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "deployer_address": deployer_address,
-                                        },
-                                    )
-                            except Exception as e:
-                                logger.error(
-                                    "Error deriving deployer address",
-                                    extra={
-                                        "task": "agent_account_deploy",
-                                        "error": str(e),
-                                    },
-                                    exc_info=True,
-                                )
-
-                        # If we have both contract name and deployer address, update the agent
-                        if contract_name and deployer_address:
-                            full_contract_principal = (
-                                f"{deployer_address}.{contract_name}"
-                            )
-
-                            logger.info(
-                                "Found existing contract",
-                                extra={
-                                    "task": "agent_account_deploy",
-                                    "contract_principal": full_contract_principal,
-                                },
-                            )
-
-                            try:
-                                if wallet.agent_id:
-                                    agent_update = AgentBase(
-                                        account_contract=full_contract_principal
-                                    )
-                                    backend.update_agent(wallet.agent_id, agent_update)
-                                    logger.info(
-                                        "Updated agent with existing contract",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "agent_id": wallet.agent_id,
-                                            "contract_principal": full_contract_principal,
-                                        },
-                                    )
-
-                                else:
-                                    logger.warning(
-                                        "Wallet has no associated agent_id for existing contract",
-                                        extra={
-                                            "task": "agent_account_deploy",
-                                            "wallet_id": wallet.id,
-                                            "agent_address": agent_address,
-                                        },
-                                    )
-                            except Exception as e:
-                                logger.error(
-                                    "Failed to update agent with existing contract",
-                                    extra={
-                                        "task": "agent_account_deploy",
-                                        "error": str(e),
-                                        "agent_id": wallet.agent_id,
-                                    },
-                                    exc_info=True,
-                                )
-                        else:
-                            logger.warning(
-                                "Could not extract contract information from error",
-                                extra={
-                                    "task": "agent_account_deploy",
-                                    "has_contract_name": bool(contract_name),
-                                    "has_deployer_address": bool(deployer_address),
-                                },
-                            )
-
-                except (json.JSONDecodeError, Exception) as e:
+                    # Update the agent with the deployed contract address
+                    agent_update = AgentBase(account_contract=full_contract_principal)
+                    backend.update_agent(wallet.agent_id, agent_update)
+                    logger.info(
+                        "Updated agent with contract address",
+                        extra={
+                            "task": "agent_account_deploy",
+                            "agent_id": wallet.agent_id,
+                            "contract_principal": full_contract_principal,
+                        },
+                    )
+                except Exception as e:
                     logger.error(
-                        "Failed to parse failed deployment output",
-                        extra={"task": "agent_account_deploy", "error": str(e)},
+                        "Failed to update agent with contract address",
+                        extra={
+                            "task": "agent_account_deploy",
+                            "error": str(e),
+                            "agent_id": wallet.agent_id,
+                        },
                         exc_info=True,
                     )
-                    # Still treat ContractAlreadyExists as successful even if parsing fails
-                    if is_contract_already_exists:
-                        logger.info(
-                            "Treating ContractAlreadyExists as successful despite parsing error",
-                            extra={"task": "agent_account_deploy"},
-                        )
+            except Exception as e:
+                error_msg = "Failed to get deployer address from tool"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "task": "agent_account_deploy",
+                        "error": str(e),
+                        "agent_id": wallet.agent_id,
+                    },
+                )
 
-            # Determine if this should be considered a successful deployment
-            # Both successful deployments and ContractAlreadyExists should be considered successful
-            deployed = (
-                deployment_result.get("success") is True or is_contract_already_exists
-            )
-
-            result = {
-                "success": True,
-                "deployed": deployed,
-                "result": deployment_result,
+            final_result = {
+                "success": parsed_output["outer_fields"].get("success", False),
+                "deployed": parsed_output["outer_fields"].get("deployed", False),
+                "result": parsed_output,
             }
 
             # Store result and mark as processed
-            update_data = QueueMessageBase(is_processed=True, result=result)
+            update_data = QueueMessageBase(is_processed=True, result=final_result)
             backend.update_queue_message(message_id, update_data)
 
             logger.info(
@@ -939,11 +735,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 extra={
                     "task": "agent_account_deploy",
                     "message_id": message_id,
-                    "deployed": deployed,
+                    "deployed": final_result["deployed"],
                 },
             )
 
-            return result
+            return final_result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
