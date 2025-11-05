@@ -40,6 +40,8 @@ from app.services.ai.simple_workflows.processors.twitter import (
 )
 from app.services.ai.simple_workflows.processors.airdrop import process_airdrop
 from app.backend.factory import get_backend
+from app.services.ai.simple_workflows.llm import get_model_config
+from app.config import config
 
 
 class Tee(object):
@@ -333,6 +335,21 @@ Recent Community Sentiment: Positive
                 "total_tokens": input_tokens + output_tokens,
             }
 
+            # Capture model configuration
+            model_config = get_model_config()
+            model_used = model_config.get("default_model", "unknown")
+            api_base_url = model_config.get("default_base_url", "")
+
+            # Get API key from config for truncation
+            api_key_full = config.chat_llm.api_key or ""
+            # Truncate API key for security - only show first 7 and last 4 characters
+            if api_key_full and len(api_key_full) > 15:
+                api_key_truncated = f"{api_key_full[:7]}...{api_key_full[-4:]}"
+            elif api_key_full:
+                api_key_truncated = "***hidden***"
+            else:
+                api_key_truncated = "N/A"
+
             # Convert to dict
             result_dict = {
                 "proposal_id": proposal_id,
@@ -358,6 +375,9 @@ Recent Community Sentiment: Positive
                 "flags": result.flags or [],
                 "token_usage": result.token_usage or computed_token_usage,
                 "images_processed": result.images_processed,
+                "model_used": model_used,
+                "api_base_url": api_base_url,
+                "api_key_truncated": api_key_truncated,
                 "expected_decision": True
                 if expected_decision == "true"
                 else False
@@ -495,6 +515,9 @@ def generate_summary(
                     and r.get("decision") == r.get("expected_decision"),
                     "explanation": r.get("explanation"),
                     "error": r.get("error"),
+                    "model_used": r.get("model_used"),
+                    "api_base_url": r.get("api_base_url"),
+                    "api_key_truncated": r.get("api_key_truncated"),
                     "tweet_snippet": (
                         content := r.get("proposal_metadata", {}).get(
                             "tweet_content", ""
@@ -595,7 +618,25 @@ Examples:
     if args.save_output:
         os.makedirs("evals", exist_ok=True)
 
+    # Get model configuration for display
+    model_config = get_model_config()
+    model_name = model_config.get("default_model", "unknown")
+    api_base = model_config.get("default_base_url", "N/A")
+    api_key_full = config.chat_llm.api_key or ""
+
+    # Truncate API key for display
+    if api_key_full and len(api_key_full) > 15:
+        api_key_display = f"{api_key_full[:7]}...{api_key_full[-4:]}"
+    elif api_key_full:
+        api_key_display = "***hidden***"
+    else:
+        api_key_display = "N/A"
+
     print("🚀 Starting Sequential Proposal Evaluation Test V2")
+    print("=" * 60)
+    print(f"Model: {model_name}")
+    print(f"API Base: {api_base}")
+    print(f"API Key: {api_key_display}")
     print("=" * 60)
     print(f"Proposals: {len(args.proposal_id)}")
     print(f"DAO ID: {args.dao_id or 'Auto-detect per proposal'}")

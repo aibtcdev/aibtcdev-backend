@@ -238,3 +238,6 @@ docker-compose.override.yml
 
 # AI Evaluations
 evals/
+
+# Commit message generator
+commit.py

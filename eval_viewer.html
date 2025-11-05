@@ -400,6 +400,21 @@
             .join("");
         };
 
+        // Extract model info from first proposal (they should all be the same)
+        const modelInfo = evals.proposals[0] || {};
+        const modelUsed = modelInfo.model_used;
+        const apiBaseUrl = modelInfo.api_base_url;
+        const apiKeyTruncated = modelInfo.api_key_truncated;
+
+        // Always show model info section with raw values
+        const modelInfoHtml = `
+          <div class="mb-4 text-sm text-gray-600">
+            <span class="mr-4"><strong>Model:</strong> ${modelUsed}</span>
+            <span class="mr-4"><strong>API Base:</strong> ${apiBaseUrl}</span>
+            <span class="mr-4"><strong>API Key:</strong> ${apiKeyTruncated}</span>
+          </div>
+        `;
+
         container.innerHTML = `
           <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h2 id="summary-title" class="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center">
@@ -407,6 +422,7 @@
               <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </h2>
             <div id="summary-content" class="overflow-x-auto">
+              ${modelInfoHtml}
               <div class="mb-4 text-sm text-gray-600">
                 <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(
                   2
@@ -676,10 +692,16 @@
         const outcomeClass = prop.decision
           ? "border-green-600"
           : "border-red-600";
+
         details.innerHTML = `
           <div class="p-4 rounded-md border ${outcomeClass}">
             <p class="font-bold ${outcomeColor}">${outcomeText}</p>
             <p class="text-sm">Explanation: ${prop.explanation || "N/A"}</p>
+            <div class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
+              <span class="mr-3"><strong>Model:</strong> ${prop.model_used}</span>
+              <span class="mr-3"><strong>API Base:</strong> ${prop.api_base_url}</span>
+              <span><strong>API Key:</strong> ${prop.api_key_truncated}</span>
+            </div>
           </div>
         `;
 
