@@ -174,33 +174,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         ]
         return all(field in message_data for field in required_fields)
 
-    def _parse_deployment_output(self, output: str) -> Optional[Dict[str, Any]]:
-        """Parse deployment output JSON."""
-        try:
-            output_data = json.loads(output)
-            if output_data and output_data.get("success") and output_data.get("data"):
-                return output_data["data"]
-            else:
-                logger.warning(
-                    "Output data missing required fields",
-                    extra={
-                        "task": "agent_account_deploy",
-                        "has_success": bool(output_data and output_data.get("success")),
-                        "has_data": bool(output_data and output_data.get("data")),
-                    },
-                )
-                return None
-        except (json.JSONDecodeError, IndexError) as e:
-            logger.error(
-                "Failed to parse deployment output",
-                extra={
-                    "task": "agent_account_deploy",
-                    "error": str(e),
-                    "output_length": len(output),
-                },
-            )
-            return None
-
     def _parse_deployment_tool_output(
         self, deployment_result: Dict
     ) -> Optional[Dict[str, Any]]:
