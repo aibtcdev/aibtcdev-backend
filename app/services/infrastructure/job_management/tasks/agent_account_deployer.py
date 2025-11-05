@@ -30,13 +30,18 @@ from app.tools.agent_account_configuration import AgentAccountApproveContractToo
 logger = configure_logger(__name__)
 
 
+def safe_get(d, key, default=None):
+    """Safely get a value from a dict, returning default if d is None."""
+    return d.get(key, default) if d is not None else default
+
+
 @dataclass
 class AgentAccountDeployResult(RunnerResult):
     """Result of agent account deployment operation."""
 
     accounts_processed: int = 0
     accounts_deployed: int = 0
-    errors: List[str] = None
+    errors: Optional[List[str]] = None
 
     def __post_init__(self):
         self.errors = self.errors or []
@@ -174,23 +179,17 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         ]
         return all(field in message_data for field in required_fields)
 
-    def _parse_deployment_tool_output(
-        self, deployment_result: Dict
-    ) -> Optional[Dict[str, Any]]:
+    def _parse_deployment_tool_output(self, deployment_result: Dict) -> Dict[str, Any]:
         """Parse deployment tool output JSON."""
-
-        # full object: result, success, deployed
-        #   result: error, output, success
-        #     output: success, message, data
 
         # example successful: {"result": {"error": null, "output": "{\n  \"success\": true,\n  \"message\": \"Transaction broadcasted successfully: 0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n  \"data\": {\n    \"name\": \"aibtc-agent-account\",\n    \"displayName\": \"aibtc-acct-STQM5-8WDPB-ST39Z-SN4CB\",\n    \"type\": \"AGENT\",\n    \"subtype\": \"AGENT_ACCOUNT\",\n    \"source\": \";; title: aibtc-agent-account\\n;; version: 3.3.3\\n;; summary: A special account contract between a ...\",\n    \"deploymentOrder\": 1,\n    \"txid\": \"a2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1\",\n    \"link\": \"https://explorer.hiro.so/txid/0xa2e72cfceac2547cb4572ebcd732e75a14f0ec65d9f30e775b2f78427be40ed1?chain=testnet\"\n  }\n}", "success": true}, "success": true, "deployed": true}
         # example error:{"result": {"error": "Unknown error occurred", "output": "{\n  \"success\": false,\n  \"message\": \"\\\"Invalid owner address: SP1ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789\\\\nUsage: bun run deploy-agent-account.ts <ownerAddress> <agentAddress> [network] [saveToFile]\\\\nExample: bun run deploy-agent-account.ts ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM \\\\\\\"testnet\\\\\\\" true\\\"\",\n  \"data\": {}\n}", "success": false}, "success": true, "deployed": false}
 
-        # evaluate outer fields
+        # evaluate outer fields: result, success, deployed
         outer_fields = {
-            "result": deployment_result.get("result", None),
-            "success": deployment_result.get("success", None),
-            "deployed": deployment_result.get("deployed", None),
+            "result": safe_get(deployment_result, "result"),
+            "success": safe_get(deployment_result, "success"),
+            "deployed": safe_get(deployment_result, "deployed"),
         }
         missing_outer_fields = [
             field for field, value in outer_fields.items() if value is None
@@ -201,14 +200,15 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 extra={
                     "task": "agent_account_deploy",
                     "missing_fields": missing_outer_fields,
+                    "outer_fields": outer_fields,
                 },
             )
 
-        # evaluate inner fields
+        # evaluate inner fields: error, output, success
         inner_fields = {
-            "success": outer_fields["result"].get("success", None),
-            "error": outer_fields["result"].get("error", None),
-            "output": outer_fields["result"].get("output", None),
+            "success": safe_get(outer_fields["result"], "success"),
+            "error": safe_get(outer_fields["result"], "error"),
+            "output": safe_get(outer_fields["result"], "output"),
         }
         missing_inner_fields = [
             field for field, value in inner_fields.items() if value is None
@@ -219,21 +219,24 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 extra={
                     "task": "agent_account_deploy",
                     "missing_fields": missing_inner_fields,
+                    "outer_fields": outer_fields,
+                    "inner_fields": inner_fields,
                 },
             )
 
         # get the tool output as a string
-        tool_output_str = inner_fields.get("output", "")
+        tool_output_str = str(inner_fields.get("output", ""))
         tool_output_fields = {}
         tool_output_parse_error = None
 
+        # evaluate tool output: success, message, data
         try:
             if tool_output_str:
                 tool_output = json.loads(tool_output_str)
                 tool_output_fields = {
-                    "success": tool_output.get("success", None),
-                    "message": tool_output.get("message", None),
-                    "data": tool_output.get("data", None),
+                    "success": safe_get(tool_output, "success"),
+                    "message": safe_get(tool_output, "message"),
+                    "data": safe_get(tool_output, "data"),
                 }
                 missing_tool_output_fields = [
                     field
@@ -246,6 +249,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         extra={
                             "task": "agent_account_deploy",
                             "missing_fields": missing_tool_output_fields,
+                            "outer_fields": outer_fields,
+                            "inner_fields": inner_fields,
+                            "tool_output_fields": tool_output_fields,
                         },
                     )
             else:
@@ -458,8 +464,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 "Deployment completed",
                 extra={
                     "task": "agent_account_deploy",
-                    "success": deployment_result.get("success"),
-                    "has_output": bool(deployment_result.get("output")),
+                    "success": safe_get(deployment_result, "success"),
+                    "deployed": safe_get(deployment_result, "deployed"),
+                    "has_result": safe_get(deployment_result, "result") is not None,
                 },
             )
 
@@ -467,7 +474,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             parsed_output = self._parse_deployment_tool_output(deployment_result)
 
             # handle empty output or parsing error
-            if parsed_output is None or parsed_output["parsed_tool_output_error"]:
+            if safe_get(parsed_output, "tool_output_parse_error") is None:
                 error_msg = "Unable to parse deployer tool result"
                 logger.error(
                     error_msg,
@@ -482,7 +489,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             # check if tool succeeded
             tool_succeeded = bool(parsed_output["tool_output"]["success"])
             if not tool_succeeded:
-                if "ContractAlreadyExists" in parsed_output["tool_output"]["data"]:
+                tool_output_data = safe_get(parsed_output["tool_output"], "data")
+                if tool_output_data is not None and "ContractAlreadyExists" in str(
+                    tool_output_data
+                ):
                     logger.warning(
                         "Contract already exists; treating as successful deployment",
                         extra={
@@ -491,7 +501,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         },
                     )
                 else:
-                    error_msg = "Deployer tool failed with error(s)"
+                    error_msg = "Deployer tool failed with unknown error"
                     logger.error(
                         error_msg,
                         extra={
@@ -517,7 +527,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 return result
 
             # get the contract name from tool data
-            contract_name = tool_output_data.get("displayName", None)
+            contract_name = safe_get(tool_output_data, "displayName")
             if contract_name is None:
                 error_msg = "Unable to find contract name in tool output"
                 logger.error(
@@ -542,8 +552,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 )
 
                 # verify we actually got the values
-                address_result_success = address_result.get("success", False)
-                address_result_output = address_result.get("output", None)
+                address_result_success = safe_get(address_result, "success", False)
+                address_result_output = safe_get(address_result, "output")
                 if not address_result_success or address_result_output is None:
                     error_msg = "Unable to get deployer address from script"
                     logger.error(
@@ -556,7 +566,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     result = {"success": False, "error": error_msg}
                     return result
 
-                deployer_address = address_result_output.strip()
+                deployer_address = str(address_result_output).strip()
 
                 if (
                     not deployer_address
@@ -648,8 +658,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 )
 
             final_result = {
-                "success": parsed_output["outer_fields"].get("success", False),
-                "deployed": parsed_output["outer_fields"].get("deployed", False),
+                "success": safe_get(parsed_output["outer_fields"], "success"),
+                "deployed": safe_get(parsed_output["outer_fields"], "deployed", False),
                 "result": parsed_output,
             }
 
