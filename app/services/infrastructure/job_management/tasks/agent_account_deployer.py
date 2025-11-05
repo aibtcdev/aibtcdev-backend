@@ -248,11 +248,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             "missing_fields": missing_tool_output_fields,
                         },
                     )
-                if tool_output_fields["data"]:
-                    tool_output_data = json.loads(tool_output_fields["data"])
-                else:
-                    tool_output_data = None
-                tool_output_fields["data"] = tool_output_data
             else:
                 raise json.JSONDecodeError("Empty tool output", "", 0)
         except (json.JSONDecodeError, IndexError) as e:
@@ -535,18 +530,24 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             tool_succeeded = bool(parsed_output["tool_output"]["success"])
             if not tool_succeeded:
                 if "ContractAlreadyExists" in parsed_output["tool_output"]["data"]:
-                    error_msg = "Deployer tool failed because contract already exists"
+                    logger.warning(
+                        "Contract already exists; treating as successful deployment",
+                        extra={
+                            "parsed_output": parsed_output,
+                            "deployment_result": deployment_result,
+                        },
+                    )
                 else:
                     error_msg = "Deployer tool failed with error(s)"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "parsed_output": parsed_output,
-                        "deployment_result": deployment_result,
-                    },
-                )
-                result = {"success": False, "error": error_msg}
-                return result
+                    logger.error(
+                        error_msg,
+                        extra={
+                            "parsed_output": parsed_output,
+                            "deployment_result": deployment_result,
+                        },
+                    )
+                    result = {"success": False, "error": error_msg}
+                    return result
 
             # check if we have data from the tool
             tool_output_data = parsed_output["tool_output"]["data"]
@@ -606,8 +607,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
                 if (
                     not deployer_address
-                    or not deployer_address.startsWith("ST")
-                    or not deployer_address.startsWith("SP")
+                    or not deployer_address.startswith("ST")
+                    or deployer_address.startswith("SP")
                 ):
                     error_msg = "Invalid Stacks address format"
                     logger.error(
