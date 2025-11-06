@@ -474,19 +474,33 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
             # check if tool succeeded
             if not tool_succeeded:
-                # where the error goes if bunscriptrunner fails
+                # check if it's because the contract is already deployed
                 if (
                     tool_output_message is not None
                     and "ContractAlreadyExists" in tool_output_message_str
                 ):
                     logger.warning(
-                        "Contract already exists; treating as successful deployment",
-                        extra={"tool_output_message": tool_output_message},
+                        "Contract already exists; treating as successful deployment"
+                        # extra={"tool_output_message": tool_output_message},
                     )
                     contract_already_exists = True
-                    # put the data back where we expect it
-                    # TODO: fix this in the bunscriptrunner
-                    tool_output_data = json.loads(tool_output_message)
+
+                    try:
+                        tool_output_data_json = (
+                            json.loads(tool_output_message_str) or None
+                        )
+                        logger.info(
+                            "Successfully extracted and parsed JSON from BunScriptRunner error output"
+                        )
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Regex extracted but JSON invalid: {e}")
+                        logger.error(
+                            "Full tool output data:",
+                            extra={
+                                "tool_output_message_str": tool_output_message_str,
+                            },
+                        )
+                        raise e
                 else:
                     error_msg = "Deployer tool failed with unknown error"
                     logger.error(
@@ -500,7 +514,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     return result
 
             # check if we have data from the tool
-            if tool_output_data is None:
+            if tool_output_data is None or (
+                contract_already_exists and tool_output_data_json is None
+            ):
                 error_msg = "Unable to extract data from tool output"
                 logger.error(
                     error_msg,
@@ -513,7 +529,12 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 return result
 
             # get the contract name from tool data
-            contract_name = safe_get(tool_output_data, "displayName")
+            if contract_already_exists:
+                target_data = safe_get(tool_output_data_json, "data", {})
+                contract_name = safe_get(target_data, "displayName")
+            else:
+                contract_name = safe_get(tool_output_data, "displayName")
+
             if contract_name is None:
                 error_msg = "Unable to find contract name in tool output"
                 logger.error(
@@ -644,7 +665,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 )
 
             final_result = {
-                "success": safe_get(parsed_output["inner_fields"], "success"),
+                "success": True
+                if contract_already_exists
+                else safe_get(parsed_output["inner_fields"], "success"),
                 "deployed": tool_succeeded or contract_already_exists,
                 "result": parsed_output,
             }
