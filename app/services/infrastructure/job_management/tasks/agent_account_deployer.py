@@ -663,7 +663,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             final_result = {
                 "success": True
                 if contract_already_exists
-                else safe_get(parsed_output["inner_fields"], "success"),
+                else safe_get(parsed_output["inner_fields"], "success", False),
                 "deployed": tool_succeeded or contract_already_exists,
                 "result": parsed_output,
             }
