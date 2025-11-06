@@ -471,6 +471,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             tool_output_message = safe_get(parsed_output["tool_output"], "message")
             tool_output_message_str = str(tool_output_message)
             tool_output_data = safe_get(parsed_output["tool_output"], "data")
+            tool_output_data_json = None
 
             # check if tool succeeded
             if not tool_succeeded:
@@ -486,9 +487,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     contract_already_exists = True
 
                     try:
-                        tool_output_data_json = (
-                            json.loads(tool_output_message_str) or None
-                        )
+                        tool_output_data_json = json.loads(tool_output_message_str)
                         logger.info(
                             "Successfully extracted and parsed JSON from BunScriptRunner error output"
                         )
@@ -575,10 +574,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
                 deployer_address = str(address_result_output).strip()
 
-                if (
-                    not deployer_address
-                    or not deployer_address.startswith("ST")
-                    or deployer_address.startswith("SP")
+                if not deployer_address or not deployer_address.startswith(
+                    ("SP", "SM", "ST", "SN")
                 ):
                     error_msg = "Invalid Stacks address format"
                     logger.error(
