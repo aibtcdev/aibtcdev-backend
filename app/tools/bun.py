@@ -122,15 +122,12 @@ class BunScriptRunner:
 
             return {"output": output, "error": None, "success": True}
         except subprocess.CalledProcessError as e:
-            error_output = e.stderr.strip() if e.stderr else "Unknown error occurred"
             stdout_output = e.stdout.strip() if e.stdout else ""
+            error_output = e.stderr.strip() if e.stderr else "Unknown error occurred"
 
             logger.error(
-                f"Script execution failed: {script_name}, exit code: {e.returncode}"
+                f"Script execution failed: {script_name}, exit code: {e.returncode}, error message: {error_output}"
             )
-            logger.error(f"Error message: {error_output}")
-            if stdout_output:
-                logger.debug(f"Script stdout before failure: {stdout_output}")
 
             return {
                 "output": stdout_output,
