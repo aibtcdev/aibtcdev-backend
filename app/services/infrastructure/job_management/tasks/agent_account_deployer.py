@@ -482,7 +482,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 ):
                     logger.warning(
                         "Contract already exists; treating as successful deployment"
-                        # extra={"tool_output_message": tool_output_message},
                     )
                     contract_already_exists = True
 
@@ -492,7 +491,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                             "Successfully extracted and parsed JSON from BunScriptRunner error output"
                         )
                     except json.JSONDecodeError as e:
-                        logger.error(f"Regex extracted but JSON invalid: {e}")
+                        logger.error(f"Failed to parse JSON from tool output: {e}")
                         logger.error(
                             "Full tool output data:",
                             extra={
