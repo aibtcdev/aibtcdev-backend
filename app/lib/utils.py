@@ -1,12 +1,13 @@
 """Workflow utility functions."""
 
 import binascii
+import httpx
 import json
 import re
 import struct
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from pydantic import BaseModel, Field, ValidationError
 
-import httpx
 
 from app.lib.logger import configure_logger
 
@@ -360,6 +361,192 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Hex decoding failed: {e}")
         return None
+
+
+##### DEFINING THE STRUCTURE #####
+# from tools/bun.py we get: success, error, and output
+#   success=True, error=None, output=stdout
+#   success=False, error=stderr, output=stdout
+# from the TS tool we get a ToolResponse type: success, message, and data
+#   success=True, message=success message, data=any
+#   success=False, message=error message, data=Error | string
+##################################
+
+
+def safe_get(d: Dict[str, Any], key: str, default=None):
+    """Safely get a value from a dict, returning default if d is None."""
+    if not d or not isinstance(d, dict):
+        logger.warning("safe_get received invalid dictionary", extra={"input": d})
+        return default
+    return d.get(key, default)
+
+
+class ToolResponse(BaseModel):
+    """Model for the standard ToolResponse type returned by agent tools in TypeScript.
+    Case 1: success=True, message=success message, data=ToolResponse<Any>
+    Case 2: success=False, message=error message, data=ToolResponse<Error | undefined>
+    """
+
+    success: bool
+    message: str
+    data: Optional[Any]
+
+
+class CombinedAgentToolResult(BaseModel):
+    """Combined result model for agent tool execution."""
+
+    py_success: bool
+    py_error: Optional[str]
+    ts_success: bool
+    ts_message: str
+    ts_data: Any = Field(None, description="TS result or error data")
+
+
+def parse_py_tool_result(
+    py_tool_result: Dict[str, Any],
+) -> Tuple[bool, str, str]:
+    """
+    Parse and validate Python tool output into expected fields.
+
+    Args:
+        py_tool_result: standard result from _run and _arun
+
+    Returns:
+        (success, error, output) from Python script.
+    """
+    if not py_tool_result or not isinstance(py_tool_result, dict):
+        raise ValueError("Tool result must be a non-empty dictionary")
+
+    # get the expected fields from the python tool
+    py_fields = {
+        "success": safe_get(py_tool_result, "success", False),
+        "error": safe_get(py_tool_result, "error"),
+        "output": safe_get(py_tool_result, "output"),
+    }
+    # check if any required fields are missing
+    # if success = True then error = None is allowed
+    missing_py_fields = [
+        field
+        for field, value in py_fields.items()
+        if value is None and not (field == "error" and py_fields["success"])
+    ]
+    if missing_py_fields:
+        raise ValueError(
+            f"Missing expected python tool result fields: {', '.join(missing_py_fields)}"
+        )
+    return (
+        bool(py_fields["success"]),
+        str(py_fields["error"] or ""),
+        str(py_fields["output"] or ""),
+    )
+
+
+def parse_ts_script_output(
+    py_output: str, strict: bool = True
+) -> Tuple[bool, str, Any]:
+    """
+    Parse and validate TS output (stdout JSON) into ToolResponse fields.
+
+    Args:
+        py_output: Raw output (str expected; lenient if strict=False).
+        strict: If True, raise on invalid/empty/missing fields. If False, default gracefully.
+
+    Returns:
+        (success, message, data) from TS script.
+    """
+    # set defaults to start
+    fallback_message = "Unknown error parsing TS ToolResponse: expected JSON with success, message, and data"
+    ts_success = False
+    ts_message = fallback_message
+    ts_data = None
+
+    # handle non-strict mode to pass string if we can't decode
+    if not strict:
+        try:
+            output_str = py_output.strip()
+            ts_json = json.loads(output_str)
+            ts_model = ToolResponse.model_validate(ts_json)
+            return ts_model.success, ts_model.message, ts_model.data
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.warning(f"TS parse failed in lenient mode: {str(e)}")
+            # return defaults without re-raising
+            return ts_success, ts_message, ts_data
+
+    # handle strict mode to require full object and parsing
+    if not isinstance(py_output, str):
+        logger.error(
+            "Python output is not a string for TS parsing",
+            extra={"type": type(py_output)},
+        )
+        raise ValueError("Python output must be a string (TS JSON stdout)")
+    py_output_str = py_output.strip()
+    if not py_output_str:
+        logger.error("Unable to parse empty output")
+        raise ValueError("Unable to parse empty output")
+    try:
+        ts_json = json.loads(py_output_str)
+    except json.JSONDecodeError as e:
+        logger.error(
+            "Unable to parse JSON from TypeScript tool", extra={"error": str(e)}
+        )
+        raise ValueError(f"Invalid TS JSON: {str(e)}") from e
+    try:
+        ts_model = ToolResponse.model_validate(ts_json)
+        return ts_model.success, ts_model.message, ts_model.data
+    except ValidationError as e:
+        logger.error("Invalid TS structure", extra={"error": str(e)})
+        raise ValueError(f"Invalid TS result structure: {str(e)}") from e
+
+
+def parse_agent_tool_result_strict(
+    tool_result: Dict[str, Any], strict: Optional[bool] = None
+) -> CombinedAgentToolResult:
+    """
+    Parse agent tool _run and _arun result into standardized CombinedAgentToolResult model.
+    Uses parse_py_tool_result and parse_ts_script_output helpers.
+    """
+
+    # check the input
+    if not tool_result or not isinstance(tool_result, dict):
+        raise ValueError("Tool result must be a non-empty dictionary")
+
+    py_success, py_error, py_output = parse_py_tool_result(tool_result)
+    # forces TS tool to return success, message, data
+    strict_mode = py_success if strict is None else strict
+    # extract data from ts output
+    ts_success, ts_message, ts_data = parse_ts_script_output(
+        py_output, strict=strict_mode
+    )
+
+    return CombinedAgentToolResult(
+        py_success=py_success,
+        py_error=py_error,
+        ts_success=ts_success,
+        ts_message=ts_message,
+        ts_data=ts_data,
+    )
+
+
+def get_txid_from_agent_tool_result(tool_result: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract transaction ID from agent tool result if available.
+    """
+    parsed_result = parse_agent_tool_result_strict(tool_result)
+    if (
+        parsed_result.ts_success
+        and isinstance(parsed_result.ts_data, dict)
+        and "txid" in parsed_result.ts_data
+    ):
+        raw_tx_id = parsed_result.ts_data["txid"]
+        if isinstance(raw_tx_id, str):
+            tx_id = raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
+            return tx_id
+        else:
+            return None
+    return None
+
+
+##################################
 
 
 def parse_agent_tool_result(tool_result: Dict[str, Any]) -> Dict[str, Any]:
