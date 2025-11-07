@@ -367,9 +367,9 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
 # from tools/bun.py we get: success, error, and output
 #   success=True, error=None, output=stdout
 #   success=False, error=stderr, output=stdout
-# from the TS tool we get a ToolResponse: success, message, and data
-#   success=True, message=success message, data=ToolResponse<Any>
-#   success=False, message=error message, data=ToolResponse<Error | string>
+# from the TS tool we get a ToolResponse type: success, message, and data
+#   success=True, message=success message, data=any
+#   success=False, message=error message, data=Error | string
 ##################################
 
 
@@ -377,19 +377,19 @@ def safe_get(d: Dict[str, Any], key: str, default=None):
     """Safely get a value from a dict, returning default if d is None."""
     if not d or not isinstance(d, dict):
         logger.warning("safe_get received invalid dictionary", extra={"input": d})
-        return None
+        return default
     return d.get(key, default)
 
 
 class ToolResponse(BaseModel):
-    """Model for the standard ToolResponse returned by agent tools in TypeScript.
+    """Model for the standard ToolResponse type returned by agent tools in TypeScript.
     Case 1: success=True, message=success message, data=ToolResponse<Any>
-    Case 2: success=False, message=error message, data=ToolResponse<Error>
+    Case 2: success=False, message=error message, data=ToolResponse<Error | undefined>
     """
 
     success: bool
     message: str
-    data: Any
+    data: Optional[Any]
 
 
 class CombinedAgentToolResult(BaseModel):
@@ -455,7 +455,7 @@ def parse_ts_script_output(
         (success, message, data) from TS script.
     """
     # set defaults to start
-    fallback_message = "Unknown error parsing TS ToolResponse"
+    fallback_message = "Unknown error parsing TS ToolResponse: expected JSON with success, message, and data"
     ts_success = False
     ts_message = fallback_message
     ts_data = None
@@ -527,7 +527,7 @@ def parse_agent_tool_result_strict(
     )
 
 
-def get_txid_from_agent_tool_result(tool_result: Dict[str, Any]):
+def get_txid_from_agent_tool_result(tool_result: Dict[str, Any]) -> Optional[str]:
     """
     Extract transaction ID from agent tool result if available.
     """
@@ -538,12 +538,11 @@ def get_txid_from_agent_tool_result(tool_result: Dict[str, Any]):
         and "txid" in parsed_result.ts_data
     ):
         raw_tx_id = parsed_result.ts_data["txid"]
-        tx_id = (
-            raw_tx_id
-            if isinstance(raw_tx_id, str) and raw_tx_id.startswith("0x")
-            else f"0x{raw_tx_id}"
-        )
-        return tx_id
+        if isinstance(raw_tx_id, str):
+            tx_id = raw_tx_id if raw_tx_id.startswith("0x") else f"0x{raw_tx_id}"
+            return tx_id
+        else:
+            return None
     return None
 
 
