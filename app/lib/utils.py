@@ -543,22 +543,6 @@ def get_txid_from_agent_tool_result(tool_result: Dict[str, Any]):
     return None
 
 
-def get_txid_from_ts_script_output(py_output: str) -> Optional[str]:
-    """
-    Extract transaction ID from TS script output if available.
-    """
-    ts_success, ts_message, ts_data = parse_ts_script_output(py_output, strict=True)
-    if ts_success and isinstance(ts_data, dict) and "txid" in ts_data:
-        raw_tx_id = ts_data["txid"]
-        tx_id = (
-            raw_tx_id
-            if isinstance(raw_tx_id, str) and raw_tx_id.startswith("0x")
-            else f"0x{raw_tx_id}"
-        )
-        return tx_id
-    return None
-
-
 ##################################
 
 
