@@ -366,14 +366,14 @@ def decode_hex_parameters(hex_string: Optional[str]) -> Optional[str]:
 ##### DEFINING THE STRUCTURE #####
 # from tools/bun.py we get: success, error, and output
 #   success=True, error=None, output=stdout
-#   success=False, error=stderr, ouptput=stdout
+#   success=False, error=stderr, output=stdout
 # from the TS tool we get a ToolResponse: success, message, and data
 #   success=True, message=success message, data=ToolResponse<Any>
 #   success=False, message=error message, data=ToolResponse<Error | string>
 ##################################
 
 
-def safe_get(d: Dict[str, Any], key, default=None):
+def safe_get(d: Dict[str, Any], key: str, default=None):
     """Safely get a value from a dict, returning default if d is None."""
     if not d or not isinstance(d, dict):
         logger.warning("safe_get received invalid dictionary", extra={"input": d})
@@ -383,8 +383,8 @@ def safe_get(d: Dict[str, Any], key, default=None):
 
 class ToolResponse(BaseModel):
     """Model for the standard ToolResponse returned by agent tools in TypeScript.
-    success=True, message=success message, data=ToolResponse<Any>
-    success=False, error=stderr, ouptput=stdout
+    Case 1: success=True, message=success message, data=ToolResponse<Any>
+    Case 2: success=False, message=error message, data=ToolResponse<Error>
     """
 
     success: bool
@@ -392,7 +392,7 @@ class ToolResponse(BaseModel):
     data: Any
 
 
-class AgentToolResult(BaseModel):
+class CombinedAgentToolResult(BaseModel):
     """Combined result model for agent tool execution."""
 
     py_success: bool
@@ -410,7 +410,6 @@ def parse_py_tool_result(
 
     Args:
         py_tool_result: standard result from _run and _arun
-        strict: should we raise on invalid/missing fields
 
     Returns:
         (success, error, output) from Python script.
@@ -425,16 +424,21 @@ def parse_py_tool_result(
         "output": safe_get(py_tool_result, "output"),
     }
     # check if any required fields are missing
-    missing_py_fields = [field for field, value in py_fields.items() if value is None]
-    # handle "success" is True and "error" is None
-    if py_fields["success"] is True and "error" in missing_py_fields:
-        missing_py_fields.remove("error")
-    # check for any missing fields
+    # if success = True then error = None is allowed
+    missing_py_fields = [
+        field
+        for field, value in py_fields.items()
+        if value is None and not (field == "error" and py_fields["success"])
+    ]
     if missing_py_fields:
         raise ValueError(
             f"Missing expected python tool result fields: {', '.join(missing_py_fields)}"
         )
-    return bool(py_fields["success"]), str(py_fields["error"]), str(py_fields["output"])
+    return (
+        bool(py_fields["success"]),
+        str(py_fields["error"] or ""),
+        str(py_fields["output"] or ""),
+    )
 
 
 def parse_ts_script_output(
@@ -496,10 +500,10 @@ def parse_ts_script_output(
 
 def parse_agent_tool_result_strict(
     tool_result: Dict[str, Any], strict: Optional[bool] = None
-) -> AgentToolResult:
+) -> CombinedAgentToolResult:
     """
-    Parse agent tool _run and _arun result into standardized AgentToolResult model.
-    Uses parse_py_output and parse_ts_script_output helpers.
+    Parse agent tool _run and _arun result into standardized CombinedAgentToolResult model.
+    Uses parse_py_tool_result and parse_ts_script_output helpers.
     """
 
     # check the input
@@ -514,7 +518,7 @@ def parse_agent_tool_result_strict(
         py_output, strict=strict_mode
     )
 
-    return AgentToolResult(
+    return CombinedAgentToolResult(
         py_success=py_success,
         py_error=py_error,
         ts_success=ts_success,
