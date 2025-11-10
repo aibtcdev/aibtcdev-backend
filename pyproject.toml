@@ -5,10 +5,10 @@ description = "FastAPI backend for AIBTC"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp==3.13.0",
-    "apscheduler==3.11.0",
+    "aiohttp==3.13.2",
+    "apscheduler==3.11.1",
     "cachetools==6.2.1",
-    "fastapi==0.119.0",
+    "fastapi==0.121.1",
     "httpx>=0.25.0",
     "langchain==0.3.27",
     "langchain-community==0.3.30",
@@ -20,16 +20,16 @@ dependencies = [
     "pgvector<=0.4.1",
     "pillow>=10.0.0",
     "psycopg2-binary==2.9.11",
-    "pydantic==2.12.2",
-    "python-dotenv==1.1.1",
+    "pydantic==2.12.4",
+    "python-dotenv==1.2.1",
     "python-magic==0.4.27",
     "python-telegram-bot==22.5",
     "sqlalchemy==2.0.44",
-    "starlette<=0.48.0",
-    "supabase==2.22.0",
+    "starlette<=0.50.0",
+    "supabase==2.24.0",
     "tiktoken==0.12.0",
     "tweepy==4.16.0",
-    "uvicorn==0.37.0",
+    "uvicorn==0.38.0",
     "vecs==0.4.5",
 ]
 
