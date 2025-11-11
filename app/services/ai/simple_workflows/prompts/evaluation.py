@@ -137,6 +137,7 @@ If the proposal passed evaluation and checks, write a synthesis:
 - Summarize key insights from all 8 categories  
 - Show how scores reinforce or contradict each other  
 - Explain long-term value, DAO alignment, and risks  
+- **If X posts were provided, include your findings about the tagged builder's activity and credibility**
 - Clearly justify the final decision  
 - Include your confidence level and why
 
@@ -173,5 +174,10 @@ EVALUATION_USER_PROMPT_TEMPLATE = """Evaluate this proposal:
 **PAST PROPOSALS:**
 {past_proposals}
 
-
-Provide detailed reasoning for your evaluation and final decision."""
+**INSTRUCTIONS:**
+1. If X profile and posts are provided separately, these are the 5 most recent posts from the tagged builder (@username) in the proposal content
+2. Review these posts to understand the tagged builder's activity, technical contributions, and community engagement
+3. Use your observations from the tagged builder's X posts to inform your Credibility and Mission Alignment scores
+4. Evaluate the proposal itself across all 8 criteria
+5. In the summary field, if X posts were provided, include your findings on the tagged builder's recent posts
+6. Provide detailed reasoning for your evaluation and final decision"""

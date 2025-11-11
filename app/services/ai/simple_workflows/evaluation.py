@@ -8,6 +8,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 from urllib.parse import urlparse
+import httpx
+import json
+import re
 
 from langchain_core.documents import Document
 from langchain_core.prompts.chat import ChatPromptTemplate
@@ -62,6 +65,206 @@ def create_embedding_model() -> OpenAIEmbeddings:
         f"Creating OpenAI embeddings with model: {config.embedding.default_model}"
     )
     return OpenAIEmbeddings(**embedding_config)
+
+
+def extract_x_username_from_content(content: str) -> Optional[str]:
+    """Extract X username from proposal content.
+    
+    Looks for @username mentions in the content. If multiple mentions exist,
+    returns the second one ().
+    If only one mention exists, returns that one.
+    
+    Args:
+        content: Proposal content text
+        
+    Returns:
+        Username without @ symbol, or None if no username found
+    """
+    if not content:
+        return None
+    
+    # Pattern to match @username (alphanumeric and underscore, 1-15 chars)
+    # X usernames can be 1-15 characters, letters, numbers, and underscores
+    pattern = r'@([A-Za-z0-9_]{1,15})\b'
+    
+    matches = re.findall(pattern, content)
+    
+    if not matches:
+        logger.debug("No X username found in proposal content")
+        return None
+    
+    # If there are 2 or more mentions, use the second one
+    # Otherwise use the first (and only) one
+    if len(matches) >= 2:
+        username = matches[1]
+        logger.debug(f"Found {len(matches)} usernames, using second one: @{username}")
+    else:
+        username = matches[0]
+        logger.debug(f"Found 1 username: @{username}")
+    
+    return username
+
+
+async def fetch_x_posts_for_user(
+    username: str, current_time: str = "November 11, 2025"
+) -> Dict[str, Any]:
+    """Fetch X posts for a user using Grok-4-fast with x_search tool.
+    
+    Fetches exactly 5 most recent posts with full content (no truncation).
+
+    Args:
+        username: X username (without @)
+        current_time: Current timestamp for context
+
+    Returns:
+        Dictionary with profile info and 5 most recent posts (full content)
+    """
+    # Get API configuration
+    api_key = config.chat_llm.api_key
+    base_url = config.chat_llm.api_base or "https://openrouter.ai/api/v1"
+    grok_model = "x-ai/grok-4-fast"
+
+    # Native Grok tools
+    x_ai_tools = [{"type": "web_search"}, {"type": "x_search"}]
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"You are a concise X-search assistant. Current time: {current_time}. "
+                f"Use the `x_search` tool with query `from:{username} since:2025-09-01` (mode='Latest') "
+                "to fetch the user's 5 most recent posts.\n\n"
+                "CRITICAL: Format your response EXACTLY as follows:\n\n"
+                "Profile: @handle (followers, bio)\n\n"
+                "--- POST 1 ---\n"
+                "[full text of most recent post]\n\n"
+                "--- POST 2 ---\n"
+                "[full text of 2nd most recent post]\n\n"
+                "--- POST 3 ---\n"
+                "[full text of 3rd most recent post]\n\n"
+                "--- POST 4 ---\n"
+                "[full text of 4th most recent post]\n\n"
+                "--- POST 5 ---\n"
+                "[full text of 5th most recent post]\n\n"
+                "Include COMPLETE post content. Use the exact separator format shown above."
+            ),
+        },
+        {"role": "user", "content": f"Fetch @{username} profile and their 5 most recent posts. Use the exact format with '--- POST N ---' separators."},
+    ]
+
+    logger.info(f"Fetching X posts for @{username}")
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        # Initial request
+        data = await _call_openrouter_async(
+            client, messages, x_ai_tools, grok_model, api_key, base_url
+        )
+        choice = data["choices"][0]
+        msg = choice["message"]
+
+        iteration = 1
+        max_iterations = 5
+
+        # Handle tool calls
+        while "tool_calls" in msg and iteration <= max_iterations:
+            logger.debug(f"Iteration {iteration}: Processing tool calls...")
+
+            # Append assistant's message with tool calls
+            messages.append(msg)
+
+            # Make next request
+            data = await _call_openrouter_async(
+                client, messages, x_ai_tools, grok_model, api_key, base_url
+            )
+            choice = data["choices"][0]
+            msg = choice["message"]
+
+            # Append tool responses if present
+            if "tool_responses" in data:
+                for tr in data["tool_responses"]:
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "name": tr["name"],
+                            "content": json.dumps(tr["content"])
+                            if isinstance(tr["content"], (dict, list))
+                            else str(tr["content"]),
+                        }
+                    )
+
+            iteration += 1
+
+        final_content = msg.get("content", "").strip()
+        
+        # Check for errors in the response
+        if "error" in choice:
+            error_msg = choice.get("error", {}).get("message", "Unknown error")
+            logger.error(f"Error fetching X posts for @{username}: {error_msg}")
+            return {
+                "username": username,
+                "raw_response": "",
+                "full_data": data,
+                "error": error_msg,
+            }
+        
+        if not final_content:
+            logger.warning(f"Empty response when fetching X posts for @{username}")
+            return {
+                "username": username,
+                "raw_response": "",
+                "full_data": data,
+                "error": "Empty response from Grok",
+            }
+        
+        logger.info(f"Successfully fetched X posts for @{username}")
+        logger.debug(f"Grok response: {final_content[:200]}...")
+
+        return {
+            "username": username,
+            "raw_response": final_content,
+            "full_data": data,
+        }
+
+
+async def _call_openrouter_async(
+    client: httpx.AsyncClient,
+    messages: list,
+    tools: Optional[list],
+    model: str,
+    api_key: str,
+    base_url: str,
+) -> Dict[str, Any]:
+    """Call OpenRouter API asynchronously.
+
+    Args:
+        client: HTTP client
+        messages: Chat messages
+        tools: Optional tools to use
+        model: Model name
+        api_key: API key
+        base_url: Base URL
+
+    Returns:
+        API response data
+    """
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.0,
+    }
+    if tools:
+        payload["tools"] = tools
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://aibtc.com",
+        "X-Title": "AIBTC",
+        "Content-Type": "application/json",
+    }
+
+    resp = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
+    resp.raise_for_status()
+    return resp.json()
 
 
 async def fetch_dao_proposals(
@@ -394,6 +597,7 @@ def create_chat_messages(
     proposal_images: List[Dict[str, Any]] = None,
     tweet_content: Optional[str] = None,
     airdrop_content: Optional[str] = None,
+    x_posts_content: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
 ) -> List:
@@ -407,6 +611,7 @@ def create_chat_messages(
         proposal_images: List of processed images
         tweet_content: Optional tweet content from linked tweets
         airdrop_content: Optional airdrop content from linked airdrop
+        x_posts_content: Optional X posts content for builder evaluation
         custom_system_prompt: Optional custom system prompt to override default
         custom_user_prompt: Optional custom user prompt to override default
 
@@ -488,6 +693,32 @@ def create_chat_messages(
             f"Added escaped airdrop content to messages: {escaped_airdrop_content[:100]}..."
         )
 
+    # Add X posts content as separate user message if available
+    if x_posts_content and x_posts_content.strip():
+        # Safely escape X posts content to prevent JSON/format issues
+        escaped_x_posts = str(x_posts_content)
+        # Remove or replace control characters (keep common whitespace)
+        escaped_x_posts = "".join(
+            char for char in escaped_x_posts if ord(char) >= 32 or char in "\n\r\t"
+        )
+        # Escape curly braces to prevent f-string/format interpretation issues
+        escaped_x_posts = escaped_x_posts.replace("{", "{{").replace("}", "}}")
+
+        messages.append(
+            {
+                "role": "user",
+                "content": f"""Here are the recent posts from the tagged user:
+
+{escaped_x_posts}
+
+What are your findings on the tagged user based on these posts? Include your findings in the summary.""",
+            }
+        )
+        logger.info(f"✅ CONFIRMED: X posts content has been added to evaluation messages")
+        logger.info(f"✅ X POSTS BEING PASSED TO LLM:")
+        logger.info(f"{escaped_x_posts}")
+        logger.info(f"✅ END OF X POSTS CONTENT")
+
     # Create user message content - start with text
     user_message_content = [{"type": "text", "text": user_content}]
 
@@ -514,6 +745,7 @@ async def evaluate_proposal(
     images: Optional[List[Dict[str, Any]]] = None,
     tweet_content: Optional[str] = None,
     airdrop_content: Optional[str] = None,
+    x_username: Optional[str] = None,
     custom_system_prompt: Optional[str] = None,
     custom_user_prompt: Optional[str] = None,
     callbacks: Optional[List[Any]] = None,
@@ -521,23 +753,41 @@ async def evaluate_proposal(
     """Evaluate a proposal comprehensively.
 
     Args:
-        proposal_content: The proposal content to evaluate
+        proposal_content: The proposal content to evaluate. If it contains @username mentions,
+                         the first username will be automatically extracted for builder evaluation.
         dao_id: Optional DAO ID for context
         proposal_id: Optional proposal UUID for fetching linked tweet content
         images: Optional list of processed images
         tweet_content: Optional tweet content (will be fetched from DB if proposal_id provided)
         airdrop_content: Optional airdrop content (will be fetched from DB if proposal_id provided)
+        x_username: Optional X username to fetch posts for builder evaluation. If not provided,
+                   will be automatically extracted from proposal_content if it contains @mentions.
         custom_system_prompt: Optional custom system prompt
         custom_user_prompt: Optional custom user prompt
         callbacks: Optional callback handlers for streaming
 
     Returns:
         Comprehensive evaluation output
+        
+    Note:
+        - If x_username is not provided, the function will automatically search for @username
+          mentions in the proposal_content and use the first one found.
+        - When a username is found (either provided or extracted), the function will fetch
+          recent X posts for that user using Grok-4-fast and evaluate their builder capability.
+        - The builder evaluation influences the Credibility and Mission Alignment scores.
     """
     proposal_id_str = str(proposal_id) if proposal_id else "unknown"
     logger.info(
         f"[EvaluationProcessor:{proposal_id_str}] Starting comprehensive evaluation"
     )
+
+    # Extract X username from proposal content if not explicitly provided
+    if not x_username and proposal_content:
+        x_username = extract_x_username_from_content(proposal_content)
+        if x_username:
+            logger.info(
+                f"[EvaluationProcessor:{proposal_id_str}] Auto-extracted X username from proposal: @{x_username}"
+            )
 
     # Fetch tweet content from the proposal's linked tweet if available
     linked_tweet_images = []
@@ -614,6 +864,42 @@ async def evaluate_proposal(
         except Exception as e:
             logger.error(
                 f"[EvaluationProcessor:{proposal_id_str}] Error fetching linked airdrop content: {str(e)}"
+            )
+
+    # Fetch X posts for the user if username is provided
+    x_posts_content = None
+    if x_username:
+        try:
+            logger.info(
+                f"[EvaluationProcessor:{proposal_id_str}] Fetching X posts for user: @{x_username}"
+            )
+            # Clean username (remove @ if present)
+            clean_username = x_username.lstrip("@")
+            
+            # Fetch posts using Grok-4-fast
+            x_data = await fetch_x_posts_for_user(clean_username)
+            
+            if x_data and x_data.get("raw_response"):
+                x_posts_content = x_data["raw_response"]
+                logger.info(
+                    f"[EvaluationProcessor:{proposal_id_str}] Successfully fetched X posts for @{clean_username}"
+                )
+                logger.info(
+                    f"[EvaluationProcessor:{proposal_id_str}] ===== X POSTS FETCHED ====="
+                )
+                logger.info(
+                    f"[EvaluationProcessor:{proposal_id_str}] {x_posts_content}"
+                )
+                logger.info(
+                    f"[EvaluationProcessor:{proposal_id_str}] ===== END X POSTS ====="
+                )
+            else:
+                logger.warning(
+                    f"[EvaluationProcessor:{proposal_id_str}] No X posts data returned for @{clean_username}"
+                )
+        except Exception as e:
+            logger.error(
+                f"[EvaluationProcessor:{proposal_id_str}] Error fetching X posts for @{x_username}: {str(e)}"
             )
 
     # Ensure proposal content is safely handled as plain text
@@ -717,6 +1003,7 @@ Recent Community Sentiment: Positive
             proposal_images=all_proposal_images,
             tweet_content=tweet_content,
             airdrop_content=airdrop_content,
+            x_posts_content=x_posts_content,
             custom_system_prompt=custom_system_prompt,
             custom_user_prompt=custom_user_prompt,
         )
