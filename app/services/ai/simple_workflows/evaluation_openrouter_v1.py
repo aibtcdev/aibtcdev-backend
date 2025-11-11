@@ -52,9 +52,13 @@ logger = configure_logger(__name__)
 
 # AIBTC BREW specific models
 
+
 class Reasons(BaseModel):
     """Nested model for per-category rationales."""
-    current_order: str = Field(description="2-3 sentence rationale for current_order alignment")
+
+    current_order: str = Field(
+        description="2-3 sentence rationale for current_order alignment"
+    )
     mission: str = Field(description="2-3 sentence rationale for mission alignment")
     value: str = Field(description="2-3 sentence rationale for value contribution")
     values: str = Field(description="2-3 sentence rationale for values alignment")
@@ -66,13 +70,19 @@ class Reasons(BaseModel):
 
 class Evidence(BaseModel):
     """Nested model for supporting evidence."""
-    value_items: List[str] = Field(default_factory=list, description="List of specific value evidence items")
+
+    value_items: List[str] = Field(
+        default_factory=list, description="List of specific value evidence items"
+    )
 
 
 class AIBTCBrewEvaluationOutput(BaseModel):
     """Output model matching the AIBTC BREW prompt's JSON schema."""
+
     # Category scores (0-100, as per prompt)
-    current_order: int = Field(ge=0, le=100, description="Current order alignment score")
+    current_order: int = Field(
+        ge=0, le=100, description="Current order alignment score"
+    )
     mission: int = Field(ge=0, le=100, description="Mission alignment score")
     value: int = Field(ge=0, le=100, description="Value contribution score")
     values: int = Field(ge=0, le=100, description="Values alignment score")
@@ -89,7 +99,9 @@ class AIBTCBrewEvaluationOutput(BaseModel):
     final_score: int = Field(ge=0, le=100, description="Final weighted score")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in evaluation")
     decision: str = Field(description="APPROVE or REJECT")
-    failed: List[str] = Field(default_factory=list, description="List of failed gates/thresholds with reasons")
+    failed: List[str] = Field(
+        default_factory=list, description="List of failed gates/thresholds with reasons"
+    )
 
     @property
     def is_approved(self) -> bool:
@@ -105,75 +117,77 @@ def convert_aibtc_brew_to_standard_format(
     """Convert AIBTC BREW result to standard evaluation format."""
     if token_usage is None:
         token_usage = {}
-    
+
     # Convert AIBTC BREW categories to standard format
     categories = [
         EvaluationCategory(
             category="Current Order Alignment",
             score=aibtc_result.current_order,
             weight=0.2,  # 20% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.current_order]
+            reasoning=[aibtc_result.reasons.current_order],
         ),
         EvaluationCategory(
             category="Mission Alignment",
             score=aibtc_result.mission,
             weight=0.2,  # 20% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.mission]
+            reasoning=[aibtc_result.reasons.mission],
         ),
         EvaluationCategory(
             category="Value Contribution",
             score=aibtc_result.value,
             weight=0.2,  # 20% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.value]
+            reasoning=[aibtc_result.reasons.value],
         ),
         EvaluationCategory(
             category="Values Alignment",
             score=aibtc_result.values,
             weight=0.1,  # 10% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.values]
+            reasoning=[aibtc_result.reasons.values],
         ),
         EvaluationCategory(
             category="Originality",
             score=aibtc_result.originality,
             weight=0.1,  # 10% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.originality]
+            reasoning=[aibtc_result.reasons.originality],
         ),
         EvaluationCategory(
             category="Clarity & Execution",
             score=aibtc_result.clarity,
             weight=0.1,  # 10% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.clarity]
+            reasoning=[aibtc_result.reasons.clarity],
         ),
         EvaluationCategory(
             category="Safety & Compliance",
             score=aibtc_result.safety,
             weight=0.1,  # 10% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.safety]
+            reasoning=[aibtc_result.reasons.safety],
         ),
         EvaluationCategory(
             category="Growth Potential",
             score=aibtc_result.growth,
             weight=0.1,  # 10% as per AIBTC BREW
-            reasoning=[aibtc_result.reasons.growth]
+            reasoning=[aibtc_result.reasons.growth],
         ),
     ]
-    
+
     # Build comprehensive explanation from all reasoning
     explanation_parts = []
     for category in categories:
         explanation_parts.append(f"**{category.category}**: {category.reasoning[0]}")
-    
+
     # Add evidence if available
     if aibtc_result.evidence.value_items:
-        explanation_parts.append(f"**Evidence**: {', '.join(aibtc_result.evidence.value_items)}")
-    
+        explanation_parts.append(
+            f"**Evidence**: {', '.join(aibtc_result.evidence.value_items)}"
+        )
+
     explanation = "\n\n".join(explanation_parts)
-    
+
     # Create summary
     summary = f"Proposal evaluated with final score of {aibtc_result.final_score}/100. Decision: {aibtc_result.decision}. Confidence: {aibtc_result.confidence:.2f}"
     if aibtc_result.failed:
         summary += f" Failed gates: {', '.join(aibtc_result.failed)}"
-    
+
     return ComprehensiveEvaluatorAgentProcessOutput(
         categories=categories,
         final_score=aibtc_result.final_score,
@@ -188,18 +202,24 @@ def convert_aibtc_brew_to_standard_format(
 
 def get_openrouter_config() -> Dict[str, str]:
     """Get OpenRouter configuration from environment."""
-    api_key = os.getenv("AIBTC_CHAT_API_KEY") or getattr(config, "AIBTC_CHAT_API_KEY", None)
+    api_key = os.getenv("AIBTC_CHAT_API_KEY") or getattr(
+        config, "AIBTC_CHAT_API_KEY", None
+    )
     if not api_key:
         raise ValueError("AIBTC_CHAT_API_KEY not found in configuration")
-    
-    base_url = os.getenv("AIBTC_CHAT_API_BASE") or getattr(config, "AIBTC_CHAT_API_BASE", None) or "https://openrouter.ai/api/v1"
-    default_model = os.getenv("AIBTC_CHAT_DEFAULT_MODEL") or getattr(config, "AIBTC_CHAT_DEFAULT_MODEL", None) or "x-ai/grok-4-fast"
-    
-    return {
-        "api_key": api_key,
-        "base_url": base_url,
-        "default_model": default_model
-    }
+
+    base_url = (
+        os.getenv("AIBTC_CHAT_API_BASE")
+        or getattr(config, "AIBTC_CHAT_API_BASE", None)
+        or "https://openrouter.ai/api/v1"
+    )
+    default_model = (
+        os.getenv("AIBTC_CHAT_DEFAULT_MODEL")
+        or getattr(config, "AIBTC_CHAT_DEFAULT_MODEL", None)
+        or "x-ai/grok-4-fast"
+    )
+
+    return {"api_key": api_key, "base_url": base_url, "default_model": default_model}
 
 
 async def call_openrouter(
@@ -209,23 +229,23 @@ async def call_openrouter(
 ) -> Dict[str, Any]:
     """Call OpenRouter API directly with HTTP requests."""
     openrouter_config = get_openrouter_config()
-    
+
     # Use provided model or default
     model_name = model or openrouter_config["default_model"]
-    
+
     headers = {
         "Authorization": f"Bearer {openrouter_config['api_key']}",
         "Content-Type": "application/json",
     }
-    
+
     payload = {
         "model": model_name,
         "messages": messages,
         "temperature": temperature,
     }
-    
+
     logger.debug(f"Making OpenRouter API call to model: {model_name}")
-    
+
     async with httpx.AsyncClient(timeout=300.0) as client:
         response = await client.post(
             f"{openrouter_config['base_url']}/chat/completions",
@@ -238,26 +258,31 @@ async def call_openrouter(
 
 async def fetch_dao_proposals(dao_id: UUID, exclude_proposal_id: str) -> List[Proposal]:
     """Fetch proposals for a DAO, excluding the current proposal."""
-    logger.debug(f"Excluded current proposal {exclude_proposal_id} from historical context")
-    
+    logger.debug(
+        f"Excluded current proposal {exclude_proposal_id} from historical context"
+    )
+
     # Get all proposals for this DAO
     proposal_filter = ProposalFilter(dao_id=dao_id)
     all_proposals = backend.get_proposals(proposal_filter)
-    
+
     # Exclude the current proposal
     filtered_proposals = [
-        p for p in all_proposals 
-        if str(p.proposal_id) != exclude_proposal_id
+        p for p in all_proposals if str(p.proposal_id) != exclude_proposal_id
     ]
-    
-    logger.debug(f"Retrieved {len(filtered_proposals)} proposals for DAO {dao_id} (excluding current)")
+
+    logger.debug(
+        f"Retrieved {len(filtered_proposals)} proposals for DAO {dao_id} (excluding current)"
+    )
     return filtered_proposals
 
 
 def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
     """Format proposals for context in evaluation prompt."""
     if not proposals:
-        return "<no_proposals>No past proposals available for comparison.</no_proposals>"
+        return (
+            "<no_proposals>No past proposals available for comparison.</no_proposals>"
+        )
 
     # Sort by created_at descending (newest first)
     sorted_proposals = sorted(
@@ -270,10 +295,10 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
     for proposal in sorted_proposals:
         # Extract basic info
         proposal_id = str(proposal.proposal_id)[:8]  # Short ID
-        title = getattr(proposal, 'title', 'Untitled')
+        title = getattr(proposal, "title", "Untitled")
 
         # Extract x_handle from x_url using urlparse
-        x_url = getattr(proposal, 'x_url', None)
+        x_url = getattr(proposal, "x_url", None)
         x_handle = "unknown"
         if x_url:
             try:
@@ -284,8 +309,8 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
                 pass  # Fallback to "unknown"
 
         # Get creation info
-        created_at_btc = getattr(proposal, 'created_at_btc', None)
-        created_at_timestamp = getattr(proposal, 'created_at', None)
+        created_at_btc = getattr(proposal, "created_at_btc", None)
+        created_at_timestamp = getattr(proposal, "created_at", None)
 
         # Safely handle created_at date formatting
         created_str = "unknown"
@@ -308,8 +333,12 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
         passed = getattr(proposal, "passed", False)
         concluded = getattr(proposal, "concluded_by", None) is not None
         proposal_status = getattr(proposal, "status", None)
-        
-        if proposal_status and hasattr(proposal_status, 'value') and proposal_status.value == "FAILED":
+
+        if (
+            proposal_status
+            and hasattr(proposal_status, "value")
+            and proposal_status.value == "FAILED"
+        ):
             proposal_passed = "n/a (failed tx)"
         elif passed:
             proposal_passed = "yes"
@@ -319,15 +348,15 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
             proposal_passed = "pending review"
 
         # Get content
-        content = getattr(proposal, 'content', '') or getattr(proposal, 'summary', '')
+        content = getattr(proposal, "content", "") or getattr(proposal, "summary", "")
         content_preview = content[:200] + "..." if len(content) > 200 else content
-        
+
         # Get tags
-        tags = getattr(proposal, 'tags', [])
+        tags = getattr(proposal, "tags", [])
         tags_str = ", ".join(tags) if tags else "no tags"
-        
+
         # Get reference
-        reference = getattr(proposal, 'reference', None)
+        reference = getattr(proposal, "reference", None)
 
         formatted_proposal = f"""- #{proposal_id} by @{x_handle}
   Created: {created_at}
@@ -335,12 +364,12 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
   Title: {title}
   Tags: {tags_str}
   Summary: {content_preview}"""
-        
+
         if reference:
             formatted_proposal += f"\n\nReference: {reference}"
-        
+
         formatted_proposals.append(formatted_proposal)
-    
+
     return "\n\n\n".join(formatted_proposals)
 
 
@@ -410,22 +439,29 @@ def create_chat_messages(
         escaped_tweet_content = str(tweet_content)
         # Remove or replace control characters (keep common whitespace)
         escaped_tweet_content = "".join(
-            char for char in escaped_tweet_content 
-            if char.isprintable() or char in ['\n', '\r', '\t']
+            char
+            for char in escaped_tweet_content
+            if char.isprintable() or char in ["\n", "\r", "\t"]
         )
-        
-        logger.debug(f"Added escaped tweet content to messages: {escaped_tweet_content[:100]}...")
-        messages.append({
-            "role": "user", 
-            "content": f"Referenced tweets in this proposal:\n\n{escaped_tweet_content}"
-        })
+
+        logger.debug(
+            f"Added escaped tweet content to messages: {escaped_tweet_content[:100]}..."
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Referenced tweets in this proposal:\n\n{escaped_tweet_content}",
+            }
+        )
 
     # Add airdrop content as separate user message if available
     if airdrop_content and airdrop_content.strip():
-        messages.append({
-            "role": "user", 
-            "content": f"Referenced airdrop in this proposal:\n\n{airdrop_content}"
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Referenced airdrop in this proposal:\n\n{airdrop_content}",
+            }
+        )
 
     # Create user message content - start with text
     user_message_content = [{"type": "text", "text": user_content}]
@@ -624,30 +660,38 @@ Recent Community Sentiment: Positive
                 model=model,
                 temperature=0.0,
             )
-            
+
             # Extract the content from the response
             content = response["choices"][0]["message"]["content"].strip()
-            
+
             # Log the raw response for debugging
-            logger.debug(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Raw LLM response: {content[:500]}...")
-            
+            logger.debug(
+                f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Raw LLM response: {content[:500]}..."
+            )
+
             # Parse the JSON response into AIBTC BREW model first
             try:
                 content_dict = json.loads(content)
-                logger.debug(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Parsed JSON keys: {list(content_dict.keys())}")
-                
+                logger.debug(
+                    f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Parsed JSON keys: {list(content_dict.keys())}"
+                )
+
                 # Check if this is AIBTC BREW format (has individual category scores)
                 if "current_order" in content_dict and "mission" in content_dict:
-                    logger.debug(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Detected AIBTC BREW format, using conversion")
+                    logger.debug(
+                        f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Detected AIBTC BREW format, using conversion"
+                    )
                     aibtc_result = AIBTCBrewEvaluationOutput(**content_dict)
                     # Convert to standard format
                     result = convert_aibtc_brew_to_standard_format(
                         aibtc_result,
                         images_processed=len(all_proposal_images),
-                        token_usage={"raw_response": content}
+                        token_usage={"raw_response": content},
                     )
                 else:
-                    logger.debug(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Detected standard format, using directly")
+                    logger.debug(
+                        f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Detected standard format, using directly"
+                    )
                     standard_result = ComprehensiveEvaluationOutput(**content_dict)
                     result = ComprehensiveEvaluatorAgentProcessOutput(
                         categories=standard_result.categories,
@@ -660,12 +704,20 @@ Recent Community Sentiment: Positive
                         images_processed=len(all_proposal_images),
                     )
             except json.JSONDecodeError as e:
-                logger.error(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] JSON decode error: {e}")
-                logger.error(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Raw content: {content}")
+                logger.error(
+                    f"[EvaluationProcessorOpenRouter:{proposal_id_str}] JSON decode error: {e}"
+                )
+                logger.error(
+                    f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Raw content: {content}"
+                )
                 raise e
             except Exception as e:
-                logger.error(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Pydantic validation error: {e}")
-                logger.error(f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Content dict: {content_dict}")
+                logger.error(
+                    f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Pydantic validation error: {e}"
+                )
+                logger.error(
+                    f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Content dict: {content_dict}"
+                )
                 raise e
         except Exception as e:
             # If we get a streaming/parsing error, try to handle it
