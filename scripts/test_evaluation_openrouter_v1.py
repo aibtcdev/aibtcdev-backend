@@ -271,7 +271,7 @@ Recent Community Sentiment: Positive
         system_message = next(
             (msg for msg in full_messages if msg["role"] == "system"), {}
         )
-        user_messages = [msg for msg in full_messages if msg["role"] == "user"]
+        # user_messages = [msg for msg in full_messages if msg["role"] == "user"]
 
         # Format the user prompt template with actual data (like the original does)
         if custom_user_prompt:
