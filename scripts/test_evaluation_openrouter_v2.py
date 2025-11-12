@@ -22,7 +22,7 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.backend.factory import backend
-from app.backend.models import ContractStatus, ProposalFilter, Proposal
+from app.backend.models import ContractStatus, ProposalFilter
 from app.config import config
 from app.services.ai.simple_workflows.evaluation_openrouter_v1 import (
     format_proposals_for_context_v2,
@@ -90,14 +90,6 @@ async def call_openrouter(
         )
         response.raise_for_status()
         return response.json()
-
-
-def print_proposal(proposal: Proposal):
-    created_at = proposal.created_at.strftime("%Y-%m-%d %H:%M:%S")
-    status = proposal.status
-    title = proposal.title[:50] if isinstance(proposal.title, str) else proposal.title
-
-    print(f"  {created_at} {status} {title}")
 
 
 async def test_evaluation(
@@ -313,8 +305,6 @@ async def test_evaluation(
             print(
                 f"Found {len(user_past_proposals)} past proposals by same sender:\n{proposal.tx_sender}"
             )
-            # for p in user_past_proposals:
-            #    print_proposal(p)
 
         # remove tx-sender matched proposals from dao proposals
         # if not present then default to full object
@@ -382,9 +372,6 @@ async def test_evaluation(
             f"Using {len(dao_draft_proposals)} DAO draft proposals for evaluation context"
         )
 
-        # for p in dao_draft_proposals:
-        #    print_proposal(p)
-
         # limit to last 100
         dao_deployed_proposals = dao_past_proposals_categorized[
             ContractStatus.DEPLOYED
@@ -398,8 +385,6 @@ async def test_evaluation(
         print(
             f"Using {len(dao_deployed_proposals)} DAO deployed proposals for evaluation context"
         )
-        # for p in dao_deployed_proposals:
-        #    print_proposal(p)
 
         # add images in format so grok will read them
         # this should be appended to user chat object
