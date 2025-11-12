@@ -36,15 +36,15 @@ class DAOInfoForEvaluation(BaseModel):
 class ProposalInfoForEvaluation(BaseModel):
     """Model representing proposal information for evaluation."""
 
-    proposal_number: int
+    proposal_number: Optional[int] = None
     title: str
     # content: str # includes metadata/tags
     summary: str
     created_at_timestamp: datetime
-    created_at_btc_block: int
-    executable_at_btc_block: int
+    created_at_btc_block: Optional[int] = None
+    executable_at_btc_block: Optional[int] = None
     x_url: str
-    tx_sender: str
+    tx_sender: Optional[str] = None
 
 
 class TweetPostInfoForEvaluation(BaseModel):
@@ -52,8 +52,8 @@ class TweetPostInfoForEvaluation(BaseModel):
 
     x_post_id: str
     images: List[str]
-    author_name: str
-    author_username: str
+    author_name: Optional[str] = None
+    author_username: Optional[str] = None
     created_at: str
     public_metrics: Dict[str, int]
 
@@ -297,9 +297,9 @@ def _fetch_and_format_tweet_info(
     return TweetPostInfoForEvaluation(
         x_post_id=str(tweet_content.tweet_id),
         images=tweet_content.images or [],
-        author_name=tweet_content.author_name,
-        author_username=tweet_content.author_username,
-        created_at=tweet_content.created_at_twitter.isoformat()
+        author_name=tweet_content.author_name or "",
+        author_username=tweet_content.author_username or "",
+        created_at=tweet_content.created_at_twitter
         if tweet_content.created_at_twitter
         else "",
         public_metrics=dict(tweet_content.public_metrics)
@@ -355,9 +355,9 @@ def _fetch_and_format_linked_tweet_info(
     return TweetPostInfoForEvaluation(
         x_post_id=str(linked_tweet_content.tweet_id),
         images=linked_tweet_content.images or [],
-        author_name=linked_tweet_content.author_name,
-        author_username=linked_tweet_content.author_username,
-        created_at=linked_tweet_content.created_at_twitter.isoformat()
+        author_name=linked_tweet_content.author_name or "",
+        author_username=linked_tweet_content.author_username or "",
+        created_at=linked_tweet_content.created_at_twitter
         if linked_tweet_content.created_at_twitter
         else "",
         public_metrics=dict(linked_tweet_content.public_metrics)
@@ -395,44 +395,36 @@ def _fetch_past_proposals_context(
 
     dao_past_proposals_categorized = {
         "ALL": sorted_dao_past_proposals,
-        ContractStatus.DRAFT: [
+        "DRAFT": [
             p for p in sorted_dao_past_proposals if p.status == ContractStatus.DRAFT
         ],
-        ContractStatus.PENDING: [
+        "PENDING": [
             p for p in sorted_dao_past_proposals if p.status == ContractStatus.PENDING
         ],
-        ContractStatus.DEPLOYED: [
+        "DEPLOYED": [
             p for p in sorted_dao_past_proposals if p.status == ContractStatus.DEPLOYED
         ],
-        ContractStatus.FAILED: [
+        "FAILED": [
             p for p in sorted_dao_past_proposals if p.status == ContractStatus.FAILED
         ],
     }
 
     dao_past_proposals_stats_for_evaluation = {
         "ALL": len(sorted_dao_past_proposals),
-        ContractStatus.DRAFT: len(dao_past_proposals_categorized[ContractStatus.DRAFT]),
-        ContractStatus.PENDING: len(
-            dao_past_proposals_categorized[ContractStatus.PENDING]
-        ),
-        ContractStatus.DEPLOYED: len(
-            dao_past_proposals_categorized[ContractStatus.DEPLOYED]
-        ),
-        ContractStatus.FAILED: len(
-            dao_past_proposals_categorized[ContractStatus.FAILED]
-        ),
+        "DRAFT": len(dao_past_proposals_categorized["DRAFT"]),
+        "PENDING": len(dao_past_proposals_categorized["PENDING"]),
+        "DEPLOYED": len(dao_past_proposals_categorized["DEPLOYED"]),
+        "FAILED": len(dao_past_proposals_categorized["FAILED"]),
     }
 
     # Limit drafts to last 20
-    dao_draft_proposals = dao_past_proposals_categorized[ContractStatus.DRAFT][:20]
+    dao_draft_proposals = dao_past_proposals_categorized["DRAFT"][:20]
     dao_draft_proposals_for_evaluation = _format_proposals_for_context(
         dao_draft_proposals
     )
 
     # Limit deployed to last 100
-    dao_deployed_proposals = dao_past_proposals_categorized[ContractStatus.DEPLOYED][
-        :100
-    ]
+    dao_deployed_proposals = dao_past_proposals_categorized["DEPLOYED"][:100]
     dao_deployed_proposals_for_evaluation = _format_proposals_for_context(
         dao_deployed_proposals
     )

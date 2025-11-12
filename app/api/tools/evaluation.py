@@ -115,17 +115,19 @@ async def run_comprehensive_evaluation(
             f"Starting comprehensive evaluation for proposal {payload.proposal_id} with agent {agent_id}"
         )
 
-        # Run the comprehensive evaluation
+        # Run the comprehensive evaluation using OpenRouter v2
         result = await evaluate_proposal_comprehensive(
             proposal_content=proposal_content,
             dao_id=payload.dao_id,
-            proposal_id=payload.proposal_id,
+            proposal_id=proposal.id,
             streaming=False,
         )
 
         evaluation = result.get("evaluation", {})
+        # v2 uses "APPROVE"/"REJECT" instead of boolean
+        decision_str = evaluation.get("decision", "REJECT")
         logger.debug(
-            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {'Approved' if evaluation.get('decision') else 'Rejected'}"
+            f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {decision_str}"
         )
         return JSONResponse(content=result)
 
