@@ -8,10 +8,11 @@ Usage:
 
 import argparse
 import asyncio
+import httpx
 import os
 import sys
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -20,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.backend.factory import backend
 from app.backend.models import ContractStatus, ProposalFilter, Proposal
+from app.config import config
 from app.services.ai.simple_workflows.evaluation_openrouter_v1 import (
     format_proposals_for_context_v2,
 )
@@ -27,6 +29,65 @@ from app.services.ai.simple_workflows.models import (
     ComprehensiveEvaluatorAgentProcessOutput,
 )
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
+
+
+def get_openrouter_config() -> Dict[str, str]:
+    """Get OpenRouter configuration from environment/config.
+    Returns:
+        Dictionary with OpenRouter configuration
+    """
+    return {
+        "api_key": config.chat_llm.api_key,
+        "model": config.chat_llm.default_model or "x-ai/grok-4-fast",
+        "base_url": "https://openrouter.ai/api/v1",
+        "referer": "https://aibtc.com",
+        "title": "AIBTC",
+    }
+
+
+async def call_openrouter(
+    messages: List[Dict[str, Any]],
+    model: Optional[str] = None,
+    temperature: float = 0.0,
+    tools: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Make a direct HTTP call to OpenRouter API.
+
+    Args:
+        messages: List of chat messages
+        model: Optional model override
+        temperature: Temperature for generation
+        tools: Optional tools for the model
+
+    Returns:
+        Response from OpenRouter API
+    """
+    config_data = get_openrouter_config()
+
+    payload = {
+        "model": model or config_data["model"],
+        "messages": messages,
+        "temperature": temperature,
+    }
+
+    if tools:
+        payload["tools"] = tools
+
+    headers = {
+        "Authorization": f"Bearer {config_data['api_key']}",
+        "HTTP-Referer": config_data["referer"],
+        "X-Title": config_data["title"],
+        "Content-Type": "application/json",
+    }
+
+    print(f"Making OpenRouter API call to model: {payload['model']}")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{config_data['base_url']}/chat/completions", json=payload, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 def print_proposal(proposal: Proposal):
@@ -438,6 +499,16 @@ async def test_evaluation(
         # then we work backwards to how we want to implement it in the other areas
         # also add these headers to any OpenRouter methods:
         # 'default_headers': {'HTTP-Referer': 'https://aibtc.com', 'X-Title': 'AIBTC'}
+
+        x_ai_tools = [{"type": "web_search"}, {"type": "x_search"}]
+
+        openrouter_response = await call_openrouter(
+            messages=messages, model=model or None, temperature=0.7, tools=x_ai_tools
+        )
+
+        print("\n" + "=" * 80)
+        print("OpenRouter Full API Response:")
+        print(openrouter_response)
 
         return
 
