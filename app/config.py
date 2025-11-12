@@ -79,13 +79,16 @@ class DiscordConfig:
 class ChatLLMConfig:
     """Configuration for chat-based LLM models."""
 
-    default_model: str = os.getenv("AIBTC_CHAT_DEFAULT_MODEL", "x-ai/grok-4")
+    default_model: str = os.getenv("AIBTC_CHAT_DEFAULT_MODEL", "x-ai/grok-4-fast")
     default_temperature: float = float(
-        os.getenv("AIBTC_CHAT_DEFAULT_TEMPERATURE", "0.9")
+        os.getenv("AIBTC_CHAT_DEFAULT_TEMPERATURE", "0.7")
     )
-    api_base: str = os.getenv("AIBTC_CHAT_API_BASE", "")
+    api_base: str = os.getenv("AIBTC_CHAT_API_BASE", "https://openrouter.ai/api/v1")
     api_key: str = os.getenv("AIBTC_CHAT_API_KEY", "")
     # Reasoning-specific model settings
+    reasoning_enabled: bool = True  # (
+    # os.getenv("AIBTC_CHAT_REASONING_ENABLED", "true").lower() == "true"
+    # )
     reasoning_model: str = os.getenv("AIBTC_CHAT_REASONING_MODEL", "o3-mini")
     reasoning_temperature: float = float(
         os.getenv("AIBTC_CHAT_REASONING_TEMPERATURE", "0.9")

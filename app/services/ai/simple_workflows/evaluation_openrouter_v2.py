@@ -119,12 +119,14 @@ class EvaluationOutput(BaseModel):
 def get_openrouter_config() -> Dict[str, str]:
     """Get OpenRouter configuration from environment/config.
     Returns:
-        Dictionary with OpenRouter configuration
+        Dictionary with OpenRouter configuration in str format
     """
     return {
         "api_key": config.chat_llm.api_key,
-        "model": config.chat_llm.default_model or "x-ai/grok-4-fast",
-        "base_url": "https://openrouter.ai/api/v1",
+        "model": config.chat_llm.default_model,
+        "temperature": str(config.chat_llm.default_temperature),
+        "base_url": config.chat_llm.api_base,
+        "reasoning_enabled": str(config.chat_llm.reasoning_enabled),
         "referer": "https://aibtc.com",
         "title": "AIBTC",
     }
@@ -133,8 +135,8 @@ def get_openrouter_config() -> Dict[str, str]:
 async def call_openrouter(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
-    temperature: float = 0.0,
-    reasoning: bool = True,
+    temperature: Optional[float] = None,
+    reasoning: Optional[bool] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Make a direct HTTP call to OpenRouter API.
@@ -152,10 +154,10 @@ async def call_openrouter(
     config_data = get_openrouter_config()
 
     payload = {
-        "model": model or config_data["model"],
         "messages": messages,
-        "temperature": temperature,
-        "reasoning": {"enabled": reasoning},
+        "model": model or config_data["model"],
+        "temperature": temperature or config_data["temperature"],
+        "reasoning": {"enabled": reasoning or config_data["reasoning_enabled"]},
     }
 
     if tools:
@@ -168,7 +170,14 @@ async def call_openrouter(
         "Content-Type": "application/json",
     }
 
-    logger.info(f"Making OpenRouter API call to model: {payload['model']}")
+    logger.info(
+        "Making OpenRouter API call",
+        extra={
+            "model": payload["model"],
+            "temp": payload["temperature"],
+            "reasoning": payload["reasoning"],
+        },
+    )
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -492,9 +501,9 @@ def _estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> s
 
 async def evaluate_proposal_openrouter(
     proposal_id: str | UUID,
-    model: str = config.chat_llm.default_model or "x-ai/grok-4-fast",
-    temperature: float = 0.7,
-    reasoning: bool = True,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    reasoning: Optional[bool] = None,
 ) -> Optional[EvaluationOutput]:
     """
     Evaluate a proposal using OpenRouter and Grok prompts.
@@ -631,7 +640,7 @@ async def evaluate_proposal_openrouter(
         usage_input_tokens = usage.get("prompt_tokens") if usage else None
         usage_output_tokens = usage.get("completion_tokens") if usage else None
         usage_est_cost = None
-        if usage_input_tokens and usage_output_tokens:
+        if model and usage_input_tokens and usage_output_tokens:
             usage_est_cost = _estimate_usage_cost(
                 usage_input_tokens,
                 usage_output_tokens,
