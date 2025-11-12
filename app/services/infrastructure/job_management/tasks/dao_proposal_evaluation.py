@@ -409,9 +409,15 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             reasoning_parts = []
             for cat_name, cat_data in categories_data.items():
                 if isinstance(cat_data, dict) and cat_data.get("reason"):
-                    reasoning_parts.append(f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}")
+                    reasoning_parts.append(
+                        f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}"
+                    )
 
-            reasoning = "\n\n".join(reasoning_parts) if reasoning_parts else "No reasoning provided"
+            reasoning = (
+                "\n\n".join(reasoning_parts)
+                if reasoning_parts
+                else "No reasoning provided"
+            )
 
             # Add failed gates to reasoning if present
             failed_gates = evaluation_data.get("failed", [])
