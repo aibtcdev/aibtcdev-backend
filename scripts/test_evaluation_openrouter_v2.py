@@ -545,7 +545,25 @@ async def test_evaluation(
         print(f"Choice Message Role: {choice_message_role}")
         print(f"Choice Message Refusal: {choice_message_refusal}")
         print(f"Choice Message Reasoning: {choice_message_reasoning}")
-        print(f"Choice Annotations: {choice_annotations}")
+        print(
+            f"Choice Annotations: {len(choice_annotations) if choice_annotations else 0}"
+        )
+        choice_annotations_urls = []
+        if choice_annotations:
+            for annotation in choice_annotations:
+                if annotation.get("type") == "url_citation":
+                    url_citation = annotation.get("url_citation")
+                    if url_citation:
+                        url = url_citation.get("url")
+                        if url:
+                            choice_annotations_urls.append(url)
+                else:
+                    print(f"Unknown annotation type: {annotation.get('type')}")
+
+        if len(choice_annotations_urls) > 0:
+            print("  URLs cited in annotations:")
+            for url in choice_annotations_urls:
+                print(f"    {url}")
 
         if not choice_message_content:
             print("❌ No content found in the choice message")
@@ -555,6 +573,7 @@ async def test_evaluation(
 
         try:
             choice_message_json = json.loads(choice_message_content)
+            print("\n" + "=" * 80)
             print("Successfully parsed JSON from message content")
             print(json.dumps(choice_message_json, indent=2))
 
