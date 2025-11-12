@@ -4,15 +4,15 @@ This module provides a functional approach to proposal evaluation using OpenRout
 with direct HTTP calls and the standard comprehensive evaluation output model.
 """
 
+import httpx
 import json
 import os
 from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 from urllib.parse import urlparse
 
-import httpx
-from pydantic import BaseModel, Field
 
 from app.backend.factory import backend
 from app.backend.models import Proposal, ProposalFilter
@@ -26,8 +26,6 @@ from app.services.ai.simple_workflows.processors.twitter import (
 from app.services.ai.simple_workflows.processors.airdrop import (
     process_airdrop,
 )
-
-# Import prompts
 from app.services.ai.simple_workflows.prompts import (
     EVALUATION_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT,
     EVALUATION_USER_PROMPT_TEMPLATE as DEFAULT_USER_PROMPT_TEMPLATE,
@@ -345,32 +343,24 @@ def format_proposals_for_context_v2(proposals: List[Proposal]) -> str:
         elif concluded:
             proposal_passed = "no"
         else:
-            proposal_passed = "pending review"
+            proposal_passed = "pending"
 
         # Get content
-        content = getattr(proposal, "content", "") or getattr(proposal, "summary", "")
-        content_preview = content[:200] + "..." if len(content) > 200 else content
+        content = getattr(proposal, "summary", "") or getattr(proposal, "content", "")
+        content_preview = content[:500] + "..." if len(content) > 500 else content
 
         # Get tags
-        tags = getattr(proposal, "tags", [])
-        tags_str = ", ".join(tags) if tags else "no tags"
+        # tags = getattr(proposal, "tags", [])
+        # tags_str = ", ".join(tags) if tags else "no tags"
 
         # Get reference
-        reference = getattr(proposal, "reference", None)
+        # reference = getattr(proposal, "reference", None)
 
-        formatted_proposal = f"""- #{proposal_id} by @{x_handle}
-  Created: {created_at}
-  Passed: {proposal_passed}
-  Title: {title}
-  Tags: {tags_str}
-  Summary: {content_preview}"""
-
-        if reference:
-            formatted_proposal += f"\n\nReference: {reference}"
+        formatted_proposal = f"""\n- #{proposal_id or "n/a"} by @{x_handle} Created: {created_at} Passed: {proposal_passed} Title: {title} Summary: {content_preview}"""
 
         formatted_proposals.append(formatted_proposal)
 
-    return "\n\n\n".join(formatted_proposals)
+    return "\n".join(formatted_proposals)
 
 
 def create_chat_messages(
