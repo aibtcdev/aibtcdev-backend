@@ -458,7 +458,7 @@ def _prepare_images_for_evaluation(tweet_images: List[str]) -> List[Dict[str, An
 
 
 async def evaluate_proposal_openrouter(
-    proposal_id: str,
+    proposal_id: str | UUID,
     model: Optional[str] = None,
     temperature: float = 0.7,
 ) -> Optional[EvaluationOutput]:
@@ -469,13 +469,20 @@ async def evaluate_proposal_openrouter(
         proposal_id: UUID of the proposal to evaluate.
         model: Optional model override (e.g., 'x-ai/grok-4').
         temperature: Generation temperature.
-        save_output: Whether to save the raw JSON output to file.
 
     Returns:
         Parsed EvaluationOutput or None if evaluation fails.
     """
     try:
-        proposal_uuid = UUID(proposal_id)
+        # parse the uuid
+        if isinstance(proposal_id, str):
+            proposal_uuid = UUID(proposal_id)
+        elif isinstance(proposal_id, UUID):
+            proposal_uuid = proposal_id
+        else:
+            logger.error(f"Invalid proposal_id type: {type(proposal_id)}")
+            return None
+        # get the proposal from backend
         proposal = backend.get_proposal(proposal_uuid)
         if not proposal:
             logger.error(f"Proposal {proposal_id} not found")
@@ -483,7 +490,7 @@ async def evaluate_proposal_openrouter(
 
         logger.info(f"Starting evaluation for proposal ID: {proposal_id}")
 
-        # Fetch and format inputs using Pydantic models
+        # fetch and format inputs using Pydantic models
         dao_info = _fetch_and_format_dao_info(str(proposal.dao_id))
         if not dao_info:
             logger.error(f"DAO not found for proposal {proposal_id}")
@@ -495,13 +502,35 @@ async def evaluate_proposal_openrouter(
         quote_tweet_info = _fetch_and_format_linked_tweet_info(proposal, "quoted")
         reply_tweet_info = _fetch_and_format_linked_tweet_info(proposal, "replied_to")
 
-        # Fetch past proposals context
+        # fetch past proposals context
         (
             user_past_proposals_for_evaluation,
             dao_past_proposals_stats_for_evaluation,
             dao_draft_proposals_for_evaluation,
             dao_deployed_proposals_for_evaluation,
         ) = _fetch_past_proposals_context(proposal)
+
+        formatted_info_collection = [
+            proposal_info,
+            tweet_info,
+            tweet_author_info,
+            quote_tweet_info,
+            reply_tweet_info,
+            user_past_proposals_for_evaluation,
+            dao_past_proposals_stats_for_evaluation,
+            dao_draft_proposals_for_evaluation,
+            dao_deployed_proposals_for_evaluation,
+        ]
+
+        # check and log any missing data
+        missing_info_fields = [
+            type(info).__name__ for info in formatted_info_collection if info is None
+        ]
+        if missing_info_fields:
+            logger.warning(
+                f"Some information missing for proposal {proposal_id}",
+                extra={missing_info_fields},
+            )
 
         # Prepare images
         images_for_evaluation = _prepare_images_for_evaluation(
@@ -515,9 +544,10 @@ async def evaluate_proposal_openrouter(
             logger.error("Could not load evaluation prompts")
             return None
 
-        # Format messages
+        # format messages starting with system message
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
 
+        # fill in user prompt with collected info
         formatted_user_content = user_prompt.format(
             dao_info_for_evaluation=dao_info.model_dump_json(),
             proposal_content_for_evaluation=proposal_info.model_dump_json(),
@@ -542,11 +572,14 @@ async def evaluate_proposal_openrouter(
             or "",
         )
 
+        # build user content with text and images
         user_content = [{"type": "text", "text": formatted_user_content}]
         user_content.extend(images_for_evaluation)
+
+        # add user message alongside system message
         messages.append({"role": "user", "content": user_content})
 
-        # Call OpenRouter
+        # call openrouter passing x tools and message
         x_ai_tools = [{"type": "web_search"}, {"type": "x_search"}]
         openrouter_response = await call_openrouter(
             messages=messages,
