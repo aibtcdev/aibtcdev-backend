@@ -31,6 +31,7 @@ async def evaluate_proposal_strict(
     proposal_id: UUID | str,
     model: Optional[str] = None,
     temperature: Optional[float] = None,
+    reasoning: bool = True,
 ) -> Optional[EvaluationOutput]:
     """Evaluates a proopsal using OpenRouter.
 
@@ -48,6 +49,7 @@ async def evaluate_proposal_strict(
             proposal_id=proposal_id,
             model=model,
             temperature=temperature,
+            reasoning=reasoning,
         )
 
         if not evaluation_result:

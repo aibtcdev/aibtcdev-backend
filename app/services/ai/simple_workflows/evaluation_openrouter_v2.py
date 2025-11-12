@@ -133,6 +133,7 @@ async def call_openrouter(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
     temperature: float = 0.0,
+    reasoning: bool = True,
     tools: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Make a direct HTTP call to OpenRouter API.
@@ -140,7 +141,8 @@ async def call_openrouter(
     Args:
         messages: List of chat messages
         model: Optional model override
-        temperature: Temperature for generation
+        temperature: Temperature for
+        reasoning: Whether to enable reasoning
         tools: Optional tools for the model
 
     Returns:
@@ -152,6 +154,7 @@ async def call_openrouter(
         "model": model or config_data["model"],
         "messages": messages,
         "temperature": temperature,
+        "reasoning": {"enabled": reasoning},
     }
 
     if tools:
@@ -476,6 +479,7 @@ async def evaluate_proposal_openrouter(
     proposal_id: str | UUID,
     model: Optional[str] = None,
     temperature: float = 0.7,
+    reasoning: bool = True,
 ) -> Optional[EvaluationOutput]:
     """
     Evaluate a proposal using OpenRouter and Grok prompts.
@@ -600,6 +604,7 @@ async def evaluate_proposal_openrouter(
             messages=messages,
             model=model,
             temperature=temperature,
+            reasoning=reasoning,
             tools=x_ai_tools,
         )
 
