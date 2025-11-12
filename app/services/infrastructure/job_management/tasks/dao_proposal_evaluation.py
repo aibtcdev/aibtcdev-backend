@@ -16,7 +16,6 @@ from app.backend.models import (
     VoteFilter,
 )
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -25,6 +24,7 @@ from app.services.infrastructure.job_management.base import (
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 from app.services.ai.simple_workflows.orchestrator import (
     evaluate_proposal_comprehensive,
+    evaluate_proposal_strict,
 )
 
 logger = configure_logger(__name__)
@@ -72,7 +72,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     DEFAULT_SCORE_THRESHOLD = 70.0
     DEFAULT_AUTO_VOTE = False
     DEFAULT_MAX_CONCURRENT_EVALUATIONS = (
-        5  # Limit concurrent evaluations to avoid rate limits
+        3  # Limit concurrent evaluations to avoid rate limits
     )
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -308,6 +308,235 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             )
             return messages
 
+    async def process_message_v2(self, message: QueueMessage) -> Dict[str, Any]:
+        """Simplified v2 processing for a single DAO proposal evaluation message.
+
+        Uses the new evaluate_proposal_strict flow for streamlined evaluation.
+        Relies on evaluation function for proposal/DAO lookups and validation.
+        """
+        message_id = message.id
+        message_data = message.message or {}
+        wallet_id = message.wallet_id
+        dao_id = message.dao_id
+        proposal_id = message_data.get("proposal_id")
+
+        if not proposal_id:
+            error_msg = f"Missing proposal_id in message {message_id}"
+            logger.error(
+                "Missing proposal_id in message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                },
+            )
+            return {"success": False, "error": error_msg}
+
+        if not dao_id:
+            error_msg = f"Missing dao_id in message {message_id}"
+            logger.error(
+                "Missing dao_id in message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                },
+            )
+            return {"success": False, "error": error_msg}
+
+        logger.debug(
+            "Processing proposal evaluation message (v2)",
+            extra={
+                "task": "dao_proposal_evaluation",
+                "message_id": str(message_id),
+                "wallet_id": str(wallet_id),
+                "proposal_id": str(proposal_id),
+                "dao_id": str(dao_id),
+            },
+        )
+
+        try:
+            # Execute the simplified proposal evaluation workflow
+            # (handles internal proposal/DAO fetches and validation)
+            logger.info(
+                "Evaluating proposal (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "proposal_id": str(proposal_id),
+                    "dao_id": str(dao_id),
+                },
+            )
+
+            evaluation_output = await evaluate_proposal_strict(
+                proposal_id=proposal_id,
+            )
+
+            if not evaluation_output:
+                error_msg = f"Evaluation failed for proposal {proposal_id}"
+                logger.error(
+                    "Evaluation returned None (v2)",
+                    extra={
+                        "task": "dao_proposal_evaluation",
+                        "proposal_id": str(proposal_id),
+                    },
+                )
+                return {"success": False, "error": error_msg}
+
+            # Map EvaluationOutput to legacy structures
+            evaluation_data = evaluation_output.model_dump()
+
+            # Map decision ("APPROVE"/"REJECT") to boolean
+            decision_str = evaluation_data.get("decision", "REJECT")
+            approval = decision_str == "APPROVE"
+
+            overall_score = evaluation_data.get("final_score", 0)
+            confidence = evaluation_data.get("confidence", 0.0)
+
+            # Build reasoning from category reasons
+            categories_data = {
+                "current_order": evaluation_data.get("current_order", {}),
+                "mission": evaluation_data.get("mission", {}),
+                "value": evaluation_data.get("value", {}),
+                "values": evaluation_data.get("values", {}),
+                "originality": evaluation_data.get("originality", {}),
+                "clarity": evaluation_data.get("clarity", {}),
+                "safety": evaluation_data.get("safety", {}),
+                "growth": evaluation_data.get("growth", {}),
+            }
+
+            # Compile reasoning from all categories
+            reasoning_parts = []
+            for cat_name, cat_data in categories_data.items():
+                if isinstance(cat_data, dict) and cat_data.get("reason"):
+                    reasoning_parts.append(
+                        f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}"
+                    )
+
+            reasoning = (
+                "\n\n".join(reasoning_parts)
+                if reasoning_parts
+                else "No reasoning provided"
+            )
+
+            # Add failed gates to reasoning if present
+            failed_gates = evaluation_data.get("failed", [])
+            if failed_gates:
+                reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
+
+            formatted_prompt = ""  # TODO: how to get full user prompt here
+            usage_data = evaluation_data.get("usage", {})
+            total_cost = usage_data.get("total_cost", 0.0)
+            model = evaluation_data.get("model", "x-ai/grok-4-fast")
+
+            # Convert categories to evaluation_scores format
+            evaluation_scores = {
+                "categories": [
+                    {
+                        "category": cat_name,
+                        "score": cat_data.get("score", 0),
+                        "weight": 0,  # Weights not in v2 schema
+                        "reasoning": cat_data.get("reason", ""),
+                        "evidence": cat_data.get("evidence", []),
+                    }
+                    for cat_name, cat_data in categories_data.items()
+                    if isinstance(cat_data, dict)
+                ],
+                "final_score": overall_score,
+                "confidence": confidence,
+                "decision": decision_str,
+            }
+
+            evaluation_flags = failed_gates
+
+            logger.info(
+                "Proposal evaluated (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "proposal_id": str(proposal_id),
+                    "result": "FOR" if approval else "AGAINST",
+                    "score": overall_score,
+                },
+            )
+
+            wallet = backend.get_wallet(wallet_id)
+
+            # Create a vote record with the evaluation results
+            vote_data = VoteCreate(
+                wallet_id=wallet_id,
+                dao_id=dao_id,
+                agent_id=(
+                    wallet.agent_id if wallet else None
+                ),  # This will be set from the wallet if it exists
+                proposal_id=proposal_id,
+                answer=approval,
+                reasoning=reasoning,
+                confidence=confidence,  # Already 0.0-1.0 in v2
+                prompt=formatted_prompt,
+                cost=total_cost,
+                model=model,
+                profile_id=wallet.profile_id if wallet else None,
+                evaluation_score=evaluation_scores,  # Store the complete evaluation scores with evidence
+                flags=evaluation_flags,  # Store the failed gates as flags
+                evaluation=evaluation_data,  # Store the complete v2 evaluation structure
+            )
+
+            # Create the vote record
+            vote = backend.create_vote(vote_data)
+            if not vote:
+                logger.error(
+                    "Failed to create vote record (v2)",
+                    extra={"task": "dao_proposal_evaluation"},
+                )
+                return {"success": False, "error": "Failed to create vote record"}
+
+            logger.info(
+                "Created vote record (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "vote_id": str(vote.id),
+                    "proposal_id": str(proposal_id),
+                },
+            )
+
+            # Mark the evaluation message as processed
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": True,
+                    "vote_id": str(vote.id),
+                    "approve": approval,
+                    "overall_score": overall_score,
+                },
+            )
+            backend.update_queue_message(message_id, update_data)
+
+            return {
+                "success": True,
+                "vote_id": str(vote.id),
+                "approve": approval,
+                "overall_score": overall_score,
+            }
+
+        except Exception as e:
+            error_msg = f"Error processing message {message_id} (v2): {str(e)}"
+            logger.error(
+                "Error processing message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": False,
+                    "error": error_msg,
+                },
+            )
+            backend.update_queue_message(message_id, update_data)
+
+            return {"success": False, "error": error_msg}
+
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single DAO proposal evaluation message."""
         message_id = message.id
@@ -368,25 +597,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
                 return {"success": False, "error": error_msg}
 
-            # Determine prompt type based on DAO name
-            prompt_type = "evaluation"  # Default
-            if dao.name == "AIBTC-BREW":
-                prompt_type = "evaluation_aibtc_brew"
-                logger.info(f"Using AIBTC-BREW-specific prompts for DAO {dao.name}")
-            elif dao.name == "ELONBTC":
-                prompt_type = "evaluation_elonbtc"
-                logger.info(f"Using ELONBTC-specific prompts for DAO {dao.name}")
-            elif dao.name == "AIBTC":
-                prompt_type = "evaluation_aibtc"
-                logger.info(f"Using AIBTC-specific prompts for DAO {dao.name}")
-            else:
-                logger.debug(f"Using general prompts for DAO {dao.name}")
-
-            # Load prompts
-            custom_system_prompt = load_prompt(prompt_type, "system")
-            custom_user_prompt = load_prompt(prompt_type, "user_template")
-
-            # Execute the proposal evaluation workflow
+            # Execute the proposal evaluation workflow using OpenRouter v2
             logger.info(
                 "Evaluating proposal",
                 extra={
@@ -396,39 +607,76 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 },
             )
 
-            # Get proposal data
-            proposal_content = proposal.content or "No content provided"
-
             evaluation = await evaluate_proposal_comprehensive(
-                proposal_content=proposal_content,
                 dao_id=dao_id,
-                proposal_id=str(proposal.id),
-                custom_system_prompt=custom_system_prompt,
-                custom_user_prompt=custom_user_prompt,
+                proposal_id=proposal.id,
                 streaming=False,
             )
 
-            # Extract evaluation results from the nested structure
+            # Extract evaluation results from OpenRouter v2 structure
             evaluation_data = evaluation.get("evaluation", {})
-            approval = evaluation_data.get("decision", False)
+
+            # Map v2 decision ("APPROVE"/"REJECT") to boolean
+            decision_str = evaluation_data.get("decision", "REJECT")
+            approval = decision_str == "APPROVE"
+
             overall_score = evaluation_data.get("final_score", 0)
-            reasoning = evaluation_data.get("explanation", "")
-            formatted_prompt = ""  # Not available in the new model structure
-            total_cost = evaluation_data.get("token_usage", {}).get("total_cost", 0.0)
-            model = evaluation_data.get("token_usage", {}).get("model", "Unknown")
+            confidence = evaluation_data.get("confidence", 0.0)
+
+            # Build reasoning from category reasons
+            categories_data = {
+                "current_order": evaluation_data.get("current_order", {}),
+                "mission": evaluation_data.get("mission", {}),
+                "value": evaluation_data.get("value", {}),
+                "values": evaluation_data.get("values", {}),
+                "originality": evaluation_data.get("originality", {}),
+                "clarity": evaluation_data.get("clarity", {}),
+                "safety": evaluation_data.get("safety", {}),
+                "growth": evaluation_data.get("growth", {}),
+            }
+
+            # Compile reasoning from all categories
+            reasoning_parts = []
+            for cat_name, cat_data in categories_data.items():
+                if isinstance(cat_data, dict) and cat_data.get("reason"):
+                    reasoning_parts.append(
+                        f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}"
+                    )
+
+            reasoning = (
+                "\n\n".join(reasoning_parts)
+                if reasoning_parts
+                else "No reasoning provided"
+            )
+
+            # Add failed gates to reasoning if present
+            failed_gates = evaluation_data.get("failed", [])
+            if failed_gates:
+                reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
+
+            formatted_prompt = ""  # Not available in OpenRouter v2
+            total_cost = 0.0  # Token usage not tracked in v2
+            model = "x-ai/grok-2-1212"  # Default model used in v2
+
+            # Convert v2 categories to evaluation_scores format
             evaluation_scores = {
                 "categories": [
                     {
-                        "category": cat.get("category", ""),
-                        "score": cat.get("score", 0),
-                        "weight": cat.get("weight", 0),
-                        "reasoning": cat.get("reasoning", ""),
+                        "category": cat_name,
+                        "score": cat_data.get("score", 0),
+                        "weight": 0,  # Weights not in v2 schema
+                        "reasoning": cat_data.get("reason", ""),
+                        "evidence": cat_data.get("evidence", []),
                     }
-                    for cat in evaluation_data.get("categories", [])
+                    for cat_name, cat_data in categories_data.items()
+                    if isinstance(cat_data, dict)
                 ],
-                "final_score": evaluation_data.get("final_score", 0),
-            }  # Convert categories to scores format
-            evaluation_flags = evaluation_data.get("flags", [])
+                "final_score": overall_score,
+                "confidence": confidence,
+                "decision": decision_str,
+            }
+
+            evaluation_flags = failed_gates
 
             logger.info(
                 "Proposal evaluated",
@@ -453,15 +701,14 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 proposal_id=proposal_id,
                 answer=approval,
                 reasoning=reasoning,
-                confidence=overall_score
-                / 100.0,  # Convert score to 0-1 range for compatibility
+                confidence=confidence,  # Use confidence from v2 (already 0.0-1.0)
                 prompt=formatted_prompt,
                 cost=total_cost,
                 model=model,
                 profile_id=wallet.profile_id if wallet else None,
-                evaluation_score=evaluation_scores,  # Store the complete evaluation scores
-                flags=evaluation_flags,  # Store the evaluation flags
-                evaluation=evaluation_data,  # Already a dictionary from the nested structure
+                evaluation_score=evaluation_scores,  # Store the complete evaluation scores with evidence
+                flags=evaluation_flags,  # Store the failed gates as flags
+                evaluation=evaluation_data,  # Store the complete v2 evaluation structure
             )
 
             # Create the vote record
@@ -538,7 +785,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         """
         async with semaphore:
             try:
-                return await self.process_message(message)
+                # TODO: using v2 now can deprecate v1 if works
+                return await self.process_message_v2(message)
             except Exception as e:
                 # Log the error and return a failure result instead of raising
                 # This prevents one failed message from crashing the entire batch

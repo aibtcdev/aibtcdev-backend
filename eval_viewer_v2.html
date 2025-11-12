@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Eval Viewer V2</title>
+    <!-- TailwindCSS via CDN for quick styling. This makes the page lightweight and
+         easy to ship with any project without additional build steps. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Preconnects improve the loading performance of Google fonts. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      /* Brand colours used to highlight decisions and sort criteria. */
+      .pass-highlight {
+        background-color: #22c55e;
+        color: white;
+      }
+      .fail-highlight {
+        background-color: #ef4444;
+        color: white;
+      }
+      .sort-highlight {
+        background-color: #3b82f6;
+        color: white;
+      }
+      /* Improve table readability by alternating row backgrounds. */
+      .table-striped tbody tr:nth-child(odd) {
+        background-color: #f9fafb;
+      }
+      /* Styles for truncating long text */
+      .text-truncate {
+        display: inline-block;
+        max-width: 30ch;
+        vertical-align: bottom;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8">
+      <!-- Page header -->
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Eval Viewer V2</h1>
+        <p class="mt-2 text-lg text-gray-600">
+          Browse and analyze proposal evaluations from JSON reports in ./evals/.
+          View per-proposal details, full prompts, scores, reasoning, and
+          outcomes, with aggregated stats for prompt improvement.
+        </p>
+      </header>
+
+      <!-- Summary of key insights will be injected here -->
+      <section id="summary-container" class="mb-8"></section>
+
+      <!-- Controls to select baseline eval, sorting and filtering -->
+      <section
+        class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-4 md:flex-row md:items-end sticky top-0 z-10"
+      >
+        <!-- Baseline eval selector -->
+        <div
+          class="flex-1"
+          id="baseline-selector-container"
+          style="display: none"
+        >
+          <label
+            for="eval-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Select Eval Report</label
+          >
+          <select
+            id="eval-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          ></select>
+        </div>
+        <!-- Sorting control -->
+        <div class="flex-1">
+          <label
+            for="sort-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Sort by</label
+          >
+          <select
+            id="sort-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="final-score-desc">Final Score (High to Low)</option>
+            <option value="final-score-asc">Final Score (Low to High)</option>
+            <option value="proposal-id-asc">Proposal ID (A-Z)</option>
+          </select>
+        </div>
+        <!-- Proposal filter -->
+        <div class="flex-1">
+          <label
+            for="proposal-filter-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Filter by Proposal ID</label
+          >
+          <select
+            id="proposal-filter-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Proposals</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Container for eval cards (per report) -->
+      <main id="eval-container"></main>
+    </div>
+
+    <!-- Template to display a loading spinner while processing eval reports -->
+    <template id="loading-template">
+      <div
+        class="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"
+      >
+        <svg
+          class="animate-spin h-8 w-8 text-gray-500"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        <p class="mt-4 text-lg font-medium text-gray-600">
+          Loading eval reports...
+        </p>
+      </div>
+    </template>
+
+    <script type="module">
+      /**
+       * This script loads eval reports from a manifest, renders summaries,
+       * sorting/filtering, and per-proposal details. It relies on
+       * relative file fetching via HTTP, so serve this file with a local
+       * server (e.g. `npx serve .`) when opening it.
+       */
+
+      // Store processed evals per report path.
+      const evalData = new Map();
+      // Keep a list of human friendly names for each report (timestamps).
+      const evalNames = new Map();
+      // Active processed evals for baseline view.
+      let currentEvals = [];
+
+      /**
+       * Entry point: discover available reports and initialise UI.
+       */
+      document.addEventListener("DOMContentLoaded", async () => {
+        // Bind controls only once.
+        document
+          .getElementById("sort-select")
+          .addEventListener("change", updateEvalView);
+        document
+          .getElementById("proposal-filter-select")
+          .addEventListener("change", updateEvalView);
+
+        // Load manifest of reports. This should be a JSON array of
+        // objects with `path` and `name` fields.
+        let manifest = [];
+        try {
+          const resp = await fetch("./evals/evals-manifest.json");
+          if (resp.ok) {
+            manifest = await resp.json();
+          }
+        } catch (err) {
+          console.warn("No manifest found; skipping load.");
+        }
+
+        // Populate selector and preload reports.
+        const baselineSelector = document.getElementById("eval-select");
+        manifest.forEach((report, idx) => {
+          evalNames.set(report.path, report.name || report.path);
+          const option = document.createElement("option");
+          option.value = report.path;
+          option.textContent = report.name || report.path;
+          baselineSelector.appendChild(option);
+        });
+
+        // Show selectors if reports available.
+        if (manifest.length > 0) {
+          document.getElementById("baseline-selector-container").style.display =
+            "block";
+        }
+
+        // Preload all reports.
+        for (const report of manifest) {
+          try {
+            const response = await fetch(report.path);
+            if (!response.ok) {
+              console.warn(
+                `Could not load report at ${report.path}: ${response.statusText}`
+              );
+              continue;
+            }
+            const rawData = await response.json();
+            const processed = processEvalData(rawData);
+            evalData.set(report.path, processed);
+          } catch (error) {
+            console.warn(`Error loading report ${report.path}:`, error);
+          }
+        }
+
+        // Display the first one as baseline if available.
+        const firstReport = manifest.find((r) => evalData.has(r.path));
+        if (firstReport) {
+          baselineSelector.value = firstReport.path;
+          currentEvals = evalData.get(firstReport.path);
+          updateViewForEval(firstReport.path);
+        } else {
+          // Display error if no reports could be loaded.
+          displayError(
+            new Error(
+              "No eval reports were loaded. Make sure evals-manifest.json exists and points to valid JSON files."
+            )
+          );
+        }
+      });
+
+      /**
+       * Transform raw eval data into a more usable form. Compute aggregates like pass rates and category averages.
+       */
+      function processEvalData(data) {
+        if (!data || !data.results || !Array.isArray(data.results)) {
+          throw new Error("Invalid eval data structure");
+        }
+
+        const proposals = data.results.map((item) => {
+          if (item.error) {
+            return {
+              proposal_id: item.proposal_id,
+              error: item.error,
+              final_score: 0,
+              confidence: 0,
+              decision: "REJECT",
+              failed: [],
+              categories: [],
+              expected_decision: item.expected_decision || null,
+              mismatch: false,
+              usage: { input_tokens: "0", output_tokens: "0", est_cost: "$0.000000" },
+            };
+          }
+
+          const evalOut = item.evaluation_output;
+          const categories = Object.entries(evalOut)
+            .filter(([key]) => key !== "final_score" && key !== "confidence" && key !== "decision" && key !== "failed" && !key.startsWith("usage_"))
+            .map(([key, val]) => ({
+              category: key,
+              score: val.score,
+              reason: val.reason,
+              evidence: val.evidence,
+            }));
+
+          return {
+            proposal_id: item.proposal_id,
+            final_score: evalOut.final_score,
+            confidence: evalOut.confidence,
+            decision: evalOut.decision === "APPROVE",
+            failed: evalOut.failed,
+            categories,
+            expected_decision: item.expected_decision === "APPROVE",
+            mismatch: item.expected_decision !== null && (item.expected_decision === "APPROVE") !== (evalOut.decision === "APPROVE"),
+            usage: {
+              input_tokens: evalOut.usage_input_tokens || "0",
+              output_tokens: evalOut.usage_output_tokens || "0",
+              est_cost: evalOut.usage_est_cost || "$0.000000",
+            },
+          };
+        });
+
+        // Compute aggregates
+        const total = proposals.length;
+        const passed = proposals.filter((p) => p.decision).length;
+        const passRate = (passed / total) * 100;
+        const avgScore = proposals.reduce((sum, p) => sum + p.final_score, 0) / total;
+        const avgConfidence = proposals.reduce((sum, p) => sum + p.confidence, 0) / total;
+        const mismatches = proposals.filter((p) => p.mismatch).length;
+        const categoryAverages = {};
+        proposals.forEach((prop) => {
+          prop.categories.forEach((cat) => {
+            categoryAverages[cat.category] = categoryAverages[cat.category] || { sum: 0, count: 0 };
+            categoryAverages[cat.category].sum += cat.score;
+            categoryAverages[cat.category].count++;
+          });
+        });
+        Object.keys(categoryAverages).forEach((key) => {
+          categoryAverages[key].avg = categoryAverages[key].sum / categoryAverages[key].count;
+        });
+
+        const totalInputTokens = proposals.reduce((sum, p) => sum + parseInt(p.usage.input_tokens), 0);
+        const totalOutputTokens = proposals.reduce((sum, p) => sum + parseInt(p.usage.output_tokens), 0);
+        const totalEstCost = proposals.reduce((sum, p) => sum + parseFloat(p.usage.est_cost.replace("$", "")), 0);
+
+        return {
+          timestamp: data.timestamp,
+          overall_stats: { total_proposals: total, passed, passRate, avg_score: avgScore, avg_confidence: avgConfidence, mismatches, total_input_tokens: totalInputTokens, total_output_tokens: totalOutputTokens, total_est_cost: totalEstCost },
+          proposals,
+          categoryAverages,
+        };
+      }
+
+      /**
+       * Display an error message in place of eval contents.
+       */
+      function displayError(error) {
+        const container = document.getElementById("eval-container");
+        container.innerHTML = `<div class="col-span-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert"><strong class="font-bold">Error:</strong><span class="block sm:inline"> ${error.message}. Please ensure the JSON files are available and this page is served over HTTP.</span></div>`;
+      }
+
+      /**
+       * When the baseline eval changes, load its data and re-render the view.
+       */
+      document.getElementById("eval-select").addEventListener("change", (e) => {
+        const path = e.target.value;
+        updateViewForEval(path);
+      });
+
+      /**
+       * Update both the summary and detailed view when switching evals.
+       */
+      function updateViewForEval(path) {
+        const evals = evalData.get(path) || [];
+        currentEvals = evals;
+        // Update page header with eval name.
+        const header = document.querySelector("header h1");
+        const evalName = evalNames.get(path);
+        header.textContent = `Eval Viewer V2${evalName ? `: ${evalName}` : ""}`;
+        // Render summary and card view.
+        renderSummary(evals);
+        populateProposalFilter(evals);
+        updateEvalView();
+      }
+
+      /**
+       * Build the key insights table for an eval.
+       */
+      function renderSummary(evals) {
+        const container = document.getElementById("summary-container");
+        if (!evals || evals.proposals.length === 0) {
+          container.innerHTML = "";
+          return;
+        }
+
+        // Top insights: e.g., highest/lowest scores, pass rate, category avgs
+        const byScoreDesc = [...evals.proposals]
+          .sort((a, b) => b.final_score - a.final_score)
+          .slice(0, 3);
+        const byScoreAsc = [...evals.proposals]
+          .sort((a, b) => a.final_score - b.final_score)
+          .slice(0, 3);
+        const mismatches = evals.proposals
+          .filter((p) => p.mismatch)
+          .slice(0, 3);
+
+        // Helper to build grouped rows
+        const createRows = (label, arr, formatFn) => {
+          if (arr.length === 0) return "";
+          return arr
+            .map((prop, idx) => {
+              const propId = prop.proposal_id.slice(0, 8);
+              const metricVal = formatFn(prop);
+              const labelCell =
+                idx === 0
+                  ? `<td class="py-3 px-4 border-b border-gray-200 text-sm font-medium text-gray-800 align-top" rowspan="${arr.length}">${label}</td>`
+                  : "";
+              return `
+                <tr>
+                  ${labelCell}
+                  <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono">${propId}</td>
+                  <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono text-right">${metricVal}</td>
+                </tr>
+              `;
+            })
+            .join("");
+        };
+
+        container.innerHTML = `
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 id="summary-title" class="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center">
+              <span>Key Insights</span>
+              <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </h2>
+            <div id="summary-content" class="overflow-x-auto space-y-6">
+              <div>
+                <h3 class="font-bold mb-2">Overall Statistics</h3>
+                <table class="min-w-full table-striped text-sm text-gray-600">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statistic</th>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Pass Rate</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.passRate.toFixed(2)}%</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Average Score</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.avg_score.toFixed(2)}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Average Confidence</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.avg_confidence.toFixed(2)}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Mismatches</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.mismatches}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Input Tokens</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.total_input_tokens}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Output Tokens</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.total_output_tokens}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Estimated Cost</td><td class="py-2 px-4 border-b border-gray-200">$${evals.overall_stats.total_est_cost.toFixed(6)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Top Performers</h3>
+                <table class="min-w-full table-striped">
+                  <thead>
+                    <tr>
+                      <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposal</th>
+                      <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${createRows(
+                      "Highest Scores",
+                      byScoreDesc,
+                      (prop) =>
+                        `${prop.final_score.toFixed(2)} (${
+                          prop.decision ? "APPROVE" : "REJECT"
+                        })`
+                    )}
+                    ${createRows(
+                      "Lowest Scores",
+                      byScoreAsc,
+                      (prop) =>
+                        `${prop.final_score.toFixed(2)} (${
+                          prop.decision ? "APPROVE" : "REJECT"
+                        })`
+                    )}
+                    ${createRows(
+                      "Mismatches",
+                      mismatches,
+                      (prop) =>
+                        `Expected: ${
+                          prop.expected_decision ? "APPROVE" : "REJECT"
+                        } | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Category Averages</h3>
+                <table class="min-w-full table-striped text-sm text-gray-600">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${Object.entries(evals.categoryAverages)
+                      .map(
+                        ([key, val]) => `<tr><td class="py-2 px-4 border-b border-gray-200">${key}</td><td class="py-2 px-4 border-b border-gray-200">${val.avg.toFixed(2)}</td></tr>`
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Add click listener for collapsible summary.
+        const summaryTitle = container.querySelector("#summary-title");
+        const summaryContent = container.querySelector("#summary-content");
+        if (summaryTitle && summaryContent) {
+          summaryTitle.addEventListener("click", () => {
+            const isCollapsed = summaryContent.style.display === "none";
+            summaryContent.style.display = isCollapsed ? "block" : "none";
+            summaryTitle
+              .querySelector(".chevron")
+              .classList.toggle("rotate-90", isCollapsed);
+          });
+        }
+      }
+
+      /**
+       * Populate the proposal filter dropdown with unique proposal IDs.
+       */
+      function populateProposalFilter(evals) {
+        const select = document.getElementById("proposal-filter-select");
+        select.innerHTML = `<option value="all">All Proposals</option>`;
+        const uniqueProposals = [
+          ...new Set(evals.proposals.map((p) => p.proposal_id)),
+        ].sort();
+        uniqueProposals.forEach((pid) => {
+          const opt = document.createElement("option");
+          opt.value = pid;
+          opt.textContent = pid.slice(0, 8);
+          select.appendChild(opt);
+        });
+      }
+
+      /**
+       * Update the eval view based on current evals, sort order and filter.
+       */
+      function updateEvalView() {
+        const container = document.getElementById("eval-container");
+        const expansionState = new Map();
+        container
+          .querySelectorAll("section[data-proposal-id]")
+          .forEach((section) => {
+            const pid = section.dataset.proposalId;
+            const details = section.querySelector(".details");
+            if (pid && details) {
+              expansionState.set(pid, details.style.display !== "none");
+            }
+          });
+        if (!currentEvals || currentEvals.proposals.length === 0) {
+          container.innerHTML = "";
+          return;
+        }
+        // Filter by proposal.
+        const selectedProposal = document.getElementById(
+          "proposal-filter-select"
+        ).value;
+        let proposals = currentEvals.proposals;
+        if (selectedProposal !== "all") {
+          proposals = proposals.filter(
+            (p) => p.proposal_id === selectedProposal
+          );
+        }
+        // Determine sort order.
+        const sortValue = document.getElementById("sort-select").value;
+        let sortField, sortDir;
+        [sortField, sortDir] = sortValue.split("-");
+        proposals.sort((a, b) => {
+          let valA =
+            sortField === "final-score" ? a.final_score : a.proposal_id;
+          let valB =
+            sortField === "final-score" ? b.final_score : b.proposal_id;
+          return sortDir === "asc"
+            ? valA > valB
+            ? 1
+            : -1
+            : valA < valB
+            ? 1
+            : -1;
+        });
+
+        container.innerHTML = "";
+        if (proposals.length === 0) {
+          container.innerHTML = `<div class="text-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"><p class="text-lg font-medium text-gray-600">No proposals match the current filter.</p></div>`;
+          return;
+        }
+        // Create a wrapper for all proposal sections.
+        const wrapper = document.createElement("div");
+        wrapper.className =
+          "bg-white p-6 rounded-xl shadow-sm border border-gray-200";
+
+        const mainTitle = document.createElement("h2");
+        mainTitle.className =
+          "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
+        mainTitle.innerHTML = `
+          <span>Proposals</span>
+          <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+
+        wrapper.appendChild(mainTitle);
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "space-y-8 pt-4";
+
+        mainTitle.addEventListener("click", () => {
+          const isCollapsed = contentDiv.style.display === "none";
+          contentDiv.style.display = isCollapsed ? "block" : "none";
+          mainTitle
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
+        });
+
+        // Render each proposal card.
+        proposals.forEach((prop) => {
+          const card = createProposalCard(prop);
+          contentDiv.appendChild(card);
+        });
+        wrapper.appendChild(contentDiv);
+        container.appendChild(wrapper);
+
+        // Re-apply expansion state
+        expansionState.forEach((isExpanded, pid) => {
+          if (isExpanded) {
+            const section = wrapper.querySelector(
+              `section[data-proposal-id="${pid}"]`
+            );
+            if (section) {
+              const title = section.querySelector("h2");
+              const details = section.querySelector(".details");
+              if (title && details) {
+                details.style.display = "block";
+                title.querySelector(".chevron").classList.add("rotate-90");
+              }
+            }
+          }
+        });
+      }
+
+      /**
+       * Expand or collapse all proposal sections.
+       */
+      function escapeHtml(unsafe) {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      /**
+       * Create a card summarising a single proposal's eval profile.
+       */
+      function createProposalCard(prop) {
+        const card = document.createElement("section");
+        card.dataset.proposalId = prop.proposal_id;
+        const shortId = prop.proposal_id.slice(0, 8);
+        const title = document.createElement("h2");
+        title.className =
+          "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
+        const outcomeColor = prop.decision
+          ? "text-green-600 border-green-600"
+          : "text-red-600 border-red-600";
+        title.innerHTML = `
+          <span class="${outcomeColor}">${shortId} - Score: ${prop.final_score.toFixed(
+          2
+        )} (${prop.decision ? "APPROVE" : "REJECT"}) - Confidence: ${prop.confidence.toFixed(2)}</span>
+          <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+        card.appendChild(title);
+
+        const details = document.createElement("div");
+        details.className = "details space-y-4";
+        details.style.display = "none"; // Collapsed by default
+
+        title.addEventListener("click", () => {
+          const isCollapsed = details.style.display === "none";
+          details.style.display = isCollapsed ? "block" : "none";
+          title
+            .querySelector(".chevron")
+            .classList.toggle("rotate-90", isCollapsed);
+        });
+
+        // Outcome and failed gates
+        let outcomeText = `Outcome: ${prop.decision ? "APPROVE" : "REJECT"}`;
+        if (prop.expected_decision !== null) {
+          const expected = prop.expected_decision ? "APPROVE" : "REJECT";
+          const actual = prop.decision ? "APPROVE" : "REJECT";
+          outcomeText += ` (Expected: ${expected})`;
+          if (prop.mismatch) {
+            outcomeText += ` - Mismatch`;
+          }
+        }
+        const outcomeClass = prop.decision
+          ? "border-green-600"
+          : "border-red-600";
+        details.innerHTML = `
+          <div class="p-4 rounded-md border ${outcomeClass}">
+            <p class="font-bold ${outcomeColor}">${outcomeText}</p>
+            <p class="text-sm">Failed Gates: ${prop.failed.length > 0 ? prop.failed.join(", ") : "None"}</p>
+          </div>
+        `;
+
+        // Usage info
+        const usageInfo = document.createElement("div");
+        usageInfo.className = "space-y-2 mb-4";
+        usageInfo.innerHTML = `
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Usage</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">Input Tokens: ${prop.usage.input_tokens}\nOutput Tokens: ${prop.usage.output_tokens}\nEst Cost: ${prop.usage.est_cost}</pre>
+          </details>
+        `;
+        details.appendChild(usageInfo);
+
+        // Categories table
+        details.innerHTML += `
+          <div class="border-t border-gray-200 pt-4 overflow-x-auto">
+            <table class="min-w-full table-striped">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  prop.categories && prop.categories.length > 0
+                    ? prop.categories
+                        .map(
+                          (cat) => `
+                  <tr>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm font-medium">${cat.category}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${cat.score.toFixed(
+                      2
+                    )}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">${escapeHtml(cat.reason)}</td>
+                    <td class="py-2 px-4 border-b border-gray-200 text-sm">
+                      <div class="text-gray-600 whitespace-pre-wrap">
+                        ${cat.evidence
+                          .map((e) => {
+                            const escaped = escapeHtml(e);
+                            return `<div class="mb-2">- ${escaped}</div>`;
+                          })
+                          .join("")}
+                      </div>
+                    </td>
+                  </tr>
+                `
+                        )
+                        .join("")
+                    : '<tr><td colspan="4" class="py-2 px-4 text-center text-sm text-gray-500">No categories available</td></tr>'
+                }
+              </tbody>
+            </table>
+          </div>
+        `;
+        card.appendChild(details);
+        return card;
+      }
+    </script>
+  </body>
+</html>

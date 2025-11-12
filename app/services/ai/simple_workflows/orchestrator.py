@@ -7,14 +7,18 @@ orchestrating the various processors and providing a clean interface for callers
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from app.backend.factory import backend
+# from app.backend.factory import backend
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.evaluation import evaluate_proposal
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
+    evaluate_proposal_openrouter,
+    EvaluationOutput,
+)
 from app.services.ai.simple_workflows.metadata import (
     generate_proposal_metadata as _generate_metadata,
 )
 from app.services.ai.simple_workflows.processors import process_images, process_tweets
-from app.services.ai.simple_workflows.prompts.loader import load_prompt
+
+# from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.ai.simple_workflows.recommendation import (
     generate_proposal_recommendation as _generate_recommendation,
 )
@@ -23,25 +27,58 @@ from app.services.ai.simple_workflows.streaming import create_streaming_setup
 logger = configure_logger(__name__)
 
 
-async def evaluate_proposal_comprehensive(
-    proposal_content: str,
-    dao_id: Optional[UUID] = None,
-    proposal_id: Optional[UUID] = None,
-    tweet_db_ids: Optional[List[UUID]] = None,
-    custom_system_prompt: Optional[str] = None,
-    custom_user_prompt: Optional[str] = None,
-    streaming: bool = False,
-) -> Dict[str, Any]:
-    """Evaluate a proposal comprehensively with all context processing.
+async def evaluate_proposal_strict(
+    proposal_id: UUID | str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    reasoning: Optional[bool] = None,
+) -> Optional[EvaluationOutput]:
+    """Evaluates a proposal using OpenRouter.
 
     Args:
-        proposal_content: The proposal content to evaluate
-        dao_id: Optional DAO ID for context
-        proposal_id: Optional proposal UUID (will fetch linked tweet content automatically)
-        tweet_db_ids: Optional list of additional tweet database IDs to process
-        custom_system_prompt: Optional custom system prompt
-        custom_user_prompt: Optional custom user prompt
-        streaming: Whether to enable streaming
+        proposal_id: Required proposal UUID for evaluation
+        model: Optional model override
+        temperature: Optional temperature override
+
+    Returns:
+        Dictionary containing comprehensive evaluation results or None.
+    """
+
+    try:
+        evaluation_result = await evaluate_proposal_openrouter(
+            proposal_id=proposal_id,
+            model=model,
+            temperature=temperature,
+            reasoning=reasoning,
+        )
+
+        if evaluation_result is None:
+            logger.error("Evaluation returned None")
+            return None
+
+        return evaluation_result
+
+    except Exception as e:
+        logger.error("Error during evaluation proposal strict", extra={"error": e})
+        return None
+
+
+async def evaluate_proposal_comprehensive(
+    dao_id: Optional[UUID] = None,
+    proposal_id: Optional[UUID] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.7,
+) -> Dict[str, Any]:
+    """Evaluate a proposal comprehensively using OpenRouter.
+
+    Args:
+        proposal_id: Required proposal UUID for evaluation
+        tweet_db_ids: Optional list of additional tweet database IDs (not used in v2)
+        custom_system_prompt: Optional custom system prompt (not used in v2)
+        custom_user_prompt: Optional custom user prompt (not used in v2)
+        streaming: Whether to enable streaming (not supported in v2)
+        model: Optional model override (e.g., 'x-ai/grok-4-fast')
+        temperature: Generation temperature (default 0.7)
 
     Returns:
         Dictionary containing comprehensive evaluation results
@@ -51,127 +88,23 @@ async def evaluate_proposal_comprehensive(
         f"[Orchestrator] Starting comprehensive evaluation for proposal {proposal_id_str}"
     )
 
-    try:
-        # Set up streaming if requested
-        callbacks = None
-        if streaming:
-            callback_handler, queue = create_streaming_setup()
-            callbacks = [callback_handler]
-
-        # Step 1: Process images from proposal content
-        logger.debug(f"[Orchestrator:{proposal_id_str}] Processing images")
-        images = await process_images(proposal_content, proposal_id_str)
-        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(images)} images")
-
-        # Step 2: Process tweets if provided (additional tweets beyond proposal's linked tweet)
-        tweet_content = ""
-        tweet_images = []
-        if tweet_db_ids:
-            logger.debug(
-                f"[Orchestrator:{proposal_id_str}] Processing {len(tweet_db_ids)} additional tweets"
-            )
-            tweet_content, tweet_images = await process_tweets(
-                tweet_db_ids, proposal_id_str
-            )
-            logger.debug(
-                f"[Orchestrator:{proposal_id_str}] Processed additional tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
-            )
-
-        # Step 3: Combine all images
-        all_images = images + tweet_images
-
-        # Determine prompt type based on DAO name
-        prompt_type = "evaluation"  # Default
-        if dao_id:
-            dao = backend.get_dao(dao_id)
-            if dao:
-                if dao.name == "AIBTC-BREW":
-                    prompt_type = "evaluation_aibtc_brew"
-                    logger.info(
-                        f"[Orchestrator:{proposal_id_str}] Using AIBTC-BREW-specific prompts for DAO {dao.name}"
-                    )
-                elif dao.name == "ELONBTC":
-                    prompt_type = "evaluation_elonbtc"
-                    logger.info(
-                        f"[Orchestrator:{proposal_id_str}] Using ELONBTC-specific prompts for DAO {dao.name}"
-                    )
-                elif dao.name == "AIBTC":
-                    prompt_type = "evaluation_aibtc"
-                    logger.info(
-                        f"[Orchestrator:{proposal_id_str}] Using AIBTC-specific prompts for DAO {dao.name}"
-                    )
-                else:
-                    logger.debug(
-                        f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO {dao.name}"
-                    )
-            else:
-                logger.debug(
-                    f"[Orchestrator:{proposal_id_str}] Using general prompts for DAO unknown"
-                )
-
-        # Load prompts if not provided
-        if custom_system_prompt is None:
-            custom_system_prompt = load_prompt(prompt_type, "system")
-        if custom_user_prompt is None:
-            custom_user_prompt = load_prompt(prompt_type, "user_template")
-
-        # Step 4: Run comprehensive evaluation
-        logger.debug(
-            f"[Orchestrator:{proposal_id_str}] Running comprehensive evaluation"
-        )
-        evaluation_result = await evaluate_proposal(
-            proposal_content=proposal_content,
-            dao_id=dao_id,
-            proposal_id=proposal_id,
-            images=all_images,
-            tweet_content=tweet_content,
-            airdrop_content=None,  # Let evaluate_proposal fetch it automatically if needed
-            custom_system_prompt=custom_system_prompt,
-            custom_user_prompt=custom_user_prompt,
-            callbacks=callbacks,
-        )
-
-        # Step 5: Add processing metadata
-        result = {
-            "evaluation": evaluation_result.model_dump()
-            if hasattr(evaluation_result, "model_dump")
-            else evaluation_result,
-            "processing_metadata": {
-                "proposal_id": proposal_id_str,
-                "dao_id": str(dao_id) if dao_id else None,
-                "images_processed": len(images),
-                "tweet_images_processed": len(tweet_images),
-                "total_images": len(all_images),
-                "tweets_processed": len(tweet_db_ids) if tweet_db_ids else 0,
-                "tweet_content_length": len(tweet_content),
-                "streaming_enabled": streaming,
-            },
-        }
-
-        # Add streaming queue if enabled
-        if streaming and callbacks:
-            result["streaming_queue"] = callbacks[0].queue
-
-        logger.info(
-            f"[Orchestrator] Completed comprehensive evaluation for proposal {proposal_id_str}"
-        )
-        return result
-
-    except Exception as e:
-        logger.error(
-            f"[Orchestrator] Error in comprehensive evaluation for proposal {proposal_id_str}: {str(e)}"
-        )
+    if not proposal_id:
+        logger.error("[Orchestrator] proposal_id is required for evaluation")
         return {
-            "error": str(e),
+            "error": "proposal_id is required",
             "evaluation": {
-                "categories": [],
+                "current_order": {"score": 0, "reason": "", "evidence": []},
+                "mission": {"score": 0, "reason": "", "evidence": []},
+                "value": {"score": 0, "reason": "", "evidence": []},
+                "values": {"score": 0, "reason": "", "evidence": []},
+                "originality": {"score": 0, "reason": "", "evidence": []},
+                "clarity": {"score": 0, "reason": "", "evidence": []},
+                "safety": {"score": 0, "reason": "", "evidence": []},
+                "growth": {"score": 0, "reason": "", "evidence": []},
                 "final_score": 0,
-                "decision": False,
-                "explanation": f"Evaluation failed: {str(e)}",
-                "flags": [f"Critical Error: {str(e)}"],
-                "summary": "Evaluation failed due to error",
-                "token_usage": {},
-                "images_processed": 0,
+                "confidence": 0.0,
+                "decision": "REJECT",
+                "failed": ["Missing proposal_id"],
             },
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
@@ -181,7 +114,101 @@ async def evaluate_proposal_comprehensive(
                 "total_images": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
-                "streaming_enabled": streaming,
+                "streaming_enabled": False,
+            },
+        }
+
+    try:
+        # Run evaluation using OpenRouter v2
+        logger.debug(f"[Orchestrator:{proposal_id_str}] Running OpenRouter evaluation")
+        evaluation_result = await evaluate_proposal_openrouter(
+            proposal_id=proposal_id_str,
+            model=model,
+            temperature=temperature,
+        )
+
+        if not evaluation_result:
+            logger.error(f"[Orchestrator:{proposal_id_str}] Evaluation returned None")
+            return {
+                "error": "Evaluation failed",
+                "evaluation": {
+                    "current_order": {"score": 0, "reason": "", "evidence": []},
+                    "mission": {"score": 0, "reason": "", "evidence": []},
+                    "value": {"score": 0, "reason": "", "evidence": []},
+                    "values": {"score": 0, "reason": "", "evidence": []},
+                    "originality": {"score": 0, "reason": "", "evidence": []},
+                    "clarity": {"score": 0, "reason": "", "evidence": []},
+                    "safety": {"score": 0, "reason": "", "evidence": []},
+                    "growth": {"score": 0, "reason": "", "evidence": []},
+                    "final_score": 0,
+                    "confidence": 0.0,
+                    "decision": "REJECT",
+                    "failed": ["Evaluation failed"],
+                },
+                "processing_metadata": {
+                    "proposal_id": proposal_id_str,
+                    "dao_id": str(dao_id) if dao_id else None,
+                    "images_processed": 0,
+                    "tweet_images_processed": 0,
+                    "total_images": 0,
+                    "tweets_processed": 0,
+                    "tweet_content_length": 0,
+                    "streaming_enabled": False,
+                },
+            }
+
+        # Convert to dict for response
+        result = {
+            "evaluation": evaluation_result.model_dump(),
+            "processing_metadata": {
+                "proposal_id": proposal_id_str,
+                "dao_id": str(dao_id) if dao_id else None,
+                "images_processed": len(evaluation_result.current_order.evidence)
+                if hasattr(evaluation_result.current_order, "evidence")
+                else 0,
+                "tweet_images_processed": 0,
+                "total_images": 0,
+                "tweets_processed": 0,
+                "tweet_content_length": 0,
+                "streaming_enabled": False,
+            },
+        }
+
+        logger.info(
+            f"[Orchestrator] Completed comprehensive evaluation for proposal {proposal_id_str}"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(
+            f"[Orchestrator] Error in comprehensive evaluation for proposal {proposal_id_str}: {str(e)}",
+            exc_info=True,
+        )
+        return {
+            "error": str(e),
+            "evaluation": {
+                "current_order": {"score": 0, "reason": "", "evidence": []},
+                "mission": {"score": 0, "reason": "", "evidence": []},
+                "value": {"score": 0, "reason": "", "evidence": []},
+                "values": {"score": 0, "reason": "", "evidence": []},
+                "originality": {"score": 0, "reason": "", "evidence": []},
+                "clarity": {"score": 0, "reason": "", "evidence": []},
+                "safety": {"score": 0, "reason": "", "evidence": []},
+                "growth": {"score": 0, "reason": "", "evidence": []},
+                "final_score": 0,
+                "confidence": 0.0,
+                "decision": "REJECT",
+                "failed": [f"Critical Error: {str(e)}"],
+            },
+            "processing_metadata": {
+                "proposal_id": proposal_id_str,
+                "dao_id": str(dao_id) if dao_id else None,
+                "images_processed": 0,
+                "tweet_images_processed": 0,
+                "total_images": 0,
+                "tweets_processed": 0,
+                "tweet_content_length": 0,
+                "streaming_enabled": False,
             },
         }
 

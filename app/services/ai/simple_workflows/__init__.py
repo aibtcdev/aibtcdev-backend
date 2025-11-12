@@ -15,6 +15,7 @@ Key modules:
 """
 
 from .orchestrator import (
+    evaluate_proposal_strict,
     evaluate_proposal_comprehensive,
     generate_proposal_metadata,
     generate_proposal_recommendation,
@@ -26,6 +27,7 @@ from .tool_executor import (
 )
 
 __all__ = [
+    "evaluate_proposal_strict",
     "evaluate_proposal_comprehensive",
     "generate_proposal_metadata",
     "generate_proposal_recommendation",
