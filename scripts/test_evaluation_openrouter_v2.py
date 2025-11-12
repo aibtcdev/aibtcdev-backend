@@ -105,10 +105,6 @@ async def test_evaluation(
 ):
     """Test the evaluation function with a proposal ID."""
     try:
-        # Generate timestamp for file naming
-        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # prop_short_id = proposal_id[:8]
-
         # Convert string to UUID
         proposal_uuid = UUID(proposal_id)
 

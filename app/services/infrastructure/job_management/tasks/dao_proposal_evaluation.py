@@ -72,7 +72,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
     DEFAULT_SCORE_THRESHOLD = 70.0
     DEFAULT_AUTO_VOTE = False
     DEFAULT_MAX_CONCURRENT_EVALUATIONS = (
-        5  # Limit concurrent evaluations to avoid rate limits
+        3  # Limit concurrent evaluations to avoid rate limits
     )
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
@@ -368,21 +368,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
                 return {"success": False, "error": error_msg}
 
-            # Determine prompt type based on DAO name
-            prompt_type = "evaluation"  # Default
-            if dao.name == "AIBTC-BREW":
-                prompt_type = "evaluation_aibtc_brew"
-                logger.info(f"Using AIBTC-BREW-specific prompts for DAO {dao.name}")
-            elif dao.name == "ELONBTC":
-                prompt_type = "evaluation_elonbtc"
-                logger.info(f"Using ELONBTC-specific prompts for DAO {dao.name}")
-            elif dao.name == "AIBTC":
-                prompt_type = "evaluation_aibtc"
-                logger.info(f"Using AIBTC-specific prompts for DAO {dao.name}")
-            else:
-                logger.debug(f"Using general prompts for DAO {dao.name}")
-
             # Load prompts
+            prompt_type = "evaluation_grok"
             custom_system_prompt = load_prompt(prompt_type, "system")
             custom_user_prompt = load_prompt(prompt_type, "user_template")
 
