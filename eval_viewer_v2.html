@@ -111,26 +111,6 @@
             <option value="all">All Proposals</option>
           </select>
         </div>
-        <!-- View controls -->
-        <div class="flex-1" id="view-controls-container" style="display: none">
-          <label class="block text-sm font-medium text-gray-700 mb-1"
-            >View Controls</label
-          >
-          <div class="flex gap-2">
-            <button
-              id="expand-all-btn"
-              class="w-full p-2 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-            >
-              Expand All
-            </button>
-            <button
-              id="collapse-all-btn"
-              class="w-full p-2 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-            >
-              Collapse All
-            </button>
-          </div>
-        </div>
       </section>
 
       <!-- Container for eval cards (per report) -->
@@ -194,12 +174,6 @@
         document
           .getElementById("proposal-filter-select")
           .addEventListener("change", updateEvalView);
-        document
-          .getElementById("expand-all-btn")
-          .addEventListener("click", () => toggleAll(true));
-        document
-          .getElementById("collapse-all-btn")
-          .addEventListener("click", () => toggleAll(false));
 
         // Load manifest of reports. This should be a JSON array of
         // objects with `path` and `name` fields.
@@ -226,8 +200,6 @@
         // Show selectors if reports available.
         if (manifest.length > 0) {
           document.getElementById("baseline-selector-container").style.display =
-            "block";
-          document.getElementById("view-controls-container").style.display =
             "block";
         }
 
@@ -429,21 +401,15 @@
               <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </h2>
             <div id="summary-content" class="overflow-x-auto">
-              <div class="mb-4 text-sm text-gray-600">
-                <span class="mr-4"><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(
-                  2
-                )}%</span>
-                <span class="mr-4"><strong>Avg Score:</strong> ${evals.overall_stats.avg_score.toFixed(
-                  2
-                )}</span>
-                <span class="mr-4"><strong>Avg Confidence:</strong> ${evals.overall_stats.avg_confidence.toFixed(
-                  2
-                )}</span>
-                <span class="mr-4"><strong>Mismatches:</strong> ${evals.overall_stats.mismatches}</span>
-                <span class="mr-4"><strong>Total Input Tokens:</strong> ${evals.overall_stats.total_input_tokens}</span>
-                <span class="mr-4"><strong>Total Output Tokens:</strong> ${evals.overall_stats.total_output_tokens}</span>
-                <span><strong>Total Est Cost:</strong> $${evals.overall_stats.total_est_cost.toFixed(6)}</span>
-              </div>
+              <ul class="mb-4 text-sm text-gray-600 space-y-1">
+                <li><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(2)}%</li>
+                <li><strong>Average Score:</strong> ${evals.overall_stats.avg_score.toFixed(2)}</li>
+                <li><strong>Average Confidence:</strong> ${evals.overall_stats.avg_confidence.toFixed(2)}</li>
+                <li><strong>Mismatches:</strong> ${evals.overall_stats.mismatches}</li>
+                <li><strong>Total Input Tokens:</strong> ${evals.overall_stats.total_input_tokens}</li>
+                <li><strong>Total Output Tokens:</strong> ${evals.overall_stats.total_output_tokens}</li>
+                <li><strong>Total Estimated Cost:</strong> $${evals.overall_stats.total_est_cost.toFixed(6)}</li>
+              </ul>
               <table class="min-w-full table-striped">
                 <thead>
                   <tr>
@@ -481,10 +447,10 @@
               </table>
               <div class="mt-4">
                 <h3 class="font-bold">Category Averages</h3>
-                <ul class="list-disc pl-5 text-sm">
+                <ul class="text-sm space-y-1">
                   ${Object.entries(evals.categoryAverages)
                     .map(
-                      ([key, val]) => `<li>${key}: ${val.avg.toFixed(2)}</li>`
+                      ([key, val]) => `<li><strong>${key}:</strong> ${val.avg.toFixed(2)}</li>`
                     )
                     .join("")}
                 </ul>
@@ -638,23 +604,6 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
-      }
-
-      function toggleAll(expand) {
-        const container = document.getElementById("eval-container");
-        container.querySelectorAll("section > h2").forEach((title) => {
-          const details = title.nextElementSibling;
-          if (details && details.classList.contains("details")) {
-            const isCurrentlyCollapsed = details.style.display === "none";
-            if (expand && isCurrentlyCollapsed) {
-              details.style.display = "block";
-              title.querySelector(".chevron").classList.add("rotate-90");
-            } else if (!expand && !isCurrentlyCollapsed) {
-              details.style.display = "none";
-              title.querySelector(".chevron").classList.remove("rotate-90");
-            }
-          }
-        });
       }
 
       /**
