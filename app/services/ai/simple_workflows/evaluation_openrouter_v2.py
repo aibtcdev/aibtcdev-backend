@@ -145,7 +145,7 @@ async def call_openrouter(
     Args:
         messages: List of chat messages
         model: Optional model override
-        temperature: Temperature for
+        temperature: Temperature for generation (float, 0.0–1.0; controls randomness/creativity)
         reasoning: Whether to enable reasoning
         tools: Optional tools for the model
 

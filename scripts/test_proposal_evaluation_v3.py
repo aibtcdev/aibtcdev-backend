@@ -232,7 +232,6 @@ Examples:
 
     parser.add_argument(
         "--reasoning",
-        action="store_true",
         default=True,
         help="Enable reasoning (default: True)",
     )

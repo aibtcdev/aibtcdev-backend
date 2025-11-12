@@ -33,7 +33,7 @@ async def evaluate_proposal_strict(
     temperature: Optional[float] = None,
     reasoning: Optional[bool] = None,
 ) -> Optional[EvaluationOutput]:
-    """Evaluates a proopsal using OpenRouter.
+    """Evaluates a proposal using OpenRouter.
 
     Args:
         proposal_id: Required proposal UUID for evaluation
