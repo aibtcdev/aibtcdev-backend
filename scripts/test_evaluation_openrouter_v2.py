@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Test script for OpenRouter evaluation (evaluation_openrouter_v1.py)
+Simplified evaluation pipeline using direct OpenRouter HTTP request.
 
 Usage:
-    python scripts/test_evaluation_openrouter_v1.py --proposal-id "your-proposal-uuid"
+    python scripts/test_evaluation_openrouter_v2.py --proposal-id "your-proposal-uuid" --save-output
 """
 
 import argparse
@@ -12,6 +12,7 @@ import httpx
 import json
 import os
 import sys
+
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse
@@ -26,7 +27,10 @@ from app.config import config
 from app.services.ai.simple_workflows.evaluation_openrouter_v1 import (
     format_proposals_for_context_v2,
 )
-from app.services.ai.simple_workflows.prompts.loader import load_prompt
+from app.services.ai.simple_workflows.prompts.evaluation_grok import (
+    EVALUATION_GROK_SYSTEM_PROMPT,
+    EVALUATION_GROK_USER_PROMPT_TEMPLATE,
+)
 
 
 def get_openrouter_config() -> Dict[str, str]:
@@ -424,8 +428,8 @@ async def test_evaluation(
 
         # determine prompt type based on DAO
         print("\n" + "=" * 80)
-        system_prompt = load_prompt("evaluation_grok", "system")
-        user_prompt = load_prompt("evaluation_grok", "user_template")
+        system_prompt = EVALUATION_GROK_SYSTEM_PROMPT
+        user_prompt = EVALUATION_GROK_USER_PROMPT_TEMPLATE
 
         # fail if not found
         if not system_prompt or not user_prompt:
