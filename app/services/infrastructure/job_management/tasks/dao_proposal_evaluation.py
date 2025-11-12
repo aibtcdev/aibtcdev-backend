@@ -784,7 +784,8 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         """
         async with semaphore:
             try:
-                return await self.process_message(message)
+                # TODO: using v2 now can deprecate v1 if works
+                return await self.process_message_v2(message)
             except Exception as e:
                 # Log the error and return a failure result instead of raising
                 # This prevents one failed message from crashing the entire batch
