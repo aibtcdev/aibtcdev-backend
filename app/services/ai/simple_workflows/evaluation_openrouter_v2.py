@@ -106,6 +106,8 @@ class EvaluationOutput(BaseModel):
     confidence: float
     decision: str
     failed: List[str]
+    usage_total_tokens: Optional[str]
+    usage_est_cost: Optional[str]
 
 
 ###############################
@@ -452,6 +454,19 @@ def _prepare_images_for_evaluation(tweet_images: List[str]) -> List[Dict[str, An
     return images
 
 
+def _estimate_usage_cost(total_tokens: int, model: str) -> str:
+    """Estimate usage cost based on total tokens and model pricing."""
+    # Example pricing (these values should be replaced with actual pricing)
+    # need to find a better way to do this
+    model_pricing = {
+        "x-ai/grok-4": 0.20,  # $0.20/M Input
+        "x-ai/grok-4-fast": 0.0015,  # $0.0015 per 1K tokens
+    }
+    price_per_1k_tokens = model_pricing.get(model, 0.002)  # Default to grok-4 pricing
+    cost = (total_tokens / 1000) * price_per_1k_tokens
+    return f"${cost:.6f}"
+
+
 ###############################
 ## Main Evaluation Function  ##
 ###############################
@@ -589,6 +604,15 @@ async def evaluate_proposal_openrouter(
         )
 
         # Parse response
+        usage = openrouter_response.get("usage")
+        usage_total_tokens = None
+        usage_est_cost = None
+        if usage and usage.get("total_tokens"):
+            logger.info(
+                f"OpenRouter usage for proposal {proposal_id}: {usage['total_tokens']} tokens"
+            )
+            usage_total_tokens = str(usage["total_tokens"])
+
         choices = openrouter_response.get("choices", [])
         if not choices:
             logger.error("No choices in OpenRouter response")
@@ -602,7 +626,11 @@ async def evaluate_proposal_openrouter(
 
         try:
             evaluation_json = json.loads(choice_message["content"])
-            evaluation_output = EvaluationOutput(**evaluation_json)
+            evaluation_output = EvaluationOutput(
+                **evaluation_json,
+                usage_total_tokens=usage_total_tokens,
+                usage_est_cost=usage_est_cost,
+            )
             logger.info(f"Successfully evaluated proposal {proposal_id}")
 
             return evaluation_output

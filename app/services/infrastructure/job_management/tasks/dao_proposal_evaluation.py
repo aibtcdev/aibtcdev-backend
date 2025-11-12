@@ -24,6 +24,7 @@ from app.services.infrastructure.job_management.base import (
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 from app.services.ai.simple_workflows.orchestrator import (
     evaluate_proposal_comprehensive,
+    evaluate_proposal_strict,
 )
 
 logger = configure_logger(__name__)
@@ -306,6 +307,234 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 extra={"task": "dao_proposal_evaluation"},
             )
             return messages
+
+    async def process_message_v2(self, message: QueueMessage) -> Dict[str, Any]:
+        """Simplified v2 processing for a single DAO proposal evaluation message.
+
+        Uses the new evaluate_proposal_strict flow for streamlined evaluation.
+        Relies on evaluation function for proposal/DAO lookups and validation.
+        """
+        message_id = message.id
+        message_data = message.message or {}
+        wallet_id = message.wallet_id
+        dao_id = message.dao_id
+        proposal_id = message_data.get("proposal_id")
+
+        if not proposal_id:
+            error_msg = f"Missing proposal_id in message {message_id}"
+            logger.error(
+                "Missing proposal_id in message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                },
+            )
+            return {"success": False, "error": error_msg}
+
+        if not dao_id:
+            error_msg = f"Missing dao_id in message {message_id}"
+            logger.error(
+                "Missing dao_id in message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                },
+            )
+            return {"success": False, "error": error_msg}
+
+        logger.debug(
+            "Processing proposal evaluation message (v2)",
+            extra={
+                "task": "dao_proposal_evaluation",
+                "message_id": str(message_id),
+                "wallet_id": str(wallet_id),
+                "proposal_id": str(proposal_id),
+                "dao_id": str(dao_id),
+            },
+        )
+
+        try:
+            # Execute the simplified proposal evaluation workflow
+            # (handles internal proposal/DAO fetches and validation)
+            logger.info(
+                "Evaluating proposal (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "proposal_id": str(proposal_id),
+                    "dao_id": str(dao_id),
+                },
+            )
+
+            evaluation_output = await evaluate_proposal_strict(
+                proposal_id=proposal_id,
+            )
+
+            if not evaluation_output:
+                error_msg = f"Evaluation failed for proposal {proposal_id}"
+                logger.error(
+                    "Evaluation returned None (v2)",
+                    extra={
+                        "task": "dao_proposal_evaluation",
+                        "proposal_id": str(proposal_id),
+                    },
+                )
+                return {"success": False, "error": error_msg}
+
+            # Map EvaluationOutput to legacy structures
+            evaluation_data = evaluation_output.model_dump()
+
+            # Map decision ("APPROVE"/"REJECT") to boolean
+            decision_str = evaluation_data.get("decision", "REJECT")
+            approval = decision_str == "APPROVE"
+
+            overall_score = evaluation_data.get("final_score", 0)
+            confidence = evaluation_data.get("confidence", 0.0)
+
+            # Build reasoning from category reasons
+            categories_data = {
+                "current_order": evaluation_data.get("current_order", {}),
+                "mission": evaluation_data.get("mission", {}),
+                "value": evaluation_data.get("value", {}),
+                "values": evaluation_data.get("values", {}),
+                "originality": evaluation_data.get("originality", {}),
+                "clarity": evaluation_data.get("clarity", {}),
+                "safety": evaluation_data.get("safety", {}),
+                "growth": evaluation_data.get("growth", {}),
+            }
+
+            # Compile reasoning from all categories
+            reasoning_parts = []
+            for cat_name, cat_data in categories_data.items():
+                if isinstance(cat_data, dict) and cat_data.get("reason"):
+                    reasoning_parts.append(
+                        f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}"
+                    )
+
+            reasoning = (
+                "\n\n".join(reasoning_parts)
+                if reasoning_parts
+                else "No reasoning provided"
+            )
+
+            # Add failed gates to reasoning if present
+            failed_gates = evaluation_data.get("failed", [])
+            if failed_gates:
+                reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
+
+            formatted_prompt = ""  # Not tracked in v2
+            total_cost = 0.0  # Token usage not tracked in v2
+            model = "x-ai/grok-4-fast"  # Default model in v2
+
+            # Convert categories to evaluation_scores format
+            evaluation_scores = {
+                "categories": [
+                    {
+                        "category": cat_name,
+                        "score": cat_data.get("score", 0),
+                        "weight": 0,  # Weights not in v2 schema
+                        "reasoning": cat_data.get("reason", ""),
+                        "evidence": cat_data.get("evidence", []),
+                    }
+                    for cat_name, cat_data in categories_data.items()
+                    if isinstance(cat_data, dict)
+                ],
+                "final_score": overall_score,
+                "confidence": confidence,
+                "decision": decision_str,
+            }
+
+            evaluation_flags = failed_gates
+
+            logger.info(
+                "Proposal evaluated (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "proposal_id": str(proposal_id),
+                    "result": "FOR" if approval else "AGAINST",
+                    "score": overall_score,
+                },
+            )
+
+            wallet = backend.get_wallet(wallet_id)
+
+            # Create a vote record with the evaluation results
+            vote_data = VoteCreate(
+                wallet_id=wallet_id,
+                dao_id=dao_id,
+                agent_id=(
+                    wallet.agent_id if wallet else None
+                ),  # This will be set from the wallet if it exists
+                proposal_id=proposal_id,
+                answer=approval,
+                reasoning=reasoning,
+                confidence=confidence,  # Already 0.0-1.0 in v2
+                prompt=formatted_prompt,
+                cost=total_cost,
+                model=model,
+                profile_id=wallet.profile_id if wallet else None,
+                evaluation_score=evaluation_scores,  # Store the complete evaluation scores with evidence
+                flags=evaluation_flags,  # Store the failed gates as flags
+                evaluation=evaluation_data,  # Store the complete v2 evaluation structure
+            )
+
+            # Create the vote record
+            vote = backend.create_vote(vote_data)
+            if not vote:
+                logger.error(
+                    "Failed to create vote record (v2)",
+                    extra={"task": "dao_proposal_evaluation"},
+                )
+                return {"success": False, "error": "Failed to create vote record"}
+
+            logger.info(
+                "Created vote record (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "vote_id": str(vote.id),
+                    "proposal_id": str(proposal_id),
+                },
+            )
+
+            # Mark the evaluation message as processed
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": True,
+                    "vote_id": str(vote.id),
+                    "approve": approval,
+                    "overall_score": overall_score,
+                },
+            )
+            backend.update_queue_message(message_id, update_data)
+
+            return {
+                "success": True,
+                "vote_id": str(vote.id),
+                "approve": approval,
+                "overall_score": overall_score,
+            }
+
+        except Exception as e:
+            error_msg = f"Error processing message {message_id} (v2): {str(e)}"
+            logger.error(
+                "Error processing message (v2)",
+                extra={
+                    "task": "dao_proposal_evaluation",
+                    "message_id": str(message_id),
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+            update_data = QueueMessageBase(
+                is_processed=True,
+                result={
+                    "success": False,
+                    "error": error_msg,
+                },
+            )
+            backend.update_queue_message(message_id, update_data)
+
+            return {"success": False, "error": error_msg}
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single DAO proposal evaluation message."""

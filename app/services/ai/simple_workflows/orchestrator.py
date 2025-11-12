@@ -11,6 +11,7 @@ from uuid import UUID
 from app.lib.logger import configure_logger
 from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
     evaluate_proposal_openrouter,
+    EvaluationOutput,
 )
 from app.services.ai.simple_workflows.metadata import (
     generate_proposal_metadata as _generate_metadata,
@@ -26,22 +27,47 @@ from app.services.ai.simple_workflows.streaming import create_streaming_setup
 logger = configure_logger(__name__)
 
 
+async def evaluate_proposal_strict(
+    proposal_id: UUID | str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> Optional[EvaluationOutput]:
+    """Evaluates a proopsal using OpenRouter.
+
+    Args:
+        proposal_id: Required proposal UUID for evaluation
+        model: Optional model override
+        temperature: Optional temperature override
+
+    Returns:
+        Dictionary containing comprehensive evaluation results or None.
+    """
+
+    try:
+        evaluation_result = await evaluate_proposal_strict(
+            proposal_id=proposal_id,
+            model=model,
+            temperature=temperature,
+        )
+
+        if not evaluation_result:
+            logger.error("Evaluation returned None")
+            return None
+
+    except Exception as e:
+        logger.error("Error during evaluation proposal strict", extra={e})
+        return None
+
+
 async def evaluate_proposal_comprehensive(
-    # proposal_content: str,
     dao_id: Optional[UUID] = None,
     proposal_id: Optional[UUID] = None,
-    # tweet_db_ids: Optional[List[UUID]] = None,
-    # custom_system_prompt: Optional[str] = None,
-    # custom_user_prompt: Optional[str] = None,
-    streaming: bool = False,
     model: Optional[str] = None,
     temperature: float = 0.7,
 ) -> Dict[str, Any]:
     """Evaluate a proposal comprehensively using OpenRouter.
 
     Args:
-        proposal_content: The proposal content to evaluate (not used - fetched from DB)
-        dao_id: Optional DAO ID for context
         proposal_id: Required proposal UUID for evaluation
         tweet_db_ids: Optional list of additional tweet database IDs (not used in v2)
         custom_system_prompt: Optional custom system prompt (not used in v2)
@@ -89,12 +115,6 @@ async def evaluate_proposal_comprehensive(
         }
 
     try:
-        # Note: streaming is not supported in OpenRouter v2
-        if streaming:
-            logger.warning(
-                f"[Orchestrator:{proposal_id_str}] Streaming not supported in OpenRouter v2, ignoring streaming flag"
-            )
-
         # Run evaluation using OpenRouter v2
         logger.debug(f"[Orchestrator:{proposal_id_str}] Running OpenRouter evaluation")
         evaluation_result = await evaluate_proposal_openrouter(
