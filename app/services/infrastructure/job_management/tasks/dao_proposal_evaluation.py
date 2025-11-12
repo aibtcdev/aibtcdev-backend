@@ -421,9 +421,10 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             if failed_gates:
                 reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
 
-            formatted_prompt = ""  # Not tracked in v2
-            total_cost = 0.0  # Token usage not tracked in v2
-            model = "x-ai/grok-4-fast"  # Default model in v2
+            formatted_prompt = ""  # TODO: how to get full user prompt here
+            usage_data = evaluation_data.get("usage", {})
+            total_cost = usage_data.get("total_cost", 0.0)
+            model = evaluation_data.get("model", "x-ai/grok-4-fast")
 
             # Convert categories to evaluation_scores format
             evaluation_scores = {
