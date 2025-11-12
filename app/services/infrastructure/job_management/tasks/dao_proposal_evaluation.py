@@ -369,7 +369,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 proposal_id=proposal_id,
             )
 
-            if not evaluation_output:
+            if evaluation_output is None:
                 error_msg = f"Evaluation failed for proposal {proposal_id}"
                 logger.error(
                     "Evaluation returned None (v2)",
@@ -421,7 +421,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             if failed_gates:
                 reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
 
-            formatted_prompt = ""  # TODO: how to get full user prompt here
             usage_data = evaluation_data.get("usage", {})
             total_cost = usage_data.get("total_cost", 0.0)
             model = evaluation_data.get("model", "x-ai/grok-4-fast")
@@ -469,7 +468,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 answer=approval,
                 reasoning=reasoning,
                 confidence=confidence,  # Already 0.0-1.0 in v2
-                prompt=formatted_prompt,
                 cost=total_cost,
                 model=model,
                 profile_id=wallet.profile_id if wallet else None,

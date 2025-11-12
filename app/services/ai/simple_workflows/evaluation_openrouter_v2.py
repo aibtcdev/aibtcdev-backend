@@ -158,7 +158,7 @@ async def call_openrouter(
         "messages": messages,
         "model": model or config_data["model"],
         "temperature": temperature or config_data["temperature"],
-        "reasoning": {"enabled": reasoning or config_data["reasoning_enabled"]},
+        "reasoning": {"enabled": reasoning or bool(config_data["reasoning_enabled"])},
     }
 
     if tools:
