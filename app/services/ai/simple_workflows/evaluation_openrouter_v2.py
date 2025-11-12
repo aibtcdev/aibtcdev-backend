@@ -167,7 +167,7 @@ async def call_openrouter(
         "Content-Type": "application/json",
     }
 
-    print(f"Making OpenRouter API call to model: {payload['model']}")
+    logger.info(f"Making OpenRouter API call to model: {payload['model']}")
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -185,9 +185,7 @@ async def call_openrouter(
 def _format_proposals_for_context(proposals: List[Proposal]) -> str:
     """Format proposals for context in evaluation prompt."""
     if not proposals:
-        return (
-            "<no_proposals>No past proposals available for comparison.</no_proposals>"
-        )
+        return "None Found."
 
     # Sort by created_at descending (newest first)
     sorted_proposals = sorted(
@@ -511,6 +509,7 @@ async def evaluate_proposal_openrouter(
 
         # fetch and format inputs using Pydantic models
         dao_info = _fetch_and_format_dao_info(str(proposal.dao_id))
+
         if not dao_info:
             logger.error(f"DAO not found for proposal {proposal_id}")
             return None
@@ -548,7 +547,7 @@ async def evaluate_proposal_openrouter(
         if missing_info_fields:
             logger.warning(
                 f"Some information missing for proposal {proposal_id}",
-                extra={missing_info_fields},
+                extra={"missing_info_fields": missing_info_fields},
             )
 
         # Prepare images
