@@ -6,7 +6,7 @@ from app.api.tools.models import ComprehensiveEvaluationRequest
 from app.backend.factory import backend
 from app.backend.models import AgentFilter, Profile
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows import evaluate_proposal_comprehensive
+from app.services.ai.simple_workflows import evaluate_proposal_strict
 from app.services.ai.simple_workflows.evaluation import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
@@ -109,23 +109,26 @@ async def run_comprehensive_evaluation(
                 detail=f"Proposal with ID {payload.proposal_id} not found",
             )
 
-        proposal_content = payload.proposal_content or proposal.content or ""
-
         logger.info(
             f"Starting comprehensive evaluation for proposal {payload.proposal_id} with agent {agent_id}"
         )
 
         # Run the comprehensive evaluation using OpenRouter v2
-        result = await evaluate_proposal_comprehensive(
-            proposal_content=proposal_content,
-            dao_id=payload.dao_id,
-            proposal_id=proposal.id,
-            streaming=False,
+        result = await evaluate_proposal_strict(
+            proposal_id=payload.proposal_id,
         )
 
-        evaluation = result.get("evaluation", {})
+        if result is None:
+            logger.error(
+                f"Comprehensive evaluation returned no result for proposal {payload.proposal_id}"
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Comprehensive evaluation failed to produce a result",
+            )
+
         # v2 uses "APPROVE"/"REJECT" instead of boolean
-        decision_str = evaluation.get("decision", "REJECT")
+        decision_str = result.decision == "APPROVE"
         logger.debug(
             f"Comprehensive evaluation completed for proposal {payload.proposal_id}: {decision_str}"
         )
