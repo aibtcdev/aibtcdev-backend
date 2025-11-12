@@ -399,8 +399,11 @@ def _fetch_past_proposals_context(
 
     # DAO past proposals
     dao_past_proposals = [
-        p for p in dao_proposals if user_past_proposals and p not in user_past_proposals
+        p
+        for p in dao_proposals
+        if not user_past_proposals or p not in user_past_proposals
     ] or dao_proposals
+
     sorted_dao_past_proposals = sorted(
         dao_past_proposals,
         key=lambda p: getattr(p, "created_at", datetime.min),
