@@ -16,7 +16,6 @@ from app.backend.models import (
     VoteFilter,
 )
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -368,12 +367,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 )
                 return {"success": False, "error": error_msg}
 
-            # Load prompts
-            prompt_type = "evaluation_grok"
-            custom_system_prompt = load_prompt(prompt_type, "system")
-            custom_user_prompt = load_prompt(prompt_type, "user_template")
-
-            # Execute the proposal evaluation workflow
+            # Execute the proposal evaluation workflow using OpenRouter v2
             logger.info(
                 "Evaluating proposal",
                 extra={
@@ -383,39 +377,70 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 },
             )
 
-            # Get proposal data
-            proposal_content = proposal.content or "No content provided"
-
             evaluation = await evaluate_proposal_comprehensive(
-                proposal_content=proposal_content,
                 dao_id=dao_id,
-                proposal_id=str(proposal.id),
-                custom_system_prompt=custom_system_prompt,
-                custom_user_prompt=custom_user_prompt,
+                proposal_id=proposal.id,
                 streaming=False,
             )
 
-            # Extract evaluation results from the nested structure
+            # Extract evaluation results from OpenRouter v2 structure
             evaluation_data = evaluation.get("evaluation", {})
-            approval = evaluation_data.get("decision", False)
+
+            # Map v2 decision ("APPROVE"/"REJECT") to boolean
+            decision_str = evaluation_data.get("decision", "REJECT")
+            approval = decision_str == "APPROVE"
+
             overall_score = evaluation_data.get("final_score", 0)
-            reasoning = evaluation_data.get("explanation", "")
-            formatted_prompt = ""  # Not available in the new model structure
-            total_cost = evaluation_data.get("token_usage", {}).get("total_cost", 0.0)
-            model = evaluation_data.get("token_usage", {}).get("model", "Unknown")
+            confidence = evaluation_data.get("confidence", 0.0)
+
+            # Build reasoning from category reasons
+            categories_data = {
+                "current_order": evaluation_data.get("current_order", {}),
+                "mission": evaluation_data.get("mission", {}),
+                "value": evaluation_data.get("value", {}),
+                "values": evaluation_data.get("values", {}),
+                "originality": evaluation_data.get("originality", {}),
+                "clarity": evaluation_data.get("clarity", {}),
+                "safety": evaluation_data.get("safety", {}),
+                "growth": evaluation_data.get("growth", {}),
+            }
+
+            # Compile reasoning from all categories
+            reasoning_parts = []
+            for cat_name, cat_data in categories_data.items():
+                if isinstance(cat_data, dict) and cat_data.get("reason"):
+                    reasoning_parts.append(f"{cat_name.replace('_', ' ').title()}: {cat_data.get('reason')}")
+
+            reasoning = "\n\n".join(reasoning_parts) if reasoning_parts else "No reasoning provided"
+
+            # Add failed gates to reasoning if present
+            failed_gates = evaluation_data.get("failed", [])
+            if failed_gates:
+                reasoning += f"\n\nFailed Gates: {', '.join(failed_gates)}"
+
+            formatted_prompt = ""  # Not available in OpenRouter v2
+            total_cost = 0.0  # Token usage not tracked in v2
+            model = "x-ai/grok-2-1212"  # Default model used in v2
+
+            # Convert v2 categories to evaluation_scores format
             evaluation_scores = {
                 "categories": [
                     {
-                        "category": cat.get("category", ""),
-                        "score": cat.get("score", 0),
-                        "weight": cat.get("weight", 0),
-                        "reasoning": cat.get("reasoning", ""),
+                        "category": cat_name,
+                        "score": cat_data.get("score", 0),
+                        "weight": 0,  # Weights not in v2 schema
+                        "reasoning": cat_data.get("reason", ""),
+                        "evidence": cat_data.get("evidence", []),
                     }
-                    for cat in evaluation_data.get("categories", [])
+                    for cat_name, cat_data in categories_data.items()
+                    if isinstance(cat_data, dict)
                 ],
-                "final_score": evaluation_data.get("final_score", 0),
-            }  # Convert categories to scores format
-            evaluation_flags = evaluation_data.get("flags", [])
+                "final_score": overall_score,
+                "confidence": confidence,
+                "decision": decision_str,
+            }
+
+            evaluation_flags = failed_gates
 
             logger.info(
                 "Proposal evaluated",
@@ -440,15 +465,14 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 proposal_id=proposal_id,
                 answer=approval,
                 reasoning=reasoning,
-                confidence=overall_score
-                / 100.0,  # Convert score to 0-1 range for compatibility
+                confidence=confidence,  # Use confidence from v2 (already 0.0-1.0)
                 prompt=formatted_prompt,
                 cost=total_cost,
                 model=model,
                 profile_id=wallet.profile_id if wallet else None,
-                evaluation_score=evaluation_scores,  # Store the complete evaluation scores
-                flags=evaluation_flags,  # Store the evaluation flags
-                evaluation=evaluation_data,  # Already a dictionary from the nested structure
+                evaluation_score=evaluation_scores,  # Store the complete evaluation scores with evidence
+                flags=evaluation_flags,  # Store the failed gates as flags
+                evaluation=evaluation_data,  # Store the complete v2 evaluation structure
             )
 
             # Create the vote record
