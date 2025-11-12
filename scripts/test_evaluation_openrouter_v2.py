@@ -9,6 +9,7 @@ Usage:
 import argparse
 import asyncio
 import httpx
+import json
 import os
 import sys
 from datetime import datetime
@@ -509,6 +510,77 @@ async def test_evaluation(
         print("\n" + "=" * 80)
         print("OpenRouter Full API Response:")
         print(openrouter_response)
+
+        print("\n" + "=" * 80)
+        print("OpenRouter Response Breakdown:")
+
+        response_id = openrouter_response.get("id")
+        response_provider = openrouter_response.get("provider")
+        response_model = openrouter_response.get("model")
+        response_usage = openrouter_response.get("usage")
+        response_usage_total_tokens = (
+            response_usage.get("total_tokens") if response_usage else None
+        )
+
+        print(f"Response ID: {response_id}")
+        print(f"Response Provider: {response_provider}")
+        print(f"Response Model: {response_model}")
+        print(f"Response Usage: {response_usage_total_tokens} total tokens")
+
+        response_choices = openrouter_response.get("choices", [])
+
+        if len(response_choices) == 0:
+            print("❌ No choices returned in OpenRouter response")
+            return
+
+        if len(response_choices) > 1:
+            print(
+                f"⚠️ Multiple choices returned ({len(response_choices)}), using the first one."
+            )
+
+        first_choice = response_choices[0]
+
+        choice_finish_reason = first_choice.get("finish_reason")
+        choice_native_finish_reason = first_choice.get("native_finish_reason")
+        choice_refusal = first_choice.get("refusal")
+        choice_annotations = first_choice.get("annotations")
+
+        print(f"Choice Finish Reason: {choice_finish_reason}")
+        print(f"Choice Native Finish Reason: {choice_native_finish_reason}")
+        print(f"Choice Refusal: {choice_refusal}")
+        print(f"Choice Annotations: {choice_annotations}")
+
+        print("\n" + "=" * 80)
+        print("Parsing JSON from message content")
+
+        choice_message = first_choice.get("message")
+        if not choice_message:
+            print("❌ No message found in the first choice")
+            return
+
+        if not isinstance(choice_message, dict):
+            print("❌ Choice message is not a dictionary")
+
+        choice_message_role = choice_message.get("role")
+        choice_message_content = choice_message.get("content")
+
+        print(f"Choice Message Role: {choice_message_role}")
+        if not choice_message_role:
+            print("❌ No role found in the choice message")
+
+        if not choice_message_content:
+            print("❌ No content found in the choice message")
+
+        if not isinstance(choice_message_content, str):
+            print("❌ Choice message content is not a string")
+
+        try:
+            choice_message_json = json.loads(choice_message_content)
+            print("Successfully parsed JSON from message content")
+            print(json.dumps(choice_message_json, indent=2))
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON decoding error: {e}")
+            return
 
         return
 
