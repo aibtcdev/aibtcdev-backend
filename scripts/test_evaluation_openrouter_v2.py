@@ -26,9 +26,6 @@ from app.config import config
 from app.services.ai.simple_workflows.evaluation_openrouter_v1 import (
     format_proposals_for_context_v2,
 )
-from app.services.ai.simple_workflows.models import (
-    ComprehensiveEvaluatorAgentProcessOutput,
-)
 from app.services.ai.simple_workflows.prompts.loader import load_prompt
 
 
@@ -99,38 +96,6 @@ def print_proposal(proposal: Proposal):
     print(f"  {created_at} {status} {title}")
 
 
-def pretty_print_result(result: ComprehensiveEvaluatorAgentProcessOutput):
-    """Pretty print the evaluation result."""
-    print("\n" + "=" * 80)
-    print("OPENROUTER EVALUATION RESULT")
-    print("=" * 80)
-
-    print(f"Decision: {'✅ APPROVED' if result.decision else '❌ REJECTED'}")
-    print(f"Final Score: {result.final_score}/100")
-    print(f"Images Processed: {result.images_processed}")
-
-    if result.flags:
-        print(f"Flags: {', '.join(result.flags)}")
-
-    print(f"\nSummary: {result.summary}")
-
-    print(f"\nExplanation:\n{result.explanation}")
-
-    if result.categories:
-        print("\nCategory Scores:")
-        for category in result.categories:
-            print(
-                f"  • {category.category}: {category.score}/100 (Weight: {category.weight:.1%})"
-            )
-            for reasoning in category.reasoning:
-                print(f"    {reasoning}")
-
-    if result.token_usage:
-        print(f"\nToken Usage: {result.token_usage}")
-
-    print("\n" + "=" * 80)
-
-
 async def test_evaluation(
     proposal_id: str, model: Optional[str] = None, save_output: bool = False
 ):
@@ -139,6 +104,7 @@ async def test_evaluation(
         # Generate timestamp for file naming
         # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # prop_short_id = proposal_id[:8]
+
         # Convert string to UUID
         proposal_uuid = UUID(proposal_id)
 
@@ -314,7 +280,6 @@ async def test_evaluation(
 
         # fetch past proposals for context
         print("\n" + "=" * 80)
-        user_past_proposals_for_evaluation = None
         dao_past_proposals_categorized = None
         dao_past_proposals_stats_for_evaluation = None
         dao_draft_proposals_for_evaluation = None
@@ -336,6 +301,7 @@ async def test_evaluation(
         # print(p)
 
         # match past proposals by same tx_sender
+        user_past_proposals_for_evaluation = None
         if proposal.tx_sender:
             user_past_proposals = [
                 p for p in dao_proposals if p.tx_sender == proposal.tx_sender
@@ -347,8 +313,8 @@ async def test_evaluation(
             print(
                 f"Found {len(user_past_proposals)} past proposals by same sender:\n{proposal.tx_sender}"
             )
-            for p in user_past_proposals:
-                print_proposal(p)
+            # for p in user_past_proposals:
+            #    print_proposal(p)
 
         # remove tx-sender matched proposals from dao proposals
         # if not present then default to full object
@@ -402,6 +368,8 @@ async def test_evaluation(
             ),
         }
 
+        print("Stats:", dao_past_proposals_stats_for_evaluation)
+
         # limit to last 20
         dao_draft_proposals = dao_past_proposals_categorized[ContractStatus.DRAFT][:20]
 
@@ -413,8 +381,9 @@ async def test_evaluation(
         print(
             f"Using {len(dao_draft_proposals)} DAO draft proposals for evaluation context"
         )
-        for p in dao_draft_proposals:
-            print_proposal(p)
+
+        # for p in dao_draft_proposals:
+        #    print_proposal(p)
 
         # limit to last 100
         dao_deployed_proposals = dao_past_proposals_categorized[
@@ -429,8 +398,8 @@ async def test_evaluation(
         print(
             f"Using {len(dao_deployed_proposals)} DAO deployed proposals for evaluation context"
         )
-        for p in dao_deployed_proposals:
-            print_proposal(p)
+        # for p in dao_deployed_proposals:
+        #    print_proposal(p)
 
         # add images in format so grok will read them
         # this should be appended to user chat object
@@ -542,13 +511,9 @@ async def test_evaluation(
 
         choice_finish_reason = first_choice.get("finish_reason")
         choice_native_finish_reason = first_choice.get("native_finish_reason")
-        choice_refusal = first_choice.get("refusal")
-        choice_annotations = first_choice.get("annotations")
 
         print(f"Choice Finish Reason: {choice_finish_reason}")
         print(f"Choice Native Finish Reason: {choice_native_finish_reason}")
-        print(f"Choice Refusal: {choice_refusal}")
-        print(f"Choice Annotations: {choice_annotations}")
 
         print("\n" + "=" * 80)
         print("Parsing JSON from message content")
@@ -563,10 +528,24 @@ async def test_evaluation(
 
         choice_message_role = choice_message.get("role")
         choice_message_content = choice_message.get("content")
+        choice_message_refusal = choice_message.get("refusal")
+        choice_message_reasoning = choice_message.get("reasoning")
+        choice_message_reasoning_details = choice_message.get("reasoning_details")
+
+        if (
+            choice_message_reasoning_details
+            and len(choice_message_reasoning_details) > 1
+        ):
+            print(
+                f"⚠️ Multiple reasoning details returned ({len(choice_message_reasoning_details)}), using the first one."
+            )
+
+        choice_annotations = choice_message.get("annotations")
 
         print(f"Choice Message Role: {choice_message_role}")
-        if not choice_message_role:
-            print("❌ No role found in the choice message")
+        print(f"Choice Message Refusal: {choice_message_refusal}")
+        print(f"Choice Message Reasoning: {choice_message_reasoning}")
+        print(f"Choice Annotations: {choice_annotations}")
 
         if not choice_message_content:
             print("❌ No content found in the choice message")

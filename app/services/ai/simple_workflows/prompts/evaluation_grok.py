@@ -16,6 +16,7 @@ CRITICAL RULES:
 - Require specific, cited evidence from the proposal. Vague claims = low scores/rejection.
 - Check for contradictions with provided charter or current order; penalize heavily and reject if present.
 - Borderline cases: Reject unless strong evidence shows clear alignment.
+- Use your built-in web search and x search tools to verify quotes, links, and claims.
 
 EVALUATION PROCESS
 
