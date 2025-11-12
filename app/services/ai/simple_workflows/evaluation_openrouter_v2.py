@@ -106,7 +106,8 @@ class EvaluationOutput(BaseModel):
     confidence: float
     decision: str
     failed: List[str]
-    usage_total_tokens: Optional[str]
+    usage_input_tokens: Optional[str]
+    usage_output_tokens: Optional[str]
     usage_est_cost: Optional[str]
 
 
@@ -455,17 +456,33 @@ def _prepare_images_for_evaluation(tweet_images: List[str]) -> List[Dict[str, An
     return images
 
 
-def _estimate_usage_cost(total_tokens: int, model: str) -> str:
-    """Estimate usage cost based on total tokens and model pricing."""
-    # Example pricing (these values should be replaced with actual pricing)
-    # need to find a better way to do this
+def _estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> str:
+    """Estimate usage cost based on input/output tokens and model pricing.
+
+    Pricing inferred from activity log for x-ai/grok-4-fast:
+    - Input: $0.000574 per 1K tokens
+    - Output (incl. reasoning): $0.000332 per 1K tokens
+    """
+
     model_pricing = {
-        "x-ai/grok-4": 0.20,  # $0.20/M Input
-        "x-ai/grok-4-fast": 0.0015,  # $0.0015 per 1K tokens
+        "x-ai/grok-4-fast": {
+            "input_per_1k": 0.000574,
+            "output_per_1k": 0.000332,
+        },
+        # Add other models as needed
     }
-    price_per_1k_tokens = model_pricing.get(model, 0.002)  # Default to grok-4 pricing
-    cost = (total_tokens / 1000) * price_per_1k_tokens
-    return f"${cost:.6f}"
+
+    if model not in model_pricing:
+        # Fallback to a default (e.g., blended grok-4-fast rate)
+        blended_rate = 0.00055
+        cost = (input_tokens + output_tokens) / 1000 * blended_rate
+        return f"${cost:.6f}"
+
+    pricing = model_pricing[model]
+    input_cost = (input_tokens / 1000) * pricing["input_per_1k"]
+    output_cost = (output_tokens / 1000) * pricing["output_per_1k"]
+    total_cost = input_cost + output_cost
+    return f"${total_cost:.6f}"
 
 
 ###############################
@@ -475,7 +492,7 @@ def _estimate_usage_cost(total_tokens: int, model: str) -> str:
 
 async def evaluate_proposal_openrouter(
     proposal_id: str | UUID,
-    model: Optional[str] = None,
+    model: str = config.chat_llm.default_model or "x-ai/grok-4-fast",
     temperature: float = 0.7,
     reasoning: bool = True,
 ) -> Optional[EvaluationOutput]:
@@ -607,16 +624,26 @@ async def evaluate_proposal_openrouter(
             tools=x_ai_tools,
         )
 
-        # Parse response
+        # parse usage information
         usage = openrouter_response.get("usage")
-        usage_total_tokens = None
-        usage_est_cost = None
-        if usage and usage.get("total_tokens"):
-            logger.info(
-                f"OpenRouter usage for proposal {proposal_id}: {usage['total_tokens']} tokens"
-            )
-            usage_total_tokens = str(usage["total_tokens"])
+        logger.debug(f"OpenRouter usage for proposal {proposal_id}: {usage}")
 
+        usage_input_tokens = usage.get("prompt_tokens") if usage else None
+        usage_output_tokens = usage.get("completion_tokens") if usage else None
+        usage_est_cost = None
+        if usage_input_tokens and usage_output_tokens:
+            usage_est_cost = _estimate_usage_cost(
+                usage_input_tokens,
+                usage_output_tokens,
+                model,
+            )
+        usage_data = {
+            "input_tokens": str(usage_input_tokens),
+            "output_tokens": str(usage_output_tokens),
+            "estimated_cost": str(usage_est_cost),
+        }
+
+        # parse first choice for requested json
         choices = openrouter_response.get("choices", [])
         if not choices:
             logger.error("No choices in OpenRouter response")
@@ -629,12 +656,15 @@ async def evaluate_proposal_openrouter(
             return None
 
         try:
+            # load the json
             evaluation_json = json.loads(choice_message["content"])
-            evaluation_output = EvaluationOutput(
-                **evaluation_json,
-                usage_total_tokens=usage_total_tokens,
-                usage_est_cost=usage_est_cost,
-            )
+            # validate with pydantic
+            evaluation_output = EvaluationOutput(**evaluation_json)
+            # attach usage data
+            evaluation_output.usage_input_tokens = usage_data["input_tokens"]
+            evaluation_output.usage_output_tokens = usage_data["output_tokens"]
+            evaluation_output.usage_est_cost = usage_data["estimated_cost"]
+
             logger.info(f"Successfully evaluated proposal {proposal_id}")
 
             return evaluation_output
