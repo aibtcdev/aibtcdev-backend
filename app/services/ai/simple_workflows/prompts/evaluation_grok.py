@@ -129,7 +129,7 @@ LAST 100 DEPLOYED DAO PROPOSALS:
 {dao_deployed_proposals_for_evaluation}
 
 NETWORK SCHOOL REFERENCE:
-{NETWORK_SCHOOL_REFERENCE_TEXT}
+{network_school_reference_text}
 
 Output the evaluation as a JSON object, strictly following the system guidelines."""
 
@@ -149,7 +149,7 @@ We got an island.
 
 That's right. Through the power of Bitcoin, we now have a beautiful island near Singapore where we're building the [Network School](https://ns.com/school). We're starting with a 90-day popup that runs from Sep 23 to Dec 23, right after the [Network State Conference](https://ns.com/conference). Rent is only $1000/month with roommates or $2000/month solo. And we have plenty of day passes for visitors.
 
-So, go apply online at [**ns.com**](https://ns.com/apply)\! Then read more below.
+So, go apply online at [**ns.com**](https://ns.com/apply)\\! Then read more below.
 
 **The Dark Talent**
 As motivation, I've always wanted to expand equality of opportunity around the world. Because my father was born in a desperately poor country, but with the right opportunity he was able to make something of himself. Like dark matter, he was _dark talent_.[1](https://balajis.com/p/network-school#footnote-1-147306339) And for more than a [decade](https://a16z.com/on-dark-talent-moocs-universities-and-startups-an-interview-with-our-first-professor-in-residence%20) I've been thinking about how to give others who are similarly situated the chance to make something of themselves.[2](https://balajis.com/p/network-school#footnote-2-147306339) That is: I've been thinking about how to empower the dark talent of the world.
@@ -185,7 +185,7 @@ We are doing our best to [productize](https://x.com/balajis/status/1824560186113
 Every member of the Network School gets a daily workout slot with a semi-personal trainer, much like a group fitness class. You run and lift in the morning at your chosen time, getting a proof-of-workout from your trainer. Your group holds you accountable for showing up. Then you get a box with your Blueprint-optimized healthy meals and head to work. The whole point is to provide willpower-as-a-service, where the community[6](https://balajis.com/p/network-school#footnote-6-147306339) provides the discipline.
 
 We're starting with the basics of running, lifting, eating, and sleeping properly. The initial goal is to hit the limits of your genetics. But if all goes well, the biotech founders that come to the Network School will eventually help us all surpass our [genetic limits](https://www.perplexity.ai/search/hayflick-limit-DsJuWyCbSV6KkOrA1U8lpg), to live much longer than we otherwise would.
-But again, we're starting small\! And so the "burning calories" part is about lifelong health and the workout-of-the-day.
+But again, we're starting small\\! And so the "burning calories" part is about lifelong health and the workout-of-the-day.
 
 **Earn**
 The third part of the Network School is about earning currency.
@@ -202,7 +202,7 @@ All work and no play makes Jack a dull boy, of course. So the fourth part of the
 
 This is the unstructured component. It's most of what you're here for. It's just about assembling great people in one place: positive-sum people who believe in technological progress, internationalism, and capitalism. It's your internet friends, coming from URL to IRL. Stanford introduced the concept of [residential education](https://www.perplexity.ai/search/discuss-residential-education-ZbzepZX7RlabyKJ_ZZwncg), but this takes it to the next level.
 
-In fact, our initial location is very similar to Stanford. It's beautiful and sunny, and less than an hour from a major city (Singapore) with an international airport (Changi). That means you can be heads down during the week, head into the city on the weekends for fun, and get to just about anywhere in Asia within the same day. This is convenient for the \>50% of the world that lives within the [Valeriepieris circle](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Valeriepieris_Circle.jpg/1920px-Valeriepieris_Circle.jpg).
+In fact, our initial location is very similar to Stanford. It's beautiful and sunny, and less than an hour from a major city (Singapore) with an international airport (Changi). That means you can be heads down during the week, head into the city on the weekends for fun, and get to just about anywhere in Asia within the same day. This is convenient for the \\>50% of the world that lives within the [Valeriepieris circle](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Valeriepieris_Circle.jpg/1920px-Valeriepieris_Circle.jpg).
 
 We'll do some group outings too, but most of the fun will be up to you.
 
@@ -241,7 +241,7 @@ Ok, so how do you apply to the Network School?
 Just register at [ns.com/apply](https://ns.com/apply), where we've set up a simple Luma page. That initial application takes a few minutes. Then, if you pass review, we'll send a second application where you pay rent. As mentioned, our monthly rent is $1000 (with roommates) and $2000 (solo). We also have daily and weekly rates too, but short-term visitors still need to [apply](https://ns.com/apply).
 
 The rent gets you an air-conditioned room on a beautiful island, with internet, gym, and access to all courses and community services. You'll still need to handle your flights and pay for your food, but we think the overall package is _extremely_ affordable. And so the Network School could be an amazing option for individuals or small teams looking to save money, get fit, and level up while living in paradise.
-I'm looking forward to seeing you there\! Just fill out the application at [**ns.com/apply**](https://ns.com/apply).
+I'm looking forward to seeing you there\\! Just fill out the application at [**ns.com/apply**](https://ns.com/apply).
 
 **FAQ**
 Join the discussion on your forum of choice:

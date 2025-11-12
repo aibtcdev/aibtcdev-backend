@@ -52,12 +52,14 @@ async def evaluate_proposal_strict(
             reasoning=reasoning,
         )
 
-        if not evaluation_result:
+        if evaluation_result is None:
             logger.error("Evaluation returned None")
             return None
 
+        return evaluation_result
+
     except Exception as e:
-        logger.error("Error during evaluation proposal strict", extra={e})
+        logger.error("Error during evaluation proposal strict", extra={"error": e})
         return None
 
 

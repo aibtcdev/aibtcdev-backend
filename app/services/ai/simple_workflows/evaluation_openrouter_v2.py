@@ -16,6 +16,7 @@ from app.lib.logger import configure_logger
 from app.services.ai.simple_workflows.prompts.evaluation_grok import (
     EVALUATION_GROK_SYSTEM_PROMPT,
     EVALUATION_GROK_USER_PROMPT_TEMPLATE,
+    NETWORK_SCHOOL_REFERENCE_TEXT,
 )
 
 logger = configure_logger(__name__)
@@ -614,6 +615,7 @@ async def evaluate_proposal_openrouter(
             dao_draft_proposals_for_evaluation=dao_draft_proposals_for_evaluation or "",
             dao_deployed_proposals_for_evaluation=dao_deployed_proposals_for_evaluation
             or "",
+            network_school_reference_text=NETWORK_SCHOOL_REFERENCE_TEXT,
         )
 
         # build user content with text and images
@@ -640,11 +642,11 @@ async def evaluate_proposal_openrouter(
         usage_input_tokens = usage.get("prompt_tokens") if usage else None
         usage_output_tokens = usage.get("completion_tokens") if usage else None
         usage_est_cost = None
-        if model and usage_input_tokens and usage_output_tokens:
+        if usage_input_tokens and usage_output_tokens:
             usage_est_cost = _estimate_usage_cost(
                 usage_input_tokens,
                 usage_output_tokens,
-                model,
+                model or config.chat_llm.default_model,
             )
         usage_data = {
             "input_tokens": str(usage_input_tokens),
@@ -668,11 +670,12 @@ async def evaluate_proposal_openrouter(
             # load the json
             evaluation_json = json.loads(choice_message["content"])
             # validate with pydantic
-            evaluation_output = EvaluationOutput(**evaluation_json)
-            # attach usage data
-            evaluation_output.usage_input_tokens = usage_data["input_tokens"]
-            evaluation_output.usage_output_tokens = usage_data["output_tokens"]
-            evaluation_output.usage_est_cost = usage_data["estimated_cost"]
+            evaluation_output = EvaluationOutput(
+                **evaluation_json,
+                usage_input_tokens=usage_data["input_tokens"],
+                usage_output_tokens=usage_data["output_tokens"],
+                usage_est_cost=usage_data["estimated_cost"],
+            )
 
             logger.info(f"Successfully evaluated proposal {proposal_id}")
 

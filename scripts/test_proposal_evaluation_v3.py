@@ -121,13 +121,16 @@ async def evaluate_single_proposal(
 
         if not result:
             error_msg = f"Evaluation failed for proposal {proposal_id}"
+            print(result)
             print(error_msg)
             return {"proposal_id": proposal_id, "error": error_msg}
 
         # Build minimal result dict with raw EvaluationOutput
         expected_dec = None
         if args.expected_decision and index <= len(args.expected_decision):
-            expected_dec = args.expected_decision[index - 1].upper()  # "APPROVE" or "REJECT"
+            expected_dec = args.expected_decision[
+                index - 1
+            ].upper()  # "APPROVE" or "REJECT"
 
         result_dict = {
             "proposal_id": proposal_id,
@@ -137,7 +140,9 @@ async def evaluate_single_proposal(
 
         # Save JSON if requested
         if args.save_output:
-            json_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            json_filename = (
+                f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            )
             with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
             print(f"✅ Results saved to {json_filename} and {log_filename}")
