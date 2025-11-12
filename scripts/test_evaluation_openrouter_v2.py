@@ -557,6 +557,21 @@ async def test_evaluation(
             choice_message_json = json.loads(choice_message_content)
             print("Successfully parsed JSON from message content")
             print(json.dumps(choice_message_json, indent=2))
+
+            if save_output:
+                # save to file
+                output_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "evals",
+                )
+                os.makedirs(output_dir, exist_ok=True)
+                output_filename = f"evaluation_openrouter_{proposal_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                output_path = os.path.join(output_dir, output_filename)
+
+                with open(output_path, "w") as f:
+                    json.dump(choice_message_json, f, indent=2)
+
+                print(f"\nSaved evaluation output to: {output_path}")
         except json.JSONDecodeError as e:
             print(f"❌ JSON decoding error: {e}")
             return
