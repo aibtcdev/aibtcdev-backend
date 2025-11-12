@@ -400,60 +400,82 @@
               <span>Key Insights</span>
               <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </h2>
-            <div id="summary-content" class="overflow-x-auto">
-              <ul class="mb-4 text-sm text-gray-600 space-y-1">
-                <li><strong>Pass Rate:</strong> ${evals.overall_stats.passRate.toFixed(2)}%</li>
-                <li><strong>Average Score:</strong> ${evals.overall_stats.avg_score.toFixed(2)}</li>
-                <li><strong>Average Confidence:</strong> ${evals.overall_stats.avg_confidence.toFixed(2)}</li>
-                <li><strong>Mismatches:</strong> ${evals.overall_stats.mismatches}</li>
-                <li><strong>Total Input Tokens:</strong> ${evals.overall_stats.total_input_tokens}</li>
-                <li><strong>Total Output Tokens:</strong> ${evals.overall_stats.total_output_tokens}</li>
-                <li><strong>Total Estimated Cost:</strong> $${evals.overall_stats.total_est_cost.toFixed(6)}</li>
-              </ul>
-              <table class="min-w-full table-striped">
-                <thead>
-                  <tr>
-                    <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposal</th>
-                    <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${createRows(
-                    "Highest Scores",
-                    byScoreDesc,
-                    (prop) =>
-                      `${prop.final_score.toFixed(2)} (${
-                        prop.decision ? "APPROVE" : "REJECT"
-                      })`
-                  )}
-                  ${createRows(
-                    "Lowest Scores",
-                    byScoreAsc,
-                    (prop) =>
-                      `${prop.final_score.toFixed(2)} (${
-                        prop.decision ? "APPROVE" : "REJECT"
-                      })`
-                  )}
-                  ${createRows(
-                    "Mismatches",
-                    mismatches,
-                    (prop) =>
-                      `Expected: ${
-                        prop.expected_decision ? "APPROVE" : "REJECT"
-                      } | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
-                  )}
-                </tbody>
-              </table>
-              <div class="mt-4">
-                <h3 class="font-bold">Category Averages</h3>
-                <ul class="text-sm space-y-1">
-                  ${Object.entries(evals.categoryAverages)
-                    .map(
-                      ([key, val]) => `<li><strong>${key}:</strong> ${val.avg.toFixed(2)}</li>`
-                    )
-                    .join("")}
-                </ul>
+            <div id="summary-content" class="overflow-x-auto space-y-6">
+              <div>
+                <h3 class="font-bold mb-2">Overall Statistics</h3>
+                <table class="min-w-full table-striped text-sm text-gray-600">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statistic</th>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Pass Rate</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.passRate.toFixed(2)}%</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Average Score</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.avg_score.toFixed(2)}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Average Confidence</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.avg_confidence.toFixed(2)}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Mismatches</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.mismatches}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Input Tokens</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.total_input_tokens}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Output Tokens</td><td class="py-2 px-4 border-b border-gray-200">${evals.overall_stats.total_output_tokens}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Estimated Cost</td><td class="py-2 px-4 border-b border-gray-200">$${evals.overall_stats.total_est_cost.toFixed(6)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Top Performers</h3>
+                <table class="min-w-full table-striped">
+                  <thead>
+                    <tr>
+                      <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposal</th>
+                      <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${createRows(
+                      "Highest Scores",
+                      byScoreDesc,
+                      (prop) =>
+                        `${prop.final_score.toFixed(2)} (${
+                          prop.decision ? "APPROVE" : "REJECT"
+                        })`
+                    )}
+                    ${createRows(
+                      "Lowest Scores",
+                      byScoreAsc,
+                      (prop) =>
+                        `${prop.final_score.toFixed(2)} (${
+                          prop.decision ? "APPROVE" : "REJECT"
+                        })`
+                    )}
+                    ${createRows(
+                      "Mismatches",
+                      mismatches,
+                      (prop) =>
+                        `Expected: ${
+                          prop.expected_decision ? "APPROVE" : "REJECT"
+                        } | Actual: ${prop.decision ? "APPROVE" : "REJECT"}`
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Category Averages</h3>
+                <table class="min-w-full table-striped text-sm text-gray-600">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${Object.entries(evals.categoryAverages)
+                      .map(
+                        ([key, val]) => `<tr><td class="py-2 px-4 border-b border-gray-200">${key}</td><td class="py-2 px-4 border-b border-gray-200">${val.avg.toFixed(2)}</td></tr>`
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
