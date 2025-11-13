@@ -24,6 +24,8 @@ from app.services.ai.simple_workflows.recommendation import (
 )
 from app.services.ai.simple_workflows.streaming import create_streaming_setup
 
+import traceback
+
 logger = configure_logger(__name__)
 
 
@@ -59,7 +61,10 @@ async def evaluate_proposal_strict(
         return evaluation_result
 
     except Exception as e:
-        logger.error("Error during evaluation proposal strict", extra={"error": e})
+        logger.error(
+            f"Error during evaluation proposal strict: {str(e)}",  # Log full error string (includes var name)
+            extra={"error": str(e), "proposal_id": str(proposal_id), "traceback": traceback.format_exc()}
+        )
         return None
 
 
