@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Response
 
 from app.api.dependencies import verify_webhook_auth
 from app.lib.logger import configure_logger
@@ -17,6 +17,7 @@ router = APIRouter(prefix="/webhooks")
 
 @router.post("/chainhook")
 async def chainhook(
+    background_tasks: BackgroundTasks,
     data: Dict[str, Any] = Body(...),
     _: None = Depends(verify_webhook_auth),
 ) -> Response:
@@ -25,13 +26,13 @@ async def chainhook(
     This endpoint requires Bearer token authentication via the Authorization header.
     The token must match the one configured in AIBTC_WEBHOOK_AUTH_TOKEN.
 
-    Always returns 200 status code regardless of processing outcome.
+    Always returns 204 No Content status regardless of processing outcome.
 
     Args:
         data: The webhook payload as JSON
 
     Returns:
-        Response: 200 OK status always
+        Response: 204 No Content (always)
 
     Raises:
         HTTPException: If authentication fails
@@ -42,8 +43,8 @@ async def chainhook(
         logger.debug(
             "Chainhook webhook received", extra={"event_type": "chainhook_webhook"}
         )
-        await service.process(data)
-        logger.info("Chainhook processing completed")
+        # offload processing to background task
+        background_tasks.add_task(service.process, data)
     except Exception as e:
         logger.error(
             "Chainhook processing failed", extra={"error": str(e)}, exc_info=True
