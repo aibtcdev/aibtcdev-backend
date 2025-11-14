@@ -12,7 +12,6 @@ from app.backend.models import (
     QueueMessageBase,
     QueueMessageFilter,
     QueueMessageType,
-    Wallet,
     WalletFilter,
 )
 from app.config import config
@@ -25,7 +24,6 @@ from app.services.infrastructure.job_management.base import (
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 from app.tools.agent_account import AgentAccountDeployTool
-from app.tools.agent_account_configuration import AgentAccountApproveContractTool
 
 logger = configure_logger(__name__)
 
@@ -252,39 +250,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             "tool_output": tool_output_fields,
             "tool_output_parse_error": tool_output_parse_error,
         }
-
-    async def _approve_aibtc_brew_contract(
-        self, wallet: Wallet, agent_account_contract: str
-    ):
-        aibtc_brew_contract = "ST2Q77H5HHT79JK4932JCFDX4VY6XA3Y1F61A25CD.aibtc-brew-action-proposal-voting"
-        approval_type = "VOTING"
-        try:
-            tool = AgentAccountApproveContractTool(wallet_id=wallet.id)
-            result = await tool._arun(
-                agent_account_contract=agent_account_contract,
-                contract_to_approve=aibtc_brew_contract,
-                approval_type=approval_type,
-            )
-            logger.info(
-                "Approved aibtc-brew contract for agent account",
-                extra={
-                    "task": "agent_account_deploy",
-                    "wallet_id": str(wallet.id),
-                    "success": result.get("success", False),
-                },
-            )
-        except Exception as e:
-            logger.error(
-                "Error approving aibtc-brew contract",
-                extra={
-                    "task": "agent_account_deploy",
-                    "wallet_id": str(wallet.id),
-                    "agent_account_contract": agent_account_contract,
-                    "aibtc_brew_contract": aibtc_brew_contract,
-                    "approval_type": approval_type,
-                    "error": str(e),
-                },
-            )
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
@@ -605,16 +570,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         "contract_principal": full_contract_principal,
                     },
                 )
-
-                # 2025/10 ADDED TO SUPPORT AIBTC-BREW
-                if (
-                    config.auto_voting_approval.enabled
-                    and config.network.network == "testnet"
-                ):
-                    if wallet.testnet_address is not None:
-                        await self._approve_aibtc_brew_contract(
-                            wallet, full_contract_principal
-                        )
 
                 # verify we have the agent_id before continuing
                 if wallet.agent_id is None:
