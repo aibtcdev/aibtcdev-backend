@@ -12,6 +12,7 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import parse_agent_tool_result_strict
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -31,7 +32,7 @@ class STXTransferResult(RunnerResult):
     transfers_processed: int = 0
     transfers_successful: int = 0
     total_amount_sent: int = 0
-    errors: List[str] = None
+    errors: Optional[List[str]] = None
 
     def __post_init__(self):
         self.errors = self.errors or []
@@ -219,7 +220,7 @@ class STXTransferTask(BaseTask[STXTransferResult]):
 
                 # Use WalletSendSTX tool for regular wallet transfers
                 send_tool = WalletSendSTX(wallet_id=wallet_id)
-                transfer_result = send_tool._arun(
+                transfer_result = await send_tool._arun(
                     recipient=recipient,
                     amount=amount,
                     fee=fee,
@@ -227,38 +228,43 @@ class STXTransferTask(BaseTask[STXTransferResult]):
                 )
             logger.debug(f"Transfer result: {transfer_result}")
 
-            # Check if transfer was successful
-            if transfer_result.get("success"):
-                wallet_info = (
-                    "STX transfer wallet (seed phrase)"
-                    if wallet_id is None
-                    else f"wallet {wallet_id}"
-                )
-                logger.info(
-                    f"Successfully sent {amount} STX to {recipient} from {wallet_info}"
-                )
-                result = {
-                    "success": True,
-                    "transferred": True,
-                    "amount": amount,
-                    "recipient": recipient,
-                    "wallet_type": "stx_transfer" if wallet_id is None else "user",
-                    "result": transfer_result,
-                }
+            # parse transfer result
+            parsed_result = parse_agent_tool_result_strict(transfer_result)
+
+            # check if python tool call succeeded
+            if parsed_result.py_success is True:
+                # check if the transfer itself succeeded
+                if parsed_result.ts_success is True:
+                    final_result = {
+                        "success": True,
+                        "transferred": True,
+                        "amount": amount,
+                        "recipient": recipient,
+                        "wallet_type": "stx_transfer" if wallet_id is None else "user",
+                        "result": parsed_result.ts_data,
+                    }
+                else:
+                    error_msg = parsed_result.ts_message or "Unknown STX transfer error"
+                    logger.error(f"STX transfer failed: {error_msg}")
+                    final_result = {
+                        "success": False,
+                        "error": error_msg,
+                        "result": parsed_result.ts_data,
+                    }
             else:
-                error_msg = transfer_result.get("error", "Unknown transfer error")
-                logger.error(f"STX transfer failed: {error_msg}")
-                result = {
+                error_msg = parsed_result.py_error or "Python tool execution error"
+                logger.error(f"STX transfer tool execution failed: {error_msg}")
+                final_result = {
                     "success": False,
                     "error": error_msg,
-                    "result": transfer_result,
+                    "result": parsed_result.ts_data,
                 }
 
             # Store result and mark as processed
-            update_data = QueueMessageBase(is_processed=True, result=result)
+            update_data = QueueMessageBase(is_processed=True, result=final_result)
             backend.update_queue_message(message_id, update_data)
 
-            return result
+            return final_result
 
         except Exception as e:
             error_msg = f"Error processing message {message_id}: {str(e)}"
