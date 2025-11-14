@@ -63,7 +63,11 @@ async def evaluate_proposal_strict(
     except Exception as e:
         logger.error(
             f"Error during evaluation proposal strict: {str(e)}",  # Log full error string (includes var name)
-            extra={"error": str(e), "proposal_id": str(proposal_id), "traceback": traceback.format_exc()}
+            extra={
+                "error": str(e),
+                "proposal_id": str(proposal_id),
+                "traceback": traceback.format_exc(),
+            },
         )
         return None
 

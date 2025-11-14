@@ -560,8 +560,13 @@ async def evaluate_proposal_openrouter(
                 dao_deployed_proposals_for_evaluation,
             ) = _fetch_past_proposals_context(proposal)
         except UnboundLocalError as e:
-            missing_var = str(e).split("'")[1] if "'" in str(e) else "unknown"  # Extract variable name from error msg
-            logger.error(f"Missing or unbound variable in past proposals fetch: {missing_var}", extra={"proposal_id": proposal_id})
+            missing_var = (
+                str(e).split("'")[1] if "'" in str(e) else "unknown"
+            )  # Extract variable name from error msg
+            logger.error(
+                f"Missing or unbound variable in past proposals fetch: {missing_var}",
+                extra={"proposal_id": proposal_id},
+            )
             return None  # Or raise/return a custom error
 
         formatted_info_collection = [
@@ -571,15 +576,22 @@ async def evaluate_proposal_openrouter(
             ("quote_tweet_info", quote_tweet_info),
             ("reply_tweet_info", reply_tweet_info),
             ("user_past_proposals_for_evaluation", user_past_proposals_for_evaluation),
-            ("dao_past_proposals_stats_for_evaluation", dao_past_proposals_stats_for_evaluation),
+            (
+                "dao_past_proposals_stats_for_evaluation",
+                dao_past_proposals_stats_for_evaluation,
+            ),
             ("dao_draft_proposals_for_evaluation", dao_draft_proposals_for_evaluation),
-            ("dao_deployed_proposals_for_evaluation", dao_deployed_proposals_for_evaluation),
+            (
+                "dao_deployed_proposals_for_evaluation",
+                dao_deployed_proposals_for_evaluation,
+            ),
         ]
 
         # check and log any missing data
         missing_info_fields = [
             f"{type(info).__name__} (variable: {var_name})"
-            for var_name, info in formatted_info_collection if info is None
+            for var_name, info in formatted_info_collection
+            if info is None
         ]
         if missing_info_fields:
             logger.warning(
