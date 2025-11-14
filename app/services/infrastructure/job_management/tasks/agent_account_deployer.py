@@ -370,7 +370,11 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     return result
 
             # get the contract name from tool data
-            contract_name = parsed_result.ts_data.get("displayName")
+            contract_name = (
+                parsed_result.ts_data.get("displayName")
+                if isinstance(parsed_result.ts_data, dict)
+                else None
+            )
 
             if contract_name is None:
                 error_msg = "Unable to find contract name in tool output"
