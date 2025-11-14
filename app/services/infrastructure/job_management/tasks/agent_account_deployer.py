@@ -16,6 +16,7 @@ from app.backend.models import (
 )
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import parse_agent_tool_result_strict
 from app.services.infrastructure.job_management.base import (
     BaseTask,
     JobContext,
@@ -26,11 +27,6 @@ from app.services.infrastructure.job_management.decorators import JobPriority, j
 from app.tools.agent_account import AgentAccountDeployTool
 
 logger = configure_logger(__name__)
-
-
-def safe_get(d, key, default=None):
-    """Safely get a value from a dict, returning default if d is None."""
-    return d.get(key, default) if d is not None else default
 
 
 @dataclass
@@ -176,80 +172,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             "agent_testnet_address",
         ]
         return all(field in message_data for field in required_fields)
-
-    def _parse_deployment_tool_output(self, deployment_result: Dict) -> Dict[str, Any]:
-        """Parse deployment tool output JSON."""
-
-        # evaluate inner fields: error, success
-        inner_fields = {
-            "success": safe_get(deployment_result, "success"),
-            "error": safe_get(deployment_result, "error"),
-        }
-        missing_inner_fields = [
-            field for field, value in inner_fields.items() if value is None
-        ]
-        if missing_inner_fields:
-            logger.warning(
-                "Deployment result missing inner fields",
-                extra={
-                    "task": "agent_account_deploy",
-                    "missing_fields": missing_inner_fields,
-                    "deployment_result": deployment_result,
-                },
-            )
-
-        # get the tool output as a string
-        tool_output_str = str(safe_get(deployment_result, "output", ""))
-        tool_output_fields = {}
-        tool_output_parse_error = None
-
-        # evaluate tool output: success, message, data
-        try:
-            if tool_output_str:
-                tool_output = json.loads(tool_output_str)
-                tool_output_fields = {
-                    "success": safe_get(tool_output, "success"),
-                    "message": safe_get(tool_output, "message"),
-                    "data": safe_get(tool_output, "data"),
-                }
-                missing_tool_output_fields = [
-                    field
-                    for field, value in tool_output_fields.items()
-                    if value is None
-                ]
-                if missing_tool_output_fields:
-                    logger.warning(
-                        "Deployment tool output missing fields",
-                        extra={
-                            "task": "agent_account_deploy",
-                            "missing_fields": missing_tool_output_fields,
-                            "inner_fields": inner_fields,
-                            "tool_output_fields": tool_output_fields,
-                        },
-                    )
-            else:
-                raise json.JSONDecodeError("Empty tool output", "", 0)
-        except (json.JSONDecodeError, IndexError) as e:
-            logger.warning(
-                "Tool output not valid JSON; treating as error with synthetic structure",
-                extra={
-                    "task": "agent_account_deploy",
-                    "error": str(e),
-                    "output_preview": tool_output_str[:100],  # truncate for logs
-                },
-            )
-            tool_output_parse_error = str(e)
-            tool_output_fields = {
-                "success": False,
-                "message": "tool error",
-                "data": tool_output_str,
-            }
-
-        return {
-            "inner_fields": inner_fields,
-            "tool_output": tool_output_fields,
-            "tool_output_parse_error": tool_output_parse_error,
-        }
 
     async def process_message(self, message: QueueMessage) -> Dict[str, Any]:
         """Process a single agent account deployment message."""
@@ -399,112 +321,63 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 agent_address=agent_address,
                 network=config.network.network,
             )
+            parsed_result = parse_agent_tool_result_strict(deployment_result)
+
             logger.debug(
                 "Deployment completed",
                 extra={
                     "task": "agent_account_deploy",
-                    "success": safe_get(deployment_result, "success"),
-                    "deployed": safe_get(deployment_result, "deployed"),
-                    "has_result": safe_get(deployment_result, "result") is not None,
+                    "py_success": parsed_result.py_success,
+                    "ts_success": parsed_result.ts_success,
+                    "ts_data": parsed_result.ts_data,
                 },
             )
 
-            # get parsed output from tool run
-            #   inner_fields: success, error
-            #   tool_output: success, message, data
-            #   tool_output_parse_error: string
-            parsed_output = self._parse_deployment_tool_output(deployment_result)
-
-            # handle empty output or parsing error
-            if safe_get(parsed_output, "tool_output_parse_error") is not None:
-                error_msg = "Unable to parse deployer tool result"
+            # handle python tool failure
+            if parsed_result.py_success is False:
+                error_msg = "Deployer tool failed in Python layer"
                 logger.error(
                     error_msg,
                     extra={
-                        "parsed_output": parsed_output,
-                        "deployment_result": deployment_result,
+                        "py_success": parsed_result.py_success,
+                        "py_error": parsed_result.py_error,
+                        "ts_data": parsed_result.ts_data,
                     },
                 )
                 result = {"success": False, "error": error_msg}
                 return result
 
-            # extract tool data
+            # handle typescript tool failure
             contract_already_exists = False
-            tool_succeeded = bool(
-                safe_get(parsed_output["tool_output"], "success", False)
-            )
-            tool_output_message = safe_get(parsed_output["tool_output"], "message")
-            tool_output_message_str = str(tool_output_message)
-            tool_output_data = safe_get(parsed_output["tool_output"], "data")
-            tool_output_data_json = None
-
-            # check if tool succeeded
-            if not tool_succeeded:
-                # check if it's because the contract is already deployed
-                if (
-                    tool_output_message is not None
-                    and "ContractAlreadyExists" in tool_output_message_str
-                ):
+            if parsed_result.ts_success is False:
+                tool_output_message_str = str(parsed_result.ts_data)
+                # handle special case - already deployed contract
+                if "ContractAlreadyExists" in tool_output_message_str:
                     logger.warning(
                         "Contract already exists; treating as successful deployment"
                     )
                     contract_already_exists = True
-
-                    try:
-                        tool_output_data_json = json.loads(tool_output_message_str)
-                        logger.info(
-                            "Successfully extracted and parsed JSON from BunScriptRunner error output"
-                        )
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse JSON from tool output: {e}")
-                        logger.error(
-                            "Full tool output data:",
-                            extra={
-                                "tool_output_message_str": tool_output_message_str,
-                            },
-                        )
-                        raise e
                 else:
-                    error_msg = "Deployer tool failed with unknown error"
+                    error_msg = "Deployer tool failed in TypeScript layer"
                     logger.error(
                         error_msg,
                         extra={
-                            "tool_output_message": tool_output_message,
-                            "tool_output_data": tool_output_data,
+                            "ts_success": parsed_result.ts_success,
+                            "ts_data": parsed_result.ts_data,
                         },
                     )
                     result = {"success": False, "error": error_msg}
                     return result
 
-            # check if we have data from the tool
-            if tool_output_data is None or (
-                contract_already_exists and tool_output_data_json is None
-            ):
-                error_msg = "Unable to extract data from tool output"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "parsed_output": parsed_output,
-                        "deployment_result": deployment_result,
-                    },
-                )
-                result = {"success": False, "error": error_msg}
-                return result
-
             # get the contract name from tool data
-            if contract_already_exists:
-                target_data = safe_get(tool_output_data_json, "data", {})
-                contract_name = safe_get(target_data, "displayName")
-            else:
-                contract_name = safe_get(tool_output_data, "displayName")
+            contract_name = parsed_result.ts_data.get("displayName")
 
             if contract_name is None:
                 error_msg = "Unable to find contract name in tool output"
                 logger.error(
                     error_msg,
                     extra={
-                        "parsed_output": parsed_output,
-                        "deployment_result": deployment_result,
+                        "ts_data": parsed_result.ts_data,
                     },
                 )
                 result = {"success": False, "error": error_msg}
@@ -521,22 +394,27 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     "get-my-wallet-address.ts",
                 )
 
-                # verify we actually got the values
-                address_result_success = safe_get(address_result, "success", False)
-                address_result_output = safe_get(address_result, "output")
-                if not address_result_success or address_result_output is None:
-                    error_msg = "Unable to get deployer address from script"
+                parsed_address_result = parse_agent_tool_result_strict(address_result)
+
+                if (
+                    parsed_address_result.py_success is False
+                    or parsed_address_result.ts_success is False
+                ):
+                    error_msg = "Deployer tool failed to get deployer address"
                     logger.error(
                         error_msg,
                         extra={
-                            "address_result_success": address_result_success,
-                            "address_result_output": address_result_output,
+                            "py_success": parsed_address_result.py_success,
+                            "py_error": parsed_address_result.py_error,
+                            "ts_success": parsed_address_result.ts_success,
+                            "ts_data": parsed_address_result.ts_data,
                         },
                     )
                     result = {"success": False, "error": error_msg}
                     return result
 
-                deployer_address = str(address_result_output).strip()
+                # returned as a string in the tool
+                deployer_address = str(parsed_address_result.ts_data)
 
                 if not deployer_address or not deployer_address.startswith(
                     ("SP", "SM", "ST", "SN")
@@ -545,8 +423,8 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     logger.error(
                         error_msg,
                         extra={
-                            "address_result_success": address_result_success,
-                            "address_result_output": address_result_output,
+                            "task": "agent_account_deploy",
+                            "deployer_address": deployer_address,
                         },
                     )
                     result = {"success": False, "error": error_msg}
@@ -618,9 +496,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             final_result = {
                 "success": True
                 if contract_already_exists
-                else safe_get(parsed_output["inner_fields"], "success", False),
-                "deployed": tool_succeeded or contract_already_exists,
-                "result": parsed_output,
+                else parsed_result.py_success,
+                "deployed": parsed_result.ts_success or contract_already_exists,
+                "result": parsed_result.ts_data,
             }
 
             # Store result and mark as processed
