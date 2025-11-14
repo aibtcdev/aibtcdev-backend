@@ -6,6 +6,7 @@ orchestrating the various processors and providing a clean interface for callers
 
 from typing import Any, Dict, List, Optional
 from uuid import UUID
+import traceback
 
 # from app.backend.factory import backend
 from app.lib.logger import configure_logger
@@ -59,7 +60,14 @@ async def evaluate_proposal_strict(
         return evaluation_result
 
     except Exception as e:
-        logger.error("Error during evaluation proposal strict", extra={"error": e})
+        logger.error(
+            "Error during evaluation proposal strict",
+            extra={
+                "error": str(e),
+                "proposal_id": str(proposal_id),
+                "traceback": traceback.format_exc(),
+            },
+        )
         return None
 
 
@@ -498,15 +506,16 @@ async def comprehensive_evaluation(
     streaming: bool = False,
 ) -> Dict[str, Any]:
     """Alias for evaluate_proposal_comprehensive for backwards compatibility."""
-    return await evaluate_proposal_comprehensive(
-        proposal_content=proposal_content,
-        dao_id=dao_id,
-        proposal_id=proposal_id,
-        tweet_db_ids=tweet_db_ids,
-        custom_system_prompt=custom_system_prompt,
-        custom_user_prompt=custom_user_prompt,
-        streaming=streaming,
-    )
+    # return await evaluate_proposal_comprehensive(
+    #    proposal_content=proposal_content,
+    #    dao_id=dao_id,
+    #    proposal_id=proposal_id,
+    #    tweet_db_ids=tweet_db_ids,
+    #    custom_system_prompt=custom_system_prompt,
+    #    custom_user_prompt=custom_user_prompt,
+    #    streaming=streaming,
+    # )
+    return await evaluate_proposal_comprehensive(dao_id=dao_id, proposal_id=proposal_id)
 
 
 async def metadata_generation(

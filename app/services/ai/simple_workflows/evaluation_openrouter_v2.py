@@ -388,6 +388,7 @@ def _fetch_past_proposals_context(
     dao_proposals = [p for p in dao_proposals if p.id != proposal.id]
 
     # User past proposals
+    user_past_proposals = []
     user_past_proposals_for_evaluation = None
     if proposal.tx_sender:
         user_past_proposals = [
@@ -559,20 +560,26 @@ async def evaluate_proposal_openrouter(
         ) = _fetch_past_proposals_context(proposal)
 
         formatted_info_collection = [
-            proposal_info,
-            tweet_info,
-            tweet_author_info,
-            quote_tweet_info,
-            reply_tweet_info,
-            user_past_proposals_for_evaluation,
-            dao_past_proposals_stats_for_evaluation,
-            dao_draft_proposals_for_evaluation,
-            dao_deployed_proposals_for_evaluation,
+            ("proposal_info", proposal_info),
+            ("tweet_info", tweet_info),
+            ("tweet_author_info", tweet_author_info),
+            ("quote_tweet_info", quote_tweet_info),
+            ("reply_tweet_info", reply_tweet_info),
+            ("user_past_proposals_for_evaluation", user_past_proposals_for_evaluation),
+            (
+                "dao_past_proposals_stats_for_evaluation",
+                dao_past_proposals_stats_for_evaluation,
+            ),
+            ("dao_draft_proposals_for_evaluation", dao_draft_proposals_for_evaluation),
+            (
+                "dao_deployed_proposals_for_evaluation",
+                dao_deployed_proposals_for_evaluation,
+            ),
         ]
 
         # check and log any missing data
         missing_info_fields = [
-            type(info).__name__ for info in formatted_info_collection if info is None
+            var_name for var_name, info in formatted_info_collection if info is None
         ]
         if missing_info_fields:
             logger.warning(
