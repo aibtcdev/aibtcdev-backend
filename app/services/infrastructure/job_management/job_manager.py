@@ -587,7 +587,7 @@ class JobManager:
                     return True
 
             logger.debug(
-                "Job execution allowed: {job_type}",
+                f"Job execution allowed: {job_type}",
                 extra={
                     "current_running": current_running,
                     "current_pending": current_pending,
