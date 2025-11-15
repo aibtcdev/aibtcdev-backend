@@ -138,7 +138,7 @@ class BunScriptRunner:
                 }
                 logger.error(
                     f"Script execution failed: {script_name}",
-                    extra={"output": output_dict},
+                    extra={"error": ts_message},
                 )
                 output_str = json.dumps(output_dict)
                 return {
