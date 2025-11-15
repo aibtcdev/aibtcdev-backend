@@ -79,7 +79,7 @@ class PriorityQueue:
         # Phase 2: Perform deduplication before enqueuing
         if await self._should_deduplicate_job(job_type, message):
             logger.debug(
-                "Job deduplicated - not enqueuing",
+                f"Job deduplicated - not enqueuing: {str(job_type)}",
                 extra={
                     "job_id": str(message.id),
                     "job_type": str(job_type),
@@ -98,10 +98,9 @@ class PriorityQueue:
         await self._queues[priority].put(execution)
 
         logger.debug(
-            "Job enqueued to priority queue",
+            f"Job enqueued to priority queue: {str(job_type)}",
             extra={
                 "job_id": str(message.id),
-                "job_type": str(job_type),
                 "priority": str(priority),
                 "event_type": "job_enqueued",
             },
@@ -198,9 +197,8 @@ class PriorityQueue:
 
                 if active_count > 0 or pending_count > 0:
                     logger.info(
-                        "Deduplicating monitoring job in executor",
+                        f"Deduplicating monitoring job in executor: {job_type_str}",
                         extra={
-                            "job_type": job_type_str,
                             "active_count": active_count,
                             "pending_count": pending_count,
                             "reason": "monitoring_job_already_exists",
@@ -231,10 +229,9 @@ class PriorityQueue:
             active_count = len(self._active_jobs.get(job_type, set()))
             if active_count > 0:
                 logger.info(
-                    "Final execution check - skipping duplicate monitoring job",
+                    f"Final execution check - skipping duplicate monitoring job: {job_type_str}",
                     extra={
                         "job_id": str(execution.id),
-                        "job_type": job_type_str,
                         "active_count": active_count,
                         "reason": "concurrent_execution_detected",
                         "aggressive_deduplication": True,
@@ -257,10 +254,9 @@ class PriorityQueue:
             self._pending_jobs_by_type[job_type].discard(job_id)
 
         logger.debug(
-            "Cleaned up skipped job",
+            f"Cleaned up skipped job: {str(job_type)}",
             extra={
                 "job_id": str(job_id),
-                "job_type": str(job_type),
                 "event_type": "job_cleanup",
             },
         )
@@ -325,10 +321,9 @@ class RetryManager:
         execution.attempt += 1
 
         logger.info(
-            "Job scheduled for retry",
+            f"Job scheduled for retry: {str(execution.job_type)}",
             extra={
                 "job_id": str(execution.id),
-                "job_type": str(execution.job_type),
                 "attempt": execution.attempt,
                 "retry_delay_seconds": delay,
                 "event_type": "job_retry_scheduled",
@@ -349,10 +344,9 @@ class DeadLetterQueue:
         self._dead_jobs[execution.id] = execution
 
         logger.error(
-            "Job moved to dead letter queue",
+            f"Job moved to dead letter queue: {str(execution.job_type)}",
             extra={
                 "job_id": str(execution.id),
-                "job_type": str(execution.job_type),
                 "attempts": execution.attempt,
                 "error": execution.error,
                 "event_type": "job_dead_letter",
@@ -426,8 +420,8 @@ class JobExecutor:
     async def _worker(self, worker_name: str) -> None:
         """Worker coroutine that processes jobs from the queue."""
         logger.debug(
-            "Worker starting",
-            extra={"worker_name": worker_name, "event_type": "worker_start"},
+            f"Worker starting: {worker_name}",
+            extra={"event_type": "worker_start"},
         )
 
         while self._running:
@@ -463,9 +457,8 @@ class JobExecutor:
 
             except Exception as e:
                 logger.error(
-                    "Worker encountered error",
+                    f"Worker encountered error: {worker_name}",
                     extra={
-                        "worker_name": worker_name,
                         "error": str(e),
                         "event_type": "worker_error",
                     },
@@ -480,9 +473,8 @@ class JobExecutor:
         start_time = time.time()
 
         logger.debug(
-            "Job execution started",
+            f"Job execution started: {worker_name}",
             extra={
-                "worker_name": worker_name,
                 "job_id": str(job_id),
                 "job_type": str(job_type),
                 "event_type": "job_execution_start",
@@ -556,21 +548,18 @@ class JobExecutor:
                     )  # True for success
                 except Exception as callback_error:
                     logger.warning(
-                        "Job completion callback failed",
+                        f"Job completion callback failed: {str(job_type)}",
                         extra={
                             "job_id": str(job_id),
-                            "job_type": str(job_type),
                             "callback_error": str(callback_error),
                             "event_type": "callback_error",
                         },
                     )
 
             logger.info(
-                "Job completed successfully",
+                f"Job completed successfully: {worker_name}, {job_type}",
                 extra={
-                    "worker_name": worker_name,
                     "job_id": str(job_id),
-                    "job_type": str(job_type),
                     "duration_seconds": round(duration, 2),
                     "event_type": "job_completed",
                 },
@@ -581,11 +570,9 @@ class JobExecutor:
             duration = time.time() - start_time
 
             logger.error(
-                "Job execution failed",
+                f"Job execution failed: {worker_name}, {job_type}",
                 extra={
-                    "worker_name": worker_name,
                     "job_id": str(job_id),
-                    "job_type": str(job_type),
                     "duration_seconds": round(duration, 2),
                     "error": error_msg,
                     "event_type": "job_failed",
@@ -622,10 +609,9 @@ class JobExecutor:
                         )  # False for failure
                     except Exception as callback_error:
                         logger.warning(
-                            "Job completion callback failed",
+                            f"Job completion callback failed: {job_type}",
                             extra={
                                 "job_id": str(job_id),
-                                "job_type": str(job_type),
                                 "callback_error": str(callback_error),
                                 "event_type": "callback_error",
                             },
@@ -648,19 +634,16 @@ class JobExecutor:
 
                 if pending_messages:
                     logger.debug(
-                        "Pending jobs enqueued",
+                        f"{len(pending_messages)} Pending jobs enqueued: {str(job_type)}",
                         extra={
-                            "job_type": str(job_type),
-                            "count": len(pending_messages),
                             "event_type": "pending_jobs_enqueued",
                         },
                     )
 
             except Exception as e:
                 logger.error(
-                    "Error enqueuing pending jobs",
+                    f"Error enqueuing pending jobs: {str(job_type)}",
                     extra={
-                        "job_type": str(job_type),
                         "error": str(e),
                         "event_type": "enqueue_error",
                     },
@@ -669,9 +652,8 @@ class JobExecutor:
 
         if enqueued_count > 0:
             logger.info(
-                "Pending jobs enqueue complete",
+                f"{enqueued_count} Pending jobs enqueue complete",
                 extra={
-                    "enqueued_count": enqueued_count,
                     "event_type": "pending_jobs_complete",
                 },
             )
