@@ -56,7 +56,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         )
         logger.debug(
             "Initialized DAO deployment tools",
-            extra={"task": "dao_deployment", "tools_count": len(self.tools_map)},
+            extra={"tools_count": len(self.tools_map)},
         )
 
     async def _validate_config(self, context: JobContext) -> bool:
@@ -65,26 +65,21 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             if not self.tools_map:
                 logger.debug(
                     "No DAO deployment tools available",
-                    extra={"task": "dao_deployment"},
                 )
                 return False
 
             if not self.tools_map_all:
-                logger.debug(
-                    "Tools not properly initialized", extra={"task": "dao_deployment"}
-                )
+                logger.debug("Tools not properly initialized")
                 return False
 
             # Configuration validation passed
-            logger.debug(
-                "Configuration validation passed", extra={"task": "dao_deployment"}
-            )
+            logger.debug("Configuration validation passed")
 
             return True
         except Exception as e:
             logger.error(
                 "Error validating config",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -96,7 +91,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             if not self.tools_map:
                 logger.error(
                     "DAO deployment tools not available",
-                    extra={"task": "dao_deployment"},
                 )
                 return False
 
@@ -104,7 +98,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         except Exception as e:
             logger.error(
                 "Resource validation failed",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -122,7 +116,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 logger.info(
                     "Found pending Twitter DAOs, skipping queue processing",
                     extra={
-                        "task": "dao_deployment",
                         "pending_count": len(pending_daos),
                     },
                 )
@@ -139,7 +132,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         except Exception as e:
             logger.error(
                 "Error validating prerequisites",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             self._pending_messages = None
@@ -149,9 +142,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         """Validate DAO deployment task-specific conditions."""
         try:
             if not self._pending_messages:
-                logger.debug(
-                    "No pending messages found", extra={"task": "dao_deployment"}
-                )
+                logger.debug("No pending messages found")
                 return False
 
             # Validate each message has required parameters
@@ -166,19 +157,17 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             if message_count > 0:
                 logger.debug(
                     "Found valid messages",
-                    extra={"task": "dao_deployment", "message_count": message_count},
+                    extra={"message_count": message_count},
                 )
                 return True
 
-            logger.debug(
-                "No valid messages to process", extra={"task": "dao_deployment"}
-            )
+            logger.debug("No valid messages to process")
             return False
 
         except Exception as e:
             logger.error(
                 "Error in task validation",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -206,7 +195,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                     logger.debug(
                         "Message missing required parameter",
                         extra={
-                            "task": "dao_deployment",
                             "message_id": str(message.id),
                             "missing_param": param,
                         },
@@ -246,7 +234,6 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             logger.error(
                 "Error validating message",
                 extra={
-                    "task": "dao_deployment",
                     "message_id": str(message.id),
                     "error": str(e),
                 },
@@ -276,7 +263,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         except KeyError as e:
             logger.error(
                 "Missing required parameter in message",
-                extra={"task": "dao_deployment", "missing_param": str(e)},
+                extra={"missing_param": str(e)},
             )
             return None
 
@@ -299,11 +286,11 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
 
             logger.info(
                 "Processing DAO deployment",
-                extra={"task": "dao_deployment", "message_id": str(message.id)},
+                extra={"message_id": str(message.id)},
             )
             logger.debug(
                 "DAO deployment parameters prepared",
-                extra={"task": "dao_deployment", "parameters": tool_input},
+                extra={"parameters": tool_input},
             )
 
             deployment_data = {}
@@ -314,16 +301,15 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                     deployment_data = chunk["content"]
                     logger.info(
                         "DAO deployment completed successfully",
-                        extra={"task": "dao_deployment"},
                     )
                     logger.debug(
                         "Deployment data received",
-                        extra={"task": "dao_deployment", "data": deployment_data},
+                        extra={"data": deployment_data},
                     )
                 elif chunk["type"] == "tool":
                     logger.debug(
                         "Executing tool",
-                        extra={"task": "dao_deployment", "tool_chunk": chunk},
+                        extra={"tool_chunk": chunk},
                     )
 
             # Extract DAO ID if available from deployment data
@@ -343,7 +329,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         except Exception as e:
             logger.error(
                 "Error processing DAO deployment message",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return DAODeploymentResult(
@@ -377,7 +363,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         if "blockchain" in str(error).lower() or "network" in str(error).lower():
             logger.warning(
                 "Blockchain/network error during DAO deployment, will retry",
-                extra={"task": "dao_deployment", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None  # Let default retry handling take over
 
@@ -396,7 +382,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         """Cleanup after DAO deployment task execution."""
         # Clear cached pending messages
         self._pending_messages = None
-        logger.debug("Task cleanup completed", extra={"task": "dao_deployment"})
+        logger.debug("Task cleanup completed")
 
     async def _execute_impl(self, context: JobContext) -> List[DAODeploymentResult]:
         """Execute DAO deployment task with enhanced processing."""
@@ -409,7 +395,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
             message = self._pending_messages[0]
             logger.debug(
                 "Processing DAO deployment message",
-                extra={"task": "dao_deployment", "message_id": str(message.id)},
+                extra={"message_id": str(message.id)},
             )
 
             result = await self._process_dao_deployment_message(message)
@@ -425,16 +411,15 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 )
                 logger.debug(
                     "Marked message as processed",
-                    extra={"task": "dao_deployment", "message_id": str(message.id)},
+                    extra={"message_id": str(message.id)},
                 )
                 logger.info(
                     "DAO deployment task completed successfully",
-                    extra={"task": "dao_deployment"},
                 )
             else:
                 logger.error(
                     "DAO deployment failed",
-                    extra={"task": "dao_deployment", "message": result.message},
+                    extra={"message": result.message},
                 )
 
             return results
@@ -442,7 +427,7 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
         except Exception as e:
             logger.error(
                 "Error in DAO deployment task",
-                extra={"task": "dao_deployment", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             results.append(

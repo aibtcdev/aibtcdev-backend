@@ -70,7 +70,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         except Exception as e:
             logger.error(
                 "Error validating config",
-                extra={"task": "proposal_approval", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -82,14 +82,13 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             if not backend:
                 logger.error(
                     "Backend not available",
-                    extra={"task": "proposal_approval"},
                 )
                 return False
             return True
         except Exception as e:
             logger.error(
                 "Resource validation failed",
-                extra={"task": "proposal_approval", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -101,13 +100,12 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             message_count = len(pending_messages)
             logger.debug(
                 "Found pending messages",
-                extra={"task": "proposal_approval", "message_count": message_count},
+                extra={"message_count": message_count},
             )
 
             if message_count == 0:
                 logger.debug(
                     "No pending messages found",
-                    extra={"task": "proposal_approval"},
                 )
                 return False
 
@@ -116,20 +114,18 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 if self._validate_message_data(message):
                     logger.debug(
                         "Found valid message",
-                        extra={"task": "proposal_approval"},
                     )
                     return True
 
             logger.warning(
                 "No valid approval data found in pending messages",
-                extra={"task": "proposal_approval"},
             )
             return False
 
         except Exception as e:
             logger.error(
                 "Error validating task",
-                extra={"task": "proposal_approval", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -161,7 +157,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             logger.error(
                 "Error getting agent for contract",
                 extra={
-                    "task": "proposal_approval",
                     "agent_account_contract": agent_account_contract,
                     "error": str(e),
                 },
@@ -178,7 +173,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 logger.warning(
                     "Agent not found for contract",
                     extra={
-                        "task": "proposal_approval",
                         "agent_account_contract": agent_account_contract,
                     },
                 )
@@ -192,7 +186,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 logger.info(
                     "Contract already approved in database",
                     extra={
-                        "task": "proposal_approval",
                         "agent_account_contract": agent_account_contract,
                         "contract_to_approve": contract_to_approve,
                     },
@@ -204,7 +197,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         except Exception as e:
             logger.warning(
                 "Could not check database approval status",
-                extra={"task": "proposal_approval", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -236,7 +229,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                     logger.info(
                         "Contract already approved on-chain",
                         extra={
-                            "task": "proposal_approval",
                             "agent_account_contract": agent_account_contract,
                             "contract_to_approve": contract_to_approve,
                         },
@@ -252,7 +244,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         except Exception as e:
             logger.warning(
                 "Could not check approval status",
-                extra={"task": "proposal_approval", "error": str(e)},
+                extra={"error": str(e)},
             )
             # If we can't check, proceed with approval attempt
             return False
@@ -267,7 +259,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 logger.error(
                     "Agent not found for contract",
                     extra={
-                        "task": "proposal_approval",
                         "agent_account_contract": agent_account_contract,
                     },
                 )
@@ -288,7 +279,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 logger.info(
                     "Updated agent approved_contracts",
                     extra={
-                        "task": "proposal_approval",
                         "agent_account_contract": agent_account_contract,
                         "contract_to_approve": contract_to_approve,
                     },
@@ -298,7 +288,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 logger.debug(
                     "Contract already in approved_contracts",
                     extra={
-                        "task": "proposal_approval",
                         "agent_account_contract": agent_account_contract,
                         "contract_to_approve": contract_to_approve,
                     },
@@ -309,7 +298,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             logger.error(
                 "Failed to update agent approved_contracts",
                 extra={
-                    "task": "proposal_approval",
                     "agent_account_contract": agent_account_contract,
                     "error": str(e),
                 },
@@ -324,7 +312,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
 
         logger.debug(
             "Processing message",
-            extra={"task": "proposal_approval", "message_id": message_id},
+            extra={"message_id": message_id},
         )
 
         try:
@@ -333,7 +321,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                 error_msg = "Invalid message data"
                 logger.error(
                     error_msg,
-                    extra={"task": "proposal_approval", "message_id": message_id},
+                    extra={"message_id": message_id},
                 )
                 result = {"success": False, "error": error_msg, "skipped": False}
 
@@ -350,7 +338,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             logger.info(
                 "Processing approval",
                 extra={
-                    "task": "proposal_approval",
                     "agent_account_contract": agent_account_contract,
                     "contract_to_approve": contract_to_approve,
                     "approval_type": approval_type,
@@ -379,7 +366,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             logger.debug(
                 "Approval result",
                 extra={
-                    "task": "proposal_approval",
                     "message_id": message_id,
                     "approval_result": approval_result,
                 },
@@ -400,7 +386,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                     logger.warning(
                         "Approval succeeded but failed to update agent database record",
                         extra={
-                            "task": "proposal_approval",
                             "agent_account_contract": agent_account_contract,
                         },
                     )
@@ -412,13 +397,12 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             if result["success"]:
                 logger.info(
                     "Successfully approved contract",
-                    extra={"task": "proposal_approval", "message_id": message_id},
+                    extra={"message_id": message_id},
                 )
             else:
                 logger.error(
                     "Failed to approve contract",
                     extra={
-                        "task": "proposal_approval",
                         "message_id": message_id,
                         "approval_result": approval_result,
                     },
@@ -430,7 +414,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
             logger.error(
                 "Error processing message",
                 extra={
-                    "task": "proposal_approval",
                     "message_id": message_id,
                     "error": str(e),
                 },
@@ -473,14 +456,14 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         if "blockchain" in str(error).lower() or "contract" in str(error).lower():
             logger.warning(
                 "Blockchain/contract error, will retry",
-                extra={"task": "proposal_approval", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "proposal_approval", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -499,7 +482,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         """Cleanup after task execution."""
         logger.debug(
             "Task cleanup completed",
-            extra={"task": "proposal_approval"},
         )
 
     async def _execute_impl(
@@ -510,7 +492,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         message_count = len(pending_messages)
         logger.debug(
             "Found pending messages",
-            extra={"task": "proposal_approval", "message_count": message_count},
+            extra={"message_count": message_count},
         )
 
         if not pending_messages:
@@ -533,7 +515,7 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
 
         logger.info(
             "Processing messages",
-            extra={"task": "proposal_approval", "message_count": message_count},
+            extra={"message_count": message_count},
         )
 
         # Process messages in batches
@@ -561,7 +543,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
                     logger.error(
                         "Exception processing message",
                         extra={
-                            "task": "proposal_approval",
                             "message_id": message.id,
                             "error": str(e),
                         },
@@ -571,7 +552,6 @@ class AgentAccountProposalApprovalTask(BaseTask[AgentAccountProposalApprovalResu
         logger.info(
             "Task completed",
             extra={
-                "task": "proposal_approval",
                 "processed_count": processed_count,
                 "successful_count": successful_count,
                 "skipped_count": skipped_count,

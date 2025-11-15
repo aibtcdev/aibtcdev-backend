@@ -78,7 +78,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 logger.error(
                     "Backend wallet seed phrase not configured",
                     extra={
-                        "task": "wallet_balance_monitor",
                         "issue": "missing_seed_phrase",
                     },
                 )
@@ -87,7 +86,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         except Exception as e:
             logger.error(
                 "Error validating config",
-                extra={"task": "wallet_balance_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -104,14 +103,12 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             if not agent_wallets:
                 logger.debug(
                     "No agent wallets found to monitor",
-                    extra={"task": "wallet_balance_monitor"},
                 )
                 return False
 
             logger.debug(
                 "Found agent wallets to monitor",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_count": len(agent_wallets),
                 },
             )
@@ -119,7 +116,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         except Exception as e:
             logger.error(
                 "Error validating task",
-                extra={"task": "wallet_balance_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -147,14 +144,14 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         if "blockchain" in str(error).lower() or "rpc" in str(error).lower():
             logger.warning(
                 "Blockchain/RPC error, will retry",
-                extra={"task": "wallet_balance_monitor", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "wallet_balance_monitor", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -171,7 +168,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         self, context: JobContext, results: List[AgentWalletBalanceMonitorResult]
     ) -> None:
         """Cleanup after task execution."""
-        logger.debug("Task cleanup completed", extra={"task": "wallet_balance_monitor"})
+        logger.debug("Task cleanup completed")
 
     def _get_agent_wallets(self) -> List:
         """Get all wallets that have an associated agent."""
@@ -179,9 +176,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             # Get all agents first
             agents = backend.list_agents()
             if not agents:
-                logger.debug(
-                    "No agents found", extra={"task": "wallet_balance_monitor"}
-                )
+                logger.debug("No agents found")
                 return []
 
             # Get wallets for these agents
@@ -196,14 +191,14 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
 
             logger.debug(
                 "Found agent wallets",
-                extra={"task": "wallet_balance_monitor", "wallet_count": len(wallets)},
+                extra={"wallet_count": len(wallets)},
             )
             return wallets
 
         except Exception as e:
             logger.error(
                 "Error getting agent wallets",
-                extra={"task": "wallet_balance_monitor", "error": str(e)},
+                extra={"error": str(e)},
             )
             return []
 
@@ -230,7 +225,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 logger.debug(
                     "Retrieved STX balance",
                     extra={
-                        "task": "wallet_balance_monitor",
                         "address": address,
                         "balance": stx_balance,
                     },
@@ -239,14 +233,13 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             else:
                 logger.warning(
                     "No STX balance info found",
-                    extra={"task": "wallet_balance_monitor", "address": address},
+                    extra={"address": address},
                 )
                 return "0"
         except Exception as e:
             logger.error(
                 "Error getting STX balance",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "address": address,
                     "error": str(e),
                 },
@@ -265,7 +258,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             if not wallet_address:
                 logger.warning(
                     "No address found for wallet",
-                    extra={"task": "wallet_balance_monitor", "wallet_id": wallet.id},
+                    extra={"wallet_id": wallet.id},
                 )
                 return False
 
@@ -286,7 +279,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.info(
                 "Queued funding request",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_id": wallet.id,
                     "wallet_address": wallet_address,
                     "funding_amount": self.funding_amount,
@@ -299,7 +291,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.error(
                 "Failed to queue funding request",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_id": wallet.id,
                     "error": str(e),
                 },
@@ -317,7 +308,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 error_msg = f"No address found for wallet {wallet.id}"
                 logger.warning(
                     "No address found for wallet",
-                    extra={"task": "wallet_balance_monitor", "wallet_id": wallet.id},
+                    extra={"wallet_id": wallet.id},
                 )
                 result.errors.append(error_msg)
                 return
@@ -325,7 +316,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.debug(
                 "Checking wallet balance",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_id": wallet.id,
                     "wallet_address": wallet_address,
                 },
@@ -338,7 +328,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 logger.error(
                     "Could not retrieve wallet balance",
                     extra={
-                        "task": "wallet_balance_monitor",
                         "wallet_id": wallet.id,
                         "wallet_address": wallet_address,
                     },
@@ -358,7 +347,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.info(
                 "Updated wallet balance",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_id": wallet.id,
                     "balance": current_balance,
                 },
@@ -371,7 +359,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                 logger.warning(
                     "Wallet has low balance",
                     extra={
-                        "task": "wallet_balance_monitor",
                         "wallet_id": wallet.id,
                         "wallet_address": wallet_address,
                         "current_balance": current_balance,
@@ -393,7 +380,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.error(
                 "Error checking wallet balance",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_id": wallet.id,
                     "error": str(e),
                 },
@@ -405,7 +391,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         self, context: JobContext
     ) -> List[AgentWalletBalanceMonitorResult]:
         """Execute agent wallet balance monitoring task."""
-        logger.info("Starting task", extra={"task": "wallet_balance_monitor"})
+        logger.info("Starting task")
 
         result = AgentWalletBalanceMonitorResult(
             success=True, message="Agent wallet balance monitoring completed"
@@ -417,7 +403,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.info(
                 "Found agent wallets to process",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallet_count": len(agent_wallets),
                 },
             )
@@ -433,7 +418,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                     logger.debug(
                         "Processing wallet",
                         extra={
-                            "task": "wallet_balance_monitor",
                             "wallet_id": wallet.id,
                         },
                     )
@@ -449,7 +433,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
                     logger.error(
                         "Error processing wallet",
                         extra={
-                            "task": "wallet_balance_monitor",
                             "wallet_id": wallet.id,
                             "error": str(e),
                         },
@@ -477,7 +460,6 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             logger.info(
                 "Task completed",
                 extra={
-                    "task": "wallet_balance_monitor",
                     "wallets_processed": result.wallets_processed,
                     "wallets_updated": result.wallets_updated,
                     "low_balance_wallets": result.low_balance_wallets,
@@ -495,7 +477,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             )
             logger.error(
                 "Error executing task",
-                extra={"task": "wallet_balance_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return [

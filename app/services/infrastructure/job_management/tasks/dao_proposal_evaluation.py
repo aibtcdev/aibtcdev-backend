@@ -84,7 +84,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.debug(
                 "Found pending proposal evaluation messages",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_count": message_count,
                 },
             )
@@ -92,7 +91,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             if message_count == 0:
                 logger.debug(
                     "No pending messages found",
-                    extra={"task": "dao_proposal_evaluation"},
                 )
                 return False
 
@@ -105,7 +103,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                     logger.warning(
                         "Message missing proposal_id",
                         extra={
-                            "task": "dao_proposal_evaluation",
                             "message_id": str(message.id),
                         },
                     )
@@ -117,7 +114,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                     logger.debug(
                         "Found valid proposal to process",
                         extra={
-                            "task": "dao_proposal_evaluation",
                             "proposal_id": str(proposal_id),
                         },
                     )
@@ -126,21 +122,19 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                     logger.warning(
                         "Proposal not found in database",
                         extra={
-                            "task": "dao_proposal_evaluation",
                             "proposal_id": str(proposal_id),
                         },
                     )
 
             logger.warning(
                 "No valid proposals found in pending messages",
-                extra={"task": "dao_proposal_evaluation"},
             )
             return False
 
         except Exception as e:
             logger.error(
                 "Error validating task",
-                extra={"task": "dao_proposal_evaluation", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -182,7 +176,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                     logger.debug(
                         "Found existing evaluation for proposal",
                         extra={
-                            "task": "dao_proposal_evaluation",
                             "proposal_id": str(proposal_id),
                         },
                     )
@@ -194,7 +187,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Error checking if proposal was evaluated",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "proposal_id": str(proposal_id),
                     "error": str(e),
                 },
@@ -246,7 +238,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                     logger.warning(
                         "Invalid UUID in message",
                         extra={
-                            "task": "dao_proposal_evaluation",
                             "message_id": str(message.id),
                             "error": str(e),
                         },
@@ -256,7 +247,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         if not proposal_wallet_pairs:
             logger.debug(
                 "No valid proposal-wallet pairs found in messages",
-                extra={"task": "dao_proposal_evaluation"},
             )
             return []
 
@@ -281,7 +271,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.info(
                     "Skipped already-evaluated proposals",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "skipped_count": skipped_count,
                     },
                 )
@@ -289,7 +278,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(
                 "Filtered to unevaluated proposals",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "unevaluated_count": len(unevaluated_messages),
                     "total_messages": len(messages),
                 },
@@ -299,12 +287,11 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         except Exception as e:
             logger.error(
                 "Error in batch evaluation check",
-                extra={"task": "dao_proposal_evaluation", "error": str(e)},
+                extra={"error": str(e)},
             )
             # Fallback to original behavior if batch check fails
             logger.warning(
                 "Falling back to individual evaluation checks",
-                extra={"task": "dao_proposal_evaluation"},
             )
             return messages
 
@@ -325,7 +312,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Missing proposal_id in message (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_id": str(message_id),
                 },
             )
@@ -336,7 +322,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Missing dao_id in message (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_id": str(message_id),
                 },
             )
@@ -345,7 +330,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         logger.debug(
             "Processing proposal evaluation message (v2)",
             extra={
-                "task": "dao_proposal_evaluation",
                 "message_id": str(message_id),
                 "wallet_id": str(wallet_id),
                 "proposal_id": str(proposal_id),
@@ -359,7 +343,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(
                 "Evaluating proposal (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "proposal_id": str(proposal_id),
                     "dao_id": str(dao_id),
                 },
@@ -374,7 +357,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "Evaluation returned None (v2)",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "proposal_id": str(proposal_id),
                     },
                 )
@@ -448,7 +430,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(
                 "Proposal evaluated (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "proposal_id": str(proposal_id),
                     "result": "FOR" if approval else "AGAINST",
                     "score": overall_score,
@@ -481,14 +462,12 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             if not vote:
                 logger.error(
                     "Failed to create vote record (v2)",
-                    extra={"task": "dao_proposal_evaluation"},
                 )
                 return {"success": False, "error": "Failed to create vote record"}
 
             logger.info(
                 "Created vote record (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "vote_id": str(vote.id),
                     "proposal_id": str(proposal_id),
                 },
@@ -518,7 +497,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Error processing message (v2)",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_id": str(message_id),
                     "error": str(e),
                 },
@@ -545,7 +523,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         logger.debug(
             "Processing proposal evaluation message",
             extra={
-                "task": "dao_proposal_evaluation",
                 "message_id": str(message_id),
                 "wallet_id": str(wallet_id),
             },
@@ -558,7 +535,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Missing proposal_id in message",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_id": str(message_id),
                 },
             )
@@ -572,7 +548,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "Proposal not found in database",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "proposal_id": str(proposal_id),
                     },
                 )
@@ -589,7 +564,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "DAO not found for proposal",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "proposal_id": str(proposal_id),
                     },
                 )
@@ -599,7 +573,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(
                 "Evaluating proposal",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "proposal_id": str(proposal.id),
                     "dao_name": dao.name,
                 },
@@ -679,7 +652,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.info(
                 "Proposal evaluated",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "proposal_id": str(proposal.id),
                     "dao_name": dao.name,
                     "result": "FOR" if approval else "AGAINST",
@@ -714,14 +686,12 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             if not vote:
                 logger.error(
                     "Failed to create vote record",
-                    extra={"task": "dao_proposal_evaluation"},
                 )
                 return {"success": False, "error": "Failed to create vote record"}
 
             logger.info(
                 "Created vote record",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "vote_id": str(vote.id),
                     "proposal_id": str(proposal_id),
                 },
@@ -751,7 +721,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             logger.error(
                 "Error processing message",
                 extra={
-                    "task": "dao_proposal_evaluation",
                     "message_id": str(message_id),
                     "error": str(e),
                 },
@@ -792,7 +761,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "Failed to process message",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "message_id": str(message.id),
                         "error": str(e),
                     },
@@ -814,7 +782,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         if context_limit is not None:
             logger.debug(
                 "Using context-provided concurrency limit",
-                extra={"task": "dao_proposal_evaluation", "limit": context_limit},
+                extra={"limit": context_limit},
             )
             return context_limit
 
@@ -838,7 +806,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         message_count = len(pending_messages)
         logger.debug(
             "Found pending proposal evaluation messages",
-            extra={"task": "dao_proposal_evaluation", "message_count": message_count},
+            extra={"message_count": message_count},
         )
 
         if not pending_messages:
@@ -875,7 +843,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         logger.info(
             "Processing unevaluated messages with concurrency",
             extra={
-                "task": "dao_proposal_evaluation",
                 "unevaluated_count": len(unevaluated_messages),
                 "skipped_count": skipped_count,
                 "max_concurrent": max_concurrent,
@@ -896,7 +863,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         logger.info(
             "Completed concurrent processing",
             extra={
-                "task": "dao_proposal_evaluation",
                 "message_count": len(unevaluated_messages),
                 "execution_time": round(execution_time, 2),
             },
@@ -913,7 +879,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "Exception processing message",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "message_id": str(unevaluated_messages[i].id),
                         "error": str(result),
                     },
@@ -931,7 +896,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
                 logger.error(
                     "Unexpected result type",
                     extra={
-                        "task": "dao_proposal_evaluation",
                         "message_id": str(unevaluated_messages[i].id),
                         "result_type": str(type(result)),
                     },
@@ -941,7 +905,6 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
         logger.info(
             "Task completed",
             extra={
-                "task": "dao_proposal_evaluation",
                 "processed": processed_count,
                 "evaluated": evaluated_count,
                 "errors": len(errors),

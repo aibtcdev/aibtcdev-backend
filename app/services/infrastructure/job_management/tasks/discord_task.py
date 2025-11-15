@@ -64,15 +64,13 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                 and not config.discord.webhook_url_failed
                 and not config.discord.webhook_url_veto
             ):
-                logger.error(
-                    "No Discord webhook URLs configured", extra={"task": "discord"}
-                )
+                logger.error("No Discord webhook URLs configured")
                 return False
             return True
         except Exception as e:
             logger.error(
                 "Error validating Discord config",
-                extra={"task": "discord", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -86,13 +84,13 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             )
             discord_service = create_discord_service(webhook_url=test_webhook)
             if not discord_service:
-                logger.error("Cannot create Discord service", extra={"task": "discord"})
+                logger.error("Cannot create Discord service")
                 return False
             return True
         except Exception as e:
             logger.error(
                 "Discord resource validation failed",
-                extra={"task": "discord", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -108,7 +106,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         except Exception as e:
             logger.error(
                 "Error validating Discord prerequisites",
-                extra={"task": "discord", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             self._pending_messages = None
@@ -117,7 +115,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
         if not self._pending_messages:
-            logger.debug("No pending Discord messages found", extra={"task": "discord"})
+            logger.debug("No pending Discord messages found")
             return False
 
         # Validate each message has required content
@@ -131,11 +129,11 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         if valid_messages:
             logger.debug(
                 "Found valid Discord messages",
-                extra={"task": "discord", "valid_message_count": len(valid_messages)},
+                extra={"valid_message_count": len(valid_messages)},
             )
             return True
 
-        logger.debug("No valid Discord messages to process", extra={"task": "discord"})
+        logger.debug("No valid Discord messages to process")
         return False
 
     async def _is_message_valid(self, message: QueueMessage) -> bool:
@@ -144,7 +142,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if not message.message or not isinstance(message.message, dict):
                 logger.debug(
                     "Message invalid: message field is not a dict",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -152,7 +150,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if not content or not str(content).strip():
                 logger.debug(
                     "Message invalid: content field is empty",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -161,7 +159,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if not isinstance(content, str):
                 logger.debug(
                     "Message invalid: content is not a string",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -170,7 +168,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if embeds is not None and not isinstance(embeds, list):
                 logger.debug(
                     "Message invalid: embeds is not a list",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -178,7 +176,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if tts is not None and not isinstance(tts, bool):
                 logger.debug(
                     "Message invalid: tts is not a boolean",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -186,7 +184,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if proposal_status is not None and not isinstance(proposal_status, str):
                 logger.debug(
                     "Message invalid: proposal_status is not a string",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return False
 
@@ -194,7 +192,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         except Exception as e:
             logger.debug(
                 "Message validation error",
-                extra={"task": "discord", "message_id": message.id, "error": str(e)},
+                extra={"message_id": message.id, "error": str(e)},
             )
             return False
 
@@ -237,7 +235,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if not message.message:
                 logger.warning(
                     "Discord message has empty message field",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return DiscordProcessingResult(
                     success=False,
@@ -250,7 +248,6 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                 logger.warning(
                     "Discord message field is not a dict",
                     extra={
-                        "task": "discord",
                         "message_id": message.id,
                         "message_type": type(message.message).__name__,
                     },
@@ -270,7 +267,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if not content or not str(content).strip():
                 logger.warning(
                     "Discord message has empty content field",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 return DiscordProcessingResult(
                     success=False,
@@ -301,12 +298,11 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
 
             logger.info(
                 "Sending Discord message",
-                extra={"task": "discord", "queue_id": message.id},
+                extra={"queue_id": message.id},
             )
             logger.debug(
                 "Discord message content",
                 extra={
-                    "task": "discord",
                     "content_preview": content[:100] + "..."
                     if content and len(content) > 100
                     else content or "No content",
@@ -315,13 +311,12 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             logger.debug(
                 "Discord message proposal status",
                 extra={
-                    "task": "discord",
                     "proposal_status": message.message.get("proposal_status", "none"),
                 },
             )
             logger.debug(
                 "Discord webhook URL used",
-                extra={"task": "discord", "webhook_url": webhook_url},
+                extra={"webhook_url": webhook_url},
             )
 
             # Send the message
@@ -330,7 +325,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             if result.get("success"):
                 logger.info(
                     "Successfully sent Discord message",
-                    extra={"task": "discord", "queue_id": message.id},
+                    extra={"queue_id": message.id},
                 )
                 return DiscordProcessingResult(
                     success=True,
@@ -343,7 +338,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             else:
                 logger.error(
                     "Failed to send Discord message",
-                    extra={"task": "discord", "result": str(result)},
+                    extra={"result": str(result)},
                 )
                 return DiscordProcessingResult(
                     success=False,
@@ -355,7 +350,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         except Exception as e:
             logger.error(
                 "Error processing Discord message",
-                extra={"task": "discord", "message_id": message.id, "error": str(e)},
+                extra={"message_id": message.id, "error": str(e)},
                 exc_info=True,
             )
             return DiscordProcessingResult(
@@ -387,14 +382,14 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         if "webhook" in str(error).lower() or "discord" in str(error).lower():
             logger.warning(
                 "Discord service error, will retry",
-                extra={"task": "discord", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "discord", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -418,7 +413,6 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         logger.debug(
             "Discord task cleanup completed",
             extra={
-                "task": "discord",
                 "cached_services_count": len(self._discord_services),
             },
         )
@@ -428,9 +422,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
         results: List[DiscordProcessingResult] = []
 
         if not self._pending_messages:
-            logger.debug(
-                "No pending Discord messages to process", extra={"task": "discord"}
-            )
+            logger.debug("No pending Discord messages to process")
             return results
 
         processed_count = 0
@@ -444,7 +436,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
             for message in batch:
                 logger.debug(
                     "Processing Discord message",
-                    extra={"task": "discord", "message_id": message.id},
+                    extra={"message_id": message.id},
                 )
                 result = await self._process_discord_message(message)
                 results.append(result)
@@ -474,7 +466,7 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     )
                     logger.debug(
                         "Marked Discord message as processed with result",
-                        extra={"task": "discord", "message_id": message.id},
+                        extra={"message_id": message.id},
                     )
                 else:
                     # Store result for failed processing
@@ -497,13 +489,12 @@ class DiscordTask(BaseTask[DiscordProcessingResult]):
                     )
                     logger.debug(
                         "Stored result for failed Discord message",
-                        extra={"task": "discord", "message_id": message.id},
+                        extra={"message_id": message.id},
                     )
 
         logger.info(
             "Discord task completed",
             extra={
-                "task": "discord",
                 "processed_count": processed_count,
                 "successful_count": success_count,
                 "failed_count": processed_count - success_count,
