@@ -634,7 +634,7 @@ class JobExecutor:
 
                 if pending_messages:
                     logger.debug(
-                        "{len(pending_messages} Pending jobs enqueued: {str(job_type)}",
+                        f"{len(pending_messages)} Pending jobs enqueued: {str(job_type)}",
                         extra={
                             "event_type": "pending_jobs_enqueued",
                         },
