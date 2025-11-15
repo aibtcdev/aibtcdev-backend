@@ -334,7 +334,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 result.errors.append(error_msg)
                 return
 
-            logger.info(
+            logger.debug(
                 "Syncing holders for token",
                 extra={
                     "token_name": token.name,
@@ -384,7 +384,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
                 )
                 return
 
-            logger.info(
+            logger.debug(
                 "Found holders from API for token",
                 extra={
                     "holder_count": len(api_holders),
@@ -394,7 +394,7 @@ class DaoTokenHoldersMonitorTask(BaseTask[DaoTokenHoldersMonitorResult]):
 
             # Get current holders from database
             db_holders = backend.list_holders(HolderFilter(token_id=token.id))
-            logger.info(
+            logger.debug(
                 "Found existing holders in database for token",
                 extra={
                     "holder_count": len(db_holders),
