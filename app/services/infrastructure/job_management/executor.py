@@ -473,10 +473,9 @@ class JobExecutor:
         start_time = time.time()
 
         logger.debug(
-            f"Job execution started: {worker_name}",
+            f"{worker_name} job execution started: {str(job_type)}",
             extra={
                 "job_id": str(job_id),
-                "job_type": str(job_type),
                 "event_type": "job_execution_start",
             },
         )
@@ -557,7 +556,7 @@ class JobExecutor:
                     )
 
             logger.info(
-                f"Job completed successfully: {worker_name}, {job_type}",
+                f"{worker_name} job completed successfully: {job_type}",
                 extra={
                     "job_id": str(job_id),
                     "duration_seconds": round(duration, 2),
@@ -570,7 +569,7 @@ class JobExecutor:
             duration = time.time() - start_time
 
             logger.error(
-                f"Job execution failed: {worker_name}, {job_type}",
+                f"{worker_name} job execution failed: {job_type}",
                 extra={
                     "job_id": str(job_id),
                     "duration_seconds": round(duration, 2),
