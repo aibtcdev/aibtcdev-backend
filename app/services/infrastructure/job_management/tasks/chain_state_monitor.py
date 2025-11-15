@@ -81,9 +81,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         # Note: __del__ can't be async, so we just log if resources weren't properly closed
         if hasattr(self, "chainhook_adapter") and self.chainhook_adapter:
             logger.warning(
-                "ChainStateMonitorTask destroyed with open chainhook adapter. "
-                "Consider calling close_adapter() explicitly.",
-                extra={"task": "chain_state_monitor"},
+                "ChainStateMonitorTask destroyed with open chainhook adapter. Consider calling close_adapter() explicitly.",
             )
 
         if (
@@ -93,9 +91,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             and self.hiro_api._session
         ):
             logger.warning(
-                "ChainStateMonitorTask destroyed with open HiroApi session. "
-                "Consider calling close_hiro_api() explicitly.",
-                extra={"task": "chain_state_monitor"},
+                "ChainStateMonitorTask destroyed with open HiroApi session. Consider calling close_hiro_api() explicitly.",
             )
 
     async def close_adapter(self):
@@ -105,13 +101,12 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 await self.chainhook_adapter.close()
                 logger.debug(
                     "Chainhook adapter closed successfully",
-                    extra={"task": "chain_state_monitor"},
                 )
                 self.chainhook_adapter = None
             except Exception as e:
                 logger.warning(
                     "Error closing chainhook adapter",
-                    extra={"task": "chain_state_monitor", "error": str(e)},
+                    extra={"error": str(e)},
                 )
 
     async def close_hiro_api(self):
@@ -121,12 +116,11 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 await self.hiro_api.close()
                 logger.debug(
                     "HiroApi session closed successfully",
-                    extra={"task": "chain_state_monitor"},
                 )
             except Exception as e:
                 logger.warning(
                     "Error closing HiroApi session",
-                    extra={"task": "chain_state_monitor", "error": str(e)},
+                    extra={"error": str(e)},
                 )
 
     async def _validate_config(self, context: JobContext) -> bool:
@@ -138,7 +132,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         except Exception as e:
             logger.error(
                 "Error validating chain state monitor config",
-                extra={"task": "chain_state_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -152,7 +146,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 if not api_info:
                     logger.error(
                         "Cannot connect to Hiro API",
-                        extra={"task": "chain_state_monitor"},
                     )
                     return False
 
@@ -160,7 +153,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         except Exception as e:
             logger.error(
                 "Resource validation failed",
-                extra={"task": "chain_state_monitor", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -173,7 +166,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         except Exception as e:
             logger.error(
                 "Error validating chain state monitor task",
-                extra={"task": "chain_state_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -192,7 +185,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             self.chainhook_adapter = StacksChainhookAdapter(adapter_config)
             logger.info(
                 "Recreated chainhook adapter",
-                extra={"task": "chain_state_monitor"},
             )
 
     async def _convert_to_chainhook_format(self, block_height: int) -> Dict[str, Any]:
@@ -212,7 +204,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             logger.debug(
                 "Converting block to chainhook format using adapter",
                 extra={
-                    "task": "chain_state_monitor",
                     "block_height": block_height,
                 },
             )
@@ -228,7 +219,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             logger.debug(
                 "Successfully retrieved template-formatted chainhook data",
                 extra={
-                    "task": "chain_state_monitor",
                     "block_height": block_height,
                     "transaction_count": len(
                         result.get("apply", [{}])[0].get("transactions", [])
@@ -242,7 +232,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             logger.error(
                 "Block not found during chainhook conversion",
                 extra={
-                    "task": "chain_state_monitor",
                     "block_height": block_height,
                     "error": str(e),
                 },
@@ -253,7 +242,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             logger.error(
                 "Transformation error during chainhook conversion",
                 extra={
-                    "task": "chain_state_monitor",
                     "block_height": block_height,
                     "error": str(e),
                     "transformation_stage": getattr(
@@ -271,7 +259,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 logger.warning(
                     "HTTP client was closed, attempting to recreate adapter",
                     extra={
-                        "task": "chain_state_monitor",
                         "block_height": block_height,
                         "error": error_msg,
                     },
@@ -288,7 +275,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     logger.info(
                         "Successfully recovered from closed client error",
                         extra={
-                            "task": "chain_state_monitor",
                             "block_height": block_height,
                         },
                     )
@@ -299,7 +285,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     logger.error(
                         "Failed to recover from closed client error",
                         extra={
-                            "task": "chain_state_monitor",
                             "block_height": block_height,
                             "retry_error": str(retry_error),
                         },
@@ -312,7 +297,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             logger.error(
                 "Unexpected error during chainhook conversion",
                 extra={
-                    "task": "chain_state_monitor",
                     "block_height": block_height,
                     "error": error_msg,
                 },
@@ -358,14 +342,14 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         if "blockchain" in str(error).lower() or "rpc" in str(error).lower():
             logger.warning(
                 "Blockchain/RPC error, will retry",
-                extra={"task": "chain_state_monitor", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "chain_state_monitor", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -384,7 +368,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         await self.close_hiro_api()
         logger.debug(
             "All ChainStateMonitorTask resources closed",
-            extra={"task": "chain_state_monitor"},
         )
 
     async def _post_execution_cleanup(
@@ -397,7 +380,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
         logger.debug(
             "Chain state monitor task cleanup completed",
-            extra={"task": "chain_state_monitor"},
         )
 
     async def _execute_impl(self, context: JobContext) -> List[ChainStateMonitorResult]:
@@ -414,7 +396,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             if not latest_chain_state:
                 logger.warning(
                     "No chain state found for network",
-                    extra={"task": "chain_state_monitor", "network": network},
+                    extra={"network": network},
                 )
                 results.append(
                     ChainStateMonitorResult(
@@ -433,7 +415,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             try:
                 logger.debug(
                     "Fetching current chain info from API",
-                    extra={"task": "chain_state_monitor"},
                 )
                 api_info = self.hiro_api.get_info()
 
@@ -447,7 +428,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         logger.error(
                             "Missing chain_tip in API response",
                             extra={
-                                "task": "chain_state_monitor",
                                 "api_response": api_info,
                             },
                         )
@@ -464,33 +444,31 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     else:
                         current_api_block_height = api_info.chain_tip.block_height
 
-                logger.info(
+                logger.debug(
                     "Current API block height",
                     extra={
-                        "task": "chain_state_monitor",
                         "api_block_height": current_api_block_height,
                     },
                 )
                 db_block_height = latest_chain_state.block_height
-                logger.info(
+                logger.debug(
                     "Current DB block height",
                     extra={
-                        "task": "chain_state_monitor",
                         "db_block_height": db_block_height,
                     },
                 )
 
                 blocks_behind = current_api_block_height - db_block_height
 
-                # Consider stale if more than 30 blocks behind
-                stale_threshold_blocks = 1
+                # Consider stale if more than 5 blocks behind
+                stale_threshold_blocks = 5
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
-                    "Chain state is blocks behind the current chain tip",
+                    f"Chain state {blocks_behind} blocks behind current chain tip",
                     extra={
-                        "task": "chain_state_monitor",
-                        "blocks_behind": blocks_behind,
+                        "network": network,
+                        "threshold": stale_threshold_blocks,
                         "db_block_height": db_block_height,
                         "api_block_height": current_api_block_height,
                     },
@@ -499,9 +477,9 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 # Process missing blocks if we're behind and stale
                 if blocks_behind > 0 and is_stale:
                     logger.warning(
-                        "Chain state is behind and exceeds threshold, processing missing blocks",
+                        "Chain state behind and exceeds threshold, processing missing blocks",
                         extra={
-                            "task": "chain_state_monitor",
+                            "network": network,
                             "blocks_behind": blocks_behind,
                             "threshold": stale_threshold_blocks,
                             "db_block_height": db_block_height,
@@ -518,7 +496,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         logger.info(
                             "Processing transactions for block height",
                             extra={
-                                "task": "chain_state_monitor",
                                 "block_height": height,
                             },
                         )
@@ -532,7 +509,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                             logger.info(
                                 "Generated chainhook message for block processing",
                                 extra={
-                                    "task": "chain_state_monitor",
                                     "block_height": height,
                                     "transaction_count": len(
                                         chainhook_data.get("apply", [{}])[0].get(
@@ -552,7 +528,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                             logger.info(
                                 "Block processed with result",
                                 extra={
-                                    "task": "chain_state_monitor",
                                     "block_height": height,
                                     "result": result,
                                 },
@@ -564,7 +539,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                             logger.error(
                                 "Error processing block",
                                 extra={
-                                    "task": "chain_state_monitor",
                                     "block_height": height,
                                     "error": str(e),
                                 },
@@ -584,17 +558,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         )
                     )
                     return results
-                else:
-                    logger.info(
-                        "Chain state status for network",
-                        extra={
-                            "task": "chain_state_monitor",
-                            "network": network,
-                            "status": "stale" if is_stale else "fresh",
-                            "blocks_behind": blocks_behind,
-                            "threshold": stale_threshold_blocks,
-                        },
-                    )
 
                 # Return result based on blocks_behind check
                 results.append(
@@ -613,13 +576,12 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
             except Exception as e:
                 logger.error(
                     "Error getting current chain info",
-                    extra={"task": "chain_state_monitor", "error": str(e)},
+                    extra={"error": str(e)},
                     exc_info=True,
                 )
                 # Cannot determine staleness without API access
                 logger.warning(
                     "Cannot determine chain state without API access",
-                    extra={"task": "chain_state_monitor"},
                 )
 
                 results.append(
@@ -636,7 +598,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
         except Exception as e:
             logger.error(
                 "Error executing chain state monitoring task",
-                extra={"task": "chain_state_monitor", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return [

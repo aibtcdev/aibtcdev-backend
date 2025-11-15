@@ -62,20 +62,20 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             if not config.embedding.api_key:
                 logger.error(
                     "Embedding API key not configured",
-                    extra={"task": "dao_proposal_embedder", "validation": "config"},
+                    extra={"validation": "config"},
                 )
                 return False
             if not backend.vecs_client:
                 logger.error(
                     "Vector client not initialized",
-                    extra={"task": "dao_proposal_embedder", "validation": "config"},
+                    extra={"validation": "config"},
                 )
                 return False
             return True
         except Exception as e:
             logger.error(
                 "Config validation failed",
-                extra={"task": "dao_proposal_embedder", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -92,13 +92,12 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 if not test_embedding:
                     logger.error(
                         "Embeddings test failed",
-                        extra={"task": "dao_proposal_embedder"},
                     )
                     return False
             except Exception as e:
                 logger.error(
                     "Embeddings service validation failed",
-                    extra={"task": "dao_proposal_embedder", "error": str(e)},
+                    extra={"error": str(e)},
                 )
                 return False
 
@@ -106,7 +105,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
         except Exception as e:
             logger.error(
                 "Resource validation failed",
-                extra={"task": "dao_proposal_embedder", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -116,7 +115,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             # Get DAO proposals that haven't been embedded (delta processing)
             logger.debug(
                 "Checking for proposals that need embeddings",
-                extra={"task": "dao_proposal_embedder"},
             )
             dao_proposals = backend.list_proposals(
                 filters=ProposalFilter(has_embedding=False)
@@ -124,7 +122,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
 
             logger.debug(
                 "Found proposals without embeddings",
-                extra={"task": "dao_proposal_embedder", "count": len(dao_proposals)},
+                extra={"count": len(dao_proposals)},
             )
 
             # Filter DAO proposals that have actual content to embed
@@ -136,7 +134,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                     logger.debug(
                         "Skipping proposal - no content to embed",
                         extra={
-                            "task": "dao_proposal_embedder",
                             "proposal_id": str(proposal.id),
                         },
                     )
@@ -147,7 +144,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.debug(
                     "Found proposals needing embeddings",
                     extra={
-                        "task": "dao_proposal_embedder",
                         "count": len(proposals_to_embed),
                     },
                 )
@@ -155,14 +151,13 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
 
             logger.debug(
                 "No proposals needing embeddings found",
-                extra={"task": "dao_proposal_embedder"},
             )
             return False
 
         except Exception as e:
             logger.error(
                 "Error validating task",
-                extra={"task": "dao_proposal_embedder", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             self._proposals_to_embed = None
@@ -190,7 +185,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
         except Exception as e:
             logger.error(
                 "Error getting embeddings",
-                extra={"task": "dao_proposal_embedder", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return None
@@ -217,14 +212,14 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
         if "openai" in str(error).lower() or "embedding" in str(error).lower():
             logger.warning(
                 "OpenAI/embedding service error, will retry",
-                extra={"task": "dao_proposal_embedder", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "dao_proposal_embedder", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -241,7 +236,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
     ) -> None:
         """Cleanup after DAO proposal embedding task execution."""
         self._proposals_to_embed = None
-        logger.debug("Task cleanup completed", extra={"task": "dao_proposal_embedder"})
+        logger.debug("Task cleanup completed")
 
     async def _execute_impl(
         self, context: JobContext
@@ -249,7 +244,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
         """Execute DAO proposal embedding task with vector store storage (delta processing only)."""
         logger.debug(
             "Starting DAO proposal embedding task",
-            extra={"task": "dao_proposal_embedder"},
         )
         errors: List[str] = []
         proposals_checked = 0
@@ -259,7 +253,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             if not self._proposals_to_embed:
                 logger.debug(
                     "No proposals needing embeddings to process",
-                    extra={"task": "dao_proposal_embedder"},
                 )
                 return [
                     DAOProposalEmbeddingResult(
@@ -279,7 +272,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.debug(
                     "Using existing vector collection",
                     extra={
-                        "task": "dao_proposal_embedder",
                         "collection": PROPOSAL_COLLECTION_NAME,
                     },
                 )
@@ -287,7 +279,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.info(
                     "Collection not found, creating",
                     extra={
-                        "task": "dao_proposal_embedder",
                         "collection": PROPOSAL_COLLECTION_NAME,
                     },
                 )
@@ -298,7 +289,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.info(
                     "Created new vector collection",
                     extra={
-                        "task": "dao_proposal_embedder",
                         "collection": PROPOSAL_COLLECTION_NAME,
                     },
                 )
@@ -308,7 +298,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
 
             logger.info(
                 "Processing proposals requiring embeddings",
-                extra={"task": "dao_proposal_embedder", "count": proposals_checked},
+                extra={"count": proposals_checked},
             )
 
             # Prepare data for embedding only for new proposals
@@ -338,7 +328,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             logger.info(
                 "Requesting embeddings for proposals",
                 extra={
-                    "task": "dao_proposal_embedder",
                     "count": len(texts_to_embed),
                     "model": config.embedding.default_model,
                 },
@@ -351,7 +340,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                 logger.info(
                     "Successfully retrieved embeddings",
                     extra={
-                        "task": "dao_proposal_embedder",
                         "count": len(embeddings_list),
                     },
                 )
@@ -374,7 +362,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                     logger.info(
                         "Successfully upserted embeddings to vector store",
                         extra={
-                            "task": "dao_proposal_embedder",
                             "count": proposals_embedded,
                         },
                     )
@@ -387,7 +374,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                             logger.debug(
                                 "Marked proposal as embedded",
                                 extra={
-                                    "task": "dao_proposal_embedder",
                                     "proposal_id": str(proposal.id),
                                 },
                             )
@@ -395,7 +381,6 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                             logger.error(
                                 "Failed to update has_embedding flag",
                                 extra={
-                                    "task": "dao_proposal_embedder",
                                     "proposal_id": str(proposal.id),
                                     "error": str(e),
                                 },
@@ -406,7 +391,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
                     error_msg = f"Failed to upsert DAO proposal embeddings to vector store: {str(e)}"
                     logger.error(
                         "Failed to upsert embeddings to vector store",
-                        extra={"task": "dao_proposal_embedder", "error": str(e)},
+                        extra={"error": str(e)},
                         exc_info=True,
                     )
                     errors.append(error_msg)
@@ -415,7 +400,7 @@ class DAOProposalEmbedderTask(BaseTask[DAOProposalEmbeddingResult]):
             error_msg = f"Error during DAO proposal embedding task: {str(e)}"
             logger.error(
                 "Error during embedding task",
-                extra={"task": "dao_proposal_embedder", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             errors.append(error_msg)

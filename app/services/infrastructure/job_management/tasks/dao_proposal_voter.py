@@ -73,14 +73,14 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if not config.scheduler:
                 logger.error(
                     "Scheduler config not available",
-                    extra={"task": "dao_proposal_voter", "validation": "config"},
+                    extra={"validation": "config"},
                 )
                 return False
             return True
         except Exception as e:
             logger.error(
                 "Error validating proposal voter config",
-                extra={"task": "dao_proposal_voter", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -92,7 +92,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         except Exception as e:
             logger.error(
                 "Backend not available",
-                extra={"task": "dao_proposal_voter", "error": str(e)},
+                extra={"error": str(e)},
             )
             return False
 
@@ -104,7 +104,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             if not pending_messages:
                 logger.info(
                     "No pending DAO proposal vote messages to process",
-                    extra={"task": "dao_proposal_voter"},
                 )
                 return False
 
@@ -118,7 +117,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.info(
                     "Found valid DAO proposal vote messages",
                     extra={
-                        "task": "dao_proposal_voter",
                         "valid_message_count": len(valid_messages),
                     },
                 )
@@ -126,14 +124,13 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
 
             logger.info(
                 "No valid DAO proposal vote messages to process",
-                extra={"task": "dao_proposal_voter"},
             )
             return False
 
         except Exception as e:
             logger.error(
                 "Error validating proposal voter task",
-                extra={"task": "dao_proposal_voter", "error": str(e)},
+                extra={"error": str(e)},
                 exc_info=True,
             )
             return False
@@ -173,7 +170,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         logger.debug(
             "Processing proposal voting message",
             extra={
-                "task": "dao_proposal_voter",
                 "message_id": message_id,
                 "wallet_id": wallet_id,
             },
@@ -185,7 +181,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             error_msg = "Missing proposal_id in message"
             logger.error(
                 error_msg,
-                extra={"task": "dao_proposal_voter", "message_id": message_id},
+                extra={"message_id": message_id},
             )
             return {
                 "success": False,
@@ -205,7 +201,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.error(
                     error_msg,
                     extra={
-                        "task": "dao_proposal_voter",
                         "proposal_id": proposal_id,
                         "message_id": message_id,
                     },
@@ -226,7 +221,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 error_msg = "Proposal not found in database"
                 logger.error(
                     error_msg,
-                    extra={"task": "dao_proposal_voter", "proposal_id": proposal_id},
+                    extra={"proposal_id": proposal_id},
                 )
                 return {
                     "success": False,
@@ -244,7 +239,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 error_msg = "Wallet not found"
                 logger.error(
                     error_msg,
-                    extra={"task": "dao_proposal_voter", "wallet_id": wallet_id},
+                    extra={"wallet_id": wallet_id},
                 )
                 return {
                     "success": False,
@@ -264,7 +259,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.warning(
                     error_msg,
                     extra={
-                        "task": "dao_proposal_voter",
                         "proposal_id": proposal_id,
                         "wallet_id": wallet_id,
                     },
@@ -291,7 +285,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.warning(
                     error_msg,
                     extra={
-                        "task": "dao_proposal_voter",
                         "proposal_id": proposal_id,
                         "wallet_id": wallet_id,
                     },
@@ -313,7 +306,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             logger.info(
                 "Found unvoted votes for proposal and wallet",
                 extra={
-                    "task": "dao_proposal_voter",
                     "unvoted_vote_count": len(unvoted_votes),
                     "proposal_id": proposal_id,
                     "wallet_id": wallet_id,
@@ -325,7 +317,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 error_msg = "Wallet is not associated with an agent"
                 logger.error(
                     error_msg,
-                    extra={"task": "dao_proposal_voter", "wallet_id": wallet_id},
+                    extra={"wallet_id": wallet_id},
                 )
                 return {
                     "success": False,
@@ -342,7 +334,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.error(
                     error_msg,
                     extra={
-                        "task": "dao_proposal_voter",
                         "agent_id": wallet.agent_id,
                         "wallet_id": wallet_id,
                     },
@@ -361,7 +352,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 error_msg = "Agent does not have an account contract"
                 logger.error(
                     error_msg,
-                    extra={"task": "dao_proposal_voter", "agent_id": agent.id},
+                    extra={"agent_id": agent.id},
                 )
                 return {
                     "success": False,
@@ -392,7 +383,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.error(
                         error_msg,
                         extra={
-                            "task": "dao_proposal_voter",
                             "vote_id": vote.id,
                             "error": vote_result.get("message", "Unknown error"),
                         },
@@ -417,7 +407,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.warning(
                         "No transaction ID found in vote result",
                         extra={
-                            "task": "dao_proposal_voter",
                             "vote_result": str(vote_result),
                         },
                     )
@@ -455,7 +444,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         logger.info(
                             "Successfully updated vote with transaction ID",
                             extra={
-                                "task": "dao_proposal_voter",
                                 "vote_id": vote.id,
                                 "tx_id": tx_id,
                             },
@@ -474,7 +462,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     else:
                         logger.error(
                             "Failed to update vote - update_vote returned None",
-                            extra={"task": "dao_proposal_voter", "vote_id": vote.id},
+                            extra={"vote_id": vote.id},
                         )
                         results.append(
                             {
@@ -492,7 +480,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.error(
                         "Error updating vote",
                         extra={
-                            "task": "dao_proposal_voter",
                             "vote_id": vote.id,
                             "error": str(e),
                         },
@@ -531,7 +518,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.info(
                     "Successfully processed all votes for message - marking as processed",
                     extra={
-                        "task": "dao_proposal_voter",
                         "successful_votes": successful_votes,
                         "message_id": message_id,
                     },
@@ -576,7 +562,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.error(
                         "Message failed after max retries - marking as processed",
                         extra={
-                            "task": "dao_proposal_voter",
                             "message_id": message_id,
                             "retry_count": current_retries,
                         },
@@ -587,7 +572,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.warning(
                         "Message processing failed - incrementing retry count",
                         extra={
-                            "task": "dao_proposal_voter",
                             "message_id": message_id,
                             "retry_count": current_retries,
                         },
@@ -605,7 +589,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
             logger.error(
                 error_msg,
                 extra={
-                    "task": "dao_proposal_voter",
                     "message_id": message_id,
                     "error": str(e),
                 },
@@ -633,7 +616,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.error(
                     "Message failed after max retries - marking as processed",
                     extra={
-                        "task": "dao_proposal_voter",
                         "message_id": message_id,
                         "retry_count": current_retries,
                     },
@@ -644,7 +626,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                 logger.warning(
                     "Message processing failed - incrementing retry count",
                     extra={
-                        "task": "dao_proposal_voter",
                         "message_id": message_id,
                         "retry_count": current_retries,
                     },
@@ -675,14 +656,14 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         if "blockchain" in str(error).lower() or "proposal" in str(error).lower():
             logger.warning(
                 "Blockchain/proposal error, will retry",
-                extra={"task": "dao_proposal_voter", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
         if isinstance(error, (ConnectionError, TimeoutError)):
             logger.warning(
                 "Network error, will retry",
-                extra={"task": "dao_proposal_voter", "error": str(error)},
+                extra={"error": str(error)},
             )
             return None
 
@@ -701,7 +682,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         """Cleanup after task execution."""
         logger.debug(
             "DAO proposal voter task cleanup completed",
-            extra={"task": "dao_proposal_voter"},
         )
 
     async def _execute_impl(self, context: JobContext) -> List[DAOProposalVoteResult]:
@@ -722,7 +702,7 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         message_count = len(pending_messages)
         logger.info(
             "Processing pending proposal voting messages",
-            extra={"task": "dao_proposal_voter", "message_count": message_count},
+            extra={"message_count": message_count},
         )
 
         # Process each message
@@ -749,7 +729,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         logger.debug(
                             "Message processed votes",
                             extra={
-                                "task": "dao_proposal_voter",
                                 "message_id": message.id,
                                 "votes_processed": votes_processed,
                             },
@@ -760,7 +739,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                         logger.error(
                             "Failed to process message",
                             extra={
-                                "task": "dao_proposal_voter",
                                 "message_id": message.id,
                                 "error": error_msg,
                             },
@@ -772,7 +750,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
                     logger.error(
                         "Exception processing message",
                         extra={
-                            "task": "dao_proposal_voter",
                             "message_id": message.id,
                             "error": str(e),
                         },
@@ -782,7 +759,6 @@ class DAOProposalVoterTask(BaseTask[DAOProposalVoteResult]):
         logger.info(
             "DAO proposal voter task completed",
             extra={
-                "task": "dao_proposal_voter",
                 "processed_count": processed_count,
                 "total_messages": message_count,
                 "votes_cast": total_votes_cast,
