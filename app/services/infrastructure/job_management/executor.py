@@ -652,7 +652,7 @@ class JobExecutor:
 
         if enqueued_count > 0:
             logger.info(
-                "{enqueued_count} Pending jobs enqueue complete",
+                f"{enqueued_count} Pending jobs enqueue complete",
                 extra={
                     "event_type": "pending_jobs_complete",
                 },
