@@ -570,7 +570,7 @@ class JobExecutor:
             duration = time.time() - start_time
 
             logger.error(
-                "Job execution failed: {worker_name}, {job_type}",
+                f"Job execution failed: {worker_name}, {job_type}",
                 extra={
                     "job_id": str(job_id),
                     "duration_seconds": round(duration, 2),
