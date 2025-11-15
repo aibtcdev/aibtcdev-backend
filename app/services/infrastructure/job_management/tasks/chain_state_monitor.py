@@ -464,7 +464,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     else:
                         current_api_block_height = api_info.chain_tip.block_height
 
-                logger.info(
+                logger.debug(
                     "Current API block height",
                     extra={
                         "task": "chain_state_monitor",
@@ -472,7 +472,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                     },
                 )
                 db_block_height = latest_chain_state.block_height
-                logger.info(
+                logger.debug(
                     "Current DB block height",
                     extra={
                         "task": "chain_state_monitor",
@@ -482,15 +482,14 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                 blocks_behind = current_api_block_height - db_block_height
 
-                # Consider stale if more than 30 blocks behind
-                stale_threshold_blocks = 1
+                # Consider stale if more than 5 blocks behind
+                stale_threshold_blocks = 5
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
-                    "Chain state is blocks behind the current chain tip",
+                    f"Chain state {blocks_behind} blocks behind current chain tip",
                     extra={
                         "task": "chain_state_monitor",
-                        "blocks_behind": blocks_behind,
                         "db_block_height": db_block_height,
                         "api_block_height": current_api_block_height,
                     },
@@ -499,7 +498,7 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 # Process missing blocks if we're behind and stale
                 if blocks_behind > 0 and is_stale:
                     logger.warning(
-                        "Chain state is behind and exceeds threshold, processing missing blocks",
+                        "Chain state behind and exceeds threshold, processing missing blocks",
                         extra={
                             "task": "chain_state_monitor",
                             "blocks_behind": blocks_behind,
