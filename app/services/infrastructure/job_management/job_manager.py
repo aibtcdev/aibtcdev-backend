@@ -124,8 +124,8 @@ class JobManager:
     async def _execute_job_via_executor(self, job_type: str) -> None:
         """Execute a job through the enhanced executor system with proper concurrency control and deduplication."""
         logger.info(
-            "Scheduled execution triggered",
-            extra={"job_type": job_type, "event_type": "scheduled_trigger"},
+            f"Scheduled execution triggered: {job_type}",
+            extra={"event_type": "scheduled_trigger"},
         )
 
         # Phase 1: Check if job of this type is already active or queued
@@ -140,21 +140,21 @@ class JobManager:
             # Convert job_type string to JobType enum
             job_type_enum = JobType.get_or_create(job_type)
             logger.debug(
-                "Job type converted to enum",
-                extra={"job_type": job_type, "job_type_enum": str(job_type_enum)},
+                f"Job type converted to enum: {job_type}",
+                extra={"job_type_enum": str(job_type_enum)},
             )
 
             logger.debug(
-                "Checking for available work",
-                extra={"job_type": job_type, "event_type": "work_check"},
+                f"Checking for available work: {job_type}",
+                extra={"event_type": "work_check"},
             )
 
             # Get job metadata to check if it should run
             metadata = JobRegistry.get_metadata(job_type_enum)
             if not metadata:
                 logger.error(
-                    "Job metadata not found",
-                    extra={"job_type": job_type, "event_type": "metadata_error"},
+                    f"Job metadata not found: {job_type}",
+                    extra={"event_type": "metadata_error"},
                 )
                 return
 
@@ -178,10 +178,8 @@ class JobManager:
                     return
 
                 logger.debug(
-                    "Found pending messages",
+                    f"Found {len(pending_messages)} pending messages: {job_type}",
                     extra={
-                        "job_type": job_type,
-                        "pending_count": len(pending_messages),
                         "event_type": "work_found",
                     },
                 )
@@ -204,9 +202,8 @@ class JobManager:
 
             # Enqueue the synthetic message with the job's priority
             logger.debug(
-                "Enqueuing job to executor",
+                f"Enqueuing job to executor: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "priority": str(metadata.priority),
                     "event_type": "enqueue",
                 },
@@ -216,20 +213,18 @@ class JobManager:
             )
 
             logger.info(
-                "Scheduled job enqueued successfully",
+                f"Scheduled job enqueued successfully: {job_type}",
                 extra={
-                    "job_type": job_type,
-                    "job_id": str(job_id),
                     "priority": str(metadata.priority),
+                    "job_id": str(job_id),
                     "event_type": "enqueue_success",
                 },
             )
 
         except Exception as e:
             logger.error(
-                "Failed to enqueue scheduled job",
+                f"Failed to enqueue scheduled job: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "error": str(e),
                     "event_type": "enqueue_error",
                 },
@@ -270,9 +265,8 @@ class JobManager:
 
                 scheduled_count += 1
                 logger.info(
-                    "Job scheduled successfully",
+                    f"Job scheduled successfully: {job_config.metadata.name}",
                     extra={
-                        "job_name": job_config.metadata.name,
                         "job_type": job_config.job_type,
                         "priority": str(job_config.metadata.priority),
                         "interval_seconds": interval_seconds,
@@ -282,9 +276,8 @@ class JobManager:
                 )
             else:
                 logger.info(
-                    "Job disabled - skipping scheduling",
+                    f"Job disabled - skipping scheduling: {job_config.metadata.name}",
                     extra={
-                        "job_name": job_config.metadata.name,
                         "job_type": job_config.job_type,
                         "event_type": "job_disabled",
                     },
@@ -507,9 +500,8 @@ class JobManager:
             }
         except Exception as e:
             logger.error(
-                "Failed to trigger job execution",
+                f"Failed to trigger job execution: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "error": str(e),
                     "event_type": "trigger_error",
                 },
@@ -530,8 +522,8 @@ class JobManager:
         # Check if deduplication is enabled in config
         if not config.scheduler.job_deduplication_enabled:
             logger.debug(
-                "Job deduplication disabled - allowing execution",
-                extra={"job_type": job_type, "event_type": "deduplication_disabled"},
+                f"Job deduplication disabled - allowing execution: {job_type}",
+                extra={"event_type": "deduplication_disabled"},
             )
             return False
 
@@ -541,8 +533,8 @@ class JobManager:
 
             if not metadata:
                 logger.error(
-                    "Job metadata not found for deduplication check",
-                    extra={"job_type": job_type, "event_type": "metadata_error"},
+                    f"Job metadata not found for deduplication check: {job_type}",
+                    extra={"event_type": "metadata_error"},
                 )
                 return True  # Skip if we can't get metadata
 
@@ -561,9 +553,8 @@ class JobManager:
 
             if total_jobs >= max_concurrent:
                 logger.info(
-                    "Skipping job execution - concurrency limit reached",
+                    f"Skipping job execution - concurrency limit reached: {job_type}",
                     extra={
-                        "job_type": job_type,
                         "current_running": current_running,
                         "current_pending": current_pending,
                         "max_concurrent": max_concurrent,
@@ -583,9 +574,8 @@ class JobManager:
                 # For monitoring jobs, skip if there's ANYTHING already queued or running
                 if current_running > 0 or current_pending > 0:
                     logger.info(
-                        "Skipping monitoring job execution - instance already queued or running",
+                        f"Skipping monitoring job execution - instance already queued or running: {job_type}",
                         extra={
-                            "job_type": job_type,
                             "current_running": current_running,
                             "current_pending": current_pending,
                             "action": "skipped",
@@ -597,9 +587,8 @@ class JobManager:
                     return True
 
             logger.debug(
-                "Job execution allowed",
+                "Job execution allowed: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "current_running": current_running,
                     "current_pending": current_pending,
                     "max_concurrent": max_concurrent,
@@ -615,9 +604,8 @@ class JobManager:
 
         except Exception as e:
             logger.error(
-                "Error in deduplication check",
+                f"Error in deduplication check: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "error": str(e),
                     "event_type": "deduplication_error",
                 },
@@ -679,9 +667,8 @@ class JobManager:
                 return loop.run_until_complete(trigger_with_dedup())
         except Exception as e:
             logger.error(
-                "Failed to trigger job",
+                f"Failed to trigger job: {job_type}",
                 extra={
-                    "job_type": job_type,
                     "error": str(e),
                     "event_type": "manual_trigger_error",
                 },
