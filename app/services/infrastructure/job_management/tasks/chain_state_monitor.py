@@ -464,6 +464,16 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                 stale_threshold_blocks = 5
                 is_stale = blocks_behind > stale_threshold_blocks
 
+                logger.info(
+                    f"Chain state {blocks_behind} blocks behind current chain tip",
+                    extra={
+                        "network": network,
+                        "threshold": stale_threshold_blocks,
+                        "db_block_height": db_block_height,
+                        "api_block_height": current_api_block_height,
+                    },
+                )
+
                 # Process missing blocks if we're behind and stale
                 if blocks_behind > 0 and is_stale:
                     logger.warning(
@@ -548,16 +558,6 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
                         )
                     )
                     return results
-                else:
-                    logger.info(
-                        f"Chain state {blocks_behind} blocks behind current chain tip",
-                        extra={
-                            "network": network,
-                            "threshold": stale_threshold_blocks,
-                            "db_block_height": db_block_height,
-                            "api_block_height": current_api_block_height,
-                        },
-                    )
 
                 # Return result based on blocks_behind check
                 results.append(
