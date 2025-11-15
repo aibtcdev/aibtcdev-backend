@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 from typing import Dict, List, Union
@@ -5,6 +6,7 @@ from typing import Dict, List, Union
 from app.backend.factory import backend
 from app.backend.models import UUID
 from app.lib.logger import configure_logger
+from app.lib.utils import parse_ts_script_output
 
 logger = configure_logger(__name__)
 
@@ -122,15 +124,36 @@ class BunScriptRunner:
 
             return {"output": output, "error": None, "success": True}
         except subprocess.CalledProcessError as e:
-            stdout_output = e.stdout.strip() if e.stdout else ""
+            # check if the tool passes an error and exits with non-zero code
+            stdout_output = e.stdout.strip() if e.stdout else None
+            # if we get any stdout output, try to parse it
+            if stdout_output:
+                ts_success, ts_message, ts_data = parse_ts_script_output(
+                    stdout_output, False
+                )
+                output_dict = {
+                    "success": ts_success,
+                    "message": ts_message,
+                    "data": ts_data,
+                }
+                logger.error(
+                    f"Script execution failed: {script_name}",
+                    extra={"error": ts_message},
+                )
+                output_str = json.dumps(output_dict)
+                return {
+                    "output": output_str,
+                    "error": "TS script exited with non-zero status",
+                    "success": True,  # Python succeeded, TS script shows error
+                }
+            # otherwise, capture stderr
             error_output = e.stderr.strip() if e.stderr else "Unknown error occurred"
-
             logger.error(
-                f"Script execution failed: {script_name}, exit code: {e.returncode}, error message: {error_output}"
+                f"Script execution failed: {script_name}",
+                extra={"return_code": e.returncode, "stderr": error_output},
             )
-
             return {
-                "output": stdout_output,
+                "output": stdout_output or "",
                 "error": error_output,
                 "success": False,
             }
