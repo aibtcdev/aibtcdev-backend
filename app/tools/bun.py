@@ -153,7 +153,7 @@ class BunScriptRunner:
                 extra={"return_code": e.returncode, "stderr": error_output},
             )
             return {
-                "output": stdout_output,
+                "output": stdout_output or "",
                 "error": error_output,
                 "success": False,
             }
