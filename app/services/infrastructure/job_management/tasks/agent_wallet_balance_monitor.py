@@ -65,10 +65,10 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         # Configurable funding thresholds using global config
         self.min_balance_threshold = int(
             config.backend_wallet.min_balance_threshold
-        )  # 1 STX in STX default
+        )  # 5 STX in STX default
         self.funding_amount = int(
             config.backend_wallet.funding_amount
-        )  # 5 STX in STX default
+        )  # 10 STX in STX default
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""

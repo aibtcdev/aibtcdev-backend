@@ -47,12 +47,6 @@ class BackendWalletConfig:
     """Configuration for backend wallet operations."""
 
     seed_phrase: str = os.getenv("AIBTC_BACKEND_WALLET_SEED_PHRASE", "")
-    min_balance_threshold: str = os.getenv(
-        "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "1"
-    )  # 1 STX in STX
-    funding_amount: str = os.getenv(
-        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "1"
-    )  # 1 STX in STX
 
 
 @dataclass
@@ -60,6 +54,14 @@ class STXTransferWalletConfig:
     """Configuration for STX transfer operations with dedicated wallet."""
 
     seed_phrase: str = os.getenv("AIBTC_STX_TRANSFER_WALLET_SEED_PHRASE", "")
+    # TODO: update env var names to match config
+    min_balance_threshold: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "5"
+    )  # 5 STX in STX
+    # TODO: update env var names to match config
+    funding_amount: str = os.getenv(
+        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "10"
+    )  # 10 STX in STX
 
 
 @dataclass
