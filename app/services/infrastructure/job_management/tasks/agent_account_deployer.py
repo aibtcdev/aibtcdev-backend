@@ -542,7 +542,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                         else:
                             voting_extension = extensions[0]
                             approval_message = QueueMessageCreate(
-                                type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
+                                type=QueueMessageType.get_or_create(
+                                    "agent_account_proposal_approval"
+                                ),
                                 dao_id=dao.id,
                                 wallet_id=wallet.id,
                                 message={
