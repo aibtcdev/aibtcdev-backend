@@ -342,7 +342,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
             backend.update_wallet(wallet.id, update_data)
             result.wallets_updated += 1
 
-            logger.info(
+            logger.debug(
                 "Updated wallet balance",
                 extra={
                     "wallet_id": wallet.id,
