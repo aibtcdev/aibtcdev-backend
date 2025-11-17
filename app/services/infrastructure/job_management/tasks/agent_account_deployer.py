@@ -674,6 +674,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         # Process each message in batches
         processed_count = 0
         deployed_count = 0
+        approvals_queued = 0
         errors = []
         batch_size = getattr(context, "batch_size", 5)
 
