@@ -281,9 +281,6 @@ class NetworkConfig:
 
 @dataclass
 class AutoVotingApprovalConfig:
-    enabled: bool = (
-        os.getenv("AIBTC_AUTO_VOTING_APPROVAL_ENABLED", "false").lower() == "true"
-    )
     auto_approve_voting_contract: bool = (
         os.getenv("AIBTC_AUTO_APPROVE_VOTING_CONTRACT", "false").lower() == "true"
     )
