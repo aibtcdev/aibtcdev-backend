@@ -58,8 +58,8 @@ class STXTransferWalletConfig:
         "AIBTC_STX_TRANSFER_WALLET_MIN_BALANCE_THRESHOLD", "5000000"
     )  # 5 STX in uSTX
     funding_amount: str = os.getenv(
-        "AIBTC_STX_TRANSFER_WALLET_FUNDING_AMOUNT", "10000000"
-    )  # 10 STX in uSTX
+        "AIBTC_STX_TRANSFER_WALLET_FUNDING_AMOUNT", "10"
+    )  # 10 STX in STX
 
 
 @dataclass
