@@ -72,7 +72,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         """Validate task configuration."""
         try:
             # Check if backend wallet is configured for funding
-            if not app_config.backend_wallet.seed_phrase:
+            if not app_config.stx_transfer_wallet.seed_phrase:
                 logger.error(
                     "Backend wallet seed phrase not configured",
                     extra={
