@@ -10,9 +10,14 @@ from app.backend.models import (
     AgentBase,
     QueueMessage,
     QueueMessageBase,
+    QueueMessageCreate,
     QueueMessageFilter,
     QueueMessageType,
     WalletFilter,
+    DAOFilter,
+    TokenFilter,
+    ExtensionFilter,
+    ContractStatus,
 )
 from app.config import config
 from app.lib.logger import configure_logger
@@ -35,6 +40,7 @@ class AgentAccountDeployResult(RunnerResult):
 
     accounts_processed: int = 0
     accounts_deployed: int = 0
+    approvals_queued: int = 0
     errors: Optional[List[str]] = None
 
     def __post_init__(self):
@@ -484,6 +490,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                 else parsed_result.py_success,
                 "deployed": parsed_result.ts_success or contract_already_exists,
                 "result": parsed_result.ts_data,
+                "approval_queued": False,
             }
 
             # Store result and mark as processed
@@ -497,6 +504,65 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     "deployed": final_result["deployed"],
                 },
             )
+
+            # Queue voting contract approval if feature is enabled
+            if (
+                config.auto_voting_approval.auto_approve_voting_contract
+                and config.auto_voting_approval.auto_approve_dao_name
+            ):
+                dao_name = config.auto_voting_approval.auto_approve_dao_name
+                daos = backend.list_daos(filters=DAOFilter(name=dao_name))
+                if not daos:
+                    logger.warning(
+                        "No DAO found for auto-approval",
+                        extra={"dao_name": dao_name},
+                    )
+                else:
+                    dao = daos[0]
+                    tokens = backend.list_tokens(filters=TokenFilter(dao_id=dao.id))
+                    if not tokens:
+                        logger.warning(
+                            "No token found for DAO",
+                            extra={"dao_id": dao.id, "dao_name": dao_name},
+                        )
+                    else:
+                        token = tokens[0]
+                        extensions = backend.list_extensions(
+                            filters=ExtensionFilter(
+                                dao_id=dao.id,
+                                subtype="ACTION_PROPOSAL_VOTING",
+                                status=ContractStatus.DEPLOYED,
+                            )
+                        )
+                        if not extensions:
+                            logger.warning(
+                                "No voting extension found for DAO",
+                                extra={"dao_id": dao.id, "dao_name": dao_name},
+                            )
+                        else:
+                            voting_extension = extensions[0]
+                            approval_message = QueueMessageCreate(
+                                type=QueueMessageType.get_or_create("agent_account_proposal_approval"),
+                                dao_id=dao.id,
+                                wallet_id=wallet.id,
+                                message={
+                                    "agent_account_contract": full_contract_principal,
+                                    "contract_to_approve": voting_extension.contract_principal,
+                                    "approval_type": "VOTING",
+                                    "token_contract": token.contract_principal,
+                                    "reason": "Auto-approval after agent deployment",
+                                },
+                            )
+                            backend.create_queue_message(approval_message)
+                            final_result["approval_queued"] = True
+                            logger.info(
+                                "Queued voting contract approval for agent",
+                                extra={
+                                    "agent_id": wallet.agent_id,
+                                    "dao_name": dao_name,
+                                    "wallet_id": wallet.id,
+                                },
+                            )
 
             return final_result
 
@@ -634,6 +700,9 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     else:
                         errors.append(result.get("error", "Unknown error"))
 
+                    if result.get("approval_queued", False):
+                        approvals_queued += 1
+
                     time.sleep(5)
 
                 except Exception as e:
@@ -653,6 +722,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             extra={
                 "processed": processed_count,
                 "deployed": deployed_count,
+                "approvals_queued": approvals_queued,
                 "errors": len(errors),
             },
         )
@@ -660,9 +730,10 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         return [
             AgentAccountDeployResult(
                 success=True,
-                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s)",
+                message=f"Processed {processed_count} account(s), deployed {deployed_count} account(s), queued {approvals_queued} approval(s)",
                 accounts_processed=processed_count,
                 accounts_deployed=deployed_count,
+                approvals_queued=approvals_queued,
                 errors=errors,
             )
         ]
