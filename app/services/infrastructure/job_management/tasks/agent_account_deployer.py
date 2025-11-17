@@ -180,6 +180,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
         """Process a single agent account deployment message."""
         message_id = message.id
         message_data = self._parse_message_data(message.message)
+        full_contract_principal = None
 
         logger.debug(
             "Processing deployment message",
@@ -509,6 +510,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             if (
                 config.auto_voting_approval.auto_approve_voting_contract
                 and config.auto_voting_approval.auto_approve_dao_name
+                and full_contract_principal is not None
             ):
                 dao_name = config.auto_voting_approval.auto_approve_dao_name
                 daos = backend.list_daos(filters=DAOFilter(name=dao_name))
@@ -556,7 +558,6 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                                 },
                             )
                             backend.create_queue_message(approval_message)
-                            final_result["approval_queued"] = True
                             logger.info(
                                 "Queued voting contract approval for agent",
                                 extra={
