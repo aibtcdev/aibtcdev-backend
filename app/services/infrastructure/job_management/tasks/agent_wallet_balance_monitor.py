@@ -20,7 +20,7 @@ from app.services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
-from app.config import config
+from app.config import config as app_config
 
 logger = configure_logger(__name__)
 
@@ -64,17 +64,15 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
         self.hiro_api = HiroApi()
         # Configurable funding thresholds using global config
         self.min_balance_threshold = int(
-            config.backend_wallet.min_balance_threshold
-        )  # 1 STX in STX default
-        self.funding_amount = int(
-            config.backend_wallet.funding_amount
-        )  # 5 STX in STX default
+            app_config.stx_transfer_wallet.min_balance_threshold
+        )
+        self.funding_amount = int(app_config.stx_transfer_wallet.funding_amount)
 
     async def _validate_config(self, context: JobContext) -> bool:
         """Validate task configuration."""
         try:
             # Check if backend wallet is configured for funding
-            if not config.backend_wallet.seed_phrase:
+            if not app_config.backend_wallet.seed_phrase:
                 logger.error(
                     "Backend wallet seed phrase not configured",
                     extra={
@@ -205,7 +203,7 @@ class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
     def _get_wallet_address(self, wallet) -> Optional[str]:
         """Get the appropriate wallet address based on network configuration."""
         # Get network from config
-        network = config.network.network
+        network = app_config.network.network
 
         if network == "testnet" and wallet.testnet_address:
             return wallet.testnet_address
