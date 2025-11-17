@@ -59,8 +59,8 @@ class AgentWalletBalanceMonitorResult(RunnerResult):
 class AgentWalletBalanceMonitorTask(BaseTask[AgentWalletBalanceMonitorResult]):
     """Task for monitoring agent wallet STX balances and auto-funding when needed."""
 
-    def __init__(self, runner_config: Optional[RunnerConfig] = None):
-        super().__init__(runner_config)
+    def __init__(self, config: Optional[RunnerConfig] = None):
+        super().__init__(config)
         self.hiro_api = HiroApi()
         # Configurable funding thresholds using global config
         self.min_balance_threshold = int(
