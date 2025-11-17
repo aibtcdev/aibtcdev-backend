@@ -47,12 +47,6 @@ class BackendWalletConfig:
     """Configuration for backend wallet operations."""
 
     seed_phrase: str = os.getenv("AIBTC_BACKEND_WALLET_SEED_PHRASE", "")
-    min_balance_threshold: str = os.getenv(
-        "AIBTC_BACKEND_WALLET_MIN_BALANCE_THRESHOLD", "1"
-    )  # 1 STX in STX
-    funding_amount: str = os.getenv(
-        "AIBTC_BACKEND_WALLET_FUNDING_AMOUNT", "1"
-    )  # 1 STX in STX
 
 
 @dataclass
@@ -60,6 +54,12 @@ class STXTransferWalletConfig:
     """Configuration for STX transfer operations with dedicated wallet."""
 
     seed_phrase: str = os.getenv("AIBTC_STX_TRANSFER_WALLET_SEED_PHRASE", "")
+    min_balance_threshold: str = os.getenv(
+        "AIBTC_STX_TRANSFER_WALLET_MIN_BALANCE_THRESHOLD", "5000000"
+    )  # 5 STX in uSTX
+    funding_amount: str = os.getenv(
+        "AIBTC_STX_TRANSFER_WALLET_FUNDING_AMOUNT", "10000000"
+    )  # 10 STX in uSTX
 
 
 @dataclass
@@ -172,7 +172,7 @@ class SchedulerConfig:
         == "true"
     )
     agent_wallet_balance_monitor_interval_seconds: int = int(
-        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "300")
+        os.getenv("AIBTC_AGENT_WALLET_BALANCE_MONITOR_INTERVAL_SECONDS", "900")
     )
 
     # chain_state_monitor job (reduced from 300 to 90 seconds for more responsive monitoring)
