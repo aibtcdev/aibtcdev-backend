@@ -8,22 +8,28 @@ import json
 import os
 from datetime import datetime
 
+import re
+
 
 def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest.json"):
-    """Generate manifest from JSON files in evals_dir."""
+    """Generate manifest from JSON files in evals_dir matching new pattern."""
     manifest = []
+    timestamp_pattern = re.compile(r'^(\d{8}-\d{6})_.*_summary\.json$')  # Matches YYYYMMDD-HHMMSS_..._summary.json
+    
     for filename in os.listdir(evals_dir):
-        if filename.endswith("_summary.json"):
-            timestamp_str = filename.split("_")[0]  # Extract YYYYMMDD_HHMMSS
+        match = timestamp_pattern.match(filename)
+        if match:
+            timestamp_str = match.group(1)  # e.g., 20251118-160840
             try:
-                timestamp = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
-                name = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                # Parse YYYYMMDD-HHMMSS
+                dt = datetime.strptime(timestamp_str.replace('-', ''), "%Y%m%d%H%M%S")
+                name = dt.strftime("%Y-%m-%d %H:%M:%S")  # Display format
             except ValueError:
                 name = filename
             manifest.append({"path": f"./evals/{filename}", "name": name})
 
-    # Sort by timestamp descending
-    manifest.sort(key=lambda x: x["name"], reverse=True)
+    # Sort by parsed datetime descending
+    manifest.sort(key=lambda x: datetime.strptime(x["name"], "%Y-%m-%d %H:%M:%S"), reverse=True)
 
     os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
     with open(manifest_path, "w") as f:
