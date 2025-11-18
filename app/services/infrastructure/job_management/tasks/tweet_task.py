@@ -405,6 +405,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     post = re.sub(re.escape(image_url), "", post).strip()
                     post = re.sub(r"\s+", " ", post)
 
+                # sleep for 60s between posts
+                # TODO: read header for rate limit info in TwitterService client
+                await asyncio.sleep(60)
+
                 # Post the tweet
                 if index == 0:
                     # First post - create new thread (no reply_id)
@@ -576,7 +580,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             batch = self._pending_messages[i : i + batch_size]
 
             for message in batch:
-                asyncio.sleep(10)  # Small delay to avoid hitting rate limits
                 logger.debug(f"Processing tweet message: {message.id}")
                 result = await self._process_tweet_message(message)
                 results.append(result)
