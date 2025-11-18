@@ -15,19 +15,14 @@ import sys
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from urllib.parse import urlparse
 from uuid import UUID
 
 # Add the parent directory to the path to import from app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.backend.factory import backend
-from app.backend.models import ContractStatus, ProposalFilter
 from app.config import config
-from app.services.ai.simple_workflows.evaluation_openrouter_v2 import evaluate_proposal_openrouter
-from app.services.ai.simple_workflows.prompts.evaluation_grok import (
-    EVALUATION_GROK_SYSTEM_PROMPT,
-    EVALUATION_GROK_USER_PROMPT_TEMPLATE,
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
+    evaluate_proposal_openrouter,
 )
 
 
@@ -104,10 +99,7 @@ async def test_evaluation(
             print(f"Using model from args: {model}")
 
         evaluation_result = await evaluate_proposal_openrouter(
-            proposal_uuid,
-            model=model,
-            temperature=0.7,
-            reasoning=True
+            proposal_uuid, model=model, temperature=0.7, reasoning=True
         )
 
         if not evaluation_result:
@@ -115,8 +107,8 @@ async def test_evaluation(
             return
 
         print("\n" + "=" * 80)
-        print("Evaluation Result:")
-        print(json.dumps(evaluation_result, indent=2))
+        # print("Evaluation Result:")
+        # print(json.dumps(evaluation_result, indent=2))
 
         if save_output:
             output_dir = os.path.join(
@@ -124,7 +116,7 @@ async def test_evaluation(
                 "evals",
             )
             os.makedirs(output_dir, exist_ok=True)
-        
+
             # New naming: YYYYMMDD-HHMMSS_{short_proposal_id}_summary.json
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d-%H%M%S")  # e.g., 20251118-160840
@@ -140,14 +132,17 @@ async def test_evaluation(
 
             output_data = {
                 "timestamp": datetime.now().isoformat(),
-                "results": [{
-                    "proposal_id": proposal_id,
-                    "evaluation_output": evaluation_output_dumped,
-                    "full_system_prompt": evaluation_result.get("full_system_prompt"),
-                    "full_user_prompt": evaluation_result.get("full_user_prompt"),
-                    "full_messages": evaluation_result.get("full_messages"),
-                    "expected_decision": None  # Set if available
-                }]
+                "results": [
+                    {
+                        "proposal_id": proposal_id,
+                        "evaluation_output": evaluation_output_dumped,
+                        "full_system_prompt": evaluation_result.get(
+                            "full_system_prompt"
+                        ),
+                        "full_user_prompt": evaluation_result.get("full_user_prompt"),
+                        "full_messages": evaluation_result.get("full_messages"),
+                    }
+                ],
             }
 
             with open(output_path, "w") as f:
