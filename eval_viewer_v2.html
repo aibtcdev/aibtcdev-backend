@@ -692,6 +692,25 @@
         `;
         details.appendChild(usageInfo);
 
+        // Prompt info (mirroring original viewer)
+        const promptInfo = document.createElement("div");
+        promptInfo.className = "space-y-2 mb-4";
+        promptInfo.innerHTML = `
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full System Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(prop.full_system_prompt)}</pre>
+          </details>
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full User Prompt</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(prop.full_user_prompt)}</pre>
+          </details>
+          <details class="bg-gray-50 p-3 rounded-md">
+            <summary class="font-medium text-gray-700 cursor-pointer">Full LLM Messages</summary>
+            <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">${escapeHtml(JSON.stringify(prop.full_messages, null, 2))}</pre>
+          </details>
+        `;
+        details.appendChild(promptInfo);
+
         // Categories table
         details.innerHTML += `
           <div class="border-t border-gray-200 pt-4 overflow-x-auto">

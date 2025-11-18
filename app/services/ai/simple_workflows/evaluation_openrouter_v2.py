@@ -527,7 +527,7 @@ async def evaluate_proposal_openrouter(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     reasoning: Optional[bool] = None,
-) -> Optional[EvaluationOutput]:
+) -> Optional[Dict[str, Any]]:
     """
     Evaluate a proposal using OpenRouter and Grok prompts.
 
@@ -537,7 +537,7 @@ async def evaluate_proposal_openrouter(
         temperature: Generation temperature.
 
     Returns:
-        Parsed EvaluationOutput or None if evaluation fails.
+        Dict with evaluation output and captured prompts, or None if evaluation fails.
     """
     try:
         # parse the uuid
@@ -706,7 +706,12 @@ async def evaluate_proposal_openrouter(
 
             logger.info(f"Successfully evaluated proposal {proposal_id}")
 
-            return evaluation_output
+            return {
+                "evaluation_output": evaluation_output.model_dump(),
+                "full_system_prompt": system_prompt,
+                "full_user_prompt": formatted_user_content,
+                "full_messages": messages,
+            }
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")

@@ -24,9 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.backend.factory import backend
 from app.backend.models import ContractStatus, ProposalFilter
 from app.config import config
-from app.services.ai.simple_workflows.evaluation_openrouter_v1 import (
-    format_proposals_for_context_v2,
-)
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import evaluate_proposal_openrouter
 from app.services.ai.simple_workflows.prompts.evaluation_grok import (
     EVALUATION_GROK_SYSTEM_PROMPT,
     EVALUATION_GROK_USER_PROMPT_TEMPLATE,
