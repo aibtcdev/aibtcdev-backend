@@ -124,7 +124,12 @@ async def test_evaluation(
                 "evals",
             )
             os.makedirs(output_dir, exist_ok=True)
-            output_filename = f"evaluation_openrouter_{proposal_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+            # New naming: YYYYMMDD-HHMMSS_{short_proposal_id}_summary.json
+            now = datetime.now()
+            timestamp = now.strftime("%Y%m%d-%H%M%S")  # e.g., 20251118-160840
+            short_id = proposal_id[:8]  # First 8 chars of UUID
+            output_filename = f"{timestamp}_{short_id}_summary.json"
             output_path = os.path.join(output_dir, output_filename)
 
             evaluation_output = evaluation_result["evaluation_output"]
