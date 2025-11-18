@@ -127,11 +127,20 @@ async def test_evaluation(
             output_filename = f"evaluation_openrouter_{proposal_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             output_path = os.path.join(output_dir, output_filename)
 
+            evaluation_output = evaluation_result["evaluation_output"]
+            if hasattr(evaluation_output, "model_dump"):
+                evaluation_output_dumped = evaluation_output.model_dump()
+            else:
+                evaluation_output_dumped = evaluation_output  # already dumped
+
             output_data = {
                 "timestamp": datetime.now().isoformat(),
                 "results": [{
                     "proposal_id": proposal_id,
-                    **evaluation_result,
+                    "evaluation_output": evaluation_output_dumped,
+                    "full_system_prompt": evaluation_result.get("full_system_prompt"),
+                    "full_user_prompt": evaluation_result.get("full_user_prompt"),
+                    "full_messages": evaluation_result.get("full_messages"),
                     "expected_decision": None  # Set if available
                 }]
             }
