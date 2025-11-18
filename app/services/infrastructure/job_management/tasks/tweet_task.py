@@ -24,6 +24,8 @@ from app.services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
+
+import asyncio
 import re
 
 logger = configure_logger(__name__)
@@ -50,7 +52,7 @@ class TweetProcessingResult(RunnerResult):
     timeout_seconds=300,
     max_concurrent=2,  # Increased from 1 to 2 to allow parallel processing
     requires_twitter=True,
-    batch_size=5,
+    batch_size=10,
     enable_dead_letter_queue=True,
 )
 class TweetTask(BaseTask[TweetProcessingResult]):
@@ -488,6 +490,21 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         try:
             import tweepy
 
+            # try to back off manually for 429 errors
+            error_string = str(error).lower()
+            logger.warning(f"Evaluating retry for error: {error_string}")
+            if "429 too many requests" in error_string:
+                logger.warning(
+                    "Twitter API rate limit hit, waiting before retrying...",
+                    extra={
+                        "headers": getattr(error, "response", None).headers
+                        if hasattr(error, "response")
+                        else None
+                    },
+                )
+                asyncio.sleep(60)
+                return True
+
             retry_errors = (
                 ConnectionError,
                 TimeoutError,
@@ -559,6 +576,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             batch = self._pending_messages[i : i + batch_size]
 
             for message in batch:
+                asyncio.sleep(10)  # Small delay to avoid hitting rate limits
                 logger.debug(f"Processing tweet message: {message.id}")
                 result = await self._process_tweet_message(message)
                 results.append(result)
