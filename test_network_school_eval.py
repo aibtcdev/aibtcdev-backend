@@ -11,7 +11,9 @@ Example:
 import asyncio
 import sys
 import json
-from app.services.ai.simple_workflows.network_school_evaluator import evaluate_user_posts
+from app.services.ai.simple_workflows.network_school_evaluator import (
+    evaluate_user_posts,
+)
 from app.lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -71,7 +73,9 @@ async def main():
     """Main test function."""
     if len(sys.argv) < 3:
         print("Usage: python test_network_school_eval.py <username> <prompt_file>")
-        print("Example: python test_network_school_eval.py balajis evaluation_prompt.txt")
+        print(
+            "Example: python test_network_school_eval.py balajis evaluation_prompt.txt"
+        )
         print("\nThe prompt file must include {username} placeholder")
         sys.exit(1)
 
@@ -96,7 +100,9 @@ async def main():
 
     try:
         # Run evaluation with prompt from file
-        result = await evaluate_user_posts(username, evaluation_prompt=evaluation_prompt)
+        result = await evaluate_user_posts(
+            username, evaluation_prompt=evaluation_prompt
+        )
 
         # Display formatted result
         print("\n" + format_result(result))
