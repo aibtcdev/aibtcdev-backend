@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+import os
 """
 CLI test script for proposal evaluations using the v3 strict workflow.
 
@@ -27,6 +29,8 @@ from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.services.ai.simple_workflows.evaluation_openrouter_v2 import evaluate_proposal_openrouter, EvaluationOutput
 from app.backend.factory import get_backend
 from scripts.generate_evals_manifest import generate_manifest
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Tee(object):
@@ -84,7 +88,7 @@ async def evaluate_single_proposal(
     tee_stderr = original_stderr
     if args.save_output:
         prop_short_id = short_uuid(proposal_id)
-        log_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+        log_filename = os.path.join(ROOT_DIR, f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt")
         log_f = open(log_filename, "w")
         tee_stdout = Tee(original_stdout, log_f)
         tee_stderr = Tee(original_stderr, log_f)
@@ -150,9 +154,7 @@ async def evaluate_single_proposal(
 
         # Save JSON if requested
         if args.save_output:
-            json_filename = (
-                f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
-            )
+            json_filename = os.path.join(ROOT_DIR, f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json")
             with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
             print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -190,7 +192,7 @@ def generate_summary(
     print("=" * 60)
 
     if save_output:
-        summary_json = f"evals/{timestamp}_summary.json"
+        summary_json = os.path.join(ROOT_DIR, f"evals/{timestamp}_summary.json")
         with open(summary_json, "w") as f:
             json.dump(summary, f, indent=2, default=str)
         print(f"✅ Summary saved to {summary_json}")
@@ -274,7 +276,7 @@ Examples:
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
     if args.save_output:
-        os.makedirs("evals", exist_ok=True)
+        os.makedirs(os.path.join(ROOT_DIR, "evals"), exist_ok=True)
 
     print("🚀 Starting Proposal Evaluation Test V3")
     print("=" * 60)
