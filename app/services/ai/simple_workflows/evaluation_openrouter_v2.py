@@ -212,7 +212,7 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
         title = getattr(proposal, "title", "Untitled")
 
         # Extract x_handle from x_url using urlparse
-        x_url = getattr(proposal, "x_url", None)
+        x_url = getattr(proposal, "x_url", "unknown")
         x_handle = "unknown"
         if x_url:
             try:
@@ -274,14 +274,15 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
 
 def _fetch_and_format_dao_info(dao_id: str) -> Optional[DAOInfoForEvaluation]:
     """Fetch and format DAO information for evaluation."""
-    dao = backend.get_dao(dao_id)
-    if not dao:
+    dao_uuid = UUID(dao_id)
+    dao = backend.get_dao(dao_uuid)
+    if dao is None:
         logger.error(f"DAO {dao_id} not found")
         return None
     return DAOInfoForEvaluation(
         dao_id=str(dao.id),
-        name=dao.name,
-        mission=dao.mission,
+        name=dao.name or "unknown",
+        mission=dao.mission or "unknown",
     )
 
 
@@ -289,12 +290,12 @@ def _fetch_and_format_proposal_info(proposal: Proposal) -> ProposalInfoForEvalua
     """Fetch and format proposal information for evaluation."""
     return ProposalInfoForEvaluation(
         proposal_number=proposal.proposal_id,
-        title=proposal.title,
-        summary=proposal.summary,
+        title=proposal.title or "unknown",
+        summary=proposal.summary or "unknown",
         created_at_timestamp=proposal.created_at,
         created_at_btc_block=proposal.created_btc,
         executable_at_btc_block=proposal.exec_start,
-        x_url=proposal.x_url,
+        x_url=proposal.x_url or "unknown",
         tx_sender=proposal.tx_sender,
     )
 
@@ -336,10 +337,10 @@ def _fetch_and_format_tweet_author_info(
         return None
     return TweetAuthorInfoForEvaluation(
         user_id=str(author_content.user_id),
-        name=author_content.name,
-        username=author_content.username,
+        name=author_content.name or "unknown",
+        username=author_content.username or "unknown",
         profile_image_url=author_content.profile_image_url or "",
-        verified=author_content.verified,
+        verified=author_content.verified or False,
         verified_type=author_content.verified_type,
         location=author_content.location,
     )
@@ -483,7 +484,6 @@ def _estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> s
             "input_per_1k": 0.000574,
             "output_per_1k": 0.000332,
         },
-        # Add other models as needed
     }
 
     if model not in model_pricing:
