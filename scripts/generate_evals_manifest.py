@@ -14,15 +14,15 @@ import re
 def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest.json"):
     """Generate manifest from JSON files in evals_dir matching new pattern."""
     manifest = []
-    timestamp_pattern = re.compile(r'^(\d{8}-\d{6})_.*_summary\.json$')  # Matches YYYYMMDD-HHMMSS_..._summary.json
+    timestamp_pattern = re.compile(r'^(\d{8}_\d{6})_.*_summary\.json$')  # Matches YYYYMMDD_HHMMSS_..._summary.json
     
     for filename in os.listdir(evals_dir):
         match = timestamp_pattern.match(filename)
         if match:
-            timestamp_str = match.group(1)  # e.g., 20251118-160840
+            timestamp_str = match.group(1)  # e.g., 20251118_160840
             try:
-                # Parse YYYYMMDD-HHMMSS
-                dt = datetime.strptime(timestamp_str.replace('-', ''), "%Y%m%d%H%M%S")
+                # Parse YYYYMMDD_HHMMSS
+                dt = datetime.strptime(timestamp_str.replace('_', ''), "%Y%m%d%H%M%S")
                 name = dt.strftime("%Y-%m-%d %H:%M:%S")  # Display format
             except ValueError:
                 name = filename
