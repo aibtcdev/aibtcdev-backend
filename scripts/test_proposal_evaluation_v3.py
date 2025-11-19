@@ -24,7 +24,7 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
-from app.services.ai.simple_workflows.orchestrator import evaluate_proposal_strict
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import evaluate_proposal_openrouter, EvaluationOutput
 from app.backend.factory import get_backend
 from scripts.generate_evals_manifest import generate_manifest
 
@@ -112,7 +112,7 @@ async def evaluate_single_proposal(
         proposal_uuid = UUID(proposal_id)
         print(f"📋 Evaluating proposal {index}: {proposal_id}")
 
-        result = await evaluate_proposal_strict(
+        result = await evaluate_proposal_openrouter(
             proposal_id=proposal_uuid,
             model=args.model,
             temperature=args.temperature,
@@ -121,7 +121,14 @@ async def evaluate_single_proposal(
 
         if not result:
             error_msg = f"Evaluation failed for proposal {proposal_id}"
-            print(result)
+            print(error_msg)
+            return {"proposal_id": proposal_id, "error": error_msg}
+
+        # Validate EvaluationOutput
+        try:
+            EvaluationOutput(**result["evaluation_output"])
+        except ValueError as ve:
+            error_msg = f"Validation failed for EvaluationOutput: {str(ve)}"
             print(error_msg)
             return {"proposal_id": proposal_id, "error": error_msg}
 
@@ -135,7 +142,10 @@ async def evaluate_single_proposal(
         result_dict = {
             "proposal_id": proposal_id,
             "expected_decision": expected_dec,
-            "evaluation_output": result.model_dump(),  # Raw as dict
+            "evaluation_output": result["evaluation_output"],  # Raw as dict
+            "full_system_prompt": result.get("full_system_prompt", "N/A"),
+            "full_user_prompt": result.get("full_user_prompt", "N/A"),
+            "full_messages": result.get("full_messages", []),
         }
 
         # Save JSON if requested
