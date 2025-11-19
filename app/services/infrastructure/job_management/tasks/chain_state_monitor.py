@@ -460,8 +460,8 @@ class ChainStateMonitorTask(BaseTask[ChainStateMonitorResult]):
 
                 blocks_behind = current_api_block_height - db_block_height
 
-                # Consider stale if more than 5 blocks behind
-                stale_threshold_blocks = 5
+                # Consider stale if more than 2 blocks behind
+                stale_threshold_blocks = 2
                 is_stale = blocks_behind > stale_threshold_blocks
 
                 logger.info(
