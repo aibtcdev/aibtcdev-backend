@@ -19,7 +19,7 @@ def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest
     evals_dir = os.path.join(ROOT_DIR, evals_dir)
     manifest_path = os.path.join(ROOT_DIR, manifest_path)
     manifest = []
-    timestamp_pattern = re.compile(r'^(\d{8}_\d{6})_.*_summary\.json$')  # Matches YYYYMMDD_HHMMSS_..._summary.json
+    timestamp_pattern = re.compile(r'^(\d{8}_\d{6})_summary\.json$')  # Matches YYYYMMDD_HHMMSS_summary.json
     
     for filename in os.listdir(evals_dir):
         match = timestamp_pattern.match(filename)
