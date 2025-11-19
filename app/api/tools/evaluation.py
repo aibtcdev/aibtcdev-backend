@@ -11,6 +11,9 @@ from app.services.ai.simple_workflows.evaluation import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT_TEMPLATE,
 )
+from app.services.ai.simple_workflows.network_school_evaluator import (
+    evaluate_user_posts,
+)
 import uuid
 
 # Configure logger
@@ -144,4 +147,67 @@ async def run_comprehensive_evaluation(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to run comprehensive evaluation: {str(e)}",
+        )
+
+
+@router.post("/network-school/{username}")
+async def evaluate_network_school_posts(
+    username: str,
+    request: Request,
+    profile: Profile = Depends(verify_profile),
+) -> JSONResponse:
+    """Evaluate Twitter/X posts for Network School alignment.
+
+    This endpoint evaluates a user's recent Twitter/X posts for alignment with
+    Network School and startup society ideals. It fetches up to 100 recent posts,
+    scores them using Grok's search capabilities, and returns the top posts with
+    payout recommendations.
+
+    Args:
+        username: Twitter/X username (with or without @ symbol)
+        request: The FastAPI request object
+        profile: The authenticated user's profile
+
+    Returns:
+        JSONResponse: Evaluation results including:
+            - username: Twitter username evaluated
+            - total_posts_analyzed: Number of posts analyzed
+            - top_posts: Top 3 posts with scores, reasons, and payouts
+            - usage_input_tokens: Input tokens used
+            - usage_output_tokens: Output tokens used
+            - usage_est_cost: Estimated cost in USD
+            - citations: List of tweet URLs analyzed
+            - search_queries: Search queries used by Grok
+            - raw_openrouter_response: Complete OpenRouter API response
+
+    Raises:
+        HTTPException: If there's an error during evaluation
+    """
+    try:
+        logger.info(
+            f"Network School evaluation request for @{username} from {request.client.host if request.client else 'unknown'} for profile {profile.id}"
+        )
+
+        # Run the evaluation
+        result = await evaluate_user_posts(username)
+
+        logger.info(
+            f"Network School evaluation completed for @{username}: "
+            f"{len(result.top_posts)} top posts, "
+            f"{result.total_posts_analyzed} total analyzed"
+        )
+
+        # Convert to dict and exclude raw_openrouter_response for frontend
+        response_data = result.model_dump(exclude={"raw_openrouter_response"})
+
+        return JSONResponse(content=response_data)
+
+    except Exception as e:
+        logger.error(
+            f"Failed to run Network School evaluation for @{username} (profile {profile.id})",
+            exc_info=e,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to evaluate Network School posts: {str(e)}",
         )
