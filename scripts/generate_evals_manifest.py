@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+import os
 """
 Utility script to generate or update evals-manifest.json based on contents of ./evals/.
 Scans for files matching *_summary.json and creates a manifest with path and name (timestamp).
@@ -13,6 +15,9 @@ import re
 
 def generate_manifest(evals_dir="./evals", manifest_path="./evals/evals-manifest.json"):
     """Generate manifest from JSON files in evals_dir matching new pattern."""
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    evals_dir = os.path.join(ROOT_DIR, evals_dir)
+    manifest_path = os.path.join(ROOT_DIR, manifest_path)
     manifest = []
     timestamp_pattern = re.compile(r'^(\d{8}_\d{6})_.*_summary\.json$')  # Matches YYYYMMDD_HHMMSS_..._summary.json
     
