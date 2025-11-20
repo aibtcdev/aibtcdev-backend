@@ -441,7 +441,9 @@ class ActionProposalHandler(BaseProposalHandler):
         try:
             _ = int(proposal_liquid_tokens or "0")
         except ValueError as e:
-            self.logger.warning(f"Invalid proposal_liquid_tokens '{proposal_liquid_tokens}': {e} - returning empty selection")
+            self.logger.warning(
+                f"Invalid proposal_liquid_tokens '{proposal_liquid_tokens}': {e} - returning empty selection"
+            )
             return LotterySelection()
 
         selection = LotterySelection()
@@ -533,11 +535,15 @@ class ActionProposalHandler(BaseProposalHandler):
             # Exact int weights (arbitrary precision, handles 1e16+ micro-units)
             weights = [int(agent.token_amount or "0") for agent in remaining_agents]
             if not weights or all(w == 0 for w in weights):
-                self.logger.warning("All remaining weights are zero, using equal weights")
+                self.logger.warning(
+                    "All remaining weights are zero, using equal weights"
+                )
                 weights = [1] * len(remaining_agents)
 
             total_weight = sum(weights)  # Exact bigint sum
-            rand_int = random.randrange(total_weight)  # Exact uniform int [0, total_weight)
+            rand_int = random.randrange(
+                total_weight
+            )  # Exact uniform int [0, total_weight)
 
             cumulative = 0
             selected_idx = 0
@@ -629,7 +635,7 @@ class ActionProposalHandler(BaseProposalHandler):
         is_update: bool = False,
     ):
         """Create fallback lottery result selecting up to max_selections agents."""
-        for agent in agents[:config.lottery.max_selections]:
+        for agent in agents[: config.lottery.max_selections]:
             lottery_selection.selected_wallets.append(
                 create_wallet_selection_dict(agent.wallet_id, agent.token_amount)
             )
@@ -653,7 +659,10 @@ class ActionProposalHandler(BaseProposalHandler):
                 liquid_tokens_at_creation=proposal.liquid_tokens or "0",
                 quorum_threshold="0",
                 total_selected_tokens=str(
-                    sum(int(w.get("token_amount", "0")) for w in lottery_selection.selected_wallets)
+                    sum(
+                        int(w.get("token_amount", "0"))
+                        for w in lottery_selection.selected_wallets
+                    )
                 ),
                 quorum_achieved=False,
                 quorum_percentage=config.lottery.quorum_percentage,
