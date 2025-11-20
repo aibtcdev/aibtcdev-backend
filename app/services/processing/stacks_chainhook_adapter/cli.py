@@ -76,8 +76,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--template",
-        action="store_true",
-        default=True,
+        action="store_false",
+        default=False,
         help="Use template-based generation (default: True)",
     )
 
@@ -134,7 +134,11 @@ async def transform_block(
                 block_height, network, use_template=False
             )
 
-        if not chainhook_data or not isinstance(chainhook_data, ChainHookData):
+        if (
+            not chainhook_data
+            or not isinstance(chainhook_data, ChainHookData)
+            or not getattr(chainhook_data, "apply", None)
+        ):
             print(
                 f"❌ Failed to retrieve data for block {block_height}", file=sys.stderr
             )
