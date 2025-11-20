@@ -32,9 +32,8 @@ import logging
 import os
 import random
 import sys
-from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import List, Optional
 
 # Add app to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -62,11 +61,10 @@ class LotterySimulator:
         agents_with_tokens: List[AgentWithWalletTokenDTO],
         proposal_liquid_tokens: str,
         bitcoin_block_hash: str,
-        bitcoin_block_height: int,
-        min_threshold: int = None,
-        max_selections: int = None,
-        quorum_percentage: float = None,
-        min_selections: int = None,
+        min_threshold: Optional[int] = None,
+        max_selections: Optional[int] = None,
+        quorum_percentage: Optional[float] = None,
+        min_selections: Optional[int] = None,
     ) -> LotterySelection:
         """Exact replica of ActionProposalHandler._conduct_quorum_lottery."""
         if min_threshold is None:
@@ -252,14 +250,14 @@ class LotterySimulator:
 
     def print_results(self, selection: LotterySelection):
         """Print detailed results in JSON format for debugging."""
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("LOTTERY RESULTS")
-        print("="*80)
+        print("=" * 80)
         print(json.dumps(selection.__dict__, indent=2, default=str))
         print("\nSelected Wallets:")
         for w in selection.selected_wallets:
             print(f"  - {w}")
-        print("="*80)
+        print("=" * 80)
 
 
 def load_agents_from_json(file_path: str) -> List[AgentWithWalletTokenDTO]:
@@ -274,53 +272,45 @@ def main():
     parser.add_argument(
         "--agents-json",
         required=True,
-        help="Path to JSON file with list of AgentWithWalletTokenDTO dicts"
+        help="Path to JSON file with list of AgentWithWalletTokenDTO dicts",
     )
     parser.add_argument(
-        "--liquid-tokens",
-        required=True,
-        help="Proposal liquid tokens (str)"
+        "--liquid-tokens", required=True, help="Proposal liquid tokens (str)"
     )
     parser.add_argument(
-        "--bitcoin-block-hash",
-        required=True,
-        help="Bitcoin block hash (str)"
+        "--bitcoin-block-hash", required=True, help="Bitcoin block hash (str)"
     )
     parser.add_argument(
         "--bitcoin-block-height",
         type=int,
         default=0,
-        help="Bitcoin block height (int, default 0)"
+        help="Bitcoin block height (int, default 0)",
     )
     parser.add_argument(
         "--min-threshold",
         type=int,
         default=None,
-        help="Override min_token_threshold (default: config.lottery.min_token_threshold)"
+        help="Override min_token_threshold (default: config.lottery.min_token_threshold)",
     )
     parser.add_argument(
         "--max-selections",
         type=int,
         default=None,
-        help="Override max_selections (default: config)"
+        help="Override max_selections (default: config)",
     )
     parser.add_argument(
         "--quorum-percentage",
         type=float,
         default=None,
-        help="Override quorum_percentage (default: 0.15)"
+        help="Override quorum_percentage (default: 0.15)",
     )
     parser.add_argument(
         "--min-selections",
         type=int,
         default=None,
-        help="Override min_selections (default: 3)"
+        help="Override min_selections (default: 3)",
     )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Verbose logging"
-    )
+    parser.add_argument("--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args()
 
@@ -334,7 +324,6 @@ def main():
         agents,
         args.liquid_tokens,
         args.bitcoin_block_hash,
-        args.bitcoin_block_height,
         args.min_threshold,
         args.max_selections,
         args.quorum_percentage,
