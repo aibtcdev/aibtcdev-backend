@@ -426,8 +426,6 @@ class ActionProposalHandler(BaseProposalHandler):
         proposal_liquid_tokens: str,
         bitcoin_block_hash: str,
         bitcoin_block_height: int,
-        quorum_percentage: float = 0.15,
-        max_selections: int = 100,
     ) -> LotterySelection:
         """Conduct a quorum-aware lottery to select agents for voting.
 
@@ -436,8 +434,6 @@ class ActionProposalHandler(BaseProposalHandler):
             proposal_liquid_tokens: Total liquid tokens from proposal
             bitcoin_block_hash: Bitcoin block hash to use as seed
             bitcoin_block_height: Bitcoin block height for transparency
-            quorum_percentage: Percentage needed for quorum (default 15%)
-            max_selections: Maximum number of agents to prevent runaway selection
 
         Returns:
             LotterySelection: Complete lottery results with quorum tracking
@@ -448,25 +444,50 @@ class ActionProposalHandler(BaseProposalHandler):
             self.logger.warning("No agents with tokens available for lottery")
             return selection
 
-        # Initialize lottery parameters
+        # Apply minimum token threshold filter
+        min_threshold = config.lottery.min_token_threshold
+        filtered_agents = [
+            agent
+            for agent in agents_with_tokens
+            if int(agent.token_amount or "0") >= min_threshold
+        ]
+        total_filtered = len(filtered_agents)
+        total_original = len(agents_with_tokens)
+
+        if total_filtered == 0:
+            self.logger.warning(
+                f"No agents meet min_token_threshold={min_threshold}, falling back to all {total_original} agents"
+            )
+            filtered_agents = agents_with_tokens
+            total_filtered = total_original
+
+        self.logger.info(
+            f"Lottery filtering: {total_original} total agents → {total_filtered} eligible (>= {min_threshold} tokens)"
+        )
+
+        # Use filtered agents for the rest of the process
+        agents_with_tokens = filtered_agents  # Override for consistency
+
+        # Initialize lottery parameters using config
         selection.liquid_tokens_at_creation = proposal_liquid_tokens
-        selection.quorum_percentage = quorum_percentage
+        selection.quorum_percentage = config.lottery.quorum_percentage
         selection.total_eligible_wallets = len(agents_with_tokens)
         selection.total_eligible_tokens = (
             QuorumCalculator.calculate_total_eligible_tokens(agents_with_tokens)
         )
         selection.quorum_threshold = QuorumCalculator.calculate_quorum_threshold(
-            proposal_liquid_tokens, quorum_percentage
+            proposal_liquid_tokens, config.lottery.quorum_percentage
         )
 
         self.logger.info(
             f"Starting quorum lottery: {len(agents_with_tokens)} eligible agents, "
-            f"liquid tokens: {proposal_liquid_tokens}, quorum needed: {selection.quorum_threshold}"
+            f"liquid tokens: {proposal_liquid_tokens}, quorum needed: {selection.quorum_threshold} "
+            f"(max_selections={config.lottery.max_selections})"
         )
 
         # Check if quorum is achievable
         if not QuorumCalculator.is_quorum_achievable(
-            proposal_liquid_tokens, selection.total_eligible_tokens, quorum_percentage
+            proposal_liquid_tokens, selection.total_eligible_tokens, config.lottery.quorum_percentage
         ):
             self.logger.warning(
                 f"Quorum not achievable: need {selection.quorum_threshold} tokens, "
@@ -494,7 +515,7 @@ class ActionProposalHandler(BaseProposalHandler):
         while (
             selected_tokens < quorum_threshold_decimal
             and remaining_agents
-            and len(selection.selected_wallets) < max_selections
+            and len(selection.selected_wallets) < config.lottery.max_selections
         ):
             round_number += 1
 
@@ -555,12 +576,12 @@ class ActionProposalHandler(BaseProposalHandler):
         selection.quorum_achieved = selected_tokens >= quorum_threshold_decimal
         selection.selection_rounds = round_number
 
-        # Ensure minimum selection for fairness (at least 3 agents if available)
-        min_agents = min(3, len(agents_with_tokens))
+        # Ensure minimum selection for fairness
+        min_agents = min(config.lottery.min_selections, len(agents_with_tokens))
         while (
             len(selection.selected_wallets) < min_agents
             and remaining_agents
-            and len(selection.selected_wallets) < max_selections
+            and len(selection.selected_wallets) < config.lottery.max_selections
         ):
             round_number += 1
             round_seed = f"{seed}_{round_number}"
@@ -584,7 +605,8 @@ class ActionProposalHandler(BaseProposalHandler):
         self.logger.info(
             f"Quorum lottery completed: selected {len(selection.selected_wallets)} agents "
             f"with {selection.total_selected_tokens} tokens "
-            f"({'✓' if selection.quorum_achieved else '✗'} quorum {'achieved' if selection.quorum_achieved else 'not achieved'})"
+            f"({'✓' if selection.quorum_achieved else '✗'} quorum {'achieved' if selection.quorum_achieved else 'not achieved'}) "
+            f"(cfg: min_th={min_threshold}, max_sel={config.lottery.max_selections}, min_sel={config.lottery.min_selections})"
         )
 
         return selection
