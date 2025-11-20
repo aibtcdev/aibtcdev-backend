@@ -5,7 +5,7 @@ A Python library that transforms Stacks API data into Chainhook-compatible forma
 enabling seamless migration from Hiro Chainhooks to direct Stacks API polling.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from .adapters.chainhook_adapter import StacksChainhookAdapter
 from .client import StacksAPIClient
 from .config import AdapterConfig
@@ -111,7 +111,7 @@ async def get_block_chainhook(
     network: str = "mainnet",
     api_url: str = None,
     use_template: bool = True,
-) -> Dict[str, Any]:
+) -> Union[ChainHookData, Dict[str, Any]]:
     """
     Quick function to get chainhook data for a single block.
 

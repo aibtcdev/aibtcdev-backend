@@ -1,7 +1,7 @@
 """Main Stacks to Chainhook adapter implementation."""
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .base import BaseAdapter
 from ..client import StacksAPIClient
@@ -81,7 +81,7 @@ class StacksChainhookAdapter(BaseAdapter):
         block_height: int,
         filters: Optional[List[Any]] = None,
         use_template: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> Union[ChainHookData, Dict[str, Any]]:
         """Get chainhook data for a specific block.
 
         Args:
@@ -118,10 +118,7 @@ class StacksChainhookAdapter(BaseAdapter):
             if use_template:
                 return self._apply_template_formatting(chainhook_data)
             else:
-                # Return as dict without templating
-                from dataclasses import asdict
-
-                return asdict(chainhook_data)
+                return chainhook_data
 
         except BlockNotFoundError:
             raise
