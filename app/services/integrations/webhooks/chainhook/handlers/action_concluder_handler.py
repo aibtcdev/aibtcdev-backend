@@ -219,14 +219,37 @@ class ActionConcluderHandler(ChainhookEventHandler):
             self.logger.warning("No contract identifier found in transaction data")
             return
 
-        # Find the DAO for this contract
-        dao_data = self._find_dao_for_contract(contract_identifier)
-        if not dao_data:
-            self.logger.warning(f"No DAO found for contract {contract_identifier}")
-            return
-
-        # Get the events from the transaction
+        # Get the events from the transaction (needed for voting contract extraction)
         events = tx_metadata.receipt.events if hasattr(tx_metadata, "receipt") else []
+
+        # Extract DAO-specific voting contract from conclude print event (handles direct/proxy calls)
+        voting_contract = None
+        for event in events:
+            if (
+                event.type == "SmartContractEvent"
+                and hasattr(event, "data")
+                and event.data.get("topic") == "print"
+                and "action-proposal-voting"
+                in event.data.get("contract_identifier", "")
+                and isinstance(event.data.get("value"), dict)
+                and "conclude-action-proposal"
+                in event.data["value"].get("notification", "")
+            ):
+                voting_contract = event.data["contract_identifier"]
+                break
+
+        effective_contract = voting_contract or contract_identifier
+        self.logger.info(
+            f"DAO lookup via effective_contract: {effective_contract} (proxy_mode: {voting_contract is not None})"
+        )
+
+        # Find the DAO for this (voting) contract
+        dao_data = self._find_dao_for_contract(effective_contract)
+        if not dao_data:
+            self.logger.warning(
+                f"No DAO found for effective_contract {effective_contract}"
+            )
+            return
 
         # Extract proposal conclusion data and update the proposal record
         conclusion_data = self._get_proposal_conclusion_data(events)

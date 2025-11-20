@@ -17,6 +17,7 @@ from . import (
     get_block_chainhook,
     StacksChainhookAdapter,
     AdapterConfig,
+    ChainHookData,
     __version__,
 )
 
@@ -75,8 +76,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--template",
-        action="store_true",
-        default=True,
+        action="store_false",
+        default=False,
         help="Use template-based generation (default: True)",
     )
 
@@ -95,7 +96,7 @@ async def transform_block(
     network: str = "testnet",
     api_url: Optional[str] = None,
     output_file: Optional[str] = None,
-    use_template: bool = True,
+    use_template: bool = False,
     pretty: bool = False,
     quiet: bool = False,
 ) -> bool:
@@ -123,13 +124,21 @@ async def transform_block(
             config = AdapterConfig(network=network, api_url=api_url)
             adapter = StacksChainhookAdapter(config)
             try:
-                chainhook_data = await adapter.get_block_chainhook(block_height)
+                chainhook_data = await adapter.get_block_chainhook(
+                    block_height, use_template=False
+                )
             finally:
                 await adapter.close()
         else:
-            chainhook_data = await get_block_chainhook(block_height, network)
+            chainhook_data = await get_block_chainhook(
+                block_height, network, use_template=False
+            )
 
-        if not chainhook_data or not chainhook_data.apply:
+        if (
+            not chainhook_data
+            or not isinstance(chainhook_data, ChainHookData)
+            or not getattr(chainhook_data, "apply", None)
+        ):
             print(
                 f"❌ Failed to retrieve data for block {block_height}", file=sys.stderr
             )
