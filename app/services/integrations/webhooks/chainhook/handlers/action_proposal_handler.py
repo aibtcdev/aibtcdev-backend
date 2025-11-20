@@ -521,47 +521,32 @@ class ActionProposalHandler(BaseProposalHandler):
         ):
             round_number += 1
 
-            # Set seed with round number for different results each round
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Calculate weights for remaining agents
-            weights = []
-            for agent in remaining_agents:
-                try:
-                    weight = float(agent.token_amount)
-                    if weight <= 0:
-                        weight = 1.0  # Minimum weight for zero-balance agents
-                    weights.append(weight)
-                except (ValueError, TypeError):
-                    weights.append(1.0)
+            # Exact int weights (arbitrary precision, handles 1e16+ micro-units)
+            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+            if not weights or all(w == 0 for w in weights):
+                self.logger.warning("All remaining weights are zero, using equal weights")
+                weights = [1] * len(remaining_agents)
 
-            if sum(weights) == 0:
-                self.logger.warning(
-                    "All remaining weights are zero, using equal weights"
-                )
-                weights = [1.0] * len(remaining_agents)
+            total_weight = sum(weights)  # Exact bigint sum
+            rand_int = random.randrange(total_weight)  # Exact uniform int [0, total_weight)
 
-            # Weighted random selection
-            total_weight = sum(weights)
-            rand_num = random.uniform(0, total_weight)
             cumulative = 0
             selected_idx = 0
-
             for idx, weight in enumerate(weights):
                 cumulative += weight
-                if rand_num <= cumulative:
+                if rand_int < cumulative:
                     selected_idx = idx
                     break
 
-            # Select the agent
             selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
-            # Update running totals
             selected_tokens += Decimal(selected_agent.token_amount)
 
             self.logger.debug(
@@ -570,8 +555,7 @@ class ActionProposalHandler(BaseProposalHandler):
                 f"(total: {selected_tokens}/{selection.quorum_threshold})"
             )
 
-            # Remove selected agent from remaining pool
-            remaining_agents.remove(selected_agent)
+            remaining_agents.pop(selected_idx)
 
         # Finalize selection results
         selection.total_selected_tokens = str(selected_tokens)
@@ -1014,7 +998,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                     quorum_threshold="0",  # No quorum calculation in fallback
                                     total_selected_tokens=str(
                                         sum(
-                                            int(float(w.get("token_amount", "0")))
+                                            int(w.get("token_amount", "0"))
                                             for w in lottery_selection.selected_wallets
                                         )
                                     ),
@@ -1023,7 +1007,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                     total_eligible_wallets=len(agents),
                                     total_eligible_tokens=str(
                                         sum(
-                                            int(float(agent.token_amount))
+                                            int(agent.token_amount or "0")
                                             for agent in agents
                                         )
                                     ),
@@ -1299,7 +1283,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                         quorum_threshold="0",
                                         total_selected_tokens=str(
                                             sum(
-                                                int(float(w.get("token_amount", "0")))
+                                                int(w.get("token_amount", "0"))
                                                 for w in lottery_selection.selected_wallets
                                             )
                                         ),
@@ -1308,7 +1292,7 @@ class ActionProposalHandler(BaseProposalHandler):
                                         total_eligible_wallets=len(agents),
                                         total_eligible_tokens=str(
                                             sum(
-                                                int(float(agent.token_amount))
+                                                int(agent.token_amount or "0")
                                                 for agent in agents
                                             )
                                         ),
