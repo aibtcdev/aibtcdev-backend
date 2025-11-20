@@ -254,7 +254,9 @@ class SchedulerConfig:
 class LotteryConfig:
     min_token_threshold: int = int(os.getenv("AIBTC_LOTTERY_MIN_TOKEN_THRESHOLD", "0"))
     max_selections: int = int(os.getenv("AIBTC_LOTTERY_MAX_SELECTIONS", "100"))
-    quorum_percentage: float = float(os.getenv("AIBTC_LOTTERY_QUORUM_PERCENTAGE", "0.15"))
+    quorum_percentage: float = float(
+        os.getenv("AIBTC_LOTTERY_QUORUM_PERCENTAGE", "0.15")
+    )
     min_selections: int = int(os.getenv("AIBTC_LOTTERY_MIN_SELECTIONS", "3"))
 
 

@@ -487,7 +487,9 @@ class ActionProposalHandler(BaseProposalHandler):
 
         # Check if quorum is achievable
         if not QuorumCalculator.is_quorum_achievable(
-            proposal_liquid_tokens, selection.total_eligible_tokens, config.lottery.quorum_percentage
+            proposal_liquid_tokens,
+            selection.total_eligible_tokens,
+            config.lottery.quorum_percentage,
         ):
             self.logger.warning(
                 f"Quorum not achievable: need {selection.quorum_threshold} tokens, "
