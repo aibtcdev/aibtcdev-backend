@@ -438,6 +438,12 @@ class ActionProposalHandler(BaseProposalHandler):
         Returns:
             LotterySelection: Complete lottery results with quorum tracking
         """
+        try:
+            _ = int(proposal_liquid_tokens or "0")
+        except ValueError as e:
+            self.logger.warning(f"Invalid proposal_liquid_tokens '{proposal_liquid_tokens}': {e} - returning empty selection")
+            return LotterySelection()
+
         selection = LotterySelection()
 
         if not agents_with_tokens:
@@ -573,15 +579,30 @@ class ActionProposalHandler(BaseProposalHandler):
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Select one more agent with equal probability
-            selected_agent = random.choice(remaining_agents)
+            # Weighted selection consistent with main loop (exact int)
+            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+            if not weights or all(w == 0 for w in weights):
+                weights = [1] * len(remaining_agents)
+
+            total_weight = sum(weights)
+            rand_int = random.randrange(total_weight)
+
+            cumulative = 0
+            selected_idx = 0
+            for idx, weight in enumerate(weights):
+                cumulative += weight
+                if rand_int < cumulative:
+                    selected_idx = idx
+                    break
+
+            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
             selected_tokens += Decimal(selected_agent.token_amount)
-            remaining_agents.remove(selected_agent)
+            remaining_agents.pop(selected_idx)
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
@@ -596,6 +617,57 @@ class ActionProposalHandler(BaseProposalHandler):
         )
 
         return selection
+
+    def _create_fallback_lottery_result(
+        self,
+        proposal,
+        dao_id: UUID,
+        agents: List[AgentWithWalletTokenDTO],
+        bitcoin_block_height: int,
+        bitcoin_block_hash: Optional[str],
+        lottery_selection: LotterySelection,
+        is_update: bool = False,
+    ):
+        """Create fallback lottery result selecting up to max_selections agents."""
+        for agent in agents[:config.lottery.max_selections]:
+            lottery_selection.selected_wallets.append(
+                create_wallet_selection_dict(agent.wallet_id, agent.token_amount)
+            )
+
+        fallback_bitcoin_hash = (
+            bitcoin_block_hash or f"fallback-hash{'-update' if is_update else ''}"
+        )
+        fallback_suffix = "-fallback-update" if is_update else "-fallback"
+        lottery_seed = hashlib.sha256(
+            f"{fallback_bitcoin_hash}{fallback_suffix}".encode()
+        ).hexdigest()
+
+        lottery_result = backend.create_lottery_result(
+            LotteryResultCreate(
+                proposal_id=proposal.id,
+                dao_id=dao_id,
+                bitcoin_block_height=bitcoin_block_height,
+                bitcoin_block_hash=fallback_bitcoin_hash,
+                lottery_seed=lottery_seed,
+                selected_wallets=lottery_selection.selected_wallets,
+                liquid_tokens_at_creation=proposal.liquid_tokens or "0",
+                quorum_threshold="0",
+                total_selected_tokens=str(
+                    sum(int(w.get("token_amount", "0")) for w in lottery_selection.selected_wallets)
+                ),
+                quorum_achieved=False,
+                quorum_percentage=config.lottery.quorum_percentage,
+                total_eligible_wallets=len(agents),
+                total_eligible_tokens=str(
+                    sum(int(agent.token_amount or "0") for agent in agents)
+                ),
+                selection_rounds=1,
+                selected_wallet_ids=extract_wallet_ids_from_selection(
+                    lottery_selection.selected_wallets
+                ),
+            )
+        )
+        return lottery_result
 
     async def _parse_and_generate_proposal_metadata(
         self, parameters: str, dao_name: str, proposal_id: str
@@ -958,74 +1030,19 @@ class ActionProposalHandler(BaseProposalHandler):
                         self.logger.warning(
                             "Bitcoin block hash or liquid tokens missing - using fallback lottery"
                         )
-                        self.logger.warning(f"Bitcoin block hash: {bitcoin_block_hash}")
-                        self.logger.warning(f"Liquid tokens: {proposal.liquid_tokens}")
-
-                        for agent in agents[:25]:  # Limit to 25 agents
-                            lottery_selection.selected_wallets.append(
-                                create_wallet_selection_dict(
-                                    agent.wallet_id, agent.token_amount
-                                )
-                            )
-
-                        self.logger.warning(
-                            f"Fallback lottery completed: selected {len(lottery_selection.selected_wallets)} agents"
+                        fallback_bitcoin_height = bitcoin_block_height or 0
+                        lottery_result = self._create_fallback_lottery_result(
+                            proposal,
+                            dao_data["id"],
+                            agents,
+                            fallback_bitcoin_height,
+                            bitcoin_block_hash,
+                            lottery_selection,
+                            is_update=False,
                         )
-
-                        # IMPORTANT: Also create lottery result for fallback case
-                        try:
-                            self.logger.info(
-                                "Creating lottery result for fallback case"
-                            )
-                            # Use dummy values for missing data
-                            fallback_bitcoin_height = bitcoin_block_height or 0
-                            fallback_bitcoin_hash = (
-                                bitcoin_block_hash or "fallback-hash"
-                            )
-
-                            lottery_result = backend.create_lottery_result(
-                                LotteryResultCreate(
-                                    proposal_id=proposal.id,
-                                    dao_id=dao_data["id"],
-                                    bitcoin_block_height=fallback_bitcoin_height,
-                                    bitcoin_block_hash=fallback_bitcoin_hash,
-                                    lottery_seed=hashlib.sha256(
-                                        f"{fallback_bitcoin_hash}-fallback".encode()
-                                    ).hexdigest(),
-                                    selected_wallets=lottery_selection.selected_wallets,
-                                    liquid_tokens_at_creation=proposal.liquid_tokens
-                                    or "0",
-                                    quorum_threshold="0",  # No quorum calculation in fallback
-                                    total_selected_tokens=str(
-                                        sum(
-                                            int(w.get("token_amount", "0"))
-                                            for w in lottery_selection.selected_wallets
-                                        )
-                                    ),
-                                    quorum_achieved=False,  # Fallback doesn't achieve quorum
-                                    quorum_percentage=0.15,
-                                    total_eligible_wallets=len(agents),
-                                    total_eligible_tokens=str(
-                                        sum(
-                                            int(agent.token_amount or "0")
-                                            for agent in agents
-                                        )
-                                    ),
-                                    selection_rounds=1,
-                                    # Backward compatibility
-                                    selected_wallet_ids=extract_wallet_ids_from_selection(
-                                        lottery_selection.selected_wallets
-                                    ),
-                                )
-                            )
-                            self.logger.info(
-                                f"Successfully created fallback lottery result with ID: {lottery_result.id}"
-                            )
-                        except Exception as fallback_lottery_error:
-                            self.logger.error(
-                                f"Failed to create fallback lottery result: {str(fallback_lottery_error)}"
-                            )
-                            raise
+                        self.logger.info(
+                            f"Successfully created fallback lottery result with ID: {lottery_result.id}"
+                        )
 
                     # Create evaluation queue messages for selected agents only
                     selected_wallet_ids = extract_wallet_ids_from_selection(
@@ -1244,72 +1261,20 @@ class ActionProposalHandler(BaseProposalHandler):
                             )
                         else:
                             # Fallback: use old system if no Bitcoin block hash or liquid tokens
-                            self.logger.warning(
-                                "Update path - Using fallback lottery system"
+                            self.logger.warning("Update path - Using fallback lottery")
+                            fallback_bitcoin_height = bitcoin_block_height or 0
+                            lottery_result = self._create_fallback_lottery_result(
+                                updated_proposal,
+                                dao_data["id"],
+                                agents,
+                                fallback_bitcoin_height,
+                                bitcoin_block_hash,
+                                lottery_selection,
+                                is_update=True,
                             )
-                            for agent in agents[:25]:  # Limit to 25 agents
-                                lottery_selection.selected_wallets.append(
-                                    create_wallet_selection_dict(
-                                        agent.wallet_id, agent.token_amount
-                                    )
-                                )
-
-                            self.logger.warning(
-                                f"Update path - Fallback lottery completed: selected {len(lottery_selection.selected_wallets)} agents"
+                            self.logger.info(
+                                f"Update path - Successfully created fallback lottery result with ID: {lottery_result.id}"
                             )
-
-                            # IMPORTANT: Also create lottery result for fallback case in update path
-                            try:
-                                self.logger.info(
-                                    "Update path - Creating lottery result for fallback case"
-                                )
-                                fallback_bitcoin_height = bitcoin_block_height or 0
-                                fallback_bitcoin_hash = (
-                                    bitcoin_block_hash or "fallback-hash-update"
-                                )
-
-                                lottery_result = backend.create_lottery_result(
-                                    LotteryResultCreate(
-                                        proposal_id=updated_proposal.id,
-                                        dao_id=dao_data["id"],
-                                        bitcoin_block_height=fallback_bitcoin_height,
-                                        bitcoin_block_hash=fallback_bitcoin_hash,
-                                        lottery_seed=hashlib.sha256(
-                                            f"{fallback_bitcoin_hash}-fallback-update".encode()
-                                        ).hexdigest(),
-                                        selected_wallets=lottery_selection.selected_wallets,
-                                        liquid_tokens_at_creation=updated_proposal.liquid_tokens
-                                        or "0",
-                                        quorum_threshold="0",
-                                        total_selected_tokens=str(
-                                            sum(
-                                                int(w.get("token_amount", "0"))
-                                                for w in lottery_selection.selected_wallets
-                                            )
-                                        ),
-                                        quorum_achieved=False,
-                                        quorum_percentage=0.15,
-                                        total_eligible_wallets=len(agents),
-                                        total_eligible_tokens=str(
-                                            sum(
-                                                int(agent.token_amount or "0")
-                                                for agent in agents
-                                            )
-                                        ),
-                                        selection_rounds=1,
-                                        selected_wallet_ids=extract_wallet_ids_from_selection(
-                                            lottery_selection.selected_wallets
-                                        ),
-                                    )
-                                )
-                                self.logger.info(
-                                    f"Update path - Successfully created fallback lottery result with ID: {lottery_result.id}"
-                                )
-                            except Exception as update_fallback_error:
-                                self.logger.error(
-                                    f"Update path - Failed to create fallback lottery result: {str(update_fallback_error)}"
-                                )
-                                raise
 
                         # Create evaluation queue messages for selected agents only
                         selected_wallet_ids = extract_wallet_ids_from_selection(
