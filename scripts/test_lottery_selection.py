@@ -170,28 +170,8 @@ class LotterySimulator:
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Exact int weights (arbitrary precision, handles 1e16+ micro-units)
-            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
-            if not weights or all(w == 0 for w in weights):
-                self.logger.warning(
-                    "All remaining weights are zero, using equal weights"
-                )
-                weights = [1] * len(remaining_agents)
+            selected_agent = self._perform_weighted_selection(remaining_agents)
 
-            total_weight = sum(weights)  # Exact bigint sum
-            rand_int = random.randrange(
-                total_weight
-            )  # Exact uniform int [0, total_weight)
-
-            cumulative = 0
-            selected_idx = 0
-            for idx, weight in enumerate(weights):
-                cumulative += weight
-                if rand_int < cumulative:
-                    selected_idx = idx
-                    break
-
-            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
@@ -204,8 +184,6 @@ class LotterySimulator:
                 f"with {selected_agent.token_amount} tokens "
                 f"(total: {selected_tokens}/{selection.quorum_threshold})"
             )
-
-            remaining_agents.pop(selected_idx)
 
         # Finalize selection results
         selection.total_selected_tokens = str(selected_tokens)
@@ -223,30 +201,14 @@ class LotterySimulator:
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Weighted selection consistent with main loop (exact int)
-            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
-            if not weights or all(w == 0 for w in weights):
-                weights = [1] * len(remaining_agents)
+            selected_agent = self._perform_weighted_selection(remaining_agents)
 
-            total_weight = sum(weights)
-            rand_int = random.randrange(total_weight)
-
-            cumulative = 0
-            selected_idx = 0
-            for idx, weight in enumerate(weights):
-                cumulative += weight
-                if rand_int < cumulative:
-                    selected_idx = idx
-                    break
-
-            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
             selected_tokens += Decimal(selected_agent.token_amount)
-            remaining_agents.pop(selected_idx)
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
@@ -261,6 +223,28 @@ class LotterySimulator:
         )
 
         return selection
+
+    def _perform_weighted_selection(
+        self, remaining_agents: List[AgentWithWalletTokenDTO]
+    ) -> AgentWithWalletTokenDTO:
+        """Perform a single round of weighted random agent selection (assumes random is seeded)."""
+        weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+        if not weights or all(w == 0 for w in weights):
+            self.logger.warning("All remaining weights are zero, using equal weights")
+            weights = [1] * len(remaining_agents)
+
+        total_weight = sum(weights)
+        rand_int = random.randrange(total_weight)
+
+        cumulative = 0
+        selected_idx = 0
+        for idx, weight in enumerate(weights):
+            cumulative += weight
+            if rand_int < cumulative:
+                selected_idx = idx
+                break
+
+        return remaining_agents.pop(selected_idx)
 
     def print_results(self, selection: LotterySelection):
         """Print detailed results in JSON format for debugging."""

@@ -433,7 +433,7 @@ class ActionProposalHandler(BaseProposalHandler):
             agents_with_tokens: List of agents with their token amounts
             proposal_liquid_tokens: Total liquid tokens from proposal
             bitcoin_block_hash: Bitcoin block hash to use as seed
-            bitcoin_block_height: Bitcoin block height for transparency
+            bitcoin_block_height: Bitcoin block height for transparency/logging/visual ID (not used in seed/selection)
 
         Returns:
             LotterySelection: Complete lottery results with quorum tracking
@@ -532,28 +532,8 @@ class ActionProposalHandler(BaseProposalHandler):
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Exact int weights (arbitrary precision, handles 1e16+ micro-units)
-            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
-            if not weights or all(w == 0 for w in weights):
-                self.logger.warning(
-                    "All remaining weights are zero, using equal weights"
-                )
-                weights = [1] * len(remaining_agents)
+            selected_agent = self._perform_weighted_selection(remaining_agents)
 
-            total_weight = sum(weights)  # Exact bigint sum
-            rand_int = random.randrange(
-                total_weight
-            )  # Exact uniform int [0, total_weight)
-
-            cumulative = 0
-            selected_idx = 0
-            for idx, weight in enumerate(weights):
-                cumulative += weight
-                if rand_int < cumulative:
-                    selected_idx = idx
-                    break
-
-            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
@@ -566,8 +546,6 @@ class ActionProposalHandler(BaseProposalHandler):
                 f"with {selected_agent.token_amount} tokens "
                 f"(total: {selected_tokens}/{selection.quorum_threshold})"
             )
-
-            remaining_agents.pop(selected_idx)
 
         # Finalize selection results
         selection.total_selected_tokens = str(selected_tokens)
@@ -585,30 +563,14 @@ class ActionProposalHandler(BaseProposalHandler):
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Weighted selection consistent with main loop (exact int)
-            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
-            if not weights or all(w == 0 for w in weights):
-                weights = [1] * len(remaining_agents)
+            selected_agent = self._perform_weighted_selection(remaining_agents)
 
-            total_weight = sum(weights)
-            rand_int = random.randrange(total_weight)
-
-            cumulative = 0
-            selected_idx = 0
-            for idx, weight in enumerate(weights):
-                cumulative += weight
-                if rand_int < cumulative:
-                    selected_idx = idx
-                    break
-
-            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
             selected_tokens += Decimal(selected_agent.token_amount)
-            remaining_agents.pop(selected_idx)
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
@@ -623,6 +585,28 @@ class ActionProposalHandler(BaseProposalHandler):
         )
 
         return selection
+
+    def _perform_weighted_selection(
+        self, remaining_agents: List[AgentWithWalletTokenDTO]
+    ) -> AgentWithWalletTokenDTO:
+        """Perform a single round of weighted random agent selection (assumes random is seeded)."""
+        weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+        if not weights or all(w == 0 for w in weights):
+            self.logger.warning("All remaining weights are zero, using equal weights")
+            weights = [1] * len(remaining_agents)
+
+        total_weight = sum(weights)
+        rand_int = random.randrange(total_weight)
+
+        cumulative = 0
+        selected_idx = 0
+        for idx, weight in enumerate(weights):
+            cumulative += weight
+            if rand_int < cumulative:
+                selected_idx = idx
+                break
+
+        return remaining_agents.pop(selected_idx)
 
     def _create_fallback_lottery_result(
         self,
@@ -650,7 +634,26 @@ class ActionProposalHandler(BaseProposalHandler):
             LotteryResult: The created lottery result object.
 
         """
-        for agent in agents[: config.lottery.max_selections]:
+        # Apply minimum token threshold filter for consistency with main lottery path
+        min_threshold = config.lottery.min_token_threshold
+        filtered_agents = [
+            agent for agent in agents if int(agent.token_amount or "0") >= min_threshold
+        ]
+        total_filtered = len(filtered_agents)
+        total_original = len(agents)
+
+        if total_filtered == 0:
+            self.logger.warning(
+                f"No agents meet min_token_threshold={min_threshold}, falling back to all {total_original} agents"
+            )
+            filtered_agents = agents
+            total_filtered = total_original
+
+        self.logger.info(
+            f"Fallback filtering: {total_original} total agents → {total_filtered} eligible (>= {min_threshold} tokens)"
+        )
+
+        for agent in filtered_agents[: config.lottery.max_selections]:
             lottery_selection.selected_wallets.append(
                 create_wallet_selection_dict(agent.wallet_id, agent.token_amount)
             )
@@ -1055,18 +1058,24 @@ class ActionProposalHandler(BaseProposalHandler):
                             "Bitcoin block hash or liquid tokens missing - using fallback lottery"
                         )
                         fallback_bitcoin_height = bitcoin_block_height or 0
-                        lottery_result = self._create_fallback_lottery_result(
-                            proposal,
-                            dao_data["id"],
-                            agents,
-                            fallback_bitcoin_height,
-                            bitcoin_block_hash,
-                            lottery_selection,
-                            is_update=False,
-                        )
-                        self.logger.info(
-                            f"Successfully created fallback lottery result with ID: {lottery_result.id}"
-                        )
+                        try:
+                            lottery_result = self._create_fallback_lottery_result(
+                                proposal,
+                                dao_data["id"],
+                                agents,
+                                fallback_bitcoin_height,
+                                bitcoin_block_hash,
+                                lottery_selection,
+                                is_update=False,
+                            )
+                            self.logger.info(
+                                f"Successfully created fallback lottery result with ID: {lottery_result.id}"
+                            )
+                        except Exception as fallback_error:
+                            self.logger.error(
+                                f"Fallback lottery failed for proposal {proposal.id}, dao {dao_data['id']}: {str(fallback_error)}"
+                            )
+                            raise
 
                     # Create evaluation queue messages for selected agents only
                     selected_wallet_ids = extract_wallet_ids_from_selection(
@@ -1287,18 +1296,24 @@ class ActionProposalHandler(BaseProposalHandler):
                             # Fallback: use old system if no Bitcoin block hash or liquid tokens
                             self.logger.warning("Update path - Using fallback lottery")
                             fallback_bitcoin_height = bitcoin_block_height or 0
-                            lottery_result = self._create_fallback_lottery_result(
-                                updated_proposal,
-                                dao_data["id"],
-                                agents,
-                                fallback_bitcoin_height,
-                                bitcoin_block_hash,
-                                lottery_selection,
-                                is_update=True,
-                            )
-                            self.logger.info(
-                                f"Update path - Successfully created fallback lottery result with ID: {lottery_result.id}"
-                            )
+                            try:
+                                lottery_result = self._create_fallback_lottery_result(
+                                    updated_proposal,
+                                    dao_data["id"],
+                                    agents,
+                                    fallback_bitcoin_height,
+                                    bitcoin_block_hash,
+                                    lottery_selection,
+                                    is_update=True,
+                                )
+                                self.logger.info(
+                                    f"Update path - Successfully created fallback lottery result with ID: {lottery_result.id}"
+                                )
+                            except Exception as fallback_error:
+                                self.logger.error(
+                                    f"Update path fallback lottery failed for proposal {updated_proposal.id}, dao {dao_data['id']}: {str(fallback_error)}"
+                                )
+                                raise
 
                         # Create evaluation queue messages for selected agents only
                         selected_wallet_ids = extract_wallet_ids_from_selection(
