@@ -4,13 +4,13 @@ Test script to simulate the exact quorum lottery selection process from ActionPr
 
 Usage:
     python scripts/test_lottery_selection.py \\
-        --agents-json agents.json \\
+        --agents-json test_lottery_selection_agents.json \\
         --liquid-tokens "10000000" \\
         --bitcoin-block-hash "0000000000000000000123abc..." \\
         --bitcoin-block-height 488 \\
         --min-threshold 1000000
 
-agents.json example:
+test_lottery_selection_agents.json example:
 [
     {
         "agent_id": "123e4567-e89b-12d3-a456-426614174000",
