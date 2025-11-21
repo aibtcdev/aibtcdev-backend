@@ -18,17 +18,17 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 - [x] **2.3** Update `TweetData` model: Add `videos: Optional[List[str]]`.
 
 ### Phase 3: Fetching/Processing (processors/twitter.py)
-- [ ] **3.1** `fetch_tweet`: Add `"videos": tweet.videos or []`.
-- [ ] **3.2** Add `extract_tweet_videos(tweet_data) → List[str]` (mirrors images).
-- [ ] **3.3** Add `format_tweet_videos(tweet_data, tweet_db_id) → List[Dict]` (`video_url` format, mirrors images).
-- [ ] **3.4** `format_tweet`: Add `<videos>{str(tweet.videos)}</videos>` XML.
-- [ ] **3.5** `process_tweets`: `tweet_media = tweet_images + tweet_videos`; return `(content, tweet_media)`.
+- [x] **3.1** `fetch_tweet`: Add `"videos": tweet.videos or []`.
+- [x] **3.2** Add `extract_tweet_videos(tweet_data) → List[str]` (mirrors images).
+- [x] **3.3** Add `format_tweet_videos(tweet_data, tweet_db_id) → List[Dict]` (`video_url` format, mirrors images).
+- [x] **3.4** `format_tweet`: Add `<videos>{str(tweet.videos)}</videos>` XML.
+- [x] **3.5** `process_tweets`: `tweet_media = tweet_images + tweet_videos`; return `(content, tweet_media)`.
 
 ### Phase 4: Media Utils (processors/images.py → media.py)
-- [ ] **4.1** Rename `images.py` → `media.py`; update imports.
-- [ ] **4.2** `process_images → process_media`: Handle images + videos (new `extract_video_urls` in utils.py).
-- [ ] **4.3** Add `format_videos(video_urls)` (mirrors `format_images`).
-- [ ] **4.4** `format_images_for_messages → format_media_for_messages(media)`.
+- [x] **4.1** Rename `images.py` → `media.py`; update imports.
+- [x] **4.2** `process_images → process_media`: Handle images + videos (new `extract_video_urls` in utils.py).
+- [x] **4.3** Add `format_videos(video_urls)` (mirrors `format_images`).
+- [x] **4.4** `format_images_for_messages → format_media_for_messages(media)`.
 
 ### Phase 5: AI Workflows
 - [ ] **5.1** `evaluation.py`/`evaluation_openrouter_v2.py`: `proposal_images → proposal_media`; append videos to `user_message_content`.
@@ -55,4 +55,4 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 - **DB Perf**: GIN index on `videos` array? Query patterns?
 - **Backfill Script**: Need `scripts/backfill_tweet_videos.py`?
 
-**Progress**: 2/7 | Last Updated: 2025-11-21
+**Progress**: 4/7 | Last Updated: 2025-11-21

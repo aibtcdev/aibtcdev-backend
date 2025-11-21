@@ -63,6 +63,7 @@ async def fetch_tweet(tweet_db_id: UUID) -> Optional[Dict[str, Any]]:
             "entities": tweet.entities or {},
             "attachments": tweet.attachments or {},
             "images": tweet.images or [],
+            "videos": tweet.videos or [],
             "tweet_images_analysis": tweet.tweet_images_analysis or [],
             "quoted_tweet_db_id": tweet.quoted_tweet_db_id,
             "quoted_tweet_id": tweet.quoted_tweet_id,
@@ -293,7 +294,8 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
     <verified_type>{author_verified_type or "None"}</verified_type>
     <bitcoin_face_score>{bitcoin_face_str}</bitcoin_face_score>
   </author_info>
-  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>{replied_post_xml}{quoted_post_xml}
+  <tweet_images_analysis>{str(tweet_images_analysis) if tweet_images_analysis else "None"}</tweet_images_analysis>
+  <videos>{str(tweet_data.get("videos", []))}</videos>{replied_post_xml}{quoted_post_xml}
 </tweet>
 """
         return formatted_tweet.strip()
@@ -332,6 +334,35 @@ def extract_tweet_images(tweet_data: Dict[str, Any]) -> List[str]:
         return []
 
 
+def extract_tweet_videos(tweet_data: Dict[str, Any]) -> List[str]:
+    """Extract video URLs from stored tweet data.
+
+    Args:
+        tweet_data: Tweet data dictionary from database
+
+    Returns:
+        List of video URLs
+    """
+    try:
+        # Get videos directly from the stored tweet data
+        video_urls = tweet_data.get("videos", [])
+
+        # Ensure we have a list and remove any None values
+        if not isinstance(video_urls, list):
+            video_urls = []
+        else:
+            video_urls = [url for url in video_urls if url]
+
+        logger.debug(
+            f"Retrieved {len(video_urls)} videos from stored tweet: {video_urls}"
+        )
+        return video_urls
+
+    except Exception as e:
+        logger.error(f"Error extracting videos from stored tweet: {str(e)}")
+        return []
+
+
 def format_tweet_images(
     tweet_data: Dict[str, Any], tweet_db_id: UUID
 ) -> List[Dict[str, Any]]:
@@ -361,6 +392,35 @@ def format_tweet_images(
     return tweet_images
 
 
+def format_tweet_videos(
+    tweet_data: Dict[str, Any], tweet_db_id: UUID
+) -> List[Dict[str, Any]]:
+    """Format tweet videos for LLM consumption.
+
+    Args:
+        tweet_data: Tweet data dictionary
+        tweet_db_id: Database ID of the tweet
+
+    Returns:
+        List of formatted video dictionaries
+    """
+    tweet_video_urls = extract_tweet_videos(tweet_data)
+    tweet_videos = []
+
+    for video_url in tweet_video_urls:
+        tweet_videos.append(
+            {
+                "type": "video_url",
+                "video_url": {"url": video_url, "detail": "auto"},
+                "source": "tweet",
+                "tweet_id": tweet_data.get("id"),  # Original Twitter ID
+                "tweet_db_id": str(tweet_db_id),  # Database ID
+            }
+        )
+
+    return tweet_videos
+
+
 async def process_tweets(
     tweet_db_ids: List[UUID],
     proposal_id: str = "unknown",
@@ -385,7 +445,7 @@ async def process_tweets(
     )
 
     tweet_contents = []
-    tweet_images = []
+    tweet_media = []
 
     for tweet_db_id in tweet_db_ids:
         if not isinstance(tweet_db_id, UUID):
@@ -414,55 +474,60 @@ async def process_tweets(
             f"[TwitterProcessor:{proposal_id}] Formatted tweet content: {formatted_tweet[:200]}..."
         )
 
-        # Extract and format images from stored tweet
+        # Extract and format media from stored tweet
         tweet_image_blobs = format_tweet_images(tweet_data, tweet_db_id)
-        tweet_images.extend(tweet_image_blobs)
+        tweet_media.extend(tweet_image_blobs)
+
+        tweet_video_blobs = format_tweet_videos(tweet_data, tweet_db_id)
+        tweet_media.extend(tweet_video_blobs)
 
         logger.debug(
-            f"[TwitterProcessor:{proposal_id}] Processed tweet {tweet_db_id}, found {len(tweet_image_blobs)} images"
+            f"[TwitterProcessor:{proposal_id}] Processed tweet {tweet_db_id}, found {len(tweet_image_blobs)} images, {len(tweet_video_blobs)} videos"
         )
 
     # Combine all tweet content
     combined_tweet_content = "\n\n".join(tweet_contents) if tweet_contents else ""
 
     logger.info(
-        f"[TwitterProcessor:{proposal_id}] Processed {len(tweet_contents)} tweets, found {len(tweet_images)} total images."
+        f"[TwitterProcessor:{proposal_id}] Processed {len(tweet_contents)} tweets, found {len(tweet_media)} total media items."
     )
 
-    return combined_tweet_content, tweet_images
+    return combined_tweet_content, tweet_media
 
 
-def count_tweet_images(tweet_images: List[Dict[str, Any]]) -> int:
-    """Count the number of tweet images.
+def count_tweet_media(tweet_media: List[Dict[str, Any]]) -> int:
+    """Count the number of tweet media items (images + videos).
 
     Args:
-        tweet_images: List of tweet image dictionaries
+        tweet_media: List of tweet media dictionaries
 
     Returns:
-        Number of tweet images
+        Number of tweet media items
     """
-    if not tweet_images:
+    if not tweet_media:
         return 0
 
-    return len([img for img in tweet_images if img.get("source") == "tweet"])
+    return len([m for m in tweet_media if m.get("source") == "tweet" and m.get("type") in ("image_url", "video_url")])
 
 
-def get_tweet_image_urls(tweet_images: List[Dict[str, Any]]) -> List[str]:
-    """Extract image URLs from tweet images.
+def get_tweet_media_urls(tweet_media: List[Dict[str, Any]]) -> List[str]:
+    """Extract media URLs from tweet media.
 
     Args:
-        tweet_images: List of tweet image dictionaries
+        tweet_media: List of tweet media dictionaries
 
     Returns:
-        List of image URLs from tweets
+        List of media URLs from tweets
     """
-    if not tweet_images:
+    if not tweet_media:
         return []
 
     urls = []
-    for image in tweet_images:
-        if image.get("source") == "tweet" and image.get("type") == "image_url":
-            url = image.get("image_url", {}).get("url")
+    for item in tweet_media:
+        if item.get("source") == "tweet":
+            item_type = item.get("type")
+            url_key = "image_url" if item_type == "image_url" else "video_url"
+            url = item.get(url_key, {}).get("url")
             if url:
                 urls.append(url)
 
