@@ -320,3 +320,23 @@ def create_dao_proposal_filter(success_only: bool = True) -> CompositeFilter:
     )
 
     return CompositeFilter([propose_filter, conclude_filter, vote_filter], logic="OR")
+
+
+def create_dao_charter_update_filter(
+    contract_pattern: Optional[str] = None,
+    success_only: bool = True,
+) -> ContractCallFilter:
+    """Create a filter for set-dao-charter transactions.
+
+    Args:
+        contract_pattern: Optional pattern to match contract identifier
+        success_only: Only match successful transactions
+
+    Returns:
+        ContractCallFilter: Configured filter for set-dao-charter
+    """
+    return ContractCallFilter(
+        method="set-dao-charter",
+        contract_pattern=contract_pattern or r".*-dao-charter",
+        success_only=success_only,
+    )
