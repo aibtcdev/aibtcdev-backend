@@ -3,19 +3,19 @@
 ## Overview
 Add support for video media (videos, animated_gifs) from X/Twitter posts, stored as `videos: List[str]` alongside `images`. Use OpenAI-compatible `{"type": "video_url", "video_url": {"url": url, "detail": "auto"}}` format in AI messages. Parse via Twitter API `includes.media`; backward-compatible.
 
-**Status**: Planned | In Progress | ✅ Completed
+**Status**: Phase 1-2 ✅ Completed
 
 ## Tasks (Checklist)
 
 ### Phase 1: Models & Backend (DB Schema)
-- [ ] **1.1** Add `videos: Optional[List[str]] = None` to `XTweetBase`/`XTweetCreate` in `app/backend/models.py`.
-- [ ] **1.2** Supabase migration: `ALTER TABLE x_tweets ADD COLUMN videos text[]; UPDATE x_tweets SET videos = ARRAY[]::text[];` (run manually).
-- [ ] **1.3** Verify SupabaseBackend CRUD auto-handles `videos` (Pydantic model_dump).
+- [x] **1.1** Add `videos: Optional[List[str]] = None` to `XTweetBase`/`XTweetCreate` in `app/backend/models.py`.
+- [x] **1.2** Supabase migration: `ALTER TABLE x_tweets ADD COLUMN videos text[]; UPDATE x_tweets SET videos = ARRAY[]::text[];` (run manually).
+- [x] **1.3** Verify SupabaseBackend CRUD auto-handles `videos` (Pydantic model_dump).
 
 ### Phase 2: Ingestion (twitter_service.py)
-- [ ] **2.1** In `TweetRepository.store_tweet`: Parse `response.includes.media` → `images=[]` (photo), `videos=[]` (video/animated_gif).
-- [ ] **2.2** Pass `images`, `videos` to `XTweetCreate`; update tweet post-creation if needed.
-- [ ] **2.3** Update `TweetData` model: Add `videos: Optional[List[str]]`.
+- [x] **2.1** In `TweetRepository.store_tweet`: Parse `response.includes.media` → `images=[]` (photo), `videos=[]` (video/animated_gif).
+- [x] **2.2** Pass `images`, `videos` to `XTweetCreate`; update tweet post-creation if needed.
+- [x] **2.3** Update `TweetData` model: Add `videos: Optional[List[str]]`.
 
 ### Phase 3: Fetching/Processing (processors/twitter.py)
 - [ ] **3.1** `fetch_tweet`: Add `"videos": tweet.videos or []`.
@@ -55,4 +55,4 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 - **DB Perf**: GIN index on `videos` array? Query patterns?
 - **Backfill Script**: Need `scripts/backfill_tweet_videos.py`?
 
-**Progress**: 0/N | Last Updated: [Date]
+**Progress**: 2/7 | Last Updated: 2025-11-21
