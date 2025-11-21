@@ -1,0 +1,58 @@
+# Video Support for X Posts - Feature Plan
+
+## Overview
+Add support for video media (videos, animated_gifs) from X/Twitter posts, stored as `videos: List[str]` alongside `images`. Use OpenAI-compatible `{"type": "video_url", "video_url": {"url": url, "detail": "auto"}}` format in AI messages. Parse via Twitter API `includes.media`; backward-compatible.
+
+**Status**: Planned | In Progress | ✅ Completed
+
+## Tasks (Checklist)
+
+### Phase 1: Models & Backend (DB Schema)
+- [ ] **1.1** Add `videos: Optional[List[str]] = None` to `XTweetBase`/`XTweetCreate` in `app/backend/models.py`.
+- [ ] **1.2** Supabase migration: `ALTER TABLE x_tweets ADD COLUMN videos text[]; UPDATE x_tweets SET videos = ARRAY[]::text[];` (run manually).
+- [ ] **1.3** Verify SupabaseBackend CRUD auto-handles `videos` (Pydantic model_dump).
+
+### Phase 2: Ingestion (twitter_service.py)
+- [ ] **2.1** In `TweetRepository.store_tweet`: Parse `response.includes.media` → `images=[]` (photo), `videos=[]` (video/animated_gif).
+- [ ] **2.2** Pass `images`, `videos` to `XTweetCreate`; update tweet post-creation if needed.
+- [ ] **2.3** Update `TweetData` model: Add `videos: Optional[List[str]]`.
+
+### Phase 3: Fetching/Processing (processors/twitter.py)
+- [ ] **3.1** `fetch_tweet`: Add `"videos": tweet.videos or []`.
+- [ ] **3.2** Add `extract_tweet_videos(tweet_data) → List[str]` (mirrors images).
+- [ ] **3.3** Add `format_tweet_videos(tweet_data, tweet_db_id) → List[Dict]` (`video_url` format, mirrors images).
+- [ ] **3.4** `format_tweet`: Add `<videos>{str(tweet.videos)}</videos>` XML.
+- [ ] **3.5** `process_tweets`: `tweet_media = tweet_images + tweet_videos`; return `(content, tweet_media)`.
+
+### Phase 4: Media Utils (processors/images.py → media.py)
+- [ ] **4.1** Rename `images.py` → `media.py`; update imports.
+- [ ] **4.2** `process_images → process_media`: Handle images + videos (new `extract_video_urls` in utils.py).
+- [ ] **4.3** Add `format_videos(video_urls)` (mirrors `format_images`).
+- [ ] **4.4** `format_images_for_messages → format_media_for_messages(media)`.
+
+### Phase 5: AI Workflows
+- [ ] **5.1** `evaluation.py`/`evaluation_openrouter_v2.py`: `proposal_images → proposal_media`; append videos to `user_message_content`.
+- [ ] **5.2** `recommendation.py`/`metadata.py`: `create_chat_messages`: Extend with `format_media_for_messages(proposal_media)`.
+- [ ] **5.3** Update helpers: `count_images → count_media` (`{"images": N, "videos": M}`); `get_image_urls → get_media_urls`.
+
+### Phase 6: Utils & Tools
+- [ ] **6.1** `app/lib/utils.py`: Add `extract_video_urls(text)` (regex: .mp4, youtube.com/watch?v=, twitter video URLs).
+- [ ] **6.2** `tools/twitter.py`: Minor: Expose videos in `get_tweet` response if needed.
+- [ ] **6.3** `tweet_task.py`: No changes (uses existing storage).
+
+### Phase 7: Testing & Monitoring
+- [ ] **7.1** Test ingestion: Tweet w/video → DB has `videos`.
+- [ ] **7.2** Test AI: Evaluate tweet w/video → `messages` has `video_url`.
+- [ ] **7.3** Metrics: Update logs (`media_processed: {"images": N, "videos": M}`).
+- [ ] **7.4** Backfill DB: Script to parse existing `attachments` → populate `videos`.
+
+## Open Questions
+- **Video Limits**: Model timeouts/costs for long videos? Test w/ 60s+ clips.
+- **Fallbacks**: Animated GIFs as video? Use `preview_image_url` if video fails?
+- **Unsupported Media**: Polls/external embeds → Skip/log?
+- **Storage**: Videos URLs only (no download)? Expire/cache policy?
+- **Regex for extract_video_urls**: Specific patterns (Twitter video URLs, YouTube, Vimeo)?
+- **DB Perf**: GIN index on `videos` array? Query patterns?
+- **Backfill Script**: Need `scripts/backfill_tweet_videos.py`?
+
+**Progress**: 0/N | Last Updated: [Date]
