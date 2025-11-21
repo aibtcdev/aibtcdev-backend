@@ -196,6 +196,7 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
       <bitcoin_face_score>{replied_bitcoin_face_str}</bitcoin_face_score>
     </author_info>
     <tweet_images_analysis>{str(replied_tweet.tweet_images_analysis) if replied_tweet.tweet_images_analysis else "None"}</tweet_images_analysis>
+    <videos>{str(replied_tweet.videos or [])}</videos>
   </replied_to_post>"""
             except Exception as e:
                 logger.warning(
@@ -271,6 +272,7 @@ def format_tweet(tweet_data: Dict[str, Any]) -> str:
       <bitcoin_face_score>{quoted_bitcoin_face_str}</bitcoin_face_score>
     </author_info>
     <tweet_images_analysis>{str(quoted_tweet.tweet_images_analysis) if quoted_tweet.tweet_images_analysis else "None"}</tweet_images_analysis>
+    <videos>{str(quoted_tweet.videos or [])}</videos>
   </quoted_post>"""
             except Exception as e:
                 logger.warning(
