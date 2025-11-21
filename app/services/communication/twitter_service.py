@@ -1032,6 +1032,27 @@ class TwitterService:
             logger.error(f"Failed to get timeline for user {user_id}: {str(e)}")
             return []
 
+    def extract_media(self, response: Optional[tweepy.Response] = None) -> tuple[List[str], List[str]]:
+        """Extract images and videos from a tweet response."""
+        images: List[str] = []
+        videos: List[str] = []
+        if not response or not response.includes:
+            return images, videos
+
+        media_list = response.includes.get("media", [])
+        for media in media_list:
+            if media.type == "photo":
+                images.append(media.url)
+            elif media.type in ["video", "animated_gif"]:
+                variants = getattr(media, "variants", [])
+                if variants:
+                    # Select highest bitrate variant
+                    best_variant = max(variants, key=lambda v: getattr(v, "bitrate", 0))
+                    videos.append(getattr(best_variant, "url", getattr(media, "url", "")))
+                else:
+                    videos.append(getattr(media, "url", ""))
+        return images, videos
+
 
 class UserProfile(TypedDict):
     """Type definition for user profile data."""
@@ -1048,16 +1069,8 @@ class TweetData(BaseModel):
     author_id: Optional[str] = None
     text: Optional[str] = None
     conversation_id: Optional[str] = None
-
-    @classmethod
-    def from_tweepy_tweet(cls, tweet: "tweepy.Tweet") -> "TweetData":
-        """Create TweetData from a tweepy Tweet object."""
-        return cls(
-            tweet_id=tweet.id,
-            author_id=tweet.author_id,
-            text=tweet.text,
-            conversation_id=tweet.conversation_id,
-        )
+    images: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
 
 
 class TwitterConfig(BaseModel):
@@ -1102,6 +1115,8 @@ class TweetRepository:
                     tweet_id=tweet_data.tweet_id,
                     message=tweet_data.text,
                     conversation_id=tweet_data.conversation_id,
+                    images=tweet_data.images,
+                    videos=tweet_data.videos,
                 )
             )
         except Exception as e:
@@ -1264,7 +1279,22 @@ class TwitterMentionHandler:
 
     async def _handle_mention(self, mention) -> None:
         """Process a single mention for analysis."""
-        tweet_data = TweetData.from_tweepy_tweet(mention)
+        tweet_response = await self.twitter_service.get_tweet_by_id(str(mention.id))
+        if not tweet_response or not tweet_response.data:
+            logger.warning(f"Could not fetch full tweet data for mention {mention.id}")
+            return
+
+        tweet = tweet_response.data
+        images, videos = self.twitter_service.extract_media(tweet_response)
+
+        tweet_data = TweetData(
+            tweet_id=str(tweet.id),
+            author_id=str(tweet.author_id),
+            text=tweet.text,
+            conversation_id=str(tweet.conversation_id),
+            images=images,
+            videos=videos,
+        )
 
         logger.debug(
             f"Processing mention - Tweet ID: {tweet_data.tweet_id}, "

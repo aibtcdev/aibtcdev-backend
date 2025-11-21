@@ -551,6 +551,7 @@ class XTweetBase(CustomBaseModel):
     confidence_score: Optional[float] = None
     reason: Optional[str] = None
     images: Optional[List[str]] = None  # Array of image URLs attached to the tweet
+    videos: Optional[List[str]] = None  # Array of video URLs attached to the tweet
     # Store additional tweet metadata
     author_name: Optional[str] = None
     author_username: Optional[str] = None
