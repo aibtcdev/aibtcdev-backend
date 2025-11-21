@@ -649,8 +649,6 @@ class ActionProposalHandler(BaseProposalHandler):
         Returns:
             LotteryResult: The created lottery result object.
 
-        Raises:
-            None.
         """
         for agent in agents[: config.lottery.max_selections]:
             lottery_selection.selected_wallets.append(
