@@ -61,6 +61,7 @@ class LotterySimulator:
         agents_with_tokens: List[AgentWithWalletTokenDTO],
         proposal_liquid_tokens: str,
         bitcoin_block_hash: str,
+        bitcoin_block_height: int,
         min_threshold: Optional[int] = None,
         max_selections: Optional[int] = None,
         quorum_percentage: Optional[float] = None,
@@ -81,6 +82,14 @@ class LotterySimulator:
         if not agents_with_tokens:
             self.logger.warning("No agents with tokens available for lottery")
             return selection
+
+        try:
+            _ = int(proposal_liquid_tokens or "0")
+        except ValueError as e:
+            self.logger.warning(
+                f"Invalid proposal_liquid_tokens '{proposal_liquid_tokens}': {e} - returning empty selection"
+            )
+            return LotterySelection()
 
         # Apply minimum token threshold filter
         filtered_agents = [
@@ -103,9 +112,9 @@ class LotterySimulator:
         )
 
         # Use filtered agents for the rest of the process
-        agents_with_tokens = filtered_agents
+        agents_with_tokens = filtered_agents  # Override for consistency
 
-        # Initialize lottery parameters
+        # Initialize lottery parameters using config
         selection.liquid_tokens_at_creation = proposal_liquid_tokens
         selection.quorum_percentage = quorum_percentage
         selection.total_eligible_wallets = len(agents_with_tokens)
@@ -124,7 +133,9 @@ class LotterySimulator:
 
         # Check if quorum is achievable
         if not QuorumCalculator.is_quorum_achievable(
-            proposal_liquid_tokens, selection.total_eligible_tokens, quorum_percentage
+            proposal_liquid_tokens,
+            selection.total_eligible_tokens,
+            quorum_percentage,
         ):
             self.logger.warning(
                 f"Quorum not achievable: need {selection.quorum_threshold} tokens, "
@@ -156,47 +167,36 @@ class LotterySimulator:
         ):
             round_number += 1
 
-            # Set seed with round number for different results each round
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Calculate weights for remaining agents
-            weights = []
-            for agent in remaining_agents:
-                try:
-                    weight = float(agent.token_amount)
-                    if weight <= 0:
-                        weight = 1.0  # Minimum weight for zero-balance agents
-                    weights.append(weight)
-                except (ValueError, TypeError):
-                    weights.append(1.0)
-
-            if sum(weights) == 0:
+            # Exact int weights (arbitrary precision, handles 1e16+ micro-units)
+            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+            if not weights or all(w == 0 for w in weights):
                 self.logger.warning(
                     "All remaining weights are zero, using equal weights"
                 )
-                weights = [1.0] * len(remaining_agents)
+                weights = [1] * len(remaining_agents)
 
-            # Weighted random selection
-            total_weight = sum(weights)
-            rand_num = random.uniform(0, total_weight)
+            total_weight = sum(weights)  # Exact bigint sum
+            rand_int = random.randrange(
+                total_weight
+            )  # Exact uniform int [0, total_weight)
+
             cumulative = 0
             selected_idx = 0
-
             for idx, weight in enumerate(weights):
                 cumulative += weight
-                if rand_num <= cumulative:
+                if rand_int < cumulative:
                     selected_idx = idx
                     break
 
-            # Select the agent
             selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
-            # Update running totals
             selected_tokens += Decimal(selected_agent.token_amount)
 
             self.logger.debug(
@@ -205,8 +205,7 @@ class LotterySimulator:
                 f"(total: {selected_tokens}/{selection.quorum_threshold})"
             )
 
-            # Remove selected agent from remaining pool
-            remaining_agents.remove(selected_agent)
+            remaining_agents.pop(selected_idx)
 
         # Finalize selection results
         selection.total_selected_tokens = str(selected_tokens)
@@ -224,15 +223,30 @@ class LotterySimulator:
             round_seed = f"{seed}_{round_number}"
             random.seed(round_seed)
 
-            # Select one more agent with equal probability
-            selected_agent = random.choice(remaining_agents)
+            # Weighted selection consistent with main loop (exact int)
+            weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+            if not weights or all(w == 0 for w in weights):
+                weights = [1] * len(remaining_agents)
+
+            total_weight = sum(weights)
+            rand_int = random.randrange(total_weight)
+
+            cumulative = 0
+            selected_idx = 0
+            for idx, weight in enumerate(weights):
+                cumulative += weight
+                if rand_int < cumulative:
+                    selected_idx = idx
+                    break
+
+            selected_agent = remaining_agents[selected_idx]
             wallet_dict = create_wallet_selection_dict(
                 selected_agent.wallet_id, selected_agent.token_amount
             )
             selection.selected_wallets.append(wallet_dict)
 
             selected_tokens += Decimal(selected_agent.token_amount)
-            remaining_agents.remove(selected_agent)
+            remaining_agents.pop(selected_idx)
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
@@ -283,8 +297,8 @@ def main():
     parser.add_argument(
         "--bitcoin-block-height",
         type=int,
-        default=0,
-        help="Bitcoin block height (int, default 0)",
+        required=True,
+        help="Bitcoin block height (int)",
     )
     parser.add_argument(
         "--min-threshold",
@@ -324,6 +338,7 @@ def main():
         agents,
         args.liquid_tokens,
         args.bitcoin_block_hash,
+        args.bitcoin_block_height,
         args.min_threshold,
         args.max_selections,
         args.quorum_percentage,
