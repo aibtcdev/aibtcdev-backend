@@ -251,6 +251,16 @@ class SchedulerConfig:
 
 
 @dataclass
+class LotteryConfig:
+    min_token_threshold: int = int(os.getenv("AIBTC_LOTTERY_MIN_TOKEN_THRESHOLD", "0"))
+    max_selections: int = int(os.getenv("AIBTC_LOTTERY_MAX_SELECTIONS", "100"))
+    quorum_percentage: float = float(
+        os.getenv("AIBTC_LOTTERY_QUORUM_PERCENTAGE", "0.15")
+    )
+    min_selections: int = int(os.getenv("AIBTC_LOTTERY_MIN_SELECTIONS", "3"))
+
+
+@dataclass
 class APIConfig:
     base_url: str = os.getenv("AIBTC_BASEURL", "https://app-staging.aibtc.dev")
     alex_base_url: str = os.getenv("AIBTC_ALEX_BASE_URL", "https://api.alexgo.io/")
@@ -306,6 +316,7 @@ class Config:
     auto_voting_approval: AutoVotingApprovalConfig = field(
         default_factory=AutoVotingApprovalConfig
     )
+    lottery: LotteryConfig = field(default_factory=LotteryConfig)
 
     @classmethod
     def load(cls) -> "Config":
