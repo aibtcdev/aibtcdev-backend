@@ -634,7 +634,24 @@ class ActionProposalHandler(BaseProposalHandler):
         lottery_selection: LotterySelection,
         is_update: bool = False,
     ):
-        """Create fallback lottery result selecting up to max_selections agents."""
+        """
+        Create a fallback lottery result by selecting up to max_selections agents.
+
+        Args:
+            proposal: The proposal object for which the lottery result is being created.
+            dao_id (UUID): The UUID of the DAO.
+            agents (List[AgentWithWalletTokenDTO]): List of agent objects with their token amounts.
+            bitcoin_block_height (int): The Bitcoin block height used for the lottery.
+            bitcoin_block_hash (Optional[str]): The Bitcoin block hash, or None to use a fallback.
+            lottery_selection (LotterySelection): The LotterySelection object to populate with selected wallets.
+            is_update (bool, optional): Whether this is an update path. Defaults to False.
+
+        Returns:
+            LotteryResult: The created lottery result object.
+
+        Raises:
+            None.
+        """
         for agent in agents[: config.lottery.max_selections]:
             lottery_selection.selected_wallets.append(
                 create_wallet_selection_dict(agent.wallet_id, agent.token_amount)
