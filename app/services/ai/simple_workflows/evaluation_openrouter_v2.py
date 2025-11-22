@@ -459,7 +459,9 @@ def _fetch_past_proposals_context(
     )
 
 
-def _prepare_media_for_evaluation(tweet_images: List[str], tweet_videos: List[str]) -> List[Dict[str, Any]]:
+def _prepare_media_for_evaluation(
+    tweet_images: List[str], tweet_videos: List[str]
+) -> List[Dict[str, Any]]:
     """Prepare media (images + videos) for evaluation context."""
     media = []
     for img_url in tweet_images:

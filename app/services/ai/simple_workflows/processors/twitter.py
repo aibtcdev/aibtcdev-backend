@@ -509,7 +509,14 @@ def count_tweet_media(tweet_media: List[Dict[str, Any]]) -> int:
     if not tweet_media:
         return 0
 
-    return len([m for m in tweet_media if m.get("source") == "tweet" and m.get("type") in ("image_url", "video_url")])
+    return len(
+        [
+            m
+            for m in tweet_media
+            if m.get("source") == "tweet"
+            and m.get("type") in ("image_url", "video_url")
+        ]
+    )
 
 
 def get_tweet_media_urls(tweet_media: List[Dict[str, Any]]) -> List[str]:

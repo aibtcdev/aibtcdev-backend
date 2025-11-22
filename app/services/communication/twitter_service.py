@@ -1032,7 +1032,9 @@ class TwitterService:
             logger.error(f"Failed to get timeline for user {user_id}: {str(e)}")
             return []
 
-    def extract_media(self, response: Optional[tweepy.Response] = None) -> tuple[List[str], List[str]]:
+    def extract_media(
+        self, response: Optional[tweepy.Response] = None
+    ) -> tuple[List[str], List[str]]:
         """Extract images and videos from a tweet response."""
         images: List[str] = []
         videos: List[str] = []
@@ -1048,7 +1050,9 @@ class TwitterService:
                 if variants:
                     # Select highest bitrate variant
                     best_variant = max(variants, key=lambda v: getattr(v, "bitrate", 0))
-                    videos.append(getattr(best_variant, "url", getattr(media, "url", "")))
+                    videos.append(
+                        getattr(best_variant, "url", getattr(media, "url", ""))
+                    )
                 else:
                     videos.append(getattr(media, "url", ""))
         return images, videos

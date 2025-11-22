@@ -57,7 +57,7 @@ async def generate_proposal_metadata(
             proposal_content=proposal_content,
             dao_name=dao_name,
             proposal_type=proposal_type,
-            proposal_images=images or [],
+            proposal_media=proposal_media or [],
         )
 
         # Create chat prompt template

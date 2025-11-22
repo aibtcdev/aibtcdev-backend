@@ -72,7 +72,7 @@ async def generate_proposal_recommendation(
             recent_proposals=recent_proposals_text,
             focus_area=focus_area,
             specific_needs=specific_needs,
-            proposal_images=images or [],
+            proposal_media=proposal_media or [],
         )
 
         # Create chat prompt template
