@@ -322,7 +322,7 @@ def extract_video_urls(text: str) -> List[str]:
     """
     # Specific pattern for Twitter videos
     url_pattern = re.compile(
-        r'https://(video\.twimg\.com|video.twimg\.com)/[^\s<>"\'()]+', re.IGNORECASE
+        r'https://video\.twimg\.com/[^\s<>"\'()]+', re.IGNORECASE
     )
     urls = re.findall(url_pattern, text)
 
