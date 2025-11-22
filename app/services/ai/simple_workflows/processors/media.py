@@ -19,7 +19,7 @@ async def process_media(
     """Process media (images and videos) in the proposal content.
 
     Args:
-        proposal_content: The proposal content to search for images
+        proposal_content: The proposal content to search for media (images and videos)
         proposal_id: Optional proposal ID for logging
 
     Returns:
