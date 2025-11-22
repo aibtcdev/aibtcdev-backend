@@ -321,9 +321,7 @@ def extract_video_urls(text: str) -> List[str]:
         A list of verified Twitter video URLs found in the string.
     """
     # Specific pattern for Twitter videos
-    url_pattern = re.compile(
-        r'https://video\.twimg\.com/[^\s<>"\'()]+', re.IGNORECASE
-    )
+    url_pattern = re.compile(r'https://video\.twimg\.com/[^\s<>"\'()]+', re.IGNORECASE)
     urls = re.findall(url_pattern, text)
 
     if not urls:
