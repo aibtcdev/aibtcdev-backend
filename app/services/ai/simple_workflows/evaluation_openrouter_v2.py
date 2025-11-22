@@ -52,7 +52,8 @@ class TweetPostInfoForEvaluation(BaseModel):
     """Model representing tweet information for evaluation."""
 
     x_post_id: str
-    images: List[str]
+    images: List[str] = []
+    videos: List[str] = []
     author_name: Optional[str] = None
     author_username: Optional[str] = None
     created_at: str
@@ -312,6 +313,7 @@ def _fetch_and_format_tweet_info(
     return TweetPostInfoForEvaluation(
         x_post_id=str(tweet_content.tweet_id),
         images=tweet_content.images or [],
+        videos=tweet_content.videos or [],
         author_name=tweet_content.author_name or "",
         author_username=tweet_content.author_username or "",
         created_at=tweet_content.created_at_twitter
@@ -370,6 +372,7 @@ def _fetch_and_format_linked_tweet_info(
     return TweetPostInfoForEvaluation(
         x_post_id=str(linked_tweet_content.tweet_id),
         images=linked_tweet_content.images or [],
+        videos=linked_tweet_content.videos or [],
         author_name=linked_tweet_content.author_name or "",
         author_username=linked_tweet_content.author_username or "",
         created_at=linked_tweet_content.created_at_twitter
@@ -456,19 +459,30 @@ def _fetch_past_proposals_context(
     )
 
 
-def _prepare_images_for_evaluation(tweet_images: List[str]) -> List[Dict[str, Any]]:
-    """Prepare images for evaluation context."""
-    images = []
+def _prepare_media_for_evaluation(
+    tweet_images: List[str], tweet_videos: List[str]
+) -> List[Dict[str, Any]]:
+    """Prepare media (images + videos) for evaluation context."""
+    media = []
     for img_url in tweet_images:
         parsed_url = urlparse(img_url)
         if parsed_url.scheme in ["http", "https"]:
-            images.append(
+            media.append(
                 {
                     "type": "image_url",
                     "image_url": {"url": img_url, "detail": "auto"},
                 }
             )
-    return images
+    for video_url in tweet_videos:
+        parsed_url = urlparse(video_url)
+        if parsed_url.scheme in ["http", "https"]:
+            media.append(
+                {
+                    "type": "video_url",
+                    "video_url": {"url": video_url, "detail": "auto"},
+                }
+            )
+    return media
 
 
 def _estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> str:
@@ -587,9 +601,10 @@ async def evaluate_proposal_openrouter(
                 extra={"missing_info_fields": missing_info_fields},
             )
 
-        # Prepare images
-        images_for_evaluation = _prepare_images_for_evaluation(
-            [] if not tweet_info else tweet_info.images
+        # Prepare media
+        media_for_evaluation = _prepare_media_for_evaluation(
+            [] if not tweet_info else tweet_info.images,
+            [] if not tweet_info else tweet_info.videos,
         )
 
         # Load prompts
@@ -628,9 +643,9 @@ async def evaluate_proposal_openrouter(
             network_school_reference_text=NETWORK_SCHOOL_REFERENCE_TEXT,
         )
 
-        # build user content with text and images
+        # build user content with text and media
         user_content = [{"type": "text", "text": formatted_user_content}]
-        user_content.extend(images_for_evaluation)
+        user_content.extend(media_for_evaluation)
 
         # add user message alongside system message
         messages.append({"role": "user", "content": user_content})
