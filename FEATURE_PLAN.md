@@ -36,22 +36,19 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 - [x] **4.4** `format_images_for_messages → format_media_for_messages(media)`.
 
 ### Phase 5: AI Workflows
-
-- [ ] **5.1** `evaluation.py`/`evaluation_openrouter_v2.py`: `proposal_images → proposal_media`; append videos to `user_message_content`.
-- [ ] **5.2** `recommendation.py`/`metadata.py`: `create_chat_messages`: Extend with `format_media_for_messages(proposal_media)`.
-- [ ] **5.3** Update helpers: `count_images → count_media` (`{"images": N, "videos": M}`); `get_image_urls → get_media_urls`.
+- [x] **5.1** `evaluation_openrouter_v2.py`: `proposal_images → proposal_media`; append videos to `user_message_content`.
+- [x] **5.2** `recommendation.py`/`metadata.py`: Extend `create_chat_messages` to handle `proposal_media` (images + videos).
+- [x] **5.3** Updated metadata counters to `media_processed`.
 
 ### Phase 6: Utils & Tools
-
-- [ ] **6.1** `app/lib/utils.py`: Add `extract_video_urls(text)` (regex: .mp4, focus on twitter video URLs for now).
-- [ ] **6.2** `tools/twitter.py`: Minor: Expose videos in `get_tweet` response if needed.
-- [ ] **6.3** `tweet_task.py`: No changes (uses existing storage).
+- [x] **6.1** `app/lib/utils.py`: Added `extract_video_urls(text)` (Twitter-focused regex + Content-Type verification).
+- [x] **6.2** `tools/twitter.py`: Already exposes videos in media details (duration_ms etc.).
+- [x] **6.3** `tweet_task.py`: No changes needed.
 
 ### Phase 7: Testing & Monitoring
-
-- [ ] **7.1** Test ingestion: Tweet w/video → DB has `videos`.
-- [ ] **7.2** Test AI: Evaluate tweet w/video → `messages` has `video_url`.
-- [ ] **7.3** Metrics: Update logs (`media_processed: {"images": N, "videos": M}`).
+- [x] **7.1** Test ingestion: Tweet w/video → DB has `videos`.
+- [x] **7.2** Test AI: Evaluate tweet w/video → `messages` has `video_url`.
+- [x] **7.3** Metrics: Update logs (`media_processed: {"images": N, "videos": M}`).
 
 ## Open Questions
 **Resolved**: All questions addressed during implementation.
