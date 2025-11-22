@@ -26,7 +26,7 @@ async def generate_proposal_recommendation(
     dao_id: UUID,
     focus_area: str = "",
     specific_needs: str = "",
-    images: Optional[List[Dict[str, Any]]] = None,
+    proposal_media: Optional[List[Dict[str, Any]]] = None,
     callbacks: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """Generate a proposal recommendation for a DAO.
@@ -93,7 +93,7 @@ async def generate_proposal_recommendation(
         result_dict["focus_area"] = focus_area
         result_dict["specific_needs"] = specific_needs
         result_dict["recent_proposals_count"] = len(recent_proposals)
-        result_dict["images_processed"] = len(images) if images else 0
+        result_dict["media_processed"] = len(proposal_media) if proposal_media else 0
 
         logger.info(
             f"[RecommendationProcessor] Generated recommendation: {result_dict.get('title', 'Unknown')}"
@@ -117,7 +117,7 @@ async def generate_proposal_recommendation(
             "focus_area": focus_area,
             "specific_needs": specific_needs,
             "recent_proposals_count": 0,
-            "images_processed": len(images) if images else 0,
+            "media_processed": len(proposal_media) if proposal_media else 0,
         }
 
 
@@ -249,7 +249,7 @@ def create_chat_messages(
     recent_proposals: str,
     focus_area: str,
     specific_needs: str,
-    proposal_images: List[Dict[str, Any]] = None,
+    proposal_media: List[Dict[str, Any]] = None,
 ) -> List:
     """Create chat messages for the proposal recommendation.
 
@@ -287,15 +287,17 @@ def create_chat_messages(
     # Create user message content - start with text
     user_message_content = [{"type": "text", "text": user_content}]
 
-    # Add images if available
-    if proposal_images:
-        for image in proposal_images:
-            if image.get("type") == "image_url":
+    # Add media if available
+    if proposal_media:
+        for item in proposal_media:
+            item_type = item.get("type")
+            if item_type in ("image_url", "video_url"):
                 # Add detail parameter if not present
-                image_with_detail = image.copy()
-                if "detail" not in image_with_detail.get("image_url", {}):
-                    image_with_detail["image_url"]["detail"] = "auto"
-                user_message_content.append(image_with_detail)
+                item_with_detail = item.copy()
+                url_key = "image_url" if item_type == "image_url" else "video_url"
+                if "detail" not in item_with_detail.get(url_key, {}):
+                    item_with_detail[url_key]["detail"] = "auto"
+                user_message_content.append(item_with_detail)
 
     # Add the user message
     messages.append({"role": "user", "content": user_message_content})

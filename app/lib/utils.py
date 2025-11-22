@@ -309,6 +309,91 @@ def extract_image_urls(text: str) -> List[str]:
     return image_urls
 
 
+def extract_video_urls(text: str) -> List[str]:
+    """
+    Extracts Twitter video URLs from a string by making HEAD requests to verify Content-Type.
+    Focuses on Twitter video patterns (video.twimg.com/video.twimg.com).
+
+    Args:
+        text: The input string to search for URLs.
+
+    Returns:
+        A list of verified Twitter video URLs found in the string.
+    """
+    # Specific pattern for Twitter videos
+    url_pattern = re.compile(
+        r'https://(video\.twimg\.com|video.twimg\.com)/[^\s<>"\'()]+',
+        re.IGNORECASE
+    )
+    urls = re.findall(url_pattern, text)
+
+    if not urls:
+        return []
+
+    video_urls = []
+
+    # Common video MIME types (focus on MP4 for Twitter)
+    video_mime_types = {
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "video/ogg",
+    }
+
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(5.0, connect=2.0),
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; VideoBot/1.0)"},
+        ) as client:
+            for url in urls:
+                try:
+                    response = client.head(url)
+                    if response.status_code == 200:
+                        content_type = (
+                            response.headers.get("Content-Type", "")
+                            .lower()
+                            .split(";")[0]
+                            .strip()
+                        )
+                        if content_type in video_mime_types:
+                            video_urls.append(url)
+                            logger.debug(
+                                "Video URL found",
+                                extra={"url": url, "content_type": content_type},
+                            )
+                        else:
+                            logger.debug(
+                                "Non-video URL skipped",
+                                extra={"url": url, "content_type": content_type},
+                            )
+                    else:
+                        logger.debug(
+                            "URL access failed",
+                            extra={"url": url, "status_code": response.status_code},
+                        )
+                except httpx.TimeoutException:
+                    logger.debug("URL check timeout", extra={"url": url})
+                except httpx.RequestError as e:
+                    logger.debug(
+                        "URL request error", extra={"url": url, "error": str(e)}
+                    )
+                except Exception as e:
+                    logger.debug(
+                        "Unexpected URL check error",
+                        extra={"url": url, "error": str(e)},
+                    )
+    except Exception as e:
+        logger.error("HTTP client initialization failed", extra={"error": str(e)})
+        return []
+
+    logger.debug(
+        "Video URL extraction completed",
+        extra={"video_urls_found": len(video_urls), "total_urls_checked": len(urls)},
+    )
+    return video_urls
+
+
 def strip_metadata_section(text: str) -> str:
     """Remove metadata section starting with '--- Metadata ---' to the end of the text.
 

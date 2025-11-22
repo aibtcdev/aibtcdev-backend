@@ -72,4 +72,4 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 
 Note that Supabase changes will be made in addition to testing this PR.
 
-**Progress**: 4/7 | Last Updated: 2025-11-21
+**Progress**: 6/7 | Last Updated: 2025-11-21
