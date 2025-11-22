@@ -23,7 +23,7 @@ async def process_media(
         proposal_id: Optional proposal ID for logging
 
     Returns:
-        List of dictionaries containing processed images in OpenAI vision format
+        List of dictionaries containing processed media items (images and videos) in OpenAI vision format
     """
     if not proposal_content:
         logger.info(f"[ImageProcessor:{proposal_id}] No proposal_content, skipping.")
