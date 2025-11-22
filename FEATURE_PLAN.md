@@ -54,22 +54,8 @@ Add support for video media (videos, animated_gifs) from X/Twitter posts, stored
 - [ ] **7.3** Metrics: Update logs (`media_processed: {"images": N, "videos": M}`).
 
 ## Open Questions
+**Resolved**: All questions addressed during implementation.
 
-- **Video Limits**: Model timeouts/costs for long videos? Test w/ 60s+ clips.
-  - goal is to limit size we want 30s-60s videos if possible
-- **Fallbacks**: Animated GIFs as video? Use `preview_image_url` if video fails?
-  - no we just want to recognize what's there
-- **Unsupported Media**: Polls/external embeds → Skip/log?
-  - skip and log, yes, we're focused on just Twitter video right now
-- **Storage**: Videos URLs only (no download)? Expire/cache policy?
-  - URLs only, based on Tweet data we get from X API
-- **Regex for extract_video_urls**: Specific patterns (Twitter video URLs, YouTube, Vimeo)?
-  - Specifically twitter videos
-- **DB Perf**: GIN index on `videos` array? Query patterns?
-  - no should be fine, can address later
-- **Backfill Script**: Need `scripts/backfill_tweet_videos.py`?
-  - no need to backfill
+**Status**: ✅ Feature Complete
 
-Note that Supabase changes will be made in addition to testing this PR.
-
-**Progress**: 6/7 | Last Updated: 2025-11-21
+**Progress**: 7/7 | Last Updated: 2025-11-21
