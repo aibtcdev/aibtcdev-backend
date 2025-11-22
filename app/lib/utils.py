@@ -312,7 +312,7 @@ def extract_image_urls(text: str) -> List[str]:
 def extract_video_urls(text: str) -> List[str]:
     """
     Extracts Twitter video URLs from a string by making HEAD requests to verify Content-Type.
-    Focuses on Twitter video patterns (video.twimg.com/video.twimg.com).
+    Focuses on Twitter video patterns (video.twimg.com).
 
     Args:
         text: The input string to search for URLs.
