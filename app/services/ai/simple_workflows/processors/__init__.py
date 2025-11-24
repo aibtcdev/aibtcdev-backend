@@ -5,10 +5,10 @@ This package contains processors for different types of content:
 - twitter: Tweet retrieval and formatting
 """
 
-from .images import process_images
+from .media import process_media
 from .twitter import process_tweets
 
 __all__ = [
-    "process_images",
+    "process_media",
     "process_tweets",
 ]

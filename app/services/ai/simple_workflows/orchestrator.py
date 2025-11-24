@@ -17,7 +17,7 @@ from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
 from app.services.ai.simple_workflows.metadata import (
     generate_proposal_metadata as _generate_metadata,
 )
-from app.services.ai.simple_workflows.processors import process_images, process_tweets
+from app.services.ai.simple_workflows.processors import process_media, process_tweets
 
 # from app.services.ai.simple_workflows.prompts.loader import load_prompt
 from app.services.ai.simple_workflows.recommendation import (
@@ -252,7 +252,7 @@ async def generate_proposal_metadata(
             callbacks = [callback_handler]
 
         # Step 1: Process images from proposal content
-        images = await process_images(proposal_content, "metadata_generation")
+        images = await process_media(proposal_content, "metadata_generation")
         logger.debug(
             f"[Orchestrator] Found {len(images)} images for metadata generation"
         )
@@ -434,7 +434,7 @@ async def process_proposal_content(
 
     try:
         # Step 1: Process images from proposal content
-        images = await process_images(proposal_content, proposal_id_str)
+        images = await process_media(proposal_content, proposal_id_str)
         logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(images)} images")
 
         # Step 2: Process tweets if provided
