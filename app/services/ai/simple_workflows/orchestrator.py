@@ -117,9 +117,9 @@ async def evaluate_proposal_comprehensive(
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
                 "dao_id": str(dao_id) if dao_id else None,
-                "images_processed": 0,
-                "tweet_images_processed": 0,
-                "total_images": 0,
+                "proposal_media_processed": 0,
+                "tweet_media_processed": 0,
+                "total_media": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
                 "streaming_enabled": False,
@@ -156,9 +156,9 @@ async def evaluate_proposal_comprehensive(
                 "processing_metadata": {
                     "proposal_id": proposal_id_str,
                     "dao_id": str(dao_id) if dao_id else None,
-                    "images_processed": 0,
-                    "tweet_images_processed": 0,
-                    "total_images": 0,
+                    "proposal_media_processed": 0,
+                    "tweet_media_processed": 0,
+                    "total_media": 0,
                     "tweets_processed": 0,
                     "tweet_content_length": 0,
                     "streaming_enabled": False,
@@ -171,11 +171,9 @@ async def evaluate_proposal_comprehensive(
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
                 "dao_id": str(dao_id) if dao_id else None,
-                "images_processed": len(evaluation_result.current_order.evidence)
-                if hasattr(evaluation_result.current_order, "evidence")
-                else 0,
-                "tweet_images_processed": 0,
-                "total_images": 0,
+                "proposal_media_processed": 0,
+                "tweet_media_processed": 0,
+                "total_media": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
                 "streaming_enabled": False,
@@ -211,9 +209,9 @@ async def evaluate_proposal_comprehensive(
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
                 "dao_id": str(dao_id) if dao_id else None,
-                "images_processed": 0,
-                "tweet_images_processed": 0,
-                "total_images": 0,
+                "proposal_media_processed": 0,
+                "tweet_media_processed": 0,
+                "total_media": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
                 "streaming_enabled": False,
@@ -251,28 +249,28 @@ async def generate_proposal_metadata(
             callback_handler, queue = create_streaming_setup()
             callbacks = [callback_handler]
 
-        # Step 1: Process images from proposal content
-        images = await process_media(proposal_content, "metadata_generation")
+        # Step 1: Process media from proposal content
+        proposal_media = await process_media(proposal_content, "metadata_generation")
         logger.debug(
-            f"[Orchestrator] Found {len(images)} images for metadata generation"
+            f"[Orchestrator] Found {len(proposal_media)} media items for metadata generation"
         )
 
         # Step 2: Process tweets if provided
         tweet_content = ""
-        tweet_images = []
+        tweet_media = []
         if tweet_db_ids:
             logger.debug(
                 f"[Orchestrator] Processing {len(tweet_db_ids)} tweets for metadata"
             )
-            tweet_content, tweet_images = await process_tweets(
+            tweet_content, tweet_media = await process_tweets(
                 tweet_db_ids, "metadata_generation"
             )
             logger.debug(
-                f"[Orchestrator] Found {len(tweet_images)} tweet images for metadata and {len(tweet_content)} chars of tweet content"
+                f"[Orchestrator] Found {len(tweet_media)} tweet media items for metadata and {len(tweet_content)} chars of tweet content"
             )
 
-        # Step 3: Combine all images
-        all_images = images + tweet_images
+        # Step 3: Combine all media
+        all_media = proposal_media + tweet_media
 
         # Step 4: Combine proposal content with tweet content
         # Escape curly braces in proposal content to prevent template parsing issues
@@ -291,7 +289,7 @@ async def generate_proposal_metadata(
             proposal_content=combined_content,
             dao_name=dao_name,
             proposal_type=proposal_type,
-            images=all_images,
+            images=all_media,  # Keep 'images' param for compatibility; LLM handles video_url
             callbacks=callbacks,
         )
 
@@ -299,9 +297,9 @@ async def generate_proposal_metadata(
         result = {
             "metadata": metadata_result,
             "processing_metadata": {
-                "images_processed": len(images),
-                "tweet_images_processed": len(tweet_images),
-                "total_images": len(all_images),
+                "proposal_media_processed": len(proposal_media),
+                "tweet_media_processed": len(tweet_media),
+                "total_media": len(all_media),
                 "tweets_processed": len(tweet_db_ids) if tweet_db_ids else 0,
                 "tweet_content_length": len(tweet_content),
                 "streaming_enabled": streaming,
@@ -326,9 +324,9 @@ async def generate_proposal_metadata(
                 "tags": [],
             },
             "processing_metadata": {
-                "images_processed": 0,
-                "tweet_images_processed": 0,
-                "total_images": 0,
+                "proposal_media_processed": 0,
+                "tweet_media_processed": 0,
+                "total_media": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
                 "streaming_enabled": streaming,
@@ -433,37 +431,37 @@ async def process_proposal_content(
     logger.info(f"[Orchestrator] Processing content for proposal {proposal_id_str}")
 
     try:
-        # Step 1: Process images from proposal content
-        images = await process_media(proposal_content, proposal_id_str)
-        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(images)} images")
+        # Step 1: Process media from proposal content
+        proposal_media = await process_media(proposal_content, proposal_id_str)
+        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(proposal_media)} media items")
 
         # Step 2: Process tweets if provided
         tweet_content = ""
-        tweet_images = []
+        tweet_media = []
         if tweet_db_ids:
             logger.debug(
                 f"[Orchestrator:{proposal_id_str}] Processing {len(tweet_db_ids)} tweets"
             )
-            tweet_content, tweet_images = await process_tweets(
+            tweet_content, tweet_media = await process_tweets(
                 tweet_db_ids, proposal_id_str
             )
             logger.debug(
-                f"[Orchestrator:{proposal_id_str}] Processed tweets: {len(tweet_content)} chars, {len(tweet_images)} images"
+                f"[Orchestrator:{proposal_id_str}] Processed tweets: {len(tweet_content)} chars, {len(tweet_media)} media items"
             )
 
-        # Step 3: Combine all images
-        all_images = images + tweet_images
+        # Step 3: Combine all media
+        all_media = proposal_media + tweet_media
 
         result = {
-            "images": images,
+            "proposal_media": proposal_media,
             "tweet_content": tweet_content,
-            "tweet_images": tweet_images,
-            "all_images": all_images,
+            "tweet_media": tweet_media,
+            "all_media": all_media,
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
-                "images_processed": len(images),
-                "tweet_images_processed": len(tweet_images),
-                "total_images": len(all_images),
+                "proposal_media_processed": len(proposal_media),
+                "tweet_media_processed": len(tweet_media),
+                "total_media": len(all_media),
                 "tweets_processed": len(tweet_db_ids) if tweet_db_ids else 0,
                 "tweet_content_length": len(tweet_content),
             },
@@ -480,15 +478,15 @@ async def process_proposal_content(
         )
         return {
             "error": str(e),
-            "images": [],
+            "proposal_media": [],
             "tweet_content": "",
-            "tweet_images": [],
-            "all_images": [],
+            "tweet_media": [],
+            "all_media": [],
             "processing_metadata": {
                 "proposal_id": proposal_id_str,
-                "images_processed": 0,
-                "tweet_images_processed": 0,
-                "total_images": 0,
+                "proposal_media_processed": 0,
+                "tweet_media_processed": 0,
+                "total_media": 0,
                 "tweets_processed": 0,
                 "tweet_content_length": 0,
             },
