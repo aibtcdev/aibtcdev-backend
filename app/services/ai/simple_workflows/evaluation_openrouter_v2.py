@@ -432,11 +432,10 @@ def _fetch_past_proposals_context(
     }
 
     dao_past_proposals_stats_for_evaluation = {
-        "ALL": len(sorted_dao_past_proposals),
-        "DRAFT": len(dao_past_proposals_categorized["DRAFT"]),
-        "PENDING": len(dao_past_proposals_categorized["PENDING"]),
-        "DEPLOYED": len(dao_past_proposals_categorized["DEPLOYED"]),
-        "FAILED": len(dao_past_proposals_categorized["FAILED"]),
+        "TOTAL_ALL_TIME": len(sorted_dao_past_proposals),
+        "NOT_SUBMITTED_ONCHAIN": len(dao_past_proposals_categorized["DRAFT"]),
+        "TRANSACTION_FAILED": len(dao_past_proposals_categorized["FAILED"]),
+        "SUBMITTED_ONCHAIN_FOR_EVAL": len(dao_past_proposals_categorized["DEPLOYED"]),
     }
 
     # Limit drafts to last 20
