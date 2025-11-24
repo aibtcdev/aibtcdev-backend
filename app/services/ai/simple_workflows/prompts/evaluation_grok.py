@@ -104,16 +104,16 @@ DAO INFO:
 PROPOSAL CONTENT:
 {proposal_content_for_evaluation}
 
-X POST CONTEXT:
+RELATED X POST:
 {tweet_info_for_evaluation}
 
-X AUTHOR CONTEXT:
+X AUTHOR:
 {tweet_author_info_for_evaluation}
 
-X QUOTED POST CONTEXT:
+X QUOTED POST:
 {quote_tweet_info_for_evaluation}
 
-X REPLY TWEET CONTEXT:
+X REPLY TWEET:
 {reply_tweet_info_for_evaluation}
 
 DAO PROPOSAL STATS:
