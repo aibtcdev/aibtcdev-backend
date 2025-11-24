@@ -433,7 +433,9 @@ async def process_proposal_content(
     try:
         # Step 1: Process media from proposal content
         proposal_media = await process_media(proposal_content, proposal_id_str)
-        logger.debug(f"[Orchestrator:{proposal_id_str}] Found {len(proposal_media)} media items")
+        logger.debug(
+            f"[Orchestrator:{proposal_id_str}] Found {len(proposal_media)} media items"
+        )
 
         # Step 2: Process tweets if provided
         tweet_content = ""
