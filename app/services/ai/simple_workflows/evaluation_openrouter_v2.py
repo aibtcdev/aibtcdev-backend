@@ -16,7 +16,6 @@ from app.lib.logger import configure_logger
 from app.services.ai.simple_workflows.prompts.evaluation_grok import (
     EVALUATION_GROK_SYSTEM_PROMPT,
     EVALUATION_GROK_USER_PROMPT_TEMPLATE,
-    NETWORK_SCHOOL_REFERENCE_TEXT,
 )
 
 logger = configure_logger(__name__)
@@ -639,7 +638,6 @@ async def evaluate_proposal_openrouter(
             dao_draft_proposals_for_evaluation=dao_draft_proposals_for_evaluation or "",
             dao_deployed_proposals_for_evaluation=dao_deployed_proposals_for_evaluation
             or "",
-            network_school_reference_text=NETWORK_SCHOOL_REFERENCE_TEXT,
         )
 
         # build user content with text and media

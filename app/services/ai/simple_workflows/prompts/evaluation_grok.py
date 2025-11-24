@@ -128,9 +128,6 @@ LAST 20 DRAFT DAO PROPOSALS:
 LAST 100 DEPLOYED DAO PROPOSALS:
 {dao_deployed_proposals_for_evaluation}
 
-NETWORK SCHOOL REFERENCE:
-{network_school_reference_text}
-
 Output the evaluation as a JSON object, strictly following the system guidelines."""
 
 # added 2025/11/12 specific to AIBTC-NS1 ORDER
