@@ -10,7 +10,7 @@ import json
 
 from app.config import config
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.evaluation_openrouter_v2 import call_openrouter, get_openrouter_config
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import call_openrouter
 
 from app.lib.utils import estimate_usage_cost
 from app.services.ai.simple_workflows.models import ProposalMetadataOutput
@@ -20,8 +20,6 @@ from app.services.ai.simple_workflows.prompts.metadata import (
 )
 
 logger = configure_logger(__name__)
-
-
 
 
 async def generate_proposal_metadata(

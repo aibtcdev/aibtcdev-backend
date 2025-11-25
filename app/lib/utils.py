@@ -796,7 +796,9 @@ def estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> st
     Returns:
         Cost string like '$0.000123' or fallback
     """
-    pricing = GROK_MODEL_PRICING_PER_1K.get(model, {"input": 0.00055, "output": 0.00055})
+    pricing = GROK_MODEL_PRICING_PER_1K.get(
+        model, {"input": 0.00055, "output": 0.00055}
+    )
     input_cost = (input_tokens / 1000) * pricing["input"]
     output_cost = (output_tokens / 1000) * pricing["output"]
     total_cost = input_cost + output_cost

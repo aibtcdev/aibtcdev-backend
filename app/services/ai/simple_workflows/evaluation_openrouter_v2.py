@@ -485,8 +485,6 @@ def _prepare_media_for_evaluation(
     return media
 
 
-
-
 ###############################
 ## Main Evaluation Function  ##
 ###############################

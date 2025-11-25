@@ -153,7 +153,9 @@ async def generate_metadata_single_proposal(
 
         # Save JSON if requested
         if args.save_output:
-            json_filename = f"metadata/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            json_filename = (
+                f"metadata/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            )
             with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
             print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -174,7 +176,9 @@ async def generate_metadata_single_proposal(
             log_f.close()
 
 
-def generate_summary(results: list[Dict[str, Any]], timestamp: str, save_output: bool) -> None:
+def generate_summary(
+    results: list[Dict[str, Any]], timestamp: str, save_output: bool
+) -> None:
     """Generate summary JSON with raw results."""
     summary = {
         "timestamp": timestamp,
@@ -185,7 +189,9 @@ def generate_summary(results: list[Dict[str, Any]], timestamp: str, save_output:
     print(f"Metadata Summary - {timestamp}")
     print("=" * 60)
     print(f"Total Proposals: {len(results)}")
-    total_media = sum(r.get("processing_metadata", {}).get("total_media", 0) for r in results)
+    total_media = sum(
+        r.get("processing_metadata", {}).get("total_media", 0) for r in results
+    )
     print(f"Total Media Processed: {total_media}")
     print("See summary JSON for details.")
     print("=" * 60)
@@ -258,7 +264,9 @@ Examples:
     results = []
     for index, proposal_id in enumerate(args.proposal_id, 1):
         result = asyncio.run(
-            generate_metadata_single_proposal(proposal_id, index, args, timestamp, backend)
+            generate_metadata_single_proposal(
+                proposal_id, index, args, timestamp, backend
+            )
         )
         results.append(result)
 
