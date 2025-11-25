@@ -289,7 +289,7 @@ async def generate_proposal_metadata(
             proposal_content=combined_content,
             dao_name=dao_name,
             proposal_type=proposal_type,
-            images=all_media,  # Keep 'images' param for compatibility; LLM handles video_url
+            proposal_media=all_media,  # All media (images/videos) from proposal + tweets
             callbacks=callbacks,
         )
 
