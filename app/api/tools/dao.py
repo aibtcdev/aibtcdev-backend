@@ -31,6 +31,8 @@ from app.services.ai.simple_workflows import (
 )
 import asyncio
 
+from app.services.processing.twitter_data_service import twitter_data_service
+
 from app.tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,
     AgentAccountVetoActionProposalTool,
@@ -678,8 +680,15 @@ async def propose_dao_action_send_message(
                     detail=f"Error validating airdrop: {str(e)}",
                 )
 
-        # Step 1: Skip standalone tweet processing (light extraction in metadata; DB linking deferred to chainhook)
+        # Step 1: Extract Twitter information and save to tweet table
         tweet_db_ids = []
+        if payload.message:
+            tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
+                payload.message
+            )
+            logger.info(
+                f"Processed {len(tweet_db_ids)} Twitter URLs from message for profile {profile.id}"
+            )
 
         # Step 2: Parallel tx submission (raw message) + metadata generation
         tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
@@ -699,7 +708,7 @@ async def propose_dao_action_send_message(
                 proposal_content=payload.message,  # RAW
                 dao_name="",
                 proposal_type="action",
-                tweet_db_ids=tweet_db_ids,  # [] – light processing only
+                tweet_db_ids=tweet_db_ids,
             )
         )
 
