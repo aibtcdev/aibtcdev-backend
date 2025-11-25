@@ -10,10 +10,9 @@ import json
 
 from app.config import config
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
-    call_openrouter,
-    get_openrouter_config,
-)
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import call_openrouter, get_openrouter_config
+
+from app.lib.utils import estimate_usage_cost
 from app.services.ai.simple_workflows.models import ProposalMetadataOutput
 from app.services.ai.simple_workflows.prompts.metadata import (
     METADATA_SYSTEM_PROMPT,
@@ -23,31 +22,6 @@ from app.services.ai.simple_workflows.prompts.metadata import (
 logger = configure_logger(__name__)
 
 
-def estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> str:
-    """Estimate usage cost based on input/output tokens and model pricing.
-
-    Pricing inferred from activity log for x-ai/grok-4-fast:
-    - Input: $0.000574 per 1K tokens
-    - Output (incl. reasoning): $0.000332 per 1K tokens
-    """
-    model_pricing = {
-        "x-ai/grok-4-fast": {
-            "input_per_1k": 0.000574,
-            "output_per_1k": 0.000332,
-        },
-    }
-
-    if model not in model_pricing:
-        # Fallback to a default (e.g., blended grok-4-fast rate)
-        blended_rate = 0.00055
-        cost = (input_tokens + output_tokens) / 1000 * blended_rate
-        return f"${cost:.6f}"
-
-    pricing = model_pricing[model]
-    input_cost = (input_tokens / 1000) * pricing["input_per_1k"]
-    output_cost = (output_tokens / 1000) * pricing["output_per_1k"]
-    total_cost = input_cost + output_cost
-    return f"${total_cost:.6f}"
 
 
 async def generate_proposal_metadata(

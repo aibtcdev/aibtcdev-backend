@@ -18,6 +18,8 @@ from app.services.ai.simple_workflows.prompts.evaluation_grok import (
     EVALUATION_GROK_USER_PROMPT_TEMPLATE,
 )
 
+from app.lib.utils import estimate_usage_cost
+
 logger = configure_logger(__name__)
 
 ##############################
@@ -483,32 +485,6 @@ def _prepare_media_for_evaluation(
     return media
 
 
-def _estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> str:
-    """Estimate usage cost based on input/output tokens and model pricing.
-
-    Pricing inferred from activity log for x-ai/grok-4-fast:
-    - Input: $0.000574 per 1K tokens
-    - Output (incl. reasoning): $0.000332 per 1K tokens
-    """
-
-    model_pricing = {
-        "x-ai/grok-4-fast": {
-            "input_per_1k": 0.000574,
-            "output_per_1k": 0.000332,
-        },
-    }
-
-    if model not in model_pricing:
-        # Fallback to a default (e.g., blended grok-4-fast rate)
-        blended_rate = 0.00055
-        cost = (input_tokens + output_tokens) / 1000 * blended_rate
-        return f"${cost:.6f}"
-
-    pricing = model_pricing[model]
-    input_cost = (input_tokens / 1000) * pricing["input_per_1k"]
-    output_cost = (output_tokens / 1000) * pricing["output_per_1k"]
-    total_cost = input_cost + output_cost
-    return f"${total_cost:.6f}"
 
 
 ###############################
@@ -665,7 +641,7 @@ async def evaluate_proposal_openrouter(
         usage_output_tokens = usage.get("completion_tokens") if usage else None
         usage_est_cost = None
         if usage_input_tokens and usage_output_tokens:
-            usage_est_cost = _estimate_usage_cost(
+            usage_est_cost = estimate_usage_cost(
                 usage_input_tokens,
                 usage_output_tokens,
                 model or config.chat_llm.default_model,
