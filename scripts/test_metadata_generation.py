@@ -261,15 +261,16 @@ Examples:
     # Create single backend instance
     backend = get_backend()
 
-    results = []
-    for index, proposal_id in enumerate(args.proposal_id, 1):
-        result = asyncio.run(
+    async def run_all_proposals():
+        tasks = [
             generate_metadata_single_proposal(
                 proposal_id, index, args, timestamp, backend
             )
-        )
-        results.append(result)
+            for index, proposal_id in enumerate(args.proposal_id, 1)
+        ]
+        return await asyncio.gather(*tasks)
 
+    results = asyncio.run(run_all_proposals())
     # Reset logging
     reset_logging()
 
