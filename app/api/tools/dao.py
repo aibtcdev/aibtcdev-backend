@@ -718,7 +718,7 @@ async def propose_dao_action_send_message(
         # Extract metadata
         metadata = metadata_result.get("metadata", {})
         title = metadata.get("title", "Action Proposal")
-        summary = metadata.get("summary", payload.message[:200] + "...")
+        summary = metadata.get("summary", (payload.message[:200] + "...") if len(payload.message) > 200 else payload.message)
         metadata_tags = metadata.get("tags", [])
 
         logger.debug(
