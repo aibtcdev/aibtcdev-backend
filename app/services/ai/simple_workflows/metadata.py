@@ -72,7 +72,7 @@ async def generate_proposal_metadata(
             tools=None,
         )
 
-        # ouput full response (debugging)
+        # output full response (debugging)
         # logger.info(
         #    f"[MetadataProcessor] OpenRouter response: {openrouter_response.get('choices', [])[0]}"
         # )
