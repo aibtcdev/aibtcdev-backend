@@ -152,7 +152,7 @@ Examples:
             proposal_content=proposal_content,
             dao_name=dao_name,
             proposal_type=proposal_type,
-            images=None,  # TODO: Support image processing if needed
+            proposal_media=None,  # TODO: Support image processing if needed
             callbacks=None,
         )
 
@@ -174,7 +174,7 @@ Examples:
         print(f"   • Tags: {', '.join(result.get('tags', []))}")
         print(f"   • Tags Count: {result.get('tags_count', 0)}")
         print(f"   • Content Length: {result.get('content_length', 0)} characters")
-        print(f"   • Images Processed: {result.get('images_processed', 0)}")
+        print(f"   • Media Processed: {result.get('media_processed', 0)}")
 
         # Show additional details in debug mode
         if args.debug_level >= 1:
