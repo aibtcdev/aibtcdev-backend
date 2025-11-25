@@ -707,7 +707,7 @@ async def propose_dao_action_send_message(
             generate_proposal_metadata(
                 proposal_content=payload.message,  # RAW
                 dao_name="",
-                proposal_type="action",
+                proposal_type="action_proposal",
                 tweet_db_ids=tweet_db_ids,
             )
         )
