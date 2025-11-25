@@ -14,7 +14,7 @@ MUST OBEY CONSTRAINTS:
 OUTPUT FORMAT
 Respond with ONLY this JSON. NO text/markdown/codefences.
 
-MUST start immediately with '{{' (first line, NO whitespace/newlines). End after '}}'.
+Your output MUST follow this EXACT structure:
 
 {{
   "title": "string",
