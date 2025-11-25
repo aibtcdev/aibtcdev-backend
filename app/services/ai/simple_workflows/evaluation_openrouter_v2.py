@@ -647,9 +647,9 @@ async def evaluate_proposal_openrouter(
                 model or config.chat_llm.default_model,
             )
         usage_data = {
-            "input_tokens": str(usage_input_tokens),
-            "output_tokens": str(usage_output_tokens),
-            "estimated_cost": str(usage_est_cost),
+            "usage_input_tokens": str(usage_input_tokens),
+            "usage_output_tokens": str(usage_output_tokens),
+            "usage_est_cost": str(usage_est_cost),
         }
 
         # parse first choice for requested json
@@ -670,9 +670,7 @@ async def evaluate_proposal_openrouter(
             # validate with pydantic
             evaluation_output = EvaluationOutput(
                 **evaluation_json,
-                usage_input_tokens=usage_data["input_tokens"],
-                usage_output_tokens=usage_data["output_tokens"],
-                usage_est_cost=usage_data["estimated_cost"],
+                **usage_data,
             )
 
             logger.info(f"Successfully evaluated proposal {proposal_id}")
