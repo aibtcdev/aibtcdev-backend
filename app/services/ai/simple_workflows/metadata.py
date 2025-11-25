@@ -6,12 +6,15 @@ converting the complex class-based metadata agent into a simple async function.
 
 from typing import Any, Dict, List, Optional
 
-from langchain_core.prompts.chat import ChatPromptTemplate
+import json
 
+from app.config import config
 from app.lib.logger import configure_logger
-from app.services.ai.simple_workflows.llm import invoke_structured
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import call_openrouter
+
+from app.lib.utils import estimate_usage_cost
 from app.services.ai.simple_workflows.models import ProposalMetadataOutput
-from app.services.ai.simple_workflows.prompts import (
+from app.services.ai.simple_workflows.prompts.metadata import (
     METADATA_SYSTEM_PROMPT,
     METADATA_USER_PROMPT_TEMPLATE,
 )
@@ -60,74 +63,73 @@ async def generate_proposal_metadata(
             proposal_media=proposal_media or [],
         )
 
-        # Create chat prompt template
-        prompt = ChatPromptTemplate.from_messages(messages)
+        # Call OpenRouter
+        openrouter_response = await call_openrouter(
+            messages=messages,
+            model=None,
+            temperature=0.0,
+            reasoning=False,
+            tools=None,
+        )
 
-        # Get structured output from the LLM
-        # Try json_mode first as it's more compatible with various models
+        # output full response (debugging)
+        # logger.info(
+        #    f"[MetadataProcessor] OpenRouter response: {openrouter_response.get('choices', [])[0]}"
+        # )
+
+        # Parse usage information
+        usage = openrouter_response.get("usage", {})
+        logger.debug(f"OpenRouter usage for metadata: {usage}")
+
+        usage_input_tokens = usage.get("prompt_tokens") if usage else None
+        usage_output_tokens = usage.get("completion_tokens") if usage else None
+        model_used = openrouter_response.get("model", config.chat_llm.default_model)
+        usage_est_cost = None
+        if usage_input_tokens is not None and usage_output_tokens is not None:
+            usage_est_cost = estimate_usage_cost(
+                usage_input_tokens,
+                usage_output_tokens,
+                model_used,
+            )
+        usage_data = {
+            "usage_input_tokens": str(usage_input_tokens),
+            "usage_output_tokens": str(usage_output_tokens),
+            "usage_est_cost": str(usage_est_cost),
+        }
+
+        # Parse first choice for requested json
+        choices = openrouter_response.get("choices", [])
+        if not choices:
+            logger.error("No choices in OpenRouter response")
+            raise ValueError("No choices in response")
+
+        first_choice = choices[0]
+        choice_message = first_choice.get("message")
+        if not choice_message or not isinstance(choice_message.get("content"), str):
+            logger.error("Invalid message content in response")
+            raise ValueError("Invalid message content")
+
         try:
-            logger.debug(
-                "[MetadataProcessor] Attempting structured output with json_mode"
-            )
-            result = await invoke_structured(
-                messages=prompt,
-                output_schema=ProposalMetadataOutput,
-                model="anthropic/claude-haiku-4.5",
-                method="json_mode",
-                include_raw=True,
-                callbacks=callbacks,
-            )
-            logger.debug(
-                f"[MetadataProcessor] Structured output result type: {type(result)}"
-            )
-
-            # Handle include_raw response
-            if isinstance(result, dict) and "parsed" in result:
-                logger.debug(
-                    "[MetadataProcessor] Extracting parsed result from raw response"
-                )
-                result = result["parsed"]
-                if result is None:
-                    logger.warning(
-                        "[MetadataProcessor] Model returned None for parsed result (possible refusal)"
-                    )
-                    raise ValueError("Model refused to generate structured output")
-        except Exception as json_mode_error:
-            logger.warning(
-                f"[MetadataProcessor] json_mode failed: {str(json_mode_error)}, trying function_calling"
-            )
-            # Fallback to function_calling method
-            try:
-                result = await invoke_structured(
-                    messages=prompt,
-                    output_schema=ProposalMetadataOutput,
-                    model="anthropic/claude-haiku-4.5",
-                    method="function_calling",
-                    include_raw=True,
-                    callbacks=callbacks,
-                )
-                # Handle include_raw response
-                if isinstance(result, dict) and "parsed" in result:
-                    result = result["parsed"]
-                    if result is None:
-                        logger.warning(
-                            "[MetadataProcessor] Model returned None for parsed result (possible refusal)"
-                        )
-                        raise ValueError("Model refused to generate structured output")
-            except Exception as function_error:
-                logger.error(
-                    f"[MetadataProcessor] Both methods failed. json_mode: {str(json_mode_error)}, function_calling: {str(function_error)}"
-                )
-                raise
+            # load the json
+            metadata_json = json.loads(choice_message["content"])
+            # validate with pydantic
+            result = ProposalMetadataOutput(**metadata_json)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            raise ValueError(f"Invalid JSON: {e}")
+        except ValueError as e:
+            logger.error(f"Pydantic validation error: {e}")
+            raise ValueError(f"Validation error: {e}")
 
         result_dict = result.model_dump()
 
-        # Add metadata
+        # Add metadata and usage
         result_dict["content_length"] = len(proposal_content)
         result_dict["dao_name"] = dao_name
         result_dict["proposal_type"] = proposal_type
         result_dict["tags_count"] = len(result_dict.get("tags", []))
         result_dict["media_processed"] = len(proposal_media) if proposal_media else 0
+        result_dict.update(usage_data)
 
         logger.info(
             f"[MetadataProcessor] Generated title, summary, and {len(result_dict.get('tags', []))} tags for proposal: {result_dict.get('title', 'Unknown')}"

@@ -778,105 +778,31 @@ def ensure_tx_id_prefix(tx_id: Optional[str]) -> Optional[str]:
     return tx_id if tx_id.startswith("0x") else f"0x{tx_id}"
 
 
-# Model pricing data (move this to a config or constants file later if needed)
-MODEL_PRICES = {
-    "gpt-4o": {
-        "input": 2.50,  # $2.50 per million input tokens
-        "output": 10.00,  # $10.00 per million output tokens
-    },
-    "gpt-4.1": {
-        "input": 2.00,  # $2.00 per million input tokens
-        "output": 8.00,  # $8.00 per million output tokens
-    },
-    "gpt-4.1-mini": {
-        "input": 0.40,  # $0.40 per million input tokens
-        "output": 1.60,  # $1.60 per million output tokens
-    },
-    "gpt-4.1-nano": {
-        "input": 0.10,  # $0.10 per million input tokens
-        "output": 0.40,  # $0.40 per million output tokens
-    },
-    # Default to gpt-4.1 pricing if model not found
-    "default": {
-        "input": 2.00,
-        "output": 8.00,
-    },
+GROK_MODEL_PRICING_PER_1K = {
+    "x-ai/grok-4-fast": {"input": 0.000574, "output": 0.000332},
+    "x-ai/grok-4.1-fast": {"input": 0.000574, "output": 0.000332},
+    "x-ai/grok-4.1-fast:free": {"input": 0.0, "output": 0.0},
 }
 
 
-def calculate_token_cost(
-    token_usage: Dict[str, int], model_name: str
-) -> Dict[str, float]:
-    """Calculate the cost of token usage based on current pricing.
+def estimate_usage_cost(input_tokens: int, output_tokens: int, model: str) -> str:
+    """Estimate usage cost based on input/output tokens and Grok model pricing (per 1K tokens).
 
     Args:
-        token_usage: Dictionary containing input_tokens and output_tokens
-        model_name: Name of the model used
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+        model: Model name (e.g., 'x-ai/grok-4-fast')
 
     Returns:
-        Dictionary containing cost breakdown and total cost
+        Cost string like '$0.000123' or fallback
     """
-    # Get pricing for the model, default to gpt-4.1 pricing if not found
-    model_prices = MODEL_PRICES.get(model_name.lower(), MODEL_PRICES["default"])
-
-    # Extract token counts, ensuring we get integers and handle None values
-    try:
-        input_tokens = int(token_usage.get("input_tokens", 0))
-        output_tokens = int(token_usage.get("output_tokens", 0))
-    except (TypeError, ValueError) as e:
-        logger.warning(
-            "Token count conversion failed",
-            extra={
-                "error": str(e),
-                "input_tokens": token_usage.get("input_tokens"),
-                "output_tokens": token_usage.get("output_tokens"),
-            },
-        )
-        input_tokens = 0
-        output_tokens = 0
-
-    # Calculate costs with more precision
-    input_cost = (input_tokens / 1_000_000.0) * model_prices["input"]
-    output_cost = (output_tokens / 1_000_000.0) * model_prices["output"]
-    total_cost = input_cost + output_cost
-
-    # Create detailed token usage breakdown
-    token_details = {
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "total_tokens": input_tokens + output_tokens,
-        "model_name": model_name,
-        "input_price_per_million": model_prices["input"],
-        "output_price_per_million": model_prices["output"],
-    }
-
-    # Add token details if available
-    if "input_token_details" in token_usage:
-        token_details["input_token_details"] = token_usage["input_token_details"]
-    if "output_token_details" in token_usage:
-        token_details["output_token_details"] = token_usage["output_token_details"]
-
-    # Debug logging with structured data
-    logger.debug(
-        "Token cost calculated",
-        extra={
-            "model": model_name,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "input_cost": round(input_cost, 6),
-            "output_cost": round(output_cost, 6),
-            "total_cost": round(total_cost, 6),
-            "event_type": "token_cost_calculation",
-        },
+    pricing = GROK_MODEL_PRICING_PER_1K.get(
+        model, {"input": 0.00055, "output": 0.00055}
     )
-
-    return {
-        "input_cost": round(input_cost, 6),
-        "output_cost": round(output_cost, 6),
-        "total_cost": round(total_cost, 6),
-        "currency": "USD",
-        "details": token_details,
-    }
+    input_cost = (input_tokens / 1000) * pricing["input"]
+    output_cost = (output_tokens / 1000) * pricing["output"]
+    total_cost = input_cost + output_cost
+    return f"${total_cost:.6f}"
 
 
 async def validate_wallet_recipients(recipients: List[str]) -> Dict[str, bool]:
