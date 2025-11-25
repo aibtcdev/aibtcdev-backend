@@ -100,6 +100,11 @@ async def generate_proposal_metadata(
             tools=None,
         )
 
+        # ouput full response (debugging)
+        # logger.info(
+        #    f"[MetadataProcessor] OpenRouter response: {openrouter_response.get('choices', [])[0]}"
+        # )
+
         # Parse usage information
         usage = openrouter_response.get("usage", {})
         logger.debug(f"OpenRouter usage for metadata: {usage}")
