@@ -712,11 +712,20 @@ async def propose_dao_action_send_message(
             )
         )
 
-        # Await both concurrently
-        tx_result, metadata_result = await asyncio.gather(tx_task, metadata_task)
+        # Await both concurrently, allowing metadata errors to be non-fatal
+        tx_result, metadata_result = await asyncio.gather(tx_task, metadata_task, return_exceptions=True)
 
-        # Extract metadata
-        metadata = metadata_result.get("metadata", {})
+        # Handle transaction errors (critical)
+        if isinstance(tx_result, Exception):
+            logger.error(f"Transaction task failed: {tx_result}")
+            raise tx_result
+
+        # Handle metadata errors (non-fatal)
+        if isinstance(metadata_result, Exception):
+            logger.error(f"Metadata generation failed: {metadata_result}")
+            metadata = {}
+        else:
+            metadata = metadata_result.get("metadata", {})
         title = metadata.get("title", "Action Proposal")
         summary = metadata.get("summary", (payload.message[:200] + "...") if len(payload.message) > 200 else payload.message)
         metadata_tags = metadata.get("tags", [])
