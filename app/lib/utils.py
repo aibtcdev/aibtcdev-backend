@@ -781,7 +781,7 @@ def ensure_tx_id_prefix(tx_id: Optional[str]) -> Optional[str]:
 GROK_MODEL_PRICING_PER_1K = {
     "x-ai/grok-4-fast": {"input": 0.000574, "output": 0.000332},
     "x-ai/grok-4.1-fast": {"input": 0.000574, "output": 0.000332},
-    "x-ai/grok-4.1.fast:free": {"input": 0.0, "output": 0.0},
+    "x-ai/grok-4.1-fast:free": {"input": 0.0, "output": 0.0},
 }
 
 
