@@ -314,7 +314,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 "AIBTC-BREW",
             ]:
                 reward_amount = "$20 BTC"
-            elif dao_name in ["ELONBTC", "AIBTC-NS1"]:
+            elif dao_name in ["ELONBTC", "AIBTC-NS1", "AIBTC-LAX"]:
                 reward_amount = "$50 BTC"
             elif dao_name:
                 reward_amount = f"1,000 ${dao_name}"
@@ -374,7 +374,7 @@ class ActionConcluderHandler(ChainhookEventHandler):
                 discord_reward = "💰 Reward: $25 BTC"
             elif dao_name == "AIBTC":
                 discord_reward = "💰 Reward: $20 BTC"
-            elif dao_name in ["ELONBTC", "AIBTC-NS1"]:
+            elif dao_name in ["ELONBTC", "AIBTC-NS1", "AIBTC-LAX"]:
                 discord_reward = "💰 Reward: $50 BTC"
             elif dao_name:
                 discord_reward = f"⭐️ Reward: 1,000 ${dao_name}"
