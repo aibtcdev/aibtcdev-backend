@@ -12,7 +12,7 @@ MUST OBEY CONSTRAINTS:
 - tags: EXACTLY 3-5, 1-3 words lowercase (governance, treasury, technical, etc.)
 
 OUTPUT FORMAT
-Respond with ONLY this JSON. NO text/markdown/codefences.
+Respond with ONLY this JSON. NO text/markdown/code fences.
 
 Your output MUST follow this EXACT structure:
 
