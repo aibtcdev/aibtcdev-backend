@@ -1,76 +1,222 @@
 #!/usr/bin/env python3
 """
-Simple CLI test script for proposal metadata generation.
+CLI test script for proposal metadata generation using orchestrator (simulates backend tasks).
 
-This test uses the simplified metadata generation workflow that creates
-title, summary, and tags for proposal content.
+This test mirrors test_proposal_evaluation_v3.py: fetches from DB, processes tweets/media via orchestrator,
+saves outputs, resets logging. Ensures media (videos/images from X posts) is detected/processed.
 
 Usage:
-    python test_metadata_generation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Some proposal content"
-    python test_metadata_generation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --proposal-data "Proposal content" --debug-level 2
-    python test_metadata_generation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000" --debug-level 2  # Lookup from database
+    python test_metadata_generation.py --proposal-id "123e4567-e89b-12d3-a456-426614174000"
+    python test_metadata_generation.py --proposal-id "ID1" --proposal-id "ID2" --save-output --debug-level 2
 """
 
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
+from datetime import datetime
+from typing import Dict, Any
 from uuid import UUID
 
 # Add the parent directory (root) to the path to import from app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.ai.simple_workflows.metadata import generate_proposal_metadata
+from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
+from app.services.ai.simple_workflows.orchestrator import generate_proposal_metadata
 from app.backend.factory import get_backend
 
 
-async def main():
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
+def reset_logging():
+    """Reset logging to a clean state with a handler to original sys.stderr."""
+    root_logger = logging.getLogger()
+    # Remove all existing handlers to clear any references to Tee/closed files
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    # Add a fresh handler to the current (original) sys.stderr
+    clean_handler = logging.StreamHandler(sys.stderr)
+    clean_handler.setFormatter(StructuredFormatter())
+    clean_handler.setLevel(logging.INFO)
+    root_logger.addHandler(clean_handler)
+    root_logger.setLevel(clean_handler.level)
+    # Propagate changes to other loggers if needed
+    for logger_name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            logger.setLevel(root_logger.level)
+            logger.handlers.clear()  # Clear per-logger handlers
+            logger.propagate = True
+    setup_uvicorn_logging()  # Re-apply any custom setup
+
+
+def short_uuid(uuid_str: str) -> str:
+    """Get first 8 characters of UUID for file naming."""
+    return uuid_str[:8]
+
+
+async def generate_metadata_single_proposal(
+    proposal_id: str,
+    index: int,
+    args: argparse.Namespace,
+    timestamp: str,
+    backend,  # Shared backend instance
+) -> Dict[str, Any]:
+    """Generate metadata for a single proposal with output redirection (simulates backend)."""
+    log_f = None
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    tee_stdout = original_stdout
+    tee_stderr = original_stderr
+    if args.save_output:
+        prop_short_id = short_uuid(proposal_id)
+        log_filename = f"metadata/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+        log_f = open(log_filename, "w")
+        tee_stdout = Tee(original_stdout, log_f)
+        tee_stderr = Tee(original_stderr, log_f)
+    sys.stdout = tee_stdout
+    sys.stderr = tee_stderr
+
+    # Update logger for this proposal
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    new_handler = logging.StreamHandler(sys.stderr)
+    new_handler.setFormatter(StructuredFormatter())
+    new_handler.setLevel(logging.DEBUG if args.debug_level >= 2 else logging.INFO)
+    root_logger.addHandler(new_handler)
+    root_logger.setLevel(new_handler.level)
+    setup_uvicorn_logging()
+    for logger_name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            logger.setLevel(root_logger.level)
+            for handler in logger.handlers[:]:
+                logger.removeHandler(handler)
+            logger.propagate = True
+
+    try:
+        proposal_uuid = UUID(proposal_id)
+        print(f"📋 Generating metadata for proposal {index}: {proposal_id}")
+
+        # Fetch proposal (simulates backend task)
+        proposal = backend.get_proposal(proposal_uuid)
+        if not proposal:
+            error_msg = f"Proposal {proposal_id} not found"
+            print(error_msg)
+            return {"proposal_id": proposal_id, "error": error_msg}
+
+        # Extract tweet_db_ids (key for media processing!)
+        tweet_db_ids = [proposal.tweet_id] if proposal.tweet_id else None
+
+        # Fetch DAO for context
+        dao_name = ""
+        if proposal.dao_id:
+            dao = backend.get_dao(proposal.dao_id)
+            if dao and dao.name:
+                dao_name = dao.name
+
+        # Simulate backend: proposal.content + tweet_db_ids → full media/tweet processing
+        result = await generate_proposal_metadata(
+            proposal_content=proposal.content or "",
+            dao_name=dao_name,
+            proposal_type=getattr(proposal, "proposal_type", ""),
+            tweet_db_ids=tweet_db_ids,
+            streaming=False,  # No streaming in test
+        )
+
+        if "error" in result and result["error"]:
+            error_msg = f"Metadata generation failed: {result['error']}"
+            print(error_msg)
+            return {"proposal_id": proposal_id, "error": error_msg}
+
+        # Build result dict
+        result_dict = {
+            "proposal_id": proposal_id,
+            "dao_name": dao_name,
+            "tweet_db_ids": [str(tid) for tid in tweet_db_ids] if tweet_db_ids else [],
+            "processing_metadata": result.get("processing_metadata", {}),
+            "metadata": result.get("metadata", {}),
+        }
+
+        # Save JSON if requested
+        if args.save_output:
+            json_filename = f"metadata/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            with open(json_filename, "w") as f:
+                json.dump(result_dict, f, indent=2, default=str)
+            print(f"✅ Results saved to {json_filename} and {log_filename}")
+
+        return result_dict
+
+    except Exception as e:
+        error_msg = f"Error generating metadata for {proposal_id}: {str(e)}"
+        print(error_msg)
+        return {"proposal_id": proposal_id, "error": error_msg}
+
+    finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        if log_f:
+            log_f.close()
+
+
+def generate_summary(results: list[Dict[str, Any]], timestamp: str, save_output: bool) -> None:
+    """Generate summary JSON with raw results."""
+    summary = {
+        "timestamp": timestamp,
+        "total_proposals": len(results),
+        "results": results,
+    }
+
+    print(f"Metadata Summary - {timestamp}")
+    print("=" * 60)
+    print(f"Total Proposals: {len(results)}")
+    total_media = sum(r.get("processing_metadata", {}).get("total_media", 0) for r in results)
+    print(f"Total Media Processed: {total_media}")
+    print("See summary JSON for details.")
+    print("=" * 60)
+
+    if save_output:
+        summary_json = f"metadata/{timestamp}_summary.json"
+        with open(summary_json, "w") as f:
+            json.dump(summary, f, indent=2, default=str)
+        print(f"✅ Summary saved to {summary_json}")
+
+
+def main():
     parser = argparse.ArgumentParser(
-        description="Test proposal metadata generation workflow",
+        description="Test proposal metadata generation via orchestrator (simulates backend)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic metadata generation with proposal data
-  python test_metadata_generation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
-    --proposal-data "Proposal to fund development of new feature"
+  # Single proposal (auto-fetches content/tweets/media from DB)
+  python test_metadata_generation.py --proposal-id "12345678-1234-5678-9012-123456789abc"
   
-  # Lookup proposal from database
-  python test_metadata_generation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
-    --debug-level 2
-  
-  # With DAO context
-  python test_metadata_generation.py --proposal-id "12345678-1234-5678-9012-123456789abc" \\
-    --proposal-data "Proposal content" --dao-name "AIBTC" --proposal-type "funding" --debug-level 2
+  # Multiple proposals
+  python test_metadata_generation.py --proposal-id "ID1" --proposal-id "ID2" --save-output --debug-level 2
         """,
     )
 
-    # Required arguments
     parser.add_argument(
         "--proposal-id",
+        action="append",
         type=str,
         required=True,
-        help="ID of the proposal to generate metadata for",
-    )
-
-    parser.add_argument(
-        "--proposal-data",
-        type=str,
-        required=False,
-        help="Content/data of the proposal (optional - will lookup from database if not provided)",
-    )
-
-    # Optional arguments
-    parser.add_argument(
-        "--dao-name",
-        type=str,
-        help="Name of the DAO",
-    )
-
-    parser.add_argument(
-        "--proposal-type",
-        type=str,
-        help="Type of the proposal (e.g., funding, governance, technical)",
+        help="Proposal ID(s) to process (multiple allowed)",
     )
 
     parser.add_argument(
@@ -81,164 +227,51 @@ Examples:
         help="Debug level: 0=normal, 1=verbose, 2=very verbose (default: 0)",
     )
 
+    parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save raw JSON + logs to metadata/ (timestamped)",
+    )
+
     args = parser.parse_args()
 
-    # If proposal_content is not provided, look it up from the database
-    proposal_content = args.proposal_data
-    dao_name = args.dao_name or ""
-    proposal_type = args.proposal_type or ""
-
-    if not proposal_content:
-        print("📋 No proposal data provided, looking up from database...")
-        try:
-            backend = get_backend()
-            proposal_uuid = UUID(args.proposal_id)
-            proposal = backend.get_proposal(proposal_uuid)
-
-            if not proposal:
-                print(
-                    f"❌ Error: Proposal with ID {args.proposal_id} not found in database"
-                )
-                sys.exit(1)
-
-            if not proposal.content:
-                print(f"❌ Error: Proposal {args.proposal_id} has no content")
-                sys.exit(1)
-
-            proposal_content = proposal.content
-            print(f"✅ Found proposal in database: {proposal.title or 'Untitled'}")
-
-            # Get DAO name if not provided and available in proposal
-            if not dao_name and proposal.dao_id:
-                try:
-                    dao = backend.get_dao(proposal.dao_id)
-                    if dao and dao.name:
-                        dao_name = dao.name
-                        print(f"✅ Using DAO name from database: {dao_name}")
-                except Exception as e:
-                    if args.debug_level >= 1:
-                        print(f"⚠️  Could not retrieve DAO name: {e}")
-
-            # Get proposal type if available
-            if not proposal_type and hasattr(proposal, "proposal_type"):
-                proposal_type = proposal.proposal_type or ""
-
-        except ValueError as e:
-            print(f"❌ Error: Invalid proposal ID format: {e}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"❌ Error looking up proposal: {e}")
-            if args.debug_level >= 1:
-                import traceback
-
-                traceback.print_exc()
-            sys.exit(1)
-
-    print("🚀 Starting Proposal Metadata Generation Test")
-    print("=" * 60)
-    print(f"Proposal ID: {args.proposal_id}")
-    print(
-        f"Proposal Data: {proposal_content[:100]}{'...' if len(proposal_content) > 100 else ''}"
-    )
-    print(f"DAO Name: {dao_name or '(not specified)'}")
-    print(f"Proposal Type: {proposal_type or '(not specified)'}")
-    print(f"Debug Level: {args.debug_level}")
-    print("=" * 60)
-
-    try:
-        # Generate metadata
-        print("🔍 Generating metadata...")
-        result = await generate_proposal_metadata(
-            proposal_content=proposal_content,
-            dao_name=dao_name,
-            proposal_type=proposal_type,
-            proposal_media=None,  # TODO: Support image processing if needed
-            callbacks=None,
-        )
-
-        print("\n✅ Metadata Generation Complete!")
-        print("=" * 60)
-
-        # Check for errors
-        if "error" in result and result["error"]:
-            print(f"❌ Error during generation: {result['error']}")
-            if args.debug_level >= 1:
-                print("\n📄 Full Result JSON:")
-                print(json.dumps(result, indent=2, default=str))
-            sys.exit(1)
-
-        # Pretty print the result
-        print("📊 Generated Metadata:")
-        print(f"   • Title: {result.get('title', 'N/A')}")
-        print(f"   • Summary: {result.get('summary', 'N/A')}")
-        print(f"   • Tags: {', '.join(result.get('tags', []))}")
-        print(f"   • Tags Count: {result.get('tags_count', 0)}")
-        print(f"   • Content Length: {result.get('content_length', 0)} characters")
-        print(f"   • Media Processed: {result.get('media_processed', 0)}")
-
-        # Show additional details in debug mode
-        if args.debug_level >= 1:
-            print("\n📋 Additional Details:")
-            print(f"   • DAO Name: {result.get('dao_name', 'N/A')}")
-            print(f"   • Proposal Type: {result.get('proposal_type', 'N/A')}")
-
-        # Show full JSON in verbose debug mode
-        if args.debug_level >= 2:
-            print("\n📄 Full Result JSON:")
-            print(json.dumps(result, indent=2, default=str))
-
-        # Validate the output
-        print("\n🔍 Validation:")
-        validation_passed = True
-
-        if not result.get("title"):
-            print("   ❌ Title is empty")
-            validation_passed = False
-        elif len(result.get("title", "")) > 100:
-            print(f"   ⚠️  Title exceeds 100 characters: {len(result['title'])}")
-            validation_passed = False
-        else:
-            print(f"   ✅ Title is valid ({len(result.get('title', ''))} characters)")
-
-        if not result.get("summary"):
-            print("   ❌ Summary is empty")
-            validation_passed = False
-        elif len(result.get("summary", "")) > 500:
-            print(f"   ⚠️  Summary exceeds 500 characters: {len(result['summary'])}")
-            validation_passed = False
-        else:
-            print(
-                f"   ✅ Summary is valid ({len(result.get('summary', ''))} characters)"
-            )
-
-        tags = result.get("tags", [])
-        if not tags:
-            print("   ❌ No tags generated")
-            validation_passed = False
-        elif len(tags) < 3:
-            print(f"   ⚠️  Fewer than 3 tags: {len(tags)}")
-            validation_passed = False
-        elif len(tags) > 5:
-            print(f"   ⚠️  More than 5 tags: {len(tags)}")
-            validation_passed = False
-        else:
-            print(f"   ✅ Tags are valid ({len(tags)} tags)")
-
-        if validation_passed:
-            print("\n🎉 All validations passed!")
-        else:
-            print("\n⚠️  Some validations failed")
-
-    except Exception as e:
-        print(f"\n❌ Error during metadata generation: {str(e)}")
-        if args.debug_level >= 1:
-            import traceback
-
-            traceback.print_exc()
+    if not args.proposal_id:
+        print("❌ At least one --proposal-id required")
         sys.exit(1)
 
-    print("\n🎉 Metadata generation test completed successfully!")
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+    if args.save_output:
+        os.makedirs("metadata", exist_ok=True)
+
+    print("🚀 Starting Metadata Generation Test (Backend Simulation)")
+    print("=" * 60)
+    print(f"Proposals: {len(args.proposal_id)}")
+    print(f"Debug Level: {args.debug_level}")
+    print(f"Save Output: {args.save_output}")
+    print("=" * 60)
+
+    # Create single backend instance
+    backend = get_backend()
+
+    results = []
+    for index, proposal_id in enumerate(args.proposal_id, 1):
+        result = asyncio.run(
+            generate_metadata_single_proposal(proposal_id, index, args, timestamp, backend)
+        )
+        results.append(result)
+
+    # Reset logging
+    reset_logging()
+
+    generate_summary(results, timestamp, args.save_output)
+
+    print("\n🎉 Metadata generation test completed (backend simulation)!")
+
+    # Clean up backend
+    backend.sqlalchemy_engine.dispose()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
