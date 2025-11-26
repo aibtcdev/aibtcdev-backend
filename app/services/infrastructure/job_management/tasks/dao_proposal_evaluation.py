@@ -349,7 +349,7 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             )
 
             evaluation_output = await evaluate_proposal_strict(
-                proposal_id=proposal_id,
+                proposal_id=proposal_id, temperature=0.2
             )
 
             if evaluation_output is None:
