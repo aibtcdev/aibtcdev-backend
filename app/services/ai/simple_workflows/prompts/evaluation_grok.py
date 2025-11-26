@@ -101,7 +101,7 @@ EVALUATION_GROK_USER_PROMPT_TEMPLATE = """Evaluate this proposal for the AIBTC p
 DAO INFO: includes AIBTC charter and current order
 {dao_info_for_evaluation}
 
-PROPOSAL CONTENT: includes auto-generated title, tweet content as summary, and links to research and verify
+PROPOSAL CONTENT: includes auto-generated title, tweet content with parsed data as summary, and links to research and verify
 {proposal_content_for_evaluation}
 
 RELATED X POST: includes data pulled from X API at time of submission with public_stats
