@@ -107,7 +107,7 @@ PROPOSAL CONTENT: includes auto-generated title, tweet content with parsed data 
 RELATED X POST: includes data pulled from X API at time of submission with public_stats
 {tweet_info_for_evaluation}
 
-X AUTHOR: includes data pulled from X API when connected to author profile with verified status
+X AUTHOR: includes data pulled from X API from the author profile with verified status
 {tweet_author_info_for_evaluation}
 
 X QUOTED POST: (optional) includes data pulled from X API if proposal quotes another post
