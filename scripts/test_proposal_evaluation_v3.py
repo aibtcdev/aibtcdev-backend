@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+import os
+
 """
 CLI test script for proposal evaluations using the v3 strict workflow.
 
@@ -14,7 +17,6 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 import sys
 from datetime import datetime
 from typing import Dict, Any
@@ -24,9 +26,14 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
-from app.services.ai.simple_workflows.orchestrator import evaluate_proposal_strict
+from app.services.ai.simple_workflows.evaluation_openrouter_v2 import (
+    evaluate_proposal_openrouter,
+    EvaluationOutput,
+)
 from app.backend.factory import get_backend
 from scripts.generate_evals_manifest import generate_manifest
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Tee(object):
@@ -84,7 +91,9 @@ async def evaluate_single_proposal(
     tee_stderr = original_stderr
     if args.save_output:
         prop_short_id = short_uuid(proposal_id)
-        log_filename = f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+        log_filename = os.path.join(
+            ROOT_DIR, f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_log.txt"
+        )
         log_f = open(log_filename, "w")
         tee_stdout = Tee(original_stdout, log_f)
         tee_stderr = Tee(original_stderr, log_f)
@@ -112,7 +121,7 @@ async def evaluate_single_proposal(
         proposal_uuid = UUID(proposal_id)
         print(f"📋 Evaluating proposal {index}: {proposal_id}")
 
-        result = await evaluate_proposal_strict(
+        result = await evaluate_proposal_openrouter(
             proposal_id=proposal_uuid,
             model=args.model,
             temperature=args.temperature,
@@ -121,7 +130,14 @@ async def evaluate_single_proposal(
 
         if not result:
             error_msg = f"Evaluation failed for proposal {proposal_id}"
-            print(result)
+            print(error_msg)
+            return {"proposal_id": proposal_id, "error": error_msg}
+
+        # Validate EvaluationOutput
+        try:
+            EvaluationOutput(**result["evaluation_output"])
+        except ValueError as ve:
+            error_msg = f"Validation failed for EvaluationOutput: {str(ve)}"
             print(error_msg)
             return {"proposal_id": proposal_id, "error": error_msg}
 
@@ -135,13 +151,16 @@ async def evaluate_single_proposal(
         result_dict = {
             "proposal_id": proposal_id,
             "expected_decision": expected_dec,
-            "evaluation_output": result.model_dump(),  # Raw as dict
+            "evaluation_output": result["evaluation_output"],  # Raw as dict
+            "full_system_prompt": result.get("full_system_prompt", "N/A"),
+            "full_user_prompt": result.get("full_user_prompt", "N/A"),
+            "full_messages": result.get("full_messages", []),
         }
 
         # Save JSON if requested
         if args.save_output:
-            json_filename = (
-                f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
+            json_filename = os.path.join(
+                ROOT_DIR, f"evals/{timestamp}_prop{index:02d}_{prop_short_id}_raw.json"
             )
             with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
@@ -180,7 +199,7 @@ def generate_summary(
     print("=" * 60)
 
     if save_output:
-        summary_json = f"evals/{timestamp}_summary.json"
+        summary_json = os.path.join(ROOT_DIR, f"evals/{timestamp}_summary.json")
         with open(summary_json, "w") as f:
             json.dump(summary, f, indent=2, default=str)
         print(f"✅ Summary saved to {summary_json}")
@@ -264,7 +283,7 @@ Examples:
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
     if args.save_output:
-        os.makedirs("evals", exist_ok=True)
+        os.makedirs(os.path.join(ROOT_DIR, "evals"), exist_ok=True)
 
     print("🚀 Starting Proposal Evaluation Test V3")
     print("=" * 60)
