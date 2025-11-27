@@ -29,6 +29,10 @@ from app.services.ai.simple_workflows import (
     generate_proposal_metadata,
     generate_proposal_recommendation,
 )
+import asyncio
+
+from app.services.processing.twitter_data_service import twitter_data_service
+
 from app.tools.agent_account_action_proposals import (
     AgentAccountCreateActionProposalTool,
     AgentAccountVetoActionProposalTool,
@@ -679,10 +683,6 @@ async def propose_dao_action_send_message(
         # Step 1: Extract Twitter information and save to tweet table
         tweet_db_ids = []
         if payload.message:
-            from app.services.processing.twitter_data_service import (
-                twitter_data_service,
-            )
-
             tweet_db_ids = await twitter_data_service.process_twitter_urls_from_text(
                 payload.message
             )
@@ -690,36 +690,62 @@ async def propose_dao_action_send_message(
                 f"Processed {len(tweet_db_ids)} Twitter URLs from message for profile {profile.id}"
             )
 
-        # Step 2: Generate metadata given the message and the tweet_id information
-        title, summary, metadata_tags = await _generate_metadata_for_message(
-            payload.message, tweet_db_ids
-        )
-
-        # Step 3: Enhance message with metadata
-        enhanced_message = _enhance_message_with_metadata(
-            payload.message, title, metadata_tags, payload.airdrop_txid
-        )
-
-        # Step 4: Deploy the information on chain
+        # Step 2: Parallel tx submission (raw message) + metadata generation
         tool = AgentAccountCreateActionProposalTool(wallet_id=wallet.id)
-        result = await tool._arun(
-            agent_account_contract=payload.agent_account_contract,
-            dao_action_proposal_voting_contract=payload.action_proposals_voting_extension,
-            action_contract_to_execute=payload.action_proposal_contract_to_execute,
-            dao_token_contract=payload.dao_token_contract_address,
-            message_to_send=enhanced_message,
-            memo=payload.memo,
+        tx_task = asyncio.create_task(
+            tool._arun(
+                agent_account_contract=payload.agent_account_contract,
+                dao_action_proposal_voting_contract=payload.action_proposals_voting_extension,
+                action_contract_to_execute=payload.action_proposal_contract_to_execute,
+                dao_token_contract=payload.dao_token_contract_address,
+                message_to_send=payload.message,  # RAW message for tx
+                memo=payload.memo,
+            )
         )
+
+        metadata_task = asyncio.create_task(
+            generate_proposal_metadata(
+                proposal_content=payload.message,  # RAW
+                dao_name="",
+                proposal_type="action_proposal",
+                tweet_db_ids=tweet_db_ids,
+            )
+        )
+
+        # Await both concurrently, allowing metadata errors to be non-fatal
+        tx_result, metadata_result = await asyncio.gather(
+            tx_task, metadata_task, return_exceptions=True
+        )
+
+        # Handle transaction errors (critical)
+        if isinstance(tx_result, Exception):
+            logger.error(f"Transaction task failed: {tx_result}")
+            raise tx_result
+
+        # Handle metadata errors (non-fatal)
+        if isinstance(metadata_result, Exception):
+            logger.error(f"Metadata generation failed: {metadata_result}")
+            metadata = {}
+        else:
+            metadata = metadata_result.get("metadata", {})
+        title = metadata.get("title", "Action Proposal")
+        summary = metadata.get(
+            "summary",
+            (payload.message[:200] + "...")
+            if len(payload.message) > 200
+            else payload.message,
+        )
+        metadata_tags = metadata.get("tags", [])
 
         logger.debug(
-            f"DAO propose send message result for wallet {wallet.id} (profile {profile.id}): {result}"
+            f"DAO propose send message result for wallet {wallet.id} (profile {profile.id}): {tx_result}"
         )
 
-        # Step 5: Create proposal record if tool execution was successful
+        # Step 3: Create proposal record if tool execution was successful
         await _create_proposal_record_if_successful(
-            result,
+            tx_result,
             payload,
-            enhanced_message,
+            payload.message,  # RAW message
             title,
             summary,
             metadata_tags,
@@ -728,7 +754,7 @@ async def propose_dao_action_send_message(
             tweet_db_ids,
         )
 
-        return JSONResponse(content=result)
+        return JSONResponse(content=tx_result)
 
     except HTTPException:
         raise
