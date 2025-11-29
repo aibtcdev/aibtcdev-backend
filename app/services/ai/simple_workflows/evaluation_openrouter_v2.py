@@ -622,13 +622,14 @@ async def evaluate_proposal_openrouter(
         messages.append({"role": "user", "content": user_content})
 
         # call openrouter passing x tools and message
-        x_ai_tools = [{"type": "web_search"}, {"type": "x_search"}]
+        # disabled x_ai_tools 2025-11-29 after 400 errors
+        # x_ai_tools = [{"type": "web_search"}, {"type": "x_search"}]
         openrouter_response = await call_openrouter(
             messages=messages,
             model=model,
             temperature=temperature,
             reasoning=reasoning,
-            tools=x_ai_tools,
+            tools=None,  # x_ai_tools,
         )
 
         # parse usage information
