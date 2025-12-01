@@ -186,6 +186,14 @@ async def call_openrouter(
         response = await client.post(
             f"{config_data['base_url']}/chat/completions", json=payload, headers=headers
         )
+        if response.status_code == 429:
+            logger.warning(
+                "OpenRouter rate limit exceeded",
+                extra={
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
         response.raise_for_status()
         return response.json()
 
