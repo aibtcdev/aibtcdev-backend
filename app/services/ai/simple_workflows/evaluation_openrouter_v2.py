@@ -225,7 +225,7 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
                 pass  # Fallback to "unknown"
 
         # Get creation info
-        created_at_btc = getattr(proposal, "created_at_btc", None)
+        created_at_btc = getattr(proposal, "created_btc", None)
         created_at_timestamp = getattr(proposal, "created_at", None)
 
         # Safely handle created_at date formatting
@@ -249,6 +249,8 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
         passed = getattr(proposal, "passed", False)
         concluded = getattr(proposal, "concluded_by", None) is not None
         proposal_status = getattr(proposal, "status", None)
+        yes_votes = getattr(proposal, "votes_for", "0")
+        no_votes = getattr(proposal, "votes_against", "0")
 
         if (
             proposal_status
@@ -262,6 +264,16 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
             proposal_passed = "no"
         else:
             proposal_passed = "pending"
+
+        # handle special case of no votes
+        if concluded and (int(yes_votes) + int(no_votes) == 0):
+            logger.warning(
+                f"Proposal {proposal_id} concluded with no votes",
+                extra={
+                    "proposal_id": proposal.id,
+                },
+            )
+            proposal_passed = "n/a (no votes)"
 
         # Get content
         content = getattr(proposal, "summary", "") or getattr(proposal, "content", "")
