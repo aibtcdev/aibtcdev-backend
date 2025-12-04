@@ -186,6 +186,14 @@ async def call_openrouter(
         response = await client.post(
             f"{config_data['base_url']}/chat/completions", json=payload, headers=headers
         )
+        if response.status_code == 429:
+            logger.warning(
+                "OpenRouter rate limit exceeded",
+                extra={
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
         response.raise_for_status()
         return response.json()
 
@@ -193,6 +201,16 @@ async def call_openrouter(
 ###############################
 # Evaluation Helpers         ##
 ###############################
+
+
+def safe_int_votes(value: Any, default: int = 0) -> int:
+    """Safely convert value to int, handling None/non-numeric cases."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
 def _format_proposals_for_context(proposals: List[Proposal]) -> str:
@@ -225,7 +243,7 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
                 pass  # Fallback to "unknown"
 
         # Get creation info
-        created_at_btc = getattr(proposal, "created_at_btc", None)
+        created_at_btc = getattr(proposal, "created_btc", None)
         created_at_timestamp = getattr(proposal, "created_at", None)
 
         # Safely handle created_at date formatting
@@ -249,6 +267,8 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
         passed = getattr(proposal, "passed", False)
         concluded = getattr(proposal, "concluded_by", None) is not None
         proposal_status = getattr(proposal, "status", None)
+        yes_votes = safe_int_votes(getattr(proposal, "votes_for", 0))
+        no_votes = safe_int_votes(getattr(proposal, "votes_against", 0))
 
         if (
             proposal_status
@@ -262,6 +282,18 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
             proposal_passed = "no"
         else:
             proposal_passed = "pending"
+
+        # handle special case of no votes
+        if concluded and (yes_votes + no_votes == 0):
+            logger.warning(
+                f"Proposal {proposal_id} concluded with no votes",
+                extra={
+                    "proposal_id": proposal.id,
+                    "yes_votes": yes_votes,
+                    "no_votes": no_votes,
+                },
+            )
+            proposal_passed = "n/a (no votes)"
 
         # Get content
         content = getattr(proposal, "summary", "") or getattr(proposal, "content", "")
