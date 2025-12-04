@@ -552,25 +552,26 @@ class ActionProposalHandler(BaseProposalHandler):
         selection.quorum_achieved = selected_tokens >= quorum_threshold_decimal
         selection.selection_rounds = round_number
 
-        # Ensure minimum selection for fairness
-        min_agents = min(config.lottery.min_selections, len(agents_with_tokens))
-        while (
-            len(selection.selected_wallets) < min_agents
-            and remaining_agents
-            and len(selection.selected_wallets) < config.lottery.max_selections
-        ):
-            round_number += 1
-            round_seed = f"{seed}_{round_number}"
-            random.seed(round_seed)
+        # Ensure minimum selection for fairness (ONLY if quorum failed - PREVENTS OVER-SELECTION)
+        if not selection.quorum_achieved:
+            min_agents = min(config.lottery.min_selections, len(agents_with_tokens))
+            while (
+                len(selection.selected_wallets) < min_agents
+                and remaining_agents
+                and len(selection.selected_wallets) < config.lottery.max_selections
+            ):
+                round_number += 1
+                round_seed = f"{seed}_{round_number}"
+                random.seed(round_seed)
 
-            selected_agent = self._perform_weighted_selection(remaining_agents)
+                selected_agent = self._perform_weighted_selection(remaining_agents)
 
-            wallet_dict = create_wallet_selection_dict(
-                selected_agent.wallet_id, selected_agent.token_amount
-            )
-            selection.selected_wallets.append(wallet_dict)
+                wallet_dict = create_wallet_selection_dict(
+                    selected_agent.wallet_id, selected_agent.token_amount
+                )
+                selection.selected_wallets.append(wallet_dict)
 
-            selected_tokens += Decimal(selected_agent.token_amount)
+                selected_tokens += Decimal(selected_agent.token_amount)
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
