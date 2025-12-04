@@ -203,6 +203,16 @@ async def call_openrouter(
 ###############################
 
 
+def safe_int_votes(value: Any, default: int = 0) -> int:
+    """Safely convert value to int, handling None/non-numeric cases."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def _format_proposals_for_context(proposals: List[Proposal]) -> str:
     """Format proposals for context in evaluation prompt."""
     if not proposals:
@@ -257,8 +267,8 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
         passed = getattr(proposal, "passed", False)
         concluded = getattr(proposal, "concluded_by", None) is not None
         proposal_status = getattr(proposal, "status", None)
-        yes_votes = getattr(proposal, "votes_for", "0")
-        no_votes = getattr(proposal, "votes_against", "0")
+        yes_votes = safe_int_votes(getattr(proposal, "votes_for", 0))
+        no_votes = safe_int_votes(getattr(proposal, "votes_against", 0))
 
         if (
             proposal_status
@@ -274,11 +284,13 @@ def _format_proposals_for_context(proposals: List[Proposal]) -> str:
             proposal_passed = "pending"
 
         # handle special case of no votes
-        if concluded and (int(yes_votes) + int(no_votes) == 0):
+        if concluded and (yes_votes + no_votes == 0):
             logger.warning(
                 f"Proposal {proposal_id} concluded with no votes",
                 extra={
                     "proposal_id": proposal.id,
+                    "yes_votes": yes_votes,
+                    "no_votes": no_votes,
                 },
             )
             proposal_passed = "n/a (no votes)"
