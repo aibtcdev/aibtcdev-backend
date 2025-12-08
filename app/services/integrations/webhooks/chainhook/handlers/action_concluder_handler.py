@@ -309,7 +309,9 @@ class ActionConcluderHandler(ChainhookEventHandler):
             dao_name = dao.name if dao else ""
 
             # Set reward amount based on DAO name
-            if dao_name in [
+            if dao_name == "AIBTC-R1":
+                reward_amount = "$1 BTC"
+            elif dao_name in [
                 "AIBTC",
                 "AIBTC-BREW",
             ]:
@@ -370,7 +372,9 @@ class ActionConcluderHandler(ChainhookEventHandler):
             formatted_message = "\n=======================================\n\n"
             formatted_message += f"✅ Approved: Contribution #{proposal.proposal_id}\n"
             # Set reward amount based on DAO name for Discord
-            if dao_name == "AIBTC-BREW":
+            if dao_name == "AIBTC-R1":
+                discord_reward = "$1 BTC"
+            elif dao_name == "AIBTC-BREW":
                 discord_reward = "💰 Reward: $25 BTC"
             elif dao_name == "AIBTC":
                 discord_reward = "💰 Reward: $20 BTC"
