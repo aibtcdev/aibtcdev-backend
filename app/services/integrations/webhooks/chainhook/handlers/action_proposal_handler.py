@@ -37,10 +37,17 @@ from app.services.ai.simple_workflows import generate_proposal_metadata
 
 
 class ActionProposalHandler(BaseProposalHandler):
-    """Handler for capturing and processing new DAO action proposals.
+    """Handler for capturing and processing new DAO action proposals from agent accounts.
 
-    This handler identifies contract calls related to proposing actions through agent account contracts,
-    creates proposal records in the database, and tracks their lifecycle including failed proposals.
+    Key features:
+    - Identifies 'create-action-proposal' calls from agent account contracts (aibtc-acct-*)
+    - Handles BOTH successful AND failed transactions
+    - Creates/updates proposal records with decoded parameters and AI-generated metadata (title/summary/tags)
+    - Performs quorum-based lottery selection for agent voters using Bitcoin block hash for determinism
+    - Records comprehensive lottery results with quorum achievement tracking
+    - Queues evaluation tasks ONLY for lottery-selected agents
+    - Creates tweet queue messages for successful proposals
+    - Gracefully handles missing Bitcoin block data with fallbacks
     """
 
     def can_handle_transaction(self, transaction: TransactionWithReceipt) -> bool:
@@ -891,6 +898,17 @@ class ActionProposalHandler(BaseProposalHandler):
                         dao_data["id"],
                     )
 
+                    # Ensure bitcoin_block_hash and bitcoin_block_height are set for lottery_result
+                    if bitcoin_block_hash is None:
+                        bitcoin_block_hash = hashlib.sha256(
+                            f"{proposal.id}{dao_data['id']}".encode()
+                        ).hexdigest()
+                        self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
+
+                    if bitcoin_block_height is None:
+                        bitcoin_block_height = 0
+                        self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
+
                     # Record the lottery results
                     try:
                         self.logger.info(
@@ -1094,6 +1112,17 @@ class ActionProposalHandler(BaseProposalHandler):
                             updated_proposal.id,
                             dao_data["id"],
                         )
+
+                        # Ensure bitcoin_block_hash and bitcoin_block_height are set for lottery_result
+                        if bitcoin_block_hash is None:
+                            bitcoin_block_hash = hashlib.sha256(
+                                f"{updated_proposal.id}{dao_data['id']}".encode()
+                            ).hexdigest()
+                            self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
+
+                        if bitcoin_block_height is None:
+                            bitcoin_block_height = 0
+                            self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
 
                         # Record the lottery results
                         try:
