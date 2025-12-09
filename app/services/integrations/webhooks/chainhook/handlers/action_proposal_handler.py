@@ -929,7 +929,7 @@ class ActionProposalHandler(BaseProposalHandler):
                         )
                         self.logger.error(
                             f"Lottery data: proposal_id={proposal.id}, dao_id={dao_data['id']}, "
-                            f"bitcoin_block_height={bitcoin_block_height},bitcoin_block_hash={bitcoin_block_hash}"
+                            f"bitcoin_block_height={bitcoin_block_height}, bitcoin_block_hash={bitcoin_block_hash}"
                         )
                         raise
 
