@@ -616,11 +616,15 @@ class ActionProposalHandler(BaseProposalHandler):
             bitcoin_block_hash = hashlib.sha256(
                 f"{proposal_id}{dao_id}".encode()
             ).hexdigest()
-            self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
+            self.logger.warning(
+                "No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID"
+            )
 
         if bitcoin_block_height is None:
             bitcoin_block_height = 0
-            self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
+            self.logger.warning(
+                "No bitcoin_block_height → fallback to 0 for lottery_result"
+            )
 
         return bitcoin_block_hash, bitcoin_block_height
 
@@ -918,8 +922,13 @@ class ActionProposalHandler(BaseProposalHandler):
                         dao_data["id"],
                     )
 
-                    bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
-                        proposal.id, dao_data["id"], bitcoin_block_hash, bitcoin_block_height
+                    bitcoin_block_hash, bitcoin_block_height = (
+                        self._ensure_bitcoin_block_data(
+                            proposal.id,
+                            dao_data["id"],
+                            bitcoin_block_hash,
+                            bitcoin_block_height,
+                        )
                     )
 
                     # Record the lottery results
@@ -1126,8 +1135,13 @@ class ActionProposalHandler(BaseProposalHandler):
                             dao_data["id"],
                         )
 
-                        bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
-                            updated_proposal.id, dao_data["id"], bitcoin_block_hash, bitcoin_block_height
+                        bitcoin_block_hash, bitcoin_block_height = (
+                            self._ensure_bitcoin_block_data(
+                                updated_proposal.id,
+                                dao_data["id"],
+                                bitcoin_block_hash,
+                                bitcoin_block_height,
+                            )
                         )
 
                         # Record the lottery results
