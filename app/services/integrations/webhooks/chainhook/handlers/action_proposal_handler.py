@@ -912,11 +912,13 @@ class ActionProposalHandler(BaseProposalHandler):
                 )
 
                 if agents:
-                    bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
-                        proposal.id,
-                        dao_data["id"],
-                        bitcoin_block_hash,
-                        bitcoin_block_height,
+                    bitcoin_block_hash, bitcoin_block_height = (
+                        self._ensure_bitcoin_block_data(
+                            proposal.id,
+                            dao_data["id"],
+                            bitcoin_block_hash,
+                            bitcoin_block_height,
+                        )
                     )
 
                     # Conduct quorum-aware lottery
@@ -1124,11 +1126,13 @@ class ActionProposalHandler(BaseProposalHandler):
                     # Conduct new quorum-aware lottery if none exists
                     agents = self._get_agent_token_holders(dao_data["id"])
                     if agents:
-                        bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
-                            updated_proposal.id,
-                            dao_data["id"],
-                            bitcoin_block_hash,
-                            bitcoin_block_height,
+                        bitcoin_block_hash, bitcoin_block_height = (
+                            self._ensure_bitcoin_block_data(
+                                updated_proposal.id,
+                                dao_data["id"],
+                                bitcoin_block_hash,
+                                bitcoin_block_height,
+                            )
                         )
 
                         lottery_selection = self._conduct_quorum_lottery(
