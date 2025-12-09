@@ -604,6 +604,26 @@ class ActionProposalHandler(BaseProposalHandler):
 
         return remaining_agents.pop(selected_idx)
 
+    def _ensure_bitcoin_block_data(
+        self,
+        proposal_id: UUID,
+        dao_id: UUID,
+        bitcoin_block_hash: Optional[str],
+        bitcoin_block_height: Optional[int],
+    ) -> tuple[str, int]:
+        """Ensure bitcoin block data is set, using fallbacks if None."""
+        if bitcoin_block_hash is None:
+            bitcoin_block_hash = hashlib.sha256(
+                f"{proposal_id}{dao_id}".encode()
+            ).hexdigest()
+            self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
+
+        if bitcoin_block_height is None:
+            bitcoin_block_height = 0
+            self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
+
+        return bitcoin_block_hash, bitcoin_block_height
+
     async def _parse_and_generate_proposal_metadata(
         self, parameters: str, dao_name: str, proposal_id: str
     ) -> Dict[str, str]:
@@ -898,16 +918,9 @@ class ActionProposalHandler(BaseProposalHandler):
                         dao_data["id"],
                     )
 
-                    # Ensure bitcoin_block_hash and bitcoin_block_height are set for lottery_result
-                    if bitcoin_block_hash is None:
-                        bitcoin_block_hash = hashlib.sha256(
-                            f"{proposal.id}{dao_data['id']}".encode()
-                        ).hexdigest()
-                        self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
-
-                    if bitcoin_block_height is None:
-                        bitcoin_block_height = 0
-                        self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
+                    bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
+                        proposal.id, dao_data["id"], bitcoin_block_hash, bitcoin_block_height
+                    )
 
                     # Record the lottery results
                     try:
@@ -1113,16 +1126,9 @@ class ActionProposalHandler(BaseProposalHandler):
                             dao_data["id"],
                         )
 
-                        # Ensure bitcoin_block_hash and bitcoin_block_height are set for lottery_result
-                        if bitcoin_block_hash is None:
-                            bitcoin_block_hash = hashlib.sha256(
-                                f"{updated_proposal.id}{dao_data['id']}".encode()
-                            ).hexdigest()
-                            self.logger.warning("No BTC hash → fallback bitcoin_block_hash for lottery_result from proposal+DAO ID")
-
-                        if bitcoin_block_height is None:
-                            bitcoin_block_height = 0
-                            self.logger.warning("No bitcoin_block_height → fallback to 0 for lottery_result")
+                        bitcoin_block_hash, bitcoin_block_height = self._ensure_bitcoin_block_data(
+                            updated_proposal.id, dao_data["id"], bitcoin_block_hash, bitcoin_block_height
+                        )
 
                         # Record the lottery results
                         try:
