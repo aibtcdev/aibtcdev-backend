@@ -2399,13 +2399,14 @@ class SupabaseBackend(AbstractBackend):
                 self.client.table("job_cooldowns")
                 .select("*")
                 .eq("job_type", job_type)
-                .single()
                 .execute()
             )
-            if not response.data:
+            data = response.data or []
+            if not data:
                 return None
-
-            cooldown = JobCooldown(**response.data)
+            if len(data) > 1:
+                logger.warning(f"Multiple job cooldowns found for {job_type}: {len(data)}")
+            cooldown = JobCooldown(**data[0])
 
             now = datetime.now(timezone.utc)
             if not cooldown.wait_until or cooldown.wait_until <= now:
