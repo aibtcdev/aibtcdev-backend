@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.backend.factory import backend
 from app.backend.models import (
+    JobCooldownCreate,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,
@@ -25,6 +26,9 @@ from app.services.infrastructure.job_management.base import (
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 import re
+import random
+import tweepy
+from datetime import datetime, timedelta, timezone
 
 logger = configure_logger(__name__)
 
@@ -457,6 +461,21 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         )
                     # For subsequent posts, we can continue
 
+            except tweepy.TooManyRequests as e:
+                retry_after = int(e.response.headers.get("Retry-After", 900))  # Default 15min
+                jitter = random.uniform(1.0, 1.5)
+                wait_until = datetime.now(timezone.utc) + timedelta(seconds=retry_after * jitter)
+                backend.upsert_job_cooldown(
+                    job_type="tweet",
+                    wait_until=wait_until,
+                    reason=f"twitter-429 (Retry-After: {retry_after}s)"
+                )
+                logger.warning(f"Tweet job cooldown set until {wait_until}")
+                return TweetProcessingResult(
+                    success=False,
+                    message=f"Rate limited until {wait_until}",
+                    dao_id=message.dao_id,
+                )
             except Exception as post_error:
                 # Check if it's a Twitter duplicate content error
                 error_message = str(post_error)
