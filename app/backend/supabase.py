@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import uuid
 
@@ -2407,7 +2407,7 @@ class SupabaseBackend(AbstractBackend):
 
             cooldown = JobCooldown(**response.data)
 
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             if not cooldown.wait_until or cooldown.wait_until <= now:
                 return None
 
@@ -2440,7 +2440,7 @@ class SupabaseBackend(AbstractBackend):
         Raises:
             Implementation-specific database exceptions on failure.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         if wait_until is None:
             wait_until = now  # Expire immediately
 
