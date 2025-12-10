@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
 from app.backend.factory import backend
 from app.backend.models import QueueMessage
-from datetime import datetime, timezone
 from app.lib.logger import configure_logger
 
 logger = configure_logger(__name__)

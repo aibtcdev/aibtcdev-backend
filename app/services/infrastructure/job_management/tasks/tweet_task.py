@@ -1,9 +1,13 @@
 """Enhanced Tweet Task using the new job queue system."""
 
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from typing import List, Optional
 from uuid import UUID
 
+import random
+import re
+import tweepy
 
 from app.backend.factory import backend
 from app.backend.models import (
@@ -24,10 +28,6 @@ from app.services.infrastructure.job_management.base import (
     RunnerResult,
 )
 from app.services.infrastructure.job_management.decorators import JobPriority, job
-import re
-import random
-import tweepy
-from datetime import datetime, timedelta, timezone
 
 logger = configure_logger(__name__)
 

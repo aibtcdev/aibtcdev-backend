@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
-import uuid
 from typing import Any, Dict, List, Optional
+import uuid
 
 import vecs
 from sqlalchemy import Column, DateTime, Engine, String, Text, func
@@ -12,21 +12,20 @@ from supabase import Client
 
 from app.backend.abstract import AbstractBackend
 from app.backend.models import (
-    DAO,
-    UUID,
+    Airdrop,
+    AirdropBase,
+    AirdropCreate,
+    AirdropFilter,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
-    Airdrop,
-    AirdropBase,
-    AirdropCreate,
-    AirdropFilter,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
     ChainStateFilter,
+    DAO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -42,6 +41,7 @@ from app.backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
+    JobCooldown,
     Key,
     KeyBase,
     KeyCreate,
@@ -82,6 +82,11 @@ from app.backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    UUID,
+    Veto,
+    VetoBase,
+    VetoCreate,
+    VetoFilter,
     Vote,
     VoteBase,
     VoteCreate,
@@ -103,11 +108,6 @@ from app.backend.models import (
     XUserBase,
     XUserCreate,
     XUserFilter,
-    Veto,
-    VetoBase,
-    VetoCreate,
-    VetoFilter,
-    JobCooldown,
 )
 from app.lib.logger import configure_logger
 
