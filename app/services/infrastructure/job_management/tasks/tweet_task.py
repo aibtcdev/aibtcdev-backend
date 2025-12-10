@@ -461,13 +461,17 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     # For subsequent posts, we can continue
 
             except tweepy.TooManyRequests as e:
-                retry_after = int(e.response.headers.get("Retry-After", 900))  # Default 15min
+                retry_after = int(
+                    e.response.headers.get("Retry-After", 900)
+                )  # Default 15min
                 jitter = random.uniform(1.0, 1.5)
-                wait_until = datetime.now(timezone.utc) + timedelta(seconds=retry_after * jitter)
+                wait_until = datetime.now(timezone.utc) + timedelta(
+                    seconds=retry_after * jitter
+                )
                 backend.upsert_job_cooldown(
                     job_type="tweet",
                     wait_until=wait_until,
-                    reason=f"twitter-429 (Retry-After: {retry_after}s)"
+                    reason=f"twitter-429 (Retry-After: {retry_after}s)",
                 )
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
                 return TweetProcessingResult(
