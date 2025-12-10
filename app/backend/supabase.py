@@ -2420,7 +2420,10 @@ class SupabaseBackend(AbstractBackend):
             raise
 
     def upsert_job_cooldown(
-        self, job_type: str, wait_until: Optional[datetime], reason: str
+        self,
+        job_type: str,
+        wait_until: Optional[datetime],
+        reason: Optional[str] = None,
     ) -> JobCooldown:
         """Atomically upsert (insert or update) a job cooldown record.
 
