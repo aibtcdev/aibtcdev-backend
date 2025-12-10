@@ -1069,3 +1069,18 @@ class AirdropFilter(CustomBaseModel):
     block_height_lte: Optional[int] = None
     timestamp_after: Optional[datetime] = None
     timestamp_before: Optional[datetime] = None
+
+
+#
+# JOB COOLDOWNS
+#
+class JobCooldownBase(CustomBaseModel):
+    job_type: str
+    wait_until: Optional[datetime] = None
+    reason: Optional[str] = None
+
+
+class JobCooldown(JobCooldownBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None

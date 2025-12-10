@@ -793,13 +793,40 @@ class AbstractBackend(ABC):
 
     # ----------- JOB COOLDOWNS -----------
     @abstractmethod
-    def get_job_cooldown(self, job_type: str) -> Optional["JobCooldown"]:
-        """Get cooldown for job_type if active (wait_until > NOW())."""
+    def get_job_cooldown(self, job_type: str) -> Optional[JobCooldown]:
+        """Get active cooldown for a job type.
+
+        Returns None if no cooldown record exists for the job_type or if the
+        cooldown has expired (wait_until <= current time).
+
+        Implementations must be thread-safe to handle concurrent reads.
+
+        Raises:
+            Implementation-specific database exceptions on query failure.
+        """
         pass
 
     @abstractmethod
     def upsert_job_cooldown(
         self, job_type: str, wait_until: Optional[datetime], reason: str
-    ) -> "JobCooldown":
-        """Atomic UPSERT cooldown row for job_type."""
+    ) -> JobCooldown:
+        """Atomically upsert (insert or update) a job cooldown record.
+
+        This operation uses an atomic database UPSERT:
+        - Inserts a new record if no existing record for job_type.
+        - Updates the existing record otherwise.
+
+        Provides atomicity guarantees: concurrent calls for the same job_type
+        will not result in race conditions or lost updates.
+
+        Implementations must be thread-safe.
+
+        Args:
+            job_type: Unique identifier for the job (e.g., job type string).
+            wait_until: Cooldown expiration timestamp (None to immediately expire/clear).
+            reason: Human-readable reason for applying the cooldown.
+
+        Raises:
+            Implementation-specific database exceptions on failure.
+        """
         pass
