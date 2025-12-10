@@ -488,9 +488,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 retry_after = int(
                     e.response.headers.get("Retry-After", 900)
                 )  # Default 15min
-                jitter = random.uniform(1.0, 1.5)
+                jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
                 wait_until = datetime.now(timezone.utc) + timedelta(
-                    seconds=retry_after * jitter
+                    seconds=retry_after + jitter
                 )
                 backend.upsert_job_cooldown(
                     job_type="tweet",
