@@ -821,10 +821,13 @@ class AbstractBackend(ABC):
 
         Implementations must be thread-safe.
 
+        To immediately expire/clear a cooldown, pass wait_until=None. Even for clears,
+        provide a reason (e.g., "manual clear", "rate limit reset").
+
         Args:
             job_type: Unique identifier for the job (e.g., job type string).
-            wait_until: Cooldown expiration timestamp (None to immediately expire/clear).
-            reason: Human-readable reason for applying the cooldown.
+            wait_until: Cooldown expiration timestamp. Use None to request immediate expiration/clearing.
+            reason: Human-readable reason for applying or clearing the cooldown.
 
         Raises:
             Implementation-specific database exceptions on failure.
