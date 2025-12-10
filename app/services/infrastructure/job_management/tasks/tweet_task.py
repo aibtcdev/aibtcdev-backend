@@ -37,8 +37,11 @@ class TweetProcessingResult(RunnerResult):
     """Result of tweet processing operation."""
 
     tweet_id: Optional[str] = None
+    first_tweet_id: Optional[str] = None
     dao_id: Optional[UUID] = None
     tweets_sent: int = 0
+    total_posts: int = 0
+    partial_success: bool = False
     chunks_processed: int = 0
 
 
@@ -312,6 +315,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return TweetProcessingResult(
                     success=False,
                     message="Tweet message structure is invalid",
+                    first_tweet_id=None,
+                    total_posts=0,
+                    partial_success=False,
                     dao_id=message.dao_id,
                 )
 
@@ -321,6 +327,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return TweetProcessingResult(
                     success=False,
                     message=f"Failed to get Twitter service for DAO: {message.dao_id}",
+                    first_tweet_id=None,
+                    total_posts=0,
+                    partial_success=False,
                     dao_id=message.dao_id,
                 )
 
@@ -330,6 +339,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return TweetProcessingResult(
                     success=False,
                     message="Tweet message missing 'posts' field",
+                    first_tweet_id=None,
+                    total_posts=0,
+                    partial_success=False,
                     dao_id=message.dao_id,
                 )
 
@@ -339,6 +351,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 return TweetProcessingResult(
                     success=False,
                     message="Tweet message has invalid posts array",
+                    first_tweet_id=None,
+                    total_posts=0,
+                    partial_success=False,
                     dao_id=message.dao_id,
                 )
 
@@ -376,6 +391,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 success=False,
                 message=f"Error sending tweet: {str(e)}",
                 error=e,
+                first_tweet_id=None,
+                total_posts=0,
+                partial_success=False,
                 tweet_id=getattr(message, "tweet_id", None),
                 dao_id=message.dao_id,
             )
@@ -384,10 +402,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage, twitter_service: TwitterService, posts: List[str]
     ) -> TweetProcessingResult:
         """Process posts in the new format with automatic threading."""
-        previous_tweet_id = (
-            None  # Start with no previous tweet - first post creates new thread
-        )
+        previous_tweet_id = None  # Start with no previous tweet - first post creates new thread
+        first_tweet_id = None
         tweets_sent = 0
+        total_posts = len(posts)
 
         logger.info(f"Processing {len(posts)} posts for DAO {message.dao_id}")
 
@@ -439,21 +457,25 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     tweets_sent += 1
                     previous_tweet_id = tweet_response.data["id"]
                     if index == 0:
+                        first_tweet_id = previous_tweet_id
                         logger.info(
                             f"Successfully created new thread with tweet {tweet_response.data['id']}"
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                     else:
                         logger.info(
-                            f"Successfully posted thread reply {index + 1}/{len(posts)}: {tweet_response.data['id']}"
+                            f"Successfully posted thread reply {index + 1}/{total_posts}: {tweet_response.data['id']}"
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                 else:
-                    logger.error(f"Failed to send tweet {index + 1}/{len(posts)}")
+                    logger.error(f"Failed to send tweet {index + 1}/{total_posts}")
                     if index == 0:  # If first post fails, whole message fails
                         return TweetProcessingResult(
                             success=False,
                             message="Failed to send first tweet post",
+                            first_tweet_id=None,
+                            total_posts=total_posts,
+                            partial_success=False,
                             dao_id=message.dao_id,
                             tweet_id=None,
                             chunks_processed=index,
@@ -476,7 +498,12 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
                 return TweetProcessingResult(
                     success=False,
-                    message=f"Rate limited until {wait_until}",
+                    partial_success=(tweets_sent > 0),
+                    message=f"Rate limited after {tweets_sent}/{total_posts} posts until {wait_until}",
+                    first_tweet_id=first_tweet_id,
+                    tweet_id=previous_tweet_id,
+                    tweets_sent=tweets_sent,
+                    total_posts=total_posts,
                     dao_id=message.dao_id,
                 )
             except Exception as post_error:
@@ -484,23 +511,29 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 error_message = str(post_error)
                 if "duplicate content" in error_message.lower():
                     logger.error(
-                        f"Twitter duplicate content error for post {index + 1}/{len(posts)}: '{post}'"
+                        f"Twitter duplicate content error for post {index + 1}/{total_posts}: '{post}'"
                     )
                     logger.error(f"Full error: {error_message}")
                 else:
                     logger.error(
-                        f"Error sending post {index + 1}/{len(posts)}: {error_message}"
+                        f"Error sending post {index + 1}/{total_posts}: {error_message}"
                     )
 
                 if index == 0:  # Critical failure on first post
                     raise post_error
 
+        success = (tweets_sent == total_posts)
+        partial_success = (tweets_sent > 0 and not success)
+
         return TweetProcessingResult(
-            success=tweets_sent > 0,
-            message=f"Successfully sent {tweets_sent}/{len(posts)} tweet posts as thread",
+            success=success,
+            partial_success=partial_success,
+            message=f"Successfully sent {tweets_sent}/{total_posts} tweet posts as thread",
+            first_tweet_id=first_tweet_id,
             tweet_id=previous_tweet_id,
             dao_id=message.dao_id,
             tweets_sent=tweets_sent,
+            total_posts=total_posts,
             chunks_processed=len(posts),
         )
 
