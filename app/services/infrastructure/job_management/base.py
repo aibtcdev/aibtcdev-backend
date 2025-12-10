@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
-from app.backend.models import QueueMessage
+from app.backend.factory import backend
+from app.backend.models import JobCooldown, QueueMessage
+from datetime import datetime, timezone
 from app.lib.logger import configure_logger
 
 logger = configure_logger(__name__)
@@ -206,6 +208,21 @@ class BaseTask(ABC, Generic[T]):
 
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate task prerequisites."""
+        # Check job cooldown
+        job_type_str = (
+            context.job_type.value
+            if hasattr(context.job_type, "value")
+            else str(context.job_type)
+        )
+        cooldown = backend.get_job_cooldown(job_type_str)
+        now = datetime.now(timezone.utc)
+        if cooldown and cooldown.wait_until and now < cooldown.wait_until:
+            logger.info(
+                f"Job '{job_type_str}' on cooldown until {cooldown.wait_until} "
+                f"(reason: {cooldown.reason}). Skipping processing."
+            )
+            return False
+
         return True
 
     async def _validate_resources(self, context: JobContext) -> bool:

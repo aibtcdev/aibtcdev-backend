@@ -788,3 +788,16 @@ class AbstractBackend(ABC):
     def delete_lottery_result(self, lottery_result_id: UUID) -> bool:
         """Delete a lottery result record."""
         pass
+
+    # ----------- JOB COOLDOWNS -----------
+    @abstractmethod
+    def get_job_cooldown(self, job_type: str) -> Optional["JobCooldown"]:
+        """Get cooldown for job_type if active (wait_until > NOW())."""
+        pass
+
+    @abstractmethod
+    def upsert_job_cooldown(
+        self, job_type: str, wait_until: Optional[datetime], reason: str
+    ) -> "JobCooldown":
+        """Atomic UPSERT cooldown row for job_type."""
+        pass
