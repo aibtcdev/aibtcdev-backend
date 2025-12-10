@@ -7,7 +7,6 @@ from uuid import UUID
 
 from app.backend.factory import backend
 from app.backend.models import (
-    JobCooldownCreate,
     QueueMessage,
     QueueMessageBase,
     QueueMessageFilter,

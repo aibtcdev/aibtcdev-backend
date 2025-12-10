@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 
 from app.backend.models import (
     DAO,
@@ -96,6 +97,7 @@ from app.backend.models import (
     VetoBase,
     VetoCreate,
     VetoFilter,
+    JobCooldown,
 )
 
 
