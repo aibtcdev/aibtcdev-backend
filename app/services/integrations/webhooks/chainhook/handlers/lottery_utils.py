@@ -57,9 +57,6 @@ class QuorumCalculator:
             return "0"
 
 
-
-
-
 class LotterySelection:
     """Data class to hold lottery selection results."""
 

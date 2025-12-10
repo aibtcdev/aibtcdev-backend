@@ -412,7 +412,9 @@ class ActionProposalHandler(BaseProposalHandler):
         try:
             return int(float(value.strip()))
         except (ValueError, TypeError) as e:
-            self.logger.warning(f"Failed to parse '{value}' as int: {e}, defaulting to 0")
+            self.logger.warning(
+                f"Failed to parse '{value}' as int: {e}, defaulting to 0"
+            )
             return 0
 
     def _get_agent_token_holders(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
