@@ -56,66 +56,8 @@ class QuorumCalculator:
             logger.error(f"Error calculating total eligible tokens: {e}")
             return "0"
 
-    @staticmethod
-    def is_quorum_achievable(
-        liquid_tokens: str, total_eligible_tokens: str, quorum_percentage: float = 0.15
-    ) -> bool:
-        """Check if quorum is achievable with available tokens.
 
-        Args:
-            liquid_tokens: Total liquid supply
-            total_eligible_tokens: Total tokens held by eligible agents
-            quorum_percentage: Required quorum percentage
 
-        Returns:
-            True if quorum is achievable, False otherwise
-        """
-        try:
-            quorum_threshold = QuorumCalculator.calculate_quorum_threshold(
-                liquid_tokens, quorum_percentage
-            )
-            return Decimal(total_eligible_tokens) >= Decimal(quorum_threshold)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Error checking quorum achievability: {e}")
-            return False
-
-    @staticmethod
-    def calculate_selected_tokens_total(selected_wallets: List[Dict[str, str]]) -> str:
-        """Calculate total tokens from selected wallets.
-
-        Args:
-            selected_wallets: List of {"wallet_id": str, "token_amount": str} dicts
-
-        Returns:
-            Total selected tokens as string
-        """
-        try:
-            total = Decimal("0")
-            for wallet in selected_wallets:
-                total += Decimal(wallet.get("token_amount", "0"))
-            return str(total)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Error calculating selected tokens total: {e}")
-            return "0"
-
-    @staticmethod
-    def validate_quorum_achievement(
-        selected_tokens_total: str, quorum_threshold: str
-    ) -> bool:
-        """Check if selected tokens meet the quorum threshold.
-
-        Args:
-            selected_tokens_total: Total tokens from selected wallets
-            quorum_threshold: Required threshold to meet quorum
-
-        Returns:
-            True if quorum is achieved, False otherwise
-        """
-        try:
-            return Decimal(selected_tokens_total) >= Decimal(quorum_threshold)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Error validating quorum achievement: {e}")
-            return False
 
 
 class LotterySelection:
