@@ -405,6 +405,16 @@ class ActionProposalHandler(BaseProposalHandler):
 
         return sanitized
 
+    def _to_safe_int(self, value: Optional[str]) -> int:
+        """Safely convert string to int, handling float strings via int(float()) with fallback to 0."""
+        if value is None or value.strip() == "":
+            return 0
+        try:
+            return int(float(value.strip()))
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Failed to parse '{value}' as int: {e}, defaulting to 0")
+            return 0
+
     def _get_agent_token_holders(self, dao_id: UUID) -> List[AgentWithWalletTokenDTO]:
         """Get agents that hold tokens for the given DAO.
 
@@ -447,13 +457,7 @@ class ActionProposalHandler(BaseProposalHandler):
         Returns:
             LotterySelection: Complete lottery results with quorum tracking
         """
-        try:
-            _ = int(proposal_liquid_tokens or "0")
-        except ValueError as e:
-            self.logger.warning(
-                f"Invalid proposal_liquid_tokens '{proposal_liquid_tokens}': {e} - returning empty selection"
-            )
-            return LotterySelection()
+        self._to_safe_int(proposal_liquid_tokens)
 
         selection = LotterySelection()
 
@@ -466,7 +470,7 @@ class ActionProposalHandler(BaseProposalHandler):
         filtered_agents = [
             agent
             for agent in agents_with_tokens
-            if int(agent.token_amount or "0") >= min_threshold
+            if self._to_safe_int(agent.token_amount) >= min_threshold
         ]
         total_filtered = len(filtered_agents)
         total_original = len(agents_with_tokens)
@@ -535,7 +539,7 @@ class ActionProposalHandler(BaseProposalHandler):
             )
             selection.selected_wallets.append(wallet_dict)
 
-            selected_tokens += Decimal(selected_agent.token_amount)
+            selected_tokens += Decimal(self._to_safe_int(selected_agent.token_amount))
 
             self.logger.debug(
                 f"Round {round_number}: Selected agent {selected_agent.agent_id} "
@@ -566,7 +570,7 @@ class ActionProposalHandler(BaseProposalHandler):
             )
             selection.selected_wallets.append(wallet_dict)
 
-            selected_tokens += Decimal(selected_agent.token_amount)
+            selected_tokens += Decimal(self._to_safe_int(selected_agent.token_amount))
 
         # Update final totals
         selection.total_selected_tokens = str(selected_tokens)
@@ -586,7 +590,7 @@ class ActionProposalHandler(BaseProposalHandler):
         self, remaining_agents: List[AgentWithWalletTokenDTO]
     ) -> AgentWithWalletTokenDTO:
         """Perform a single round of weighted random agent selection (assumes random is seeded)."""
-        weights = [int(agent.token_amount or "0") for agent in remaining_agents]
+        weights = [self._to_safe_int(agent.token_amount) for agent in remaining_agents]
         if not weights or all(w == 0 for w in weights):
             self.logger.warning("All remaining weights are zero, using equal weights")
             weights = [1] * len(remaining_agents)
