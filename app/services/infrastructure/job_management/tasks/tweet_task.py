@@ -316,8 +316,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             "posts": ["post1", "post2", "post3", ...]
         }
 
-        Each post will be validated to ensure it's ≤280 characters, splitting longer posts
+        Each post will be validated to ensure ≤280 characters, splitting longer posts
         without breaking words. Posts are sent as a threaded sequence.
+        Supports resumption from partial failures using stored result.
         """
         try:
             # Validate message structure first
@@ -359,42 +360,88 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
 
             posts = message.message["posts"]
+            total_posts = len(posts)
             if not isinstance(posts, list) or not posts:
                 logger.warning(f"Tweet message {message.id} has invalid posts array")
                 return TweetProcessingResult(
                     success=False,
                     message="Tweet message has invalid posts array",
                     first_tweet_id=None,
-                    total_posts=0,
+                    total_posts=total_posts,
                     partial_success=False,
                     dao_id=message.dao_id,
                 )
 
-            logger.info(
-                f"Processing tweet message for DAO {message.dao_id} with {len(posts)} posts"
-            )
+            # Parse prior result for resumption
+            prior_sent = 0
+            resume_info: Optional[Dict[str, Optional[str]]] = None
+            if message.result and isinstance(message.result, dict):
+                prior_sent = message.result.get("tweets_sent", 0)
+                if prior_sent > 0:
+                    resume_info = {
+                        "first_tweet_id": message.result.get("first_tweet_id"),
+                        "previous_tweet_id": message.result.get("tweet_id"),
+                    }
+                    logger.info(
+                        f"Resuming message {message.id}: {prior_sent}/{total_posts} already sent"
+                    )
 
-            # Validate and split posts to ensure ≤280 characters
-            processed_posts = []
-            for i, post in enumerate(posts):
+            if resume_info:
+                start_index = prior_sent
+                remaining_posts = posts[start_index:]
+                total_remaining = len(remaining_posts)
+                logger.info(
+                    f"Resuming with {total_remaining} remaining posts, replying to {resume_info['previous_tweet_id']}"
+                )
+            else:
+                remaining_posts = posts
+                total_remaining = total_posts
+                logger.info(
+                    f"Starting new message {message.id} for DAO {message.dao_id} with {total_remaining} posts"
+                )
+
+            # Validate and split remaining posts to ensure ≤280 characters
+            processed_remaining_posts = []
+            for i, post in enumerate(remaining_posts):
+                orig_index = prior_sent + i + 1 if resume_info else i + 1
                 if len(post) <= 280:
-                    processed_posts.append(post)
+                    processed_remaining_posts.append(post)
                     logger.debug(
-                        f"Post {i + 1} is within 280 character limit ({len(post)} chars)"
+                        f"Post {orig_index} is within 280 character limit ({len(post)} chars)"
                     )
                 else:
                     # Split post into chunks without breaking words
                     chunks = split_text_into_chunks(post, limit=280)
-                    processed_posts.extend(chunks)
+                    processed_remaining_posts.extend(chunks)
                     logger.info(
-                        f"Post {i + 1} exceeded 280 chars ({len(post)} chars), split into {len(chunks)} chunks"
+                        f"Post {orig_index} exceeded 280 chars ({len(post)} chars), split into {len(chunks)} chunks"
                     )
 
             logger.info(
-                f"After validation/splitting: {len(processed_posts)} posts ready to send"
+                f"After validation/splitting: {len(processed_remaining_posts)} remaining posts ready to send"
             )
 
-            return await self._process_posts(message, twitter_service, processed_posts)
+            sub_result = await self._process_posts(
+                message, twitter_service, processed_remaining_posts, resume_info or {}, total_remaining
+            )
+
+            total_sent = prior_sent + sub_result["tweets_sent_this_run"]
+            first_tweet_id = sub_result["first_tweet_id"]
+            tweet_id = sub_result["final_tweet_id"]
+            success = total_sent == total_posts
+            partial_success = total_sent > prior_sent and not success
+
+            return TweetProcessingResult(
+                success=success,
+                partial_success=partial_success,
+                message=f"Sent {sub_result['tweets_sent_this_run']} more posts ({total_sent}/{total_posts} total)",
+                first_tweet_id=first_tweet_id,
+                tweet_id=tweet_id,
+                tweets_sent=total_sent,
+                total_posts=total_posts,
+                chunks_processed=total_sent,
+                dao_id=message.dao_id,
+            )
 
         except Exception as e:
             logger.error(
@@ -405,9 +452,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 message=f"Error sending tweet: {str(e)}",
                 error=e,
                 first_tweet_id=None,
-                total_posts=0,
+                total_posts=len(message.message["posts"]) if message.message and "posts" in message.message else 0,
                 partial_success=False,
-                tweet_id=getattr(message, "tweet_id", None),
+                tweet_id=None,
                 dao_id=message.dao_id,
             )
 
