@@ -619,38 +619,37 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 results.append(result)
                 processed_count += 1
 
-                if result.success:
+                # Build result dict with all fields
+                result_dict = {
+                    "success": result.success,
+                    "partial_success": result.partial_success,
+                    "message": result.message,
+                    "tweet_id": result.tweet_id,
+                    "first_tweet_id": result.first_tweet_id,
+                    "dao_id": str(result.dao_id) if result.dao_id else None,
+                    "tweets_sent": result.tweets_sent,
+                    "total_posts": result.total_posts,
+                    "chunks_processed": result.chunks_processed,
+                    "error": str(result.error) if result.error else None,
+                }
+
+                if result.tweets_sent > 0:
                     success_count += 1
-                    # Mark message as processed with result
-                    result_dict = {
-                        "success": result.success,
-                        "message": result.message,
-                        "tweet_id": result.tweet_id,
-                        "dao_id": str(result.dao_id) if result.dao_id else None,
-                        "tweets_sent": result.tweets_sent,
-                        "chunks_processed": result.chunks_processed,
-                        "error": str(result.error) if result.error else None,
-                    }
+                    # Partial or full success: mark as processed (no retry)
                     backend.update_queue_message(
                         queue_message_id=message.id,
                         update_data=QueueMessageBase(
                             is_processed=True, result=result_dict
                         ),
                     )
-                    logger.debug(
-                        f"Marked message {message.id} as processed with result"
+                    status = "partial success" if result.partial_success else "success"
+                    logger.info(
+                        f"Message {message.id} marked processed ({status}): "
+                        f"{result.tweets_sent}/{result.total_posts} posts, "
+                        f"thread root: {result.first_tweet_id}"
                     )
                 else:
-                    # Store result for failed processing
-                    result_dict = {
-                        "success": result.success,
-                        "message": result.message,
-                        "tweet_id": result.tweet_id,
-                        "dao_id": str(result.dao_id) if result.dao_id else None,
-                        "tweets_sent": result.tweets_sent,
-                        "chunks_processed": result.chunks_processed,
-                        "error": str(result.error) if result.error else None,
-                    }
+                    # Full failure: store result but allow retry (don't set is_processed)
                     backend.update_queue_message(
                         queue_message_id=message.id,
                         update_data=QueueMessageBase(result=result_dict),
