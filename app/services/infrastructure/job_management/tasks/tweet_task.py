@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 
 import random
@@ -219,6 +219,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             else:
                 invalid_count += 1
 
+        # Prioritize incomplete messages (lowest tweets_sent first)
+        valid_messages.sort(
+            key=lambda m: (m.result.get("tweets_sent", 0) if m.result and isinstance(m.result, dict) else 0)
+        )
+
         self._pending_messages = valid_messages
 
         logger.info(
@@ -284,6 +289,14 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     logger.debug(
                         f"Tweet message {message.id} invalid: post {i} is empty or whitespace"
                     )
+                    return False
+
+            # Check if already complete from prior result
+            if message.result and isinstance(message.result, dict):
+                prior_sent = message.result.get("tweets_sent", 0)
+                posts_len = len(posts)
+                if prior_sent >= posts_len:
+                    logger.debug(f"Tweet message {message.id} already complete ({prior_sent}/{posts_len})")
                     return False
 
             logger.debug(f"Tweet message {message.id} is valid with {len(posts)} posts")
@@ -399,23 +412,29 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             )
 
     async def _process_posts(
-        self, message: QueueMessage, twitter_service: TwitterService, posts: List[str]
-    ) -> TweetProcessingResult:
-        """Process posts in the new format with automatic threading."""
-        previous_tweet_id = (
-            None  # Start with no previous tweet - first post creates new thread
+        self,
+        message: QueueMessage,
+        twitter_service: TwitterService,
+        remaining_posts: List[str],
+        resume_info: Dict[str, Optional[str]],
+        total_remaining: int,
+    ) -> Dict[str, Any]:
+        """Process remaining posts with automatic threading and resumption support."""
+        previous_tweet_id = resume_info.get("previous_tweet_id")
+        first_tweet_id = resume_info.get("first_tweet_id")
+        tweets_sent_this_run = 0
+        is_first_ever = previous_tweet_id is None
+
+        logger.info(
+            f"Processing {len(remaining_posts)} remaining posts for DAO {message.dao_id} "
+            f"(first_ever={is_first_ever}, prior_last={previous_tweet_id})"
         )
-        first_tweet_id = None
-        tweets_sent = 0
-        total_posts = len(posts)
 
-        logger.info(f"Processing {len(posts)} posts for DAO {message.dao_id}")
+        # Debug: Log all remaining post content to identify duplicates
+        for i, post in enumerate(remaining_posts):
+            logger.debug(f"Remaining post {i + 1} content: '{post}'")
 
-        # Debug: Log all post content to identify duplicates
-        for i, post in enumerate(posts):
-            logger.debug(f"Post {i + 1} content: '{post}'")
-
-        for index, post in enumerate(posts):
+        for index, post in enumerate(remaining_posts):
             try:
                 # Check for image URLs in the post
                 image_urls = extract_image_urls(post)
@@ -426,39 +445,27 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     post = re.sub(re.escape(image_url), "", post).strip()
                     post = re.sub(r"\s+", " ", post)
 
+                # Determine reply_id: None for first ever, else previous_tweet_id
+                reply_tweet_id = None if previous_tweet_id is None else previous_tweet_id
+
                 # Post the tweet
-                if index == 0:
-                    # First post - create new thread (no reply_id)
-                    if image_url:
-                        tweet_response = await twitter_service.post_tweet_with_media(
-                            image_url=image_url,
-                            text=post,
-                            reply_id=None,  # No reply for first post
-                        )
-                    else:
-                        tweet_response = await twitter_service._apost_tweet(
-                            text=post,
-                            reply_in_reply_to_tweet_id=None,  # No reply for first post
-                        )
+                if image_url:
+                    tweet_response = await twitter_service.post_tweet_with_media(
+                        image_url=image_url,
+                        text=post,
+                        reply_id=reply_tweet_id,
+                    )
                 else:
-                    # Subsequent posts - reply to previous tweet to continue thread
-                    if image_url:
-                        tweet_response = await twitter_service.post_tweet_with_media(
-                            image_url=image_url,
-                            text=post,
-                            reply_id=previous_tweet_id,
-                        )
-                    else:
-                        tweet_response = await twitter_service._apost_tweet(
-                            text=post,
-                            reply_in_reply_to_tweet_id=previous_tweet_id,
-                        )
+                    tweet_response = await twitter_service._apost_tweet(
+                        text=post,
+                        reply_in_reply_to_tweet_id=reply_tweet_id,
+                    )
                 logger.debug(f"Tweet response: {tweet_response}")
 
                 if tweet_response and tweet_response.data:
-                    tweets_sent += 1
+                    tweets_sent_this_run += 1
                     previous_tweet_id = tweet_response.data["id"]
-                    if index == 0:
+                    if first_tweet_id is None:
                         first_tweet_id = previous_tweet_id
                         logger.info(
                             f"Successfully created new thread with tweet {tweet_response.data['id']}"
@@ -466,23 +473,20 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         )
                     else:
                         logger.info(
-                            f"Successfully posted thread reply {index + 1}/{total_posts}: {tweet_response.data['id']}"
+                            f"Successfully posted thread reply {index + 1}/{total_remaining}: {tweet_response.data['id']}"
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                 else:
-                    logger.error(f"Failed to send tweet {index + 1}/{total_posts}")
-                    if index == 0:  # If first post fails, whole message fails
-                        return TweetProcessingResult(
-                            success=False,
-                            message="Failed to send first tweet post",
-                            first_tweet_id=None,
-                            total_posts=total_posts,
-                            partial_success=False,
-                            dao_id=message.dao_id,
-                            tweet_id=None,
-                            chunks_processed=index,
-                        )
-                    # For subsequent posts, we can continue
+                    logger.error(f"Failed to send remaining tweet {index + 1}/{total_remaining}")
+                    if is_first_ever and index == 0:  # First post ever fails -> whole run fails
+                        return {
+                            "tweets_sent_this_run": 0,
+                            "final_tweet_id": previous_tweet_id,
+                            "first_tweet_id": first_tweet_id,
+                            "success_this_run": False,
+                            "partial_success_this_run": False,
+                        }
+                    # For other failures, continue for partial success
 
             except tweepy.TooManyRequests as e:
                 retry_after = int(
@@ -498,47 +502,50 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     reason=f"twitter-429 (Retry-After: {retry_after}s)",
                 )
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
-                return TweetProcessingResult(
-                    success=False,
-                    partial_success=(tweets_sent > 0),
-                    message=f"Rate limited after {tweets_sent}/{total_posts} posts until {wait_until}",
-                    first_tweet_id=first_tweet_id,
-                    tweet_id=previous_tweet_id,
-                    tweets_sent=tweets_sent,
-                    total_posts=total_posts,
-                    dao_id=message.dao_id,
-                    chunks_processed=index,
-                )
-            except Exception as post_error:
-                # Check if it's a Twitter duplicate content error
-                error_message = str(post_error)
-                if "duplicate content" in error_message.lower():
-                    logger.error(
-                        f"Twitter duplicate content error for post {index + 1}/{total_posts}: '{post}'"
+                return {
+                    "tweets_sent_this_run": tweets_sent_this_run,
+                    "final_tweet_id": previous_tweet_id,
+                    "first_tweet_id": first_tweet_id,
+                    "success_this_run": False,
+                    "partial_success_this_run": tweets_sent_this_run > 0,
+                }
+            except tweepy.Forbidden as e:
+                error_msg = str(e).lower()
+                if "duplicate" in error_msg or "status is a duplicate" in error_msg:
+                    logger.warning(
+                        f"Skipping duplicate post {index + 1}/{total_remaining}: '{post[:100]}...'"
                     )
-                    logger.error(f"Full error: {error_message}")
+                    tweets_sent_this_run += 1  # Treat as already sent to avoid retry loop
+                    continue
                 else:
-                    logger.error(
-                        f"Error sending post {index + 1}/{total_posts}: {error_message}"
-                    )
+                    logger.error(f"Forbidden error on post {index + 1}/{total_remaining}: {e}")
+                    if is_first_ever and index == 0:
+                        return {
+                            "tweets_sent_this_run": 0,
+                            "final_tweet_id": previous_tweet_id,
+                            "first_tweet_id": first_tweet_id,
+                            "success_this_run": False,
+                            "partial_success_this_run": False,
+                        }
+            except Exception as post_error:
+                error_message = str(post_error)
+                logger.error(
+                    f"Error sending remaining post {index + 1}/{total_remaining}: {error_message}"
+                )
 
-                if index == 0:  # Critical failure on first post
+                if is_first_ever and index == 0:  # Critical failure on first post ever
                     raise post_error
 
-        success = tweets_sent == total_posts
-        partial_success = tweets_sent > 0 and not success
+        success_this_run = tweets_sent_this_run == total_remaining
+        partial_success_this_run = tweets_sent_this_run > 0 and not success_this_run
 
-        return TweetProcessingResult(
-            success=success,
-            partial_success=partial_success,
-            message=f"Successfully sent {tweets_sent}/{total_posts} tweet posts as thread",
-            first_tweet_id=first_tweet_id,
-            tweet_id=previous_tweet_id,
-            dao_id=message.dao_id,
-            tweets_sent=tweets_sent,
-            total_posts=total_posts,
-            chunks_processed=len(posts),
-        )
+        return {
+            "tweets_sent_this_run": tweets_sent_this_run,
+            "final_tweet_id": previous_tweet_id,
+            "first_tweet_id": first_tweet_id,
+            "success_this_run": success_this_run,
+            "partial_success_this_run": partial_success_this_run,
+        }
 
     def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
         """Determine if error should trigger retry."""
@@ -622,7 +629,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 results.append(result)
                 processed_count += 1
 
-                # Build result dict with all fields
+                # Build result dict with all fields (cumulative)
                 result_dict = {
                     "success": result.success,
                     "partial_success": result.partial_success,
@@ -636,28 +643,30 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     "error": str(result.error) if result.error else None,
                 }
 
-                if result.tweets_sent > 0:
+                # Always update result; set is_processed only on full success
+                update_data = QueueMessageBase(result=result_dict)
+                if result.success:
+                    update_data.is_processed = True
+
+                backend.update_queue_message(
+                    queue_message_id=message.id,
+                    update_data=update_data,
+                )
+
+                if result.success:
                     success_count += 1
-                    # Partial or full success: mark as processed (no retry)
-                    backend.update_queue_message(
-                        queue_message_id=message.id,
-                        update_data=QueueMessageBase(
-                            is_processed=True, result=result_dict
-                        ),
-                    )
-                    status = "partial success" if result.partial_success else "success"
+                    status = "success"
                     logger.info(
-                        f"Message {message.id} marked processed ({status}): "
+                        f"Message {message.id} fully completed ({status}): "
                         f"{result.tweets_sent}/{result.total_posts} posts, "
                         f"thread root: {result.first_tweet_id}"
                     )
                 else:
-                    # Full failure: store result but allow retry (don't set is_processed)
-                    backend.update_queue_message(
-                        queue_message_id=message.id,
-                        update_data=QueueMessageBase(result=result_dict),
+                    status = "partial success" if result.partial_success else "failure"
+                    logger.info(
+                        f"Message {message.id} {status} ({result.tweets_sent}/{result.total_posts}): "
+                        f"will retry remaining posts, thread root: {result.first_tweet_id}"
                     )
-                    logger.debug(f"Stored result for failed message {message.id}")
 
         logger.info(
             f"Tweet task completed - Processed: {processed_count}, "
