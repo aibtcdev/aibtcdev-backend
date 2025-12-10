@@ -507,6 +507,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     tweets_sent=tweets_sent,
                     total_posts=total_posts,
                     dao_id=message.dao_id,
+                    chunks_processed=index,
                 )
             except Exception as post_error:
                 # Check if it's a Twitter duplicate content error
