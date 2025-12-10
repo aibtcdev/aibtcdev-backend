@@ -2405,7 +2405,9 @@ class SupabaseBackend(AbstractBackend):
             if not data:
                 return None
             if len(data) > 1:
-                logger.warning(f"Multiple job cooldowns found for {job_type}: {len(data)}")
+                logger.warning(
+                    f"Multiple job cooldowns found for {job_type}: {len(data)}"
+                )
             cooldown = JobCooldown(**data[0])
 
             now = datetime.now(timezone.utc)
