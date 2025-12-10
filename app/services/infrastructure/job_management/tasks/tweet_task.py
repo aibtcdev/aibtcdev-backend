@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import random
