@@ -2451,9 +2451,11 @@ class SupabaseBackend(AbstractBackend):
         }
 
         try:
-            response = self.client.table("job_cooldowns").upsert(
-                payload, on_conflict="job_type"
-            ).execute()
+            response = (
+                self.client.table("job_cooldowns")
+                .upsert(payload, on_conflict="job_type")
+                .execute()
+            )
             data = response.data or []
             if not data:
                 raise ValueError("No data returned from job_cooldowns upsert.")
