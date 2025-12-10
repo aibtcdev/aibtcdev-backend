@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -106,6 +107,7 @@ from app.backend.models import (
     VetoBase,
     VetoCreate,
     VetoFilter,
+    JobCooldown,
 )
 from app.lib.logger import configure_logger
 
@@ -2377,3 +2379,85 @@ class SupabaseBackend(AbstractBackend):
         )
         deleted = response.data or []
         return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # JOB COOLDOWNS
+    # ----------------------------------------------------------------
+    def get_job_cooldown(self, job_type: str) -> Optional[JobCooldown]:
+        """Get active cooldown for a job type.
+
+        Returns None if no cooldown record exists for the job_type or if the
+        cooldown has expired (wait_until <= current time).
+
+        Implementations must be thread-safe to handle concurrent reads.
+
+        Raises:
+            Implementation-specific database exceptions on query failure.
+        """
+        try:
+            response = (
+                self.client.table("job_cooldowns")
+                .select("*")
+                .eq("job_type", job_type)
+                .single()
+                .execute()
+            )
+            if not response.data:
+                return None
+
+            cooldown = JobCooldown(**response.data)
+
+            now = datetime.now()
+            if not cooldown.wait_until or cooldown.wait_until <= now:
+                return None
+
+            return cooldown
+        except Exception as e:
+            logger.error(f"Error getting job cooldown for {job_type}: {str(e)}")
+            raise
+
+    def upsert_job_cooldown(
+        self, job_type: str, wait_until: Optional[datetime], reason: str
+    ) -> JobCooldown:
+        """Atomically upsert (insert or update) a job cooldown record.
+
+        This operation uses an atomic database UPSERT:
+        - Inserts a new record if no existing record for job_type.
+        - Updates the existing record otherwise.
+
+        Provides atomicity guarantees: concurrent calls for the same job_type
+        will not result in race conditions or lost updates.
+
+        Implementations must be thread-safe.
+
+        If wait_until is None, sets to current time (immediate expire/clear).
+
+        Args:
+            job_type: Unique identifier for the job (e.g., job type string).
+            wait_until: Cooldown expiration timestamp (None to immediately expire/clear).
+            reason: Human-readable reason for applying the cooldown.
+
+        Raises:
+            Implementation-specific database exceptions on failure.
+        """
+        now = datetime.now()
+        if wait_until is None:
+            wait_until = now  # Expire immediately
+
+        payload = {
+            "job_type": job_type,
+            "wait_until": wait_until.isoformat(),
+            "reason": reason,
+        }
+
+        try:
+            response = self.client.table("job_cooldowns").upsert(
+                payload, on_conflict="job_type"
+            ).execute()
+            data = response.data or []
+            if not data:
+                raise ValueError("No data returned from job_cooldowns upsert.")
+            return JobCooldown(**data[0])
+        except Exception as e:
+            logger.error(f"Error upserting job cooldown for {job_type}: {str(e)}")
+            raise
