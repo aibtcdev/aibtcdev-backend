@@ -221,7 +221,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         # Prioritize incomplete messages (lowest tweets_sent first)
         valid_messages.sort(
-            key=lambda m: (m.result.get("tweets_sent", 0) if m.result and isinstance(m.result, dict) else 0)
+            key=lambda m: (
+                m.result.get("tweets_sent", 0)
+                if m.result and isinstance(m.result, dict)
+                else 0
+            )
         )
 
         self._pending_messages = valid_messages
@@ -296,7 +300,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 prior_sent = message.result.get("tweets_sent", 0)
                 posts_len = len(posts)
                 if prior_sent >= posts_len:
-                    logger.debug(f"Tweet message {message.id} already complete ({prior_sent}/{posts_len})")
+                    logger.debug(
+                        f"Tweet message {message.id} already complete ({prior_sent}/{posts_len})"
+                    )
                     return False
 
             logger.debug(f"Tweet message {message.id} is valid with {len(posts)} posts")
@@ -422,7 +428,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             )
 
             sub_result = await self._process_posts(
-                message, twitter_service, processed_remaining_posts, resume_info or {}, total_remaining
+                message,
+                twitter_service,
+                processed_remaining_posts,
+                resume_info or {},
+                total_remaining,
             )
 
             total_sent = prior_sent + sub_result["tweets_sent_this_run"]
@@ -452,7 +462,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 message=f"Error sending tweet: {str(e)}",
                 error=e,
                 first_tweet_id=None,
-                total_posts=len(message.message["posts"]) if message.message and "posts" in message.message else 0,
+                total_posts=len(message.message["posts"])
+                if message.message and "posts" in message.message
+                else 0,
                 partial_success=False,
                 tweet_id=None,
                 dao_id=message.dao_id,
@@ -493,7 +505,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     post = re.sub(r"\s+", " ", post)
 
                 # Determine reply_id: None for first ever, else previous_tweet_id
-                reply_tweet_id = None if previous_tweet_id is None else previous_tweet_id
+                reply_tweet_id = (
+                    None if previous_tweet_id is None else previous_tweet_id
+                )
 
                 # Post the tweet
                 if image_url:
@@ -524,8 +538,12 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                             f"{f' - {post[:50]}...' if len(post) > 50 else f' - {post}'}"
                         )
                 else:
-                    logger.error(f"Failed to send remaining tweet {index + 1}/{total_remaining}")
-                    if is_first_ever and index == 0:  # First post ever fails -> whole run fails
+                    logger.error(
+                        f"Failed to send remaining tweet {index + 1}/{total_remaining}"
+                    )
+                    if (
+                        is_first_ever and index == 0
+                    ):  # First post ever fails -> whole run fails
                         return {
                             "tweets_sent_this_run": 0,
                             "final_tweet_id": previous_tweet_id,
@@ -562,10 +580,14 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     logger.warning(
                         f"Skipping duplicate post {index + 1}/{total_remaining}: '{post[:100]}...'"
                     )
-                    tweets_sent_this_run += 1  # Treat as already sent to avoid retry loop
+                    tweets_sent_this_run += (
+                        1  # Treat as already sent to avoid retry loop
+                    )
                     continue
                 else:
-                    logger.error(f"Forbidden error on post {index + 1}/{total_remaining}: {e}")
+                    logger.error(
+                        f"Forbidden error on post {index + 1}/{total_remaining}: {e}"
+                    )
                     if is_first_ever and index == 0:
                         return {
                             "tweets_sent_this_run": 0,

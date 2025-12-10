@@ -1086,9 +1086,12 @@ class JobCooldownBase(CustomBaseModel):
         reason (Optional[str]): The reason for the cooldown, if any.
             - This is free-form text and may be used to provide context for why the cooldown was set.
     """
+
     job_type: str
     wait_until: Optional[datetime] = None
     reason: Optional[str] = None
+
+
 class JobCooldown(JobCooldownBase):
     id: UUID
     created_at: datetime
