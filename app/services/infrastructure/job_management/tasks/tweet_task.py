@@ -402,7 +402,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         self, message: QueueMessage, twitter_service: TwitterService, posts: List[str]
     ) -> TweetProcessingResult:
         """Process posts in the new format with automatic threading."""
-        previous_tweet_id = None  # Start with no previous tweet - first post creates new thread
+        previous_tweet_id = (
+            None  # Start with no previous tweet - first post creates new thread
+        )
         first_tweet_id = None
         tweets_sent = 0
         total_posts = len(posts)
@@ -522,8 +524,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 if index == 0:  # Critical failure on first post
                     raise post_error
 
-        success = (tweets_sent == total_posts)
-        partial_success = (tweets_sent > 0 and not success)
+        success = tweets_sent == total_posts
+        partial_success = tweets_sent > 0 and not success
 
         return TweetProcessingResult(
             success=success,
