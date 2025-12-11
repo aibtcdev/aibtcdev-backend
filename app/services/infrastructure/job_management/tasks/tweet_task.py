@@ -575,6 +575,22 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     if (
                         is_first_ever and index == 0
                     ):  # First post ever fails -> whole run fails
+                        # Fallback rate limit handling (TwitterService swallows 429)
+                        retry_after = 900  # Default 15min
+                        jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
+                        wait_until = datetime.now(timezone.utc) + timedelta(
+                            seconds=retry_after + jitter
+                        )
+                        backend.upsert_job_cooldown(
+                            job_type="tweet",
+                            wait_until=wait_until,
+                            reason=f"twitter-429-fallback (Retry-After: {retry_after}s)",
+                        )
+                        logger.warning(f"Tweet job cooldown set until {wait_until}")
+                        self._rate_limited_this_run = True
+                        logger.warning(
+                            f"Tweet rate limited; cooldown={wait_until}; stopping batch"
+                        )
                         return {
                             "tweets_sent_this_run": 0,
                             "final_tweet_id": previous_tweet_id,
@@ -585,9 +601,12 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     # For other failures, continue for partial success
 
             except tweepy.TooManyRequests as e:
-                retry_after = int(
-                    e.response.headers.get("Retry-After", 900)
-                )  # Default 15min
+                retry_after = 900  # Default 15min
+                try:
+                    if hasattr(e, 'response') and e.response and hasattr(e.response, 'headers'):
+                        retry_after = int(e.response.headers.get("Retry-After", 900))
+                except (AttributeError, KeyError, ValueError, TypeError):
+                    pass  # Use default
                 jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
                 wait_until = datetime.now(timezone.utc) + timedelta(
                     seconds=retry_after + jitter
