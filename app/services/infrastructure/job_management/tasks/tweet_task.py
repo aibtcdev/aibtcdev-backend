@@ -226,8 +226,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 if len(self._pending_messages) >= max_per_run:
                     break
 
+            num_daos_selected = len({msg.dao_id for msg in self._pending_messages})
             logger.info(
-                f"Limited to {len(self._pending_messages)} valid messages across {len(dao_to_messages)} DAOs (max: {max_per_run})"
+                f"Limited to {len(self._pending_messages)} valid messages across {num_daos_selected} DAOs (max: {max_per_run})"
             )
 
             # Log some details about the messages for debugging
