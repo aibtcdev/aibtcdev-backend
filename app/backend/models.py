@@ -1094,5 +1094,4 @@ class JobCooldownBase(CustomBaseModel):
 
 class JobCooldown(JobCooldownBase):
     id: UUID
-    created_at: datetime
     updated_at: Optional[datetime] = None
