@@ -530,10 +530,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         wait_until = datetime.now(timezone.utc) + timedelta(
             seconds=retry_after + jitter
         )
+        reason = f"twitter-429 (Retry-After: {retry_after}s)"
         backend.upsert_job_cooldown(
             job_type="tweet",
             wait_until=wait_until,
-            reason=f"twitter-429 (Retry-After: {retry_after}s)",
+            reason=reason or "twitter rate limit",
         )
         self._rate_limited_this_run = True
         logger.warning(f"Tweet job rate limited; cooldown set until {wait_until}; stopping batch")
