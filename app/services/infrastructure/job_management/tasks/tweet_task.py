@@ -501,6 +501,32 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id,
             )
 
+    def _handle_rate_limit(
+        self,
+        retry_after: int,
+        tweets_sent_this_run: int,
+        previous_tweet_id: Optional[str],
+        first_tweet_id: Optional[str],
+    ) -> Dict[str, Any]:
+        """Shared rate limit handling: cooldown + early return."""
+        jitter = random.uniform(0, 30)
+        wait_until = datetime.now(timezone.utc) + timedelta(seconds=retry_after + jitter)
+        backend.upsert_job_cooldown(
+            job_type="tweet",
+            wait_until=wait_until,
+            reason=f"twitter-429 (Retry-After: {retry_after}s)",
+        )
+        logger.warning(f"Tweet job cooldown set until {wait_until}")
+        self._rate_limited_this_run = True
+        logger.warning(f"Tweet rate limited; cooldown={wait_until}; stopping batch")
+        return {
+            "tweets_sent_this_run": tweets_sent_this_run,
+            "final_tweet_id": previous_tweet_id,
+            "first_tweet_id": first_tweet_id,
+            "success_this_run": False,
+            "partial_success_this_run": tweets_sent_this_run > 0,
+        }
+
     async def _process_posts(
         self,
         message: QueueMessage,
