@@ -603,7 +603,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             except tweepy.TooManyRequests as e:
                 retry_after = 900  # Default 15min
                 try:
-                    if hasattr(e, 'response') and e.response and hasattr(e.response, 'headers'):
+                    if (
+                        hasattr(e, "response")
+                        and e.response
+                        and hasattr(e.response, "headers")
+                    ):
                         retry_after = int(e.response.headers.get("Retry-After", 900))
                 except (AttributeError, KeyError, ValueError, TypeError):
                     pass  # Use default
