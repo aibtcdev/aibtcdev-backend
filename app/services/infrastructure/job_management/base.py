@@ -219,7 +219,12 @@ class BaseTask(ABC, Generic[T]):
         if cooldown and cooldown.wait_until and now < cooldown.wait_until:
             logger.info(
                 f"Job '{job_type_str}' on cooldown until {cooldown.wait_until} "
-                f"(reason: {cooldown.reason}). Skipping processing."
+                f"(reason: {cooldown.reason}). Skipping processing.",
+                extra={
+                    "job_type": job_type_str,
+                    "cooldown_until": cooldown.wait_until.isoformat(),
+                    "cooldown_reason": cooldown.reason,
+                }
             )
             return False
 

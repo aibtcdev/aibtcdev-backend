@@ -567,7 +567,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
                 self._rate_limited_this_run = True
                 logger.warning(f"Tweet rate limited; cooldown={wait_until}; stopping batch")
-                raise tweepy.TooManyRequests("Rate limited - batch stop")
+                raise Exception(f"Twitter rate limited until {wait_until}")
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
                 if "duplicate" in error_msg or "status is a duplicate" in error_msg:
