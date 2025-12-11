@@ -25,6 +25,11 @@ from .tool_executor import (
     generate_dao_tweet,
     analyze_tweet,
 )
+from .network_school_evaluator import (
+    evaluate_user_posts,
+    NetworkSchoolEvaluationResult,
+    PostEvaluation,
+)
 
 __all__ = [
     "evaluate_proposal_strict",
@@ -34,4 +39,7 @@ __all__ = [
     "execute_workflow_stream",
     "generate_dao_tweet",
     "analyze_tweet",
+    "evaluate_user_posts",
+    "NetworkSchoolEvaluationResult",
+    "PostEvaluation",
 ]
