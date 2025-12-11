@@ -224,7 +224,7 @@ class BaseTask(ABC, Generic[T]):
                     "job_type": job_type_str,
                     "cooldown_until": cooldown.wait_until.isoformat(),
                     "cooldown_reason": cooldown.reason,
-                }
+                },
             )
             return False
 

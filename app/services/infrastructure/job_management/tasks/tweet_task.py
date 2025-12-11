@@ -213,7 +213,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 # Sort by tweets_sent asc (incomplete first)
                 incomplete = sorted(
                     msgs,
-                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0
+                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0,
                 )
                 self._pending_messages.append(incomplete[0])
                 if len(self._pending_messages) >= 3:
@@ -566,7 +566,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 )
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
                 self._rate_limited_this_run = True
-                logger.warning(f"Tweet rate limited; cooldown={wait_until}; stopping batch")
+                logger.warning(
+                    f"Tweet rate limited; cooldown={wait_until}; stopping batch"
+                )
                 raise Exception(f"Twitter rate limited until {wait_until}")
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
