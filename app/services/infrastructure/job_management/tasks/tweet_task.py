@@ -575,22 +575,6 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     if (
                         is_first_ever and index == 0
                     ):  # First post ever fails -> whole run fails
-                        # Fallback rate limit handling (TwitterService swallows 429)
-                        retry_after = 900  # Default 15min
-                        jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
-                        wait_until = datetime.now(timezone.utc) + timedelta(
-                            seconds=retry_after + jitter
-                        )
-                        backend.upsert_job_cooldown(
-                            job_type="tweet",
-                            wait_until=wait_until,
-                            reason=f"twitter-429-fallback (Retry-After: {retry_after}s)",
-                        )
-                        logger.warning(f"Tweet job cooldown set until {wait_until}")
-                        self._rate_limited_this_run = True
-                        logger.warning(
-                            f"Tweet rate limited; cooldown={wait_until}; stopping batch"
-                        )
                         return {
                             "tweets_sent_this_run": 0,
                             "final_tweet_id": previous_tweet_id,
@@ -611,27 +595,12 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         retry_after = int(e.response.headers.get("Retry-After", 900))
                 except (AttributeError, ValueError, TypeError):
                     pass  # Use default
-                jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
-                wait_until = datetime.now(timezone.utc) + timedelta(
-                    seconds=retry_after + jitter
+                return self._handle_rate_limit(
+                    retry_after=retry_after,
+                    tweets_sent_this_run=tweets_sent_this_run,
+                    previous_tweet_id=previous_tweet_id,
+                    first_tweet_id=first_tweet_id,
                 )
-                backend.upsert_job_cooldown(
-                    job_type="tweet",
-                    wait_until=wait_until,
-                    reason=f"twitter-429 (Retry-After: {retry_after}s)",
-                )
-                logger.warning(f"Tweet job cooldown set until {wait_until}")
-                self._rate_limited_this_run = True
-                logger.warning(
-                    f"Tweet rate limited; cooldown={wait_until}; stopping batch"
-                )
-                return {
-                    "tweets_sent_this_run": tweets_sent_this_run,
-                    "final_tweet_id": previous_tweet_id,
-                    "first_tweet_id": first_tweet_id,
-                    "success_this_run": False,
-                    "partial_success_this_run": tweets_sent_this_run > 0,
-                }
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
                 if "duplicate" in error_msg or "status is a duplicate" in error_msg:

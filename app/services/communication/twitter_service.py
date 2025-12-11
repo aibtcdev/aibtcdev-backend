@@ -147,6 +147,9 @@ class TwitterService:
 
             return None
 
+        except tweepy.TooManyRequests as e:
+            logger.error(f"Failed to post tweet with media: 429 Too Many Requests - {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to post tweet with media: {str(e)}")
             return None
@@ -256,6 +259,9 @@ class TwitterService:
                 logger.error(f"Failed to post tweet: {text[:20]}...")
                 return None
 
+        except tweepy.TooManyRequests as e:
+            logger.error(f"Failed to post tweet: 429 Too Many Requests - {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to post tweet: {str(e)}")
             return None
