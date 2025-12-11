@@ -631,12 +631,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             except tweepy.TooManyRequests as e:
                 retry_after = 900  # Default 15min
                 try:
-                    if (
-                        hasattr(e, "response")
-                        and e.response
-                        and hasattr(e.response, "headers")
-                    ):
-                        retry_after = int(e.response.headers.get("Retry-After", 900))
+                    if hasattr(e, "response") and e.response:
+                        headers = getattr(e.response, "headers", {})
+                        retry_after_str = headers.get("Retry-After")
+                        if retry_after_str:
+                            retry_after = int(retry_after_str)
                 except (AttributeError, ValueError, TypeError):
                     pass  # Use default
                 return self._handle_rate_limit(
