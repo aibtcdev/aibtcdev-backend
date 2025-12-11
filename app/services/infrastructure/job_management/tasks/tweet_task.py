@@ -609,7 +609,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         and hasattr(e.response, "headers")
                     ):
                         retry_after = int(e.response.headers.get("Retry-After", 900))
-                except (AttributeError, KeyError, ValueError, TypeError):
+                except (AttributeError, ValueError, TypeError):
                     pass  # Use default
                 jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
                 wait_until = datetime.now(timezone.utc) + timedelta(
