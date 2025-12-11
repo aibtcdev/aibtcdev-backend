@@ -29,7 +29,7 @@ from app.services.infrastructure.job_management.base import (
 )
 from collections import defaultdict
 
-from app.services.infrastructure.job_management.decorators import JobPriority, job
+from app.services.infrastructure.job_management.decorators import JobPriority, JobRegistry, job
 
 logger = configure_logger(__name__)
 
@@ -182,14 +182,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate task prerequisites."""
         try:
-            # Check job cooldown first
-            cooldown = backend.get_job_cooldown("tweet")
-            now = datetime.now(timezone.utc)
-            if cooldown and cooldown.wait_until and now < cooldown.wait_until:
-                logger.info(
-                    f"Tweet task skipped: cooldown active until {cooldown.wait_until} "
-                    f"(reason: {cooldown.reason})"
-                )
+            # Delegate to base cooldown check first
+            if not await super()._validate_prerequisites(context):
                 self._pending_messages = []
                 return False
 
@@ -203,24 +197,31 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 f"Found {len(self._pending_messages)} unprocessed tweet messages"
             )
 
-            # Prioritize: 1 oldest/incomplete per DAO, max 3 total/run
-            dao_to_msgs: defaultdict[UUID, List[QueueMessage]] = defaultdict(list)
-            for msg in self._pending_messages:
-                dao_to_msgs[msg.dao_id].append(msg)
+            # Get batch_size from job metadata
+            metadata = JobRegistry.get_metadata(context.job_type)
+            max_per_run = metadata.batch_size if metadata else 3
+
+            # Prioritize: 1 most incomplete (lowest tweets_sent) valid msg per DAO, max batch_size total
+            dao_to_messages: defaultdict[UUID, List[QueueMessage]] = defaultdict(list)
+            for message in self._pending_messages:
+                dao_to_messages[message.dao_id].append(message)
 
             self._pending_messages = []
-            for dao_id, msgs in dao_to_msgs.items():
-                # Sort by tweets_sent asc (incomplete first)
-                incomplete = sorted(
-                    msgs,
-                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0,
+            for dao_id, messages in dao_to_messages.items():
+                # Filter valids + sort lowest tweets_sent first
+                valid_messages = [m for m in messages if self._is_message_struct_valid(m)]
+                if not valid_messages:
+                    continue
+                sorted_messages = sorted(
+                    valid_messages,
+                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0
                 )
-                self._pending_messages.append(incomplete[0])
-                if len(self._pending_messages) >= 3:
+                self._pending_messages.append(sorted_messages[0])
+                if len(self._pending_messages) >= max_per_run:
                     break
 
             logger.info(
-                f"Limited to {len(self._pending_messages)} msgs across {len(dao_to_msgs)} DAOs"
+                f"Limited to {len(self._pending_messages)} valid messages across {len(dao_to_messages)} DAOs (max: {max_per_run})"
             )
 
             # Log some details about the messages for debugging
@@ -240,6 +241,23 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
         return True
+
+    def _is_message_struct_valid(self, message: QueueMessage) -> bool:
+        """Lightweight structural validation (no Twitter init/DB calls)."""
+        try:
+            if not message.message or not isinstance(message.message, dict) or "posts" not in message.message:
+                return False
+            posts = message.message["posts"]
+            if not isinstance(posts, list) or not posts or any(not isinstance(p, str) or not p.strip() for p in posts):
+                return False
+            # Skip completes
+            if message.result and isinstance(message.result, dict):
+                prior_sent = message.result.get("tweets_sent", 0)
+                if prior_sent >= len(posts):
+                    return False
+            return True
+        except Exception:
+            return False
 
     async def _is_message_valid(self, message: QueueMessage) -> bool:
         """Check if a message is valid for processing with new 'posts' format."""
@@ -569,7 +587,13 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 logger.warning(
                     f"Tweet rate limited; cooldown={wait_until}; stopping batch"
                 )
-                raise Exception(f"Twitter rate limited until {wait_until}")
+                return {
+                    "tweets_sent_this_run": tweets_sent_this_run,
+                    "final_tweet_id": previous_tweet_id,
+                    "first_tweet_id": first_tweet_id,
+                    "success_this_run": False,
+                    "partial_success_this_run": tweets_sent_this_run > 0,
+                }
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
                 if "duplicate" in error_msg or "status is a duplicate" in error_msg:
@@ -685,7 +709,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         processed_count = 0
         success_count = 0
-        batch_size = getattr(context, "batch_size", 5)
+
+        # Get batch_size from job metadata
+        metadata = JobRegistry.get_metadata(context.job_type)
+        batch_size = metadata.batch_size if metadata else 3
 
         # Process messages in batches
         for i in range(0, len(self._pending_messages), batch_size):
