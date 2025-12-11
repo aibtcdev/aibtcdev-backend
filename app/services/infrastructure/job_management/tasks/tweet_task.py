@@ -508,7 +508,24 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         previous_tweet_id: Optional[str],
         first_tweet_id: Optional[str],
     ) -> Dict[str, Any]:
-        """Shared rate limit handling: cooldown + early return."""
+        """
+        Handle Twitter rate limiting by setting a job cooldown and returning partial results
+        for resumption on next execution.
+
+        Args:
+            retry_after: Seconds to wait before retrying (from Retry-After header or default).
+            tweets_sent_this_run: Number of tweets successfully sent in this execution attempt.
+            previous_tweet_id: ID of the last successfully sent tweet (for threading resumption).
+            first_tweet_id: ID of the first tweet in the thread (for tracking).
+
+        Returns:
+            Dict[str, Any] with keys:
+                - tweets_sent_this_run: int (unchanged)
+                - final_tweet_id: Optional[str] (previous_tweet_id)
+                - first_tweet_id: Optional[str]
+                - success_this_run: bool (always False)
+                - partial_success_this_run: bool (True if tweets_sent_this_run > 0)
+        """
         jitter = random.uniform(0, 30)
         wait_until = datetime.now(timezone.utc) + timedelta(
             seconds=retry_after + jitter
