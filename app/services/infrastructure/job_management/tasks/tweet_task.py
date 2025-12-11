@@ -140,6 +140,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 client_secret=config.twitter.client_secret,
                 access_token=config.twitter.access_token,
                 access_secret=config.twitter.access_secret,
+                bearer_token=config.twitter.bearer_token,
             )
             await self.twitter_service._ainitialize()
             logger.debug(f"Initialized Twitter service for DAO {dao_id}")
