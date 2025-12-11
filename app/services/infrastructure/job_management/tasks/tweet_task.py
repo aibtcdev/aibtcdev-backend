@@ -27,7 +27,13 @@ from app.services.infrastructure.job_management.base import (
     RunnerConfig,
     RunnerResult,
 )
-from app.services.infrastructure.job_management.decorators import JobPriority, job
+from collections import defaultdict
+
+from app.services.infrastructure.job_management.decorators import (
+    JobPriority,
+    JobRegistry,
+    job,
+)
 
 logger = configure_logger(__name__)
 
@@ -49,14 +55,14 @@ class TweetProcessingResult(RunnerResult):
     job_type="tweet",
     name="Tweet Processor",
     description="Processes and sends tweets for DAOs with automatic retry and error handling",
-    interval_seconds=30,  # Reduced frequency from 5s to 30s
+    interval_seconds=120,
     priority=JobPriority.NORMAL,  # Changed from HIGH to NORMAL to not dominate queue
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=2,  # Increased from 1 to 2 to allow parallel processing
+    max_concurrent=1,
     requires_twitter=True,
-    batch_size=5,
+    batch_size=3,
     enable_dead_letter_queue=True,
 )
 class TweetTask(BaseTask[TweetProcessingResult]):
@@ -66,6 +72,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         super().__init__(config)
         self._pending_messages: Optional[List[QueueMessage]] = None
         self._twitter_services: dict[UUID, TwitterService] = {}
+        self._rate_limited_this_run = False
 
     async def _get_twitter_service(self, dao_id: UUID) -> Optional[TwitterService]:
         """Get or create Twitter service for a DAO with caching."""
@@ -179,6 +186,11 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate task prerequisites."""
         try:
+            # Delegate to base cooldown check first
+            if not await super()._validate_prerequisites(context):
+                self._pending_messages = []
+                return False
+
             # Cache pending messages for later use
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
@@ -189,6 +201,36 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 f"Found {len(self._pending_messages)} unprocessed tweet messages"
             )
 
+            # Get batch_size from job metadata
+            metadata = JobRegistry.get_metadata(context.job_type)
+            max_per_run = metadata.batch_size if metadata else 3
+
+            # Prioritize: 1 most incomplete (lowest tweets_sent) valid msg per DAO, max batch_size total
+            dao_to_messages: defaultdict[UUID, List[QueueMessage]] = defaultdict(list)
+            for message in self._pending_messages:
+                dao_to_messages[message.dao_id].append(message)
+
+            self._pending_messages = []
+            for dao_id, messages in dao_to_messages.items():
+                # Filter valids + sort lowest tweets_sent first
+                valid_messages = [
+                    m for m in messages if self._is_message_struct_valid(m)
+                ]
+                if not valid_messages:
+                    continue
+                sorted_messages = sorted(
+                    valid_messages,
+                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0,
+                )
+                self._pending_messages.append(sorted_messages[0])
+                if len(self._pending_messages) >= max_per_run:
+                    break
+
+            num_daos_selected = len({msg.dao_id for msg in self._pending_messages})
+            logger.info(
+                f"Limited to {len(self._pending_messages)} valid messages across {num_daos_selected} DAOs (max: {max_per_run})"
+            )
+
             # Log some details about the messages for debugging
             if self._pending_messages:
                 for idx, msg in enumerate(self._pending_messages[:3]):  # Log first 3
@@ -197,7 +239,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         f"Message type={type(msg.message)}, Content preview: {str(msg.message)[:100]}"
                     )
 
-            return True
+            return len(self._pending_messages) > 0
         except Exception as e:
             logger.error(f"Error loading pending tweets: {str(e)}", exc_info=True)
             self._pending_messages = None
@@ -205,43 +247,32 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
-        if not self._pending_messages:
-            logger.debug("No pending tweet messages found - skipping execution")
-            return False
+        return True
 
-        # Validate each message before processing
-        valid_messages = []
-        invalid_count = 0
-
-        for message in self._pending_messages:
-            if await self._is_message_valid(message):
-                valid_messages.append(message)
-            else:
-                invalid_count += 1
-
-        # Prioritize incomplete messages (lowest tweets_sent first)
-        valid_messages.sort(
-            key=lambda m: (
-                m.result.get("tweets_sent", 0)
-                if m.result and isinstance(m.result, dict)
-                else 0
-            )
-        )
-
-        self._pending_messages = valid_messages
-
-        logger.info(
-            f"Tweet validation complete: {len(valid_messages)} valid, {invalid_count} invalid messages"
-        )
-
-        if valid_messages:
-            logger.debug(f"Found {len(valid_messages)} valid tweet messages")
+    def _is_message_struct_valid(self, message: QueueMessage) -> bool:
+        """Lightweight structural validation (no Twitter init/DB calls)."""
+        try:
+            if (
+                not message.message
+                or not isinstance(message.message, dict)
+                or "posts" not in message.message
+            ):
+                return False
+            posts = message.message["posts"]
+            if (
+                not isinstance(posts, list)
+                or not posts
+                or any(not isinstance(p, str) or not p.strip() for p in posts)
+            ):
+                return False
+            # Skip completes
+            if message.result and isinstance(message.result, dict):
+                prior_sent = message.result.get("tweets_sent", 0)
+                if prior_sent >= len(posts):
+                    return False
             return True
-
-        logger.warning(
-            f"No valid tweet messages to process (found {invalid_count} invalid messages)"
-        )
-        return False
+        except Exception:
+            return False
 
     async def _is_message_valid(self, message: QueueMessage) -> bool:
         """Check if a message is valid for processing with new 'posts' format."""
@@ -567,6 +598,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     reason=f"twitter-429 (Retry-After: {retry_after}s)",
                 )
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
+                self._rate_limited_this_run = True
+                logger.warning(
+                    f"Tweet rate limited; cooldown={wait_until}; stopping batch"
+                )
                 return {
                     "tweets_sent_this_run": tweets_sent_this_run,
                     "final_tweet_id": previous_tweet_id,
@@ -671,6 +706,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         # Clear cached pending messages
         self._pending_messages = None
 
+        # Reset rate limit flag for next run
+        self._rate_limited_this_run = False
+
         # Don't clear Twitter services cache as they can be reused
         logger.debug(
             f"Cleanup completed. Cached Twitter services: {len(self._twitter_services)}"
@@ -686,56 +724,60 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
         processed_count = 0
         success_count = 0
-        batch_size = getattr(context, "batch_size", 5)
 
-        # Process messages in batches
-        for i in range(0, len(self._pending_messages), batch_size):
-            batch = self._pending_messages[i : i + batch_size]
+        # Process messages sequentially with per-message rate limit check
+        idx = 0
+        while idx < len(self._pending_messages):
+            if self._rate_limited_this_run:
+                logger.warning("Skipping remaining messages: rate limited this run")
+                break
 
-            for message in batch:
-                logger.debug(f"Processing tweet message: {message.id}")
-                result = await self._process_tweet_message(message)
-                results.append(result)
-                processed_count += 1
+            message = self._pending_messages[idx]
+            logger.debug(f"Processing tweet message: {message.id}")
+            result = await self._process_tweet_message(message)
+            results.append(result)
+            processed_count += 1
 
-                # Build result dict with all fields (cumulative)
-                result_dict = {
-                    "success": result.success,
-                    "partial_success": result.partial_success,
-                    "message": result.message,
-                    "tweet_id": result.tweet_id,
-                    "first_tweet_id": result.first_tweet_id,
-                    "dao_id": str(result.dao_id) if result.dao_id else None,
-                    "tweets_sent": result.tweets_sent,
-                    "total_posts": result.total_posts,
-                    "chunks_processed": result.chunks_processed,
-                    "error": str(result.error) if result.error else None,
-                }
+            # Build result dict with all fields (cumulative)
+            result_dict = {
+                "success": result.success,
+                "partial_success": result.partial_success,
+                "message": result.message,
+                "tweet_id": result.tweet_id,
+                "first_tweet_id": result.first_tweet_id,
+                "dao_id": str(result.dao_id) if result.dao_id else None,
+                "tweets_sent": result.tweets_sent,
+                "total_posts": result.total_posts,
+                "chunks_processed": result.chunks_processed,
+                "error": str(result.error) if result.error else None,
+            }
 
-                # Always update result; set is_processed only on full success
-                update_data = QueueMessageBase(result=result_dict)
-                if result.success:
-                    update_data.is_processed = True
+            # Always update result; set is_processed only on full success
+            update_data = QueueMessageBase(result=result_dict)
+            if result.success:
+                update_data.is_processed = True
 
-                backend.update_queue_message(
-                    queue_message_id=message.id,
-                    update_data=update_data,
+            backend.update_queue_message(
+                queue_message_id=message.id,
+                update_data=update_data,
+            )
+
+            if result.success:
+                success_count += 1
+                status = "success"
+                logger.info(
+                    f"Message {message.id} fully completed ({status}): "
+                    f"{result.tweets_sent}/{result.total_posts} posts, "
+                    f"thread root: {result.first_tweet_id}"
+                )
+            else:
+                status = "partial success" if result.partial_success else "failure"
+                logger.info(
+                    f"Message {message.id} {status} ({result.tweets_sent}/{result.total_posts}): "
+                    f"will retry remaining posts, thread root: {result.first_tweet_id}"
                 )
 
-                if result.success:
-                    success_count += 1
-                    status = "success"
-                    logger.info(
-                        f"Message {message.id} fully completed ({status}): "
-                        f"{result.tweets_sent}/{result.total_posts} posts, "
-                        f"thread root: {result.first_tweet_id}"
-                    )
-                else:
-                    status = "partial success" if result.partial_success else "failure"
-                    logger.info(
-                        f"Message {message.id} {status} ({result.tweets_sent}/{result.total_posts}): "
-                        f"will retry remaining posts, thread root: {result.first_tweet_id}"
-                    )
+            idx += 1
 
         logger.info(
             f"Tweet task completed - Processed: {processed_count}, "
