@@ -501,6 +501,53 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 dao_id=message.dao_id,
             )
 
+    def _handle_rate_limit(
+        self,
+        retry_after: int,
+        tweets_sent_this_run: int,
+        previous_tweet_id: Optional[str],
+        first_tweet_id: Optional[str],
+    ) -> Dict[str, Any]:
+        """
+        Handle Twitter rate limiting by setting a job cooldown and returning partial results
+        for resumption on next execution.
+
+        Args:
+            retry_after: Seconds to wait before retrying (from Retry-After header or default).
+            tweets_sent_this_run: Number of tweets successfully sent in this execution attempt.
+            previous_tweet_id: ID of the last successfully sent tweet (for threading resumption).
+            first_tweet_id: ID of the first tweet in the thread (for tracking).
+
+        Returns:
+            Dict[str, Any] with keys:
+                - tweets_sent_this_run: int (unchanged)
+                - final_tweet_id: Optional[str] (previous_tweet_id)
+                - first_tweet_id: Optional[str]
+                - success_this_run: bool (always False)
+                - partial_success_this_run: bool (True if tweets_sent_this_run > 0)
+        """
+        jitter = random.uniform(0, 30)
+        wait_until = datetime.now(timezone.utc) + timedelta(
+            seconds=retry_after + jitter
+        )
+        reason = f"twitter-429 (Retry-After: {retry_after}s)"
+        backend.upsert_job_cooldown(
+            job_type="tweet",
+            wait_until=wait_until,
+            reason=reason or "twitter rate limit",
+        )
+        self._rate_limited_this_run = True
+        logger.warning(
+            f"Tweet job rate limited; cooldown set until {wait_until}; stopping batch"
+        )
+        return {
+            "tweets_sent_this_run": tweets_sent_this_run,
+            "final_tweet_id": previous_tweet_id,
+            "first_tweet_id": first_tweet_id,
+            "success_this_run": False,
+            "partial_success_this_run": tweets_sent_this_run > 0,
+        }
+
     async def _process_posts(
         self,
         message: QueueMessage,
@@ -585,30 +632,21 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     # For other failures, continue for partial success
 
             except tweepy.TooManyRequests as e:
-                retry_after = int(
-                    e.response.headers.get("Retry-After", 900)
-                )  # Default 15min
-                jitter = random.uniform(0, 30)  # Additive jitter: 0-30 seconds
-                wait_until = datetime.now(timezone.utc) + timedelta(
-                    seconds=retry_after + jitter
+                retry_after = 900  # Default 15min
+                try:
+                    if hasattr(e, "response") and e.response:
+                        headers = getattr(e.response, "headers", {})
+                        retry_after_str = headers.get("Retry-After")
+                        if retry_after_str:
+                            retry_after = int(retry_after_str)
+                except (AttributeError, ValueError, TypeError):
+                    pass  # Use default
+                return self._handle_rate_limit(
+                    retry_after=retry_after,
+                    tweets_sent_this_run=tweets_sent_this_run,
+                    previous_tweet_id=previous_tweet_id,
+                    first_tweet_id=first_tweet_id,
                 )
-                backend.upsert_job_cooldown(
-                    job_type="tweet",
-                    wait_until=wait_until,
-                    reason=f"twitter-429 (Retry-After: {retry_after}s)",
-                )
-                logger.warning(f"Tweet job cooldown set until {wait_until}")
-                self._rate_limited_this_run = True
-                logger.warning(
-                    f"Tweet rate limited; cooldown={wait_until}; stopping batch"
-                )
-                return {
-                    "tweets_sent_this_run": tweets_sent_this_run,
-                    "final_tweet_id": previous_tweet_id,
-                    "first_tweet_id": first_tweet_id,
-                    "success_this_run": False,
-                    "partial_success_this_run": tweets_sent_this_run > 0,
-                }
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
                 if "duplicate" in error_msg or "status is a duplicate" in error_msg:
