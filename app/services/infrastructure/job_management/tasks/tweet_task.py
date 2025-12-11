@@ -518,9 +518,8 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             wait_until=wait_until,
             reason=f"twitter-429 (Retry-After: {retry_after}s)",
         )
-        logger.warning(f"Tweet job cooldown set until {wait_until}")
         self._rate_limited_this_run = True
-        logger.warning(f"Tweet rate limited; cooldown={wait_until}; stopping batch")
+        logger.warning(f"Tweet job rate limited; cooldown set until {wait_until}; stopping batch")
         return {
             "tweets_sent_this_run": tweets_sent_this_run,
             "final_tweet_id": previous_tweet_id,
