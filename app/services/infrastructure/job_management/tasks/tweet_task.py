@@ -29,7 +29,11 @@ from app.services.infrastructure.job_management.base import (
 )
 from collections import defaultdict
 
-from app.services.infrastructure.job_management.decorators import JobPriority, JobRegistry, job
+from app.services.infrastructure.job_management.decorators import (
+    JobPriority,
+    JobRegistry,
+    job,
+)
 
 logger = configure_logger(__name__)
 
@@ -209,12 +213,14 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             self._pending_messages = []
             for dao_id, messages in dao_to_messages.items():
                 # Filter valids + sort lowest tweets_sent first
-                valid_messages = [m for m in messages if self._is_message_struct_valid(m)]
+                valid_messages = [
+                    m for m in messages if self._is_message_struct_valid(m)
+                ]
                 if not valid_messages:
                     continue
                 sorted_messages = sorted(
                     valid_messages,
-                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0
+                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0,
                 )
                 self._pending_messages.append(sorted_messages[0])
                 if len(self._pending_messages) >= max_per_run:
@@ -245,10 +251,18 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     def _is_message_struct_valid(self, message: QueueMessage) -> bool:
         """Lightweight structural validation (no Twitter init/DB calls)."""
         try:
-            if not message.message or not isinstance(message.message, dict) or "posts" not in message.message:
+            if (
+                not message.message
+                or not isinstance(message.message, dict)
+                or "posts" not in message.message
+            ):
                 return False
             posts = message.message["posts"]
-            if not isinstance(posts, list) or not posts or any(not isinstance(p, str) or not p.strip() for p in posts):
+            if (
+                not isinstance(posts, list)
+                or not posts
+                or any(not isinstance(p, str) or not p.strip() for p in posts)
+            ):
                 return False
             # Skip completes
             if message.result and isinstance(message.result, dict):
