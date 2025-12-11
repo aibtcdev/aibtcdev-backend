@@ -27,6 +27,8 @@ from app.services.infrastructure.job_management.base import (
     RunnerConfig,
     RunnerResult,
 )
+from collections import defaultdict
+
 from app.services.infrastructure.job_management.decorators import JobPriority, job
 
 logger = configure_logger(__name__)
@@ -49,14 +51,14 @@ class TweetProcessingResult(RunnerResult):
     job_type="tweet",
     name="Tweet Processor",
     description="Processes and sends tweets for DAOs with automatic retry and error handling",
-    interval_seconds=30,  # Reduced frequency from 5s to 30s
+    interval_seconds=120,
     priority=JobPriority.NORMAL,  # Changed from HIGH to NORMAL to not dominate queue
     max_retries=3,
     retry_delay_seconds=60,
     timeout_seconds=300,
-    max_concurrent=2,  # Increased from 1 to 2 to allow parallel processing
+    max_concurrent=1,
     requires_twitter=True,
-    batch_size=5,
+    batch_size=3,
     enable_dead_letter_queue=True,
 )
 class TweetTask(BaseTask[TweetProcessingResult]):
@@ -66,6 +68,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         super().__init__(config)
         self._pending_messages: Optional[List[QueueMessage]] = None
         self._twitter_services: dict[UUID, TwitterService] = {}
+        self._rate_limited_this_run = False
 
     async def _get_twitter_service(self, dao_id: UUID) -> Optional[TwitterService]:
         """Get or create Twitter service for a DAO with caching."""
@@ -179,6 +182,17 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     async def _validate_prerequisites(self, context: JobContext) -> bool:
         """Validate task prerequisites."""
         try:
+            # Check job cooldown first
+            cooldown = backend.get_job_cooldown("tweet")
+            now = datetime.now(timezone.utc)
+            if cooldown and cooldown.wait_until and now < cooldown.wait_until:
+                logger.info(
+                    f"Tweet task skipped: cooldown active until {cooldown.wait_until} "
+                    f"(reason: {cooldown.reason})"
+                )
+                self._pending_messages = []
+                return False
+
             # Cache pending messages for later use
             self._pending_messages = backend.list_queue_messages(
                 filters=QueueMessageFilter(
@@ -189,6 +203,26 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                 f"Found {len(self._pending_messages)} unprocessed tweet messages"
             )
 
+            # Prioritize: 1 oldest/incomplete per DAO, max 3 total/run
+            dao_to_msgs: defaultdict[UUID, List[QueueMessage]] = defaultdict(list)
+            for msg in self._pending_messages:
+                dao_to_msgs[msg.dao_id].append(msg)
+
+            self._pending_messages = []
+            for dao_id, msgs in dao_to_msgs.items():
+                # Sort by tweets_sent asc (incomplete first)
+                incomplete = sorted(
+                    msgs,
+                    key=lambda m: m.result.get("tweets_sent", 0) if m.result else 0
+                )
+                self._pending_messages.append(incomplete[0])
+                if len(self._pending_messages) >= 3:
+                    break
+
+            logger.info(
+                f"Limited to {len(self._pending_messages)} msgs across {len(dao_to_msgs)} DAOs"
+            )
+
             # Log some details about the messages for debugging
             if self._pending_messages:
                 for idx, msg in enumerate(self._pending_messages[:3]):  # Log first 3
@@ -197,7 +231,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                         f"Message type={type(msg.message)}, Content preview: {str(msg.message)[:100]}"
                     )
 
-            return True
+            return len(self._pending_messages) > 0
         except Exception as e:
             logger.error(f"Error loading pending tweets: {str(e)}", exc_info=True)
             self._pending_messages = None
@@ -205,43 +239,7 @@ class TweetTask(BaseTask[TweetProcessingResult]):
 
     async def _validate_task_specific(self, context: JobContext) -> bool:
         """Validate task-specific conditions."""
-        if not self._pending_messages:
-            logger.debug("No pending tweet messages found - skipping execution")
-            return False
-
-        # Validate each message before processing
-        valid_messages = []
-        invalid_count = 0
-
-        for message in self._pending_messages:
-            if await self._is_message_valid(message):
-                valid_messages.append(message)
-            else:
-                invalid_count += 1
-
-        # Prioritize incomplete messages (lowest tweets_sent first)
-        valid_messages.sort(
-            key=lambda m: (
-                m.result.get("tweets_sent", 0)
-                if m.result and isinstance(m.result, dict)
-                else 0
-            )
-        )
-
-        self._pending_messages = valid_messages
-
-        logger.info(
-            f"Tweet validation complete: {len(valid_messages)} valid, {invalid_count} invalid messages"
-        )
-
-        if valid_messages:
-            logger.debug(f"Found {len(valid_messages)} valid tweet messages")
-            return True
-
-        logger.warning(
-            f"No valid tweet messages to process (found {invalid_count} invalid messages)"
-        )
-        return False
+        return True
 
     async def _is_message_valid(self, message: QueueMessage) -> bool:
         """Check if a message is valid for processing with new 'posts' format."""
@@ -567,13 +565,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
                     reason=f"twitter-429 (Retry-After: {retry_after}s)",
                 )
                 logger.warning(f"Tweet job cooldown set until {wait_until}")
-                return {
-                    "tweets_sent_this_run": tweets_sent_this_run,
-                    "final_tweet_id": previous_tweet_id,
-                    "first_tweet_id": first_tweet_id,
-                    "success_this_run": False,
-                    "partial_success_this_run": tweets_sent_this_run > 0,
-                }
+                self._rate_limited_this_run = True
+                logger.warning(f"Tweet rate limited; cooldown={wait_until}; stopping batch")
+                raise tweepy.TooManyRequests("Rate limited - batch stop")
             except tweepy.Forbidden as e:
                 error_msg = str(e).lower()
                 if "duplicate" in error_msg or "status is a duplicate" in error_msg:
@@ -671,6 +665,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         # Clear cached pending messages
         self._pending_messages = None
 
+        # Reset rate limit flag for next run
+        self._rate_limited_this_run = False
+
         # Don't clear Twitter services cache as they can be reused
         logger.debug(
             f"Cleanup completed. Cached Twitter services: {len(self._twitter_services)}"
@@ -691,6 +688,10 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         # Process messages in batches
         for i in range(0, len(self._pending_messages), batch_size):
             batch = self._pending_messages[i : i + batch_size]
+
+            if self._rate_limited_this_run:
+                logger.warning("Skipping remaining batch: rate limited this run")
+                break
 
             for message in batch:
                 logger.debug(f"Processing tweet message: {message.id}")
