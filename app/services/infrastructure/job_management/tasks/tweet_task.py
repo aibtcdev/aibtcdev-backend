@@ -510,7 +510,9 @@ class TweetTask(BaseTask[TweetProcessingResult]):
     ) -> Dict[str, Any]:
         """Shared rate limit handling: cooldown + early return."""
         jitter = random.uniform(0, 30)
-        wait_until = datetime.now(timezone.utc) + timedelta(seconds=retry_after + jitter)
+        wait_until = datetime.now(timezone.utc) + timedelta(
+            seconds=retry_after + jitter
+        )
         backend.upsert_job_cooldown(
             job_type="tweet",
             wait_until=wait_until,
