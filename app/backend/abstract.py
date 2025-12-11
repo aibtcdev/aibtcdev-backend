@@ -1,22 +1,22 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.backend.models import (
-    DAO,
-    UUID,
+    Airdrop,
+    AirdropBase,
+    AirdropCreate,
+    AirdropFilter,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
-    Airdrop,
-    AirdropBase,
-    AirdropCreate,
-    AirdropFilter,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
     ChainStateFilter,
+    DAO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -32,6 +32,7 @@ from app.backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
+    JobCooldown,
     Key,
     KeyBase,
     KeyCreate,
@@ -71,6 +72,11 @@ from app.backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    UUID,
+    Veto,
+    VetoBase,
+    VetoCreate,
+    VetoFilter,
     Vote,
     VoteBase,
     VoteCreate,
@@ -92,10 +98,6 @@ from app.backend.models import (
     XUserBase,
     XUserCreate,
     XUserFilter,
-    Veto,
-    VetoBase,
-    VetoCreate,
-    VetoFilter,
 )
 
 
@@ -787,4 +789,47 @@ class AbstractBackend(ABC):
     @abstractmethod
     def delete_lottery_result(self, lottery_result_id: UUID) -> bool:
         """Delete a lottery result record."""
+        pass
+
+    # ----------- JOB COOLDOWNS -----------
+    @abstractmethod
+    def get_job_cooldown(self, job_type: str) -> Optional[JobCooldown]:
+        """Get active cooldown for a job type.
+
+        Returns None if no cooldown record exists for the job_type or if the
+        cooldown has expired (wait_until <= current time).
+
+        Implementations must be thread-safe to handle concurrent reads.
+
+        Raises:
+            Implementation-specific database exceptions on query failure.
+        """
+        pass
+
+    @abstractmethod
+    def upsert_job_cooldown(
+        self, job_type: str, wait_until: Optional[datetime], reason: str
+    ) -> JobCooldown:
+        """Atomically upsert (insert or update) a job cooldown record.
+
+        This operation uses an atomic database UPSERT:
+        - Inserts a new record if no existing record for job_type.
+        - Updates the existing record otherwise.
+
+        Provides atomicity guarantees: concurrent calls for the same job_type
+        will not result in race conditions or lost updates.
+
+        Implementations must be thread-safe.
+
+        To immediately expire/clear a cooldown, pass wait_until=None. Even for clears,
+        provide a reason (e.g., "manual clear", "rate limit reset").
+
+        Args:
+            job_type: Unique identifier for the job (e.g., job type string).
+            wait_until: Cooldown expiration timestamp. Use None to request immediate expiration/clearing.
+            reason: Human-readable reason for applying or clearing the cooldown.
+
+        Raises:
+            Implementation-specific database exceptions on failure.
+        """
         pass

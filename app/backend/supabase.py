@@ -1,6 +1,7 @@
 import time
-import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+import uuid
 
 import vecs
 from sqlalchemy import Column, DateTime, Engine, String, Text, func
@@ -11,21 +12,20 @@ from supabase import Client
 
 from app.backend.abstract import AbstractBackend
 from app.backend.models import (
-    DAO,
-    UUID,
+    Airdrop,
+    AirdropBase,
+    AirdropCreate,
+    AirdropFilter,
     Agent,
     AgentBase,
     AgentCreate,
     AgentFilter,
     AgentWithWalletTokenDTO,
-    Airdrop,
-    AirdropBase,
-    AirdropCreate,
-    AirdropFilter,
     ChainState,
     ChainStateBase,
     ChainStateCreate,
     ChainStateFilter,
+    DAO,
     DAOBase,
     DAOCreate,
     DAOFilter,
@@ -41,6 +41,7 @@ from app.backend.models import (
     HolderBase,
     HolderCreate,
     HolderFilter,
+    JobCooldown,
     Key,
     KeyBase,
     KeyCreate,
@@ -81,6 +82,11 @@ from app.backend.models import (
     TokenBase,
     TokenCreate,
     TokenFilter,
+    UUID,
+    Veto,
+    VetoBase,
+    VetoCreate,
+    VetoFilter,
     Vote,
     VoteBase,
     VoteCreate,
@@ -102,10 +108,6 @@ from app.backend.models import (
     XUserBase,
     XUserCreate,
     XUserFilter,
-    Veto,
-    VetoBase,
-    VetoCreate,
-    VetoFilter,
 )
 from app.lib.logger import configure_logger
 
@@ -2377,3 +2379,94 @@ class SupabaseBackend(AbstractBackend):
         )
         deleted = response.data or []
         return len(deleted) > 0
+
+    # ----------------------------------------------------------------
+    # JOB COOLDOWNS
+    # ----------------------------------------------------------------
+    def get_job_cooldown(self, job_type: str) -> Optional[JobCooldown]:
+        """Get active cooldown for a job type.
+
+        Returns None if no cooldown record exists for the job_type or if the
+        cooldown has expired (wait_until <= current time).
+
+        Implementations must be thread-safe to handle concurrent reads.
+
+        Raises:
+            Implementation-specific database exceptions on query failure.
+        """
+        try:
+            response = (
+                self.client.table("job_cooldowns")
+                .select("*")
+                .eq("job_type", job_type)
+                .execute()
+            )
+            data = response.data or []
+            if not data:
+                return None
+            if len(data) > 1:
+                logger.warning(
+                    f"Multiple job cooldowns found for {job_type}: {len(data)}"
+                )
+            cooldown = JobCooldown(**data[0])
+
+            now = datetime.now(timezone.utc)
+            if not cooldown.wait_until or cooldown.wait_until <= now:
+                return None
+
+            return cooldown
+        except Exception as e:
+            logger.error(f"Error getting job cooldown for {job_type}: {str(e)}")
+            raise
+
+    def upsert_job_cooldown(
+        self,
+        job_type: str,
+        wait_until: Optional[datetime],
+        reason: Optional[str] = None,
+    ) -> JobCooldown:
+        """Atomically upsert (insert or update) a job cooldown record.
+
+        This operation uses an atomic database UPSERT:
+        - Inserts a new record if no existing record for job_type.
+        - Updates the existing record otherwise.
+
+        Provides atomicity guarantees: concurrent calls for the same job_type
+        will not result in race conditions or lost updates.
+
+        Implementations must be thread-safe.
+
+        To immediately expire/clear a cooldown, pass wait_until=None. Even for clears,
+        provide a reason (e.g., "manual clear", "rate limit reset").
+
+        Args:
+            job_type: Unique identifier for the job (e.g., job type string).
+            wait_until: Cooldown expiration timestamp. Use None to request immediate expiration/clearing.
+            reason: Human-readable reason for applying or clearing the cooldown.
+
+        Raises:
+            Implementation-specific database exceptions on failure.
+        """
+        now = datetime.now(timezone.utc)
+        if wait_until is None:
+            wait_until = now  # Expire immediately
+
+        payload = {
+            "job_type": job_type,
+            "wait_until": wait_until.isoformat(),
+            "reason": reason,
+        }
+
+        try:
+            response = (
+                self.client.table("job_cooldowns")
+                .upsert(payload, on_conflict="job_type")
+                .execute()
+            )
+            data = response.data or []
+            if not data:
+                raise ValueError("No data returned from job_cooldowns upsert.")
+            return JobCooldown(**data[0])
+        except Exception as e:
+            logger.error(f"Error upserting job cooldown for {job_type}: {str(e)}")
+            raise

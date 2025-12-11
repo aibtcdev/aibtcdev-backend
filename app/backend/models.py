@@ -1069,3 +1069,30 @@ class AirdropFilter(CustomBaseModel):
     block_height_lte: Optional[int] = None
     timestamp_after: Optional[datetime] = None
     timestamp_before: Optional[datetime] = None
+
+
+#
+# JOB COOLDOWNS
+#
+class JobCooldownBase(CustomBaseModel):
+    """
+    Base model for job cooldowns.
+
+    Attributes:
+        job_type (str): The type or name of the job to which the cooldown applies.
+        wait_until (Optional[datetime]): The datetime until which the job is in cooldown.
+            - If None, there is no active cooldown for this job (i.e., the job can be run).
+            - If set to a datetime in the future, the job should not be run until that time.
+        reason (Optional[str]): The reason for the cooldown, if any.
+            - This is free-form text and may be used to provide context for why the cooldown was set.
+    """
+
+    job_type: str
+    wait_until: Optional[datetime] = None
+    reason: Optional[str] = None
+
+
+class JobCooldown(JobCooldownBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
