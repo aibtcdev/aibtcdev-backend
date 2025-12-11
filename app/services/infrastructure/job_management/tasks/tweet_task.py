@@ -725,62 +725,59 @@ class TweetTask(BaseTask[TweetProcessingResult]):
         processed_count = 0
         success_count = 0
 
-        # Get batch_size from job metadata
-        metadata = JobRegistry.get_metadata(context.job_type)
-        batch_size = metadata.batch_size if metadata else 3
-
-        # Process messages in batches
-        for i in range(0, len(self._pending_messages), batch_size):
-            batch = self._pending_messages[i : i + batch_size]
-
+        # Process messages sequentially with per-message rate limit check
+        idx = 0
+        while idx < len(self._pending_messages):
             if self._rate_limited_this_run:
-                logger.warning("Skipping remaining batch: rate limited this run")
+                logger.warning("Skipping remaining messages: rate limited this run")
                 break
 
-            for message in batch:
-                logger.debug(f"Processing tweet message: {message.id}")
-                result = await self._process_tweet_message(message)
-                results.append(result)
-                processed_count += 1
+            message = self._pending_messages[idx]
+            logger.debug(f"Processing tweet message: {message.id}")
+            result = await self._process_tweet_message(message)
+            results.append(result)
+            processed_count += 1
 
-                # Build result dict with all fields (cumulative)
-                result_dict = {
-                    "success": result.success,
-                    "partial_success": result.partial_success,
-                    "message": result.message,
-                    "tweet_id": result.tweet_id,
-                    "first_tweet_id": result.first_tweet_id,
-                    "dao_id": str(result.dao_id) if result.dao_id else None,
-                    "tweets_sent": result.tweets_sent,
-                    "total_posts": result.total_posts,
-                    "chunks_processed": result.chunks_processed,
-                    "error": str(result.error) if result.error else None,
-                }
+            # Build result dict with all fields (cumulative)
+            result_dict = {
+                "success": result.success,
+                "partial_success": result.partial_success,
+                "message": result.message,
+                "tweet_id": result.tweet_id,
+                "first_tweet_id": result.first_tweet_id,
+                "dao_id": str(result.dao_id) if result.dao_id else None,
+                "tweets_sent": result.tweets_sent,
+                "total_posts": result.total_posts,
+                "chunks_processed": result.chunks_processed,
+                "error": str(result.error) if result.error else None,
+            }
 
-                # Always update result; set is_processed only on full success
-                update_data = QueueMessageBase(result=result_dict)
-                if result.success:
-                    update_data.is_processed = True
+            # Always update result; set is_processed only on full success
+            update_data = QueueMessageBase(result=result_dict)
+            if result.success:
+                update_data.is_processed = True
 
-                backend.update_queue_message(
-                    queue_message_id=message.id,
-                    update_data=update_data,
+            backend.update_queue_message(
+                queue_message_id=message.id,
+                update_data=update_data,
+            )
+
+            if result.success:
+                success_count += 1
+                status = "success"
+                logger.info(
+                    f"Message {message.id} fully completed ({status}): "
+                    f"{result.tweets_sent}/{result.total_posts} posts, "
+                    f"thread root: {result.first_tweet_id}"
+                )
+            else:
+                status = "partial success" if result.partial_success else "failure"
+                logger.info(
+                    f"Message {message.id} {status} ({result.tweets_sent}/{result.total_posts}): "
+                    f"will retry remaining posts, thread root: {result.first_tweet_id}"
                 )
 
-                if result.success:
-                    success_count += 1
-                    status = "success"
-                    logger.info(
-                        f"Message {message.id} fully completed ({status}): "
-                        f"{result.tweets_sent}/{result.total_posts} posts, "
-                        f"thread root: {result.first_tweet_id}"
-                    )
-                else:
-                    status = "partial success" if result.partial_success else "failure"
-                    logger.info(
-                        f"Message {message.id} {status} ({result.tweets_sent}/{result.total_posts}): "
-                        f"will retry remaining posts, thread root: {result.first_tweet_id}"
-                    )
+            idx += 1
 
         logger.info(
             f"Tweet task completed - Processed: {processed_count}, "
