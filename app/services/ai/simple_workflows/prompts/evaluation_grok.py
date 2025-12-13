@@ -78,56 +78,15 @@ Your output MUST include the following categories:
 Your output MUST follow this EXACT structure:
 
 {{
-  "verifications": [{"tool": "x_keyword_search", "query": "viral AI+BTC", "finding": "top post 10k likes"}],
-  "current_order": {{
+  "category_name": {{
     "score": int,
     "reason": "2-3 sentence rationale with specific evidence",
     "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
   }},
-  "mission": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "value": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "values": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "uniqueness": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "originality": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "clarity": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "safety": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "growth": {{
-    "score": int,
-    "reason": "2-3 sentence rationale with specific evidence",
-    "evidence": ["tool-derived citations (e.g., '[x_keyword_search: post_id]: 10k likes')"]
-  }},
-  "final_score": int,
-  "confidence": float,
-  "decision": "APPROVE" or "REJECT",
-  "failed": [ "G1", "H3", "LOW_CONFIDENCE" ]
+  final_score: int,
+  confidence: float,
+  decision: "APPROVE" or "REJECT",
+  failed: [ "G1", "H3", "LOW_CONFIDENCE", "NO_VERIFICATION" ]
 }}
 
 GUIDELINES
@@ -138,7 +97,7 @@ GUIDELINES
 - final_score: integer 0-100.
 - confidence: float 0.0-1.0.
 - decision: "APPROVE" or "REJECT".
-- failed: list of failed gate/threshold codes or "LOW_CONFIDENCE".
+- failed: list of failed gate/threshold codes, "LOW_CONFIDENCE", or "NO_VERIFICATION".
 """
 
 
