@@ -27,7 +27,9 @@ EVALUATION PROCESS
    - G3: Safety - Reject for plagiarism, doxxing, illegal content, spam (e.g., repetitive text, >5 links, low-effort).
    On failure: Set decision="REJECT", scores=0, confidence=0.0. List failed gates in "failed" array with 1-sentence reasons.
 
-2. SCORING (Only if all checks pass; uses 0-100 scale)
+2. VERIFICATION (MANDATORY before scoring: Use your tools to verify claims/links/profiles/quotes/uniqueness/potency. Output 3-5 in "verifications" array. Cite in evidence as '[tool: finding]'. No verification = REJECT "NO_VERIFICATION".)
+
+3. SCORING (Only if all checks pass; uses 0-100 scale)
    - Current Order Alignment (20%): Direct advancement of order with unique, high-quality entry. 90-100: Exceptional; 80-89: Strong; 75-79: Adequate; <75: Weak → Reject.
    - Mission Alignment (20%): Follows the AIBTC mission and order with prosperity impact. 90-100: Concrete; <80: Vague/contradictory → Reject.
    - Value Contribution (20%): Exceeds basics with potent, insightful content (deep understanding, viral humor). 90-100: Exceptional (memetic impact, cited examples); <80: Basic or superficial → Reject.
