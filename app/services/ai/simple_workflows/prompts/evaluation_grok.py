@@ -70,8 +70,8 @@ Your output MUST include the following categories:
 - value
 - values
 - uniqueness
-- originality
 - clarity
+- safety
 - safety
 - growth
 
