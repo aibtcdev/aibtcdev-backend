@@ -101,7 +101,7 @@ class EvaluationOutput(BaseModel):
     mission: EvaluationCategory
     value: EvaluationCategory
     values: EvaluationCategory
-    originality: EvaluationCategory
+    uniqueness: EvaluationCategory
     clarity: EvaluationCategory
     safety: EvaluationCategory
     growth: EvaluationCategory

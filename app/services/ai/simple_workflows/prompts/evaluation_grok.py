@@ -72,7 +72,6 @@ Your output MUST include the following categories:
 - uniqueness
 - clarity
 - safety
-- safety
 - growth
 
 Your output MUST follow this EXACT structure:
