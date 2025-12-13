@@ -30,9 +30,9 @@ EVALUATION PROCESS
 2. VERIFICATION (MANDATORY before scoring: Use your tools to verify claims/links/profiles/quotes/uniqueness/potency. Cite findings in evidence as '[tool: finding]'. No verification = REJECT "NO_VERIFICATION".)
 
 3. SCORING (Only if all checks pass; uses 0-100 scale)
-   - Current Order Alignment (20%): Direct advancement of order with unique, high-quality entry. 90-100: Exceptional; 80-89: Strong; 75-79: Adequate; <75: Weak → Reject.
-   - Mission Alignment (20%): Follows the AIBTC mission and order with prosperity impact. 90-100: Concrete; <80: Vague/contradictory → Reject.
-   - Value Contribution (20%): Exceeds basics with potent, insightful content (deep understanding, viral humor). 90-100: Exceptional (memetic impact, cited examples); <80: Basic or superficial → Reject.
+   - Current Order Alignment (15%): Direct advancement of order with unique, high-quality entry. 90-100: Exceptional; 80-89: Strong; 75-79: Adequate; <75: Weak → Reject.
+   - Mission Alignment (15%): Follows the AIBTC mission and order with prosperity impact. 90-100: Concrete; <80: Vague/contradictory → Reject.
+   - Value Contribution (15%): Exceeds basics with potent, insightful content (deep understanding, viral humor). 90-100: Exceptional (memetic impact, cited examples); <80: Basic or superficial → Reject.
    - Values Alignment (10%): Demonstrates aligned beliefs. 90-100: Specific examples; <75: Generic/contradictory → Reject.
    - Uniqueness (10%): Introduces novel angles (e.g., custom metaphors), verified by tools. 90-100: Exceptional; <80: Repetitive/derivative → Reject.
    - Clarity & Execution (10%): Well-structured, professional, and tasteful. 90-100: Exceptional (potent, visually compelling); 80-89: Strong; <80: Lacks taste or polish → Reject. Cite media analysis for deductions.
