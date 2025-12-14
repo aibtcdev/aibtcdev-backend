@@ -156,6 +156,14 @@
       const vettingNames = new Map();
       let currentVettings = [];
 
+      // Proposal details toggle
+      function toggleProposalDetails(row) {
+        const detailsRow = row.nextElementSibling;
+        if (detailsRow && detailsRow.classList.contains('proposal-details')) {
+          detailsRow.classList.toggle('hidden');
+        }
+      }
+
       /**
        * Init: Load manifest, preload reports, render first.
        */
@@ -566,7 +574,7 @@
           `;
         }
 
-        // Proposals table
+        // Proposals table with more details
         const proposalsHtml = `
           <div class="border-t border-gray-200 pt-4 overflow-x-auto">
             <h4 class="font-bold mb-2">Past Proposals (${contrib.proposals.length})</h4>
@@ -575,22 +583,39 @@
                 <tr>
                   <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passed</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Summary Preview</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status / Passed</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">X URL</th>
                 </tr>
               </thead>
               <tbody>
                 ${contrib.proposals.map((p) => {
                   const shortId = (p.proposal_id || p.id || "").slice(0, 8);
                   const title = escapeHtml(p.title || "Untitled");
+                  const summary = escapeHtml((p.summary || p.content || "").slice(0, 100)) + (p.summary && p.summary.length > 100 ? "..." : "");
                   const status = escapeHtml(p.status || "Unknown");
-                  const passed = p.passed ? "Yes" : p.concluded ? "No" : "Pending";
+                  const passed = p.passed ? "Yes" : (p.concluded_by ? "No" : "Pending");
+                  const tags = escapeHtml((p.tags || []).slice(0, 3).join(", "));
+                  const xUrl = p.x_url ? `<a href="${escapeHtml(p.x_url)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline" title="${escapeHtml(p.x_url)}">View</a>` : "N/A";
                   return `
-                    <tr>
-                      <td class="py-2 px-4 border-b border-gray-200 font-mono">${shortId}</td>
-                      <td class="py-2 px-4 border-b border-gray-200 text-truncate" title="${title}">${title}</td>
-                      <td class="py-2 px-4 border-b border-gray-200">${status}</td>
-                      <td class="py-2 px-4 border-b border-gray-200">${passed}</td>
+                    <tr class="hover:bg-gray-50 cursor-pointer group" onclick="toggleProposalDetails(this)">
+                      <td class="py-2 px-4 border-b border-gray-200 font-mono group-hover:font-bold">${shortId}</td>
+                      <td class="py-2 px-4 border-b border-gray-200 text-truncate max-w-[200px]" title="${title}">${title}</td>
+                      <td class="py-2 px-4 border-b border-gray-200 text-truncate max-w-[250px]" title="${summary}">${summary}</td>
+                      <td class="py-2 px-4 border-b border-gray-200">${status}<br><small class="text-xs opacity-75">${passed}</small></td>
+                      <td class="py-2 px-4 border-b border-gray-200">${tags}${tags.length > 0 ? '<br><small class="text-xs opacity-75">+' + (p.tags?.length - 3 || 0) + ' more</small>' : ''}</td>
+                      <td class="py-2 px-4 border-b border-gray-200">${xUrl}</td>
+                    </tr>
+                    <tr class="proposal-details hidden bg-gray-50">
+                      <td colspan="6" class="p-4 border-b border-gray-200">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div><strong>Full Summary:</strong> <span class="whitespace-pre-wrap break-words">${escapeHtml(p.summary || p.content || "N/A")}</span></div>
+                          ${p.tags ? `<div><strong>All Tags:</strong> ${escapeHtml(p.tags.join(', '))}</div>` : ''}
+                          ${p.created_at ? `<div><strong>Created:</strong> ${escapeHtml(p.created_at)}</div>` : ''}
+                          ${p.votes_for !== undefined && p.votes_against !== undefined ? `<div><strong>Votes:</strong> For: ${p.votes_for}, Against: ${p.votes_against}</div>` : ''}
+                        </div>
+                      </td>
                     </tr>
                   `;
                 }).join("")}
