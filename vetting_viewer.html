@@ -234,6 +234,7 @@
               notable_proposals: [],
               proposals: item.contributor_data?.proposals || [],
               usage: null,
+              raw_result: item,
             };
           }
 
@@ -249,6 +250,7 @@
             proposals: item.contributor_data?.proposals || [],
             user_prompt_filled: item.user_prompt_filled || "",
             usage: item.usage || null,
+            raw_result: item,
           };
         });
 
@@ -597,7 +599,15 @@
           </div>
         `;
 
-        details.innerHTML = outcomeHtml + reasoningHtml + notableHtml + promptsHtml + usageHtml + proposalsHtml;
+        // Raw JSON
+        const rawHtml = contrib.raw_result ? `
+          <details class="bg-gray-100 p-4 rounded-md mt-6 border border-gray-200">
+            <summary class="font-semibold text-gray-800 cursor-pointer pb-2 border-b border-gray-200">Raw JSON Result</summary>
+            <pre class="mt-3 text-xs overflow-x-auto max-h-96 p-4 rounded bg-gray-900 text-green-400 font-mono">${escapeHtml(JSON.stringify(contrib.raw_result, null, 2))}</pre>
+          </details>
+        ` : "";
+
+        details.innerHTML = outcomeHtml + reasoningHtml + notableHtml + promptsHtml + usageHtml + proposalsHtml + rawHtml;
         section.appendChild(details);
         return section;
       }
