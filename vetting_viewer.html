@@ -318,15 +318,13 @@
           .sort((a, b) => b.confidence - a.confidence)
           .slice(0, 10);
 
-        const createRows = (label, arr) => {
+        const createRows = (arr) => {
           if (arr.length === 0) return "";
-          return arr.map((contrib, idx) => {
-            const labelCell = idx === 0 ? `<td class="py-3 px-4 border-b border-gray-200 text-sm font-medium text-gray-800 align-top" rowspan="${arr.length}">${label}</td>` : "";
+          return arr.map((contrib) => {
             const explorerUrl = `https://explorer.hiro.so/address/${contrib.contributor_id}?chain=testnet`;
             return `
               <tr>
-                ${labelCell}
-                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600"><a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="font-mono hover:underline" title="Full address">${contrib.short_id}</a></td>
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600"><a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="font-mono hover:underline" title="View on Explorer">${contrib.contributor_id}</a></td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600">${contrib.proposal_count}</td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono text-right">${contrib.confidence.toFixed(2)}</td>
               </tr>
@@ -356,15 +354,15 @@
               <div>
                 <h3 class="font-bold mb-2">Top Allowed</h3>
                 <table class="min-w-full table-striped">
-                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
-                  <tbody>${createRows("Top Allowed", topAllowed)}</tbody>
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <tbody>${createRows(topAllowed)}</tbody>
                 </table>
               </div>
               <div>
                 <h3 class="font-bold mb-2">Top Blocked</h3>
                 <table class="min-w-full table-striped">
-                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
-                  <tbody>${createRows("Top Blocked", topBlocked)}</tbody>
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <tbody>${createRows(topBlocked)}</tbody>
                 </table>
               </div>
             </div>
