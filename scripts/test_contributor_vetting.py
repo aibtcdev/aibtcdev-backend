@@ -28,6 +28,8 @@ from app.backend.factory import get_backend
 from app.backend.models import ProposalFilter, DAO, DAOFilter
 from app.services.ai.simple_workflows.llm import invoke_structured
 from app.services.ai.simple_workflows.prompts.loader import load_prompt  # Optional, for future
+from app.config import config
+import httpx
 from pydantic import BaseModel, Field
 
 # Custom Pydantic model for structured LLM output
@@ -165,8 +167,8 @@ async def vet_single_contributor(
             },
         ]
 
-        # Invoke LLM with structured output
-        result = await invoke_structured(
+        # Call OpenRouter directly with structured JSON parsing (mirrors evaluation_openrouter_v2.py)
+        openrouter_response = await call_openrouter_structured(
             messages,
             ContributorVettingOutput,
             model=args.model,
@@ -177,7 +179,8 @@ async def vet_single_contributor(
             "contributor_id": contributor_id,
             "contributor_data": contributor_data,
             "dao_id": str(dao.id),
-            "vetting_output": result.model_dump(),
+            "vetting_output": openrouter_response.model_dump(),
+            "usage": getattr(openrouter_response, "usage", None),
         }
 
         # Save JSON if requested
@@ -384,13 +387,89 @@ Examples:
         # Reset logging
         reset_logging()
 
-        generate_summary(results, timestamp, args.save_output, str(dao_uuid))
+        generate_summary(results, timestamp, args.save_output, str(dao.id))
 
         print("\n🎉 Contributor vetting test completed!")
 
     finally:
         # Clean up backend
         backend.sqlalchemy_engine.dispose()
+
+
+async def call_openrouter_structured(
+    messages: List[Dict[str, Any]],
+    output_model: type[BaseModel],
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> ContributorVettingOutput:
+    """Direct OpenRouter API call with JSON parsing and Pydantic validation (adapted from evaluation_openrouter_v2.py)."""
+    config_data = {
+        "api_key": config.chat_llm.api_key,
+        "model": model or config.chat_llm.default_model,
+        "temperature": temperature or config.chat_llm.default_temperature,
+        "base_url": config.chat_llm.api_base,
+    }
+
+    payload = {
+        "messages": messages,
+        "model": config_data["model"],
+        "temperature": config_data["temperature"],
+    }
+
+    headers = {
+        "Authorization": f"Bearer {config_data['api_key']}",
+        "HTTP-Referer": "https://aibtc.com",
+        "X-Title": "AIBTC",
+        "Content-Type": "application/json",
+    }
+
+    print(f"📡 Calling OpenRouter: {config_data['model']} (temp={config_data['temperature']:.1f})")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{config_data['base_url']}/chat/completions",
+            json=payload,
+            headers=headers,
+        )
+        response.raise_for_status()
+
+    data = response.json()
+    choices = data.get("choices", [])
+    if not choices:
+        raise ValueError("No choices in OpenRouter response")
+
+    choice_message = choices[0].get("message")
+    if not choice_message or not isinstance(choice_message.get("content"), str):
+        raise ValueError("Invalid message content in response")
+
+    try:
+        # Parse strict JSON from content
+        evaluation_json = json.loads(choice_message["content"])
+
+        # Extract usage
+        usage = data.get("usage", {})
+        input_tokens = usage.get("prompt_tokens")
+        output_tokens = usage.get("completion_tokens")
+        usage_info = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+        } if input_tokens is not None and output_tokens is not None else None
+
+        # Validate with Pydantic + add usage
+        result = output_model(**evaluation_json)
+        if usage_info:
+            # Monkey-patch usage to model instance (for summary/export)
+            object.__setattr__(result, "usage", usage_info)
+
+        print(f"✅ OpenRouter success: {result.decision} (conf: {result.confidence_score:.2f})")
+        return result
+
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON decode error: {e}\nRaw content: {choice_message['content'][:500]}...")
+        raise
+    except ValueError as e:
+        print(f"❌ Pydantic validation error: {e}")
+        raise
 
 if __name__ == "__main__":
     main()
