@@ -551,12 +551,6 @@
         section.appendChild(title);
         title.querySelector(".chevron").classList.add("rotate-90");
 
-        // Agent account line
-        const agentAccountDiv = document.createElement("div");
-        agentAccountDiv.className = "text-sm text-gray-500 mb-4 pl-1 font-mono border-l-4 border-gray-200";
-        agentAccountDiv.innerHTML = `Agent account: <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="hover:underline text-blue-600" title="View on Explorer">${contrib.contributor_id}</a>`;
-        section.appendChild(agentAccountDiv);
-
         const details = document.createElement("div");
         details.className = "details space-y-4";
         details.style.display = "block";
@@ -566,6 +560,13 @@
           details.style.display = collapsed ? "block" : "none";
           title.querySelector(".chevron").classList.toggle("rotate-90", collapsed);
         });
+
+        // Agent account
+        const agentAccountHtml = `
+          <div class="text-sm text-gray-500 mb-4 pl-1 font-mono border-l-4 border-gray-200">
+            Agent account: <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="hover:underline text-blue-600" title="View on Explorer">${contrib.contributor_id}</a>
+          </div>
+        `;
 
         // Decision badge
         let outcomeHtml = `<div class="p-4 rounded-md border ${decisionClass}"><p class="font-bold ${decisionClass}">Decision: ${decisionText}</p>`;
@@ -635,7 +636,7 @@
           </details>
         ` : "";
 
-        details.innerHTML = outcomeHtml + reasoningHtml + notableHtml + promptsHtml + usageHtml + proposalsHtml + rawHtml;
+        details.innerHTML = agentAccountHtml + outcomeHtml + reasoningHtml + notableHtml + promptsHtml + usageHtml + proposalsHtml + rawHtml;
         section.appendChild(details);
         return section;
       }
