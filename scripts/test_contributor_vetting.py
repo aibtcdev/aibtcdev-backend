@@ -33,6 +33,8 @@ from datetime import datetime
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
+from scripts.generate_vettings_manifest import generate_manifest
+
 
 # Custom Pydantic model for structured LLM output
 class ContributorVettingOutput(BaseModel):
@@ -556,6 +558,8 @@ Examples:
         reset_logging()
 
         generate_summary(results, timestamp, args.save_output, str(dao.id))
+
+        generate_manifest()
 
         print("\n🎉 Contributor vetting test completed!")
 
