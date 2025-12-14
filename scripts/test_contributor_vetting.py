@@ -25,10 +25,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.backend.factory import get_backend
-from app.backend.models import ProposalFilter, DAO, DAOFilter
+from app.backend.models import ProposalFilter, DAO, DAOFilter, Proposal
 from app.config import config
 import httpx
 from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 
 # Custom Pydantic model for structured LLM output
@@ -65,6 +68,110 @@ class Tee(object):
     def flush(self):
         for f in self.files:
             f.flush()
+
+
+def safe_int_votes(value: Any, default: int = 0) -> int:
+    """Safely convert value to int, handling None/non-numeric cases."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def format_proposals_for_context(proposals: List[Dict[str, Any]]) -> str:
+    """Format proposals for context in evaluation prompt (adapted from evaluation_openrouter_v2.py)."""
+    if not proposals:
+        return "None Found."
+
+    # Sort by created_at descending (newest first)
+    def get_created_at(p: Dict[str, Any]):
+        created_at = p.get("created_at")
+        if created_at:
+            try:
+                # Handle ISO format
+                if isinstance(created_at, str):
+                    return datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        return datetime.min
+
+    sorted_proposals = sorted(proposals, key=get_created_at, reverse=True)
+
+    formatted_proposals = []
+    for proposal in sorted_proposals:
+        # Extract basic info
+        proposal_id = str(proposal.get("proposal_id") or proposal.get("id", ""))[:8]  # Short ID
+        title = proposal.get("title", "Untitled")
+
+        # Extract x_handle from x_url
+        x_url = proposal.get("x_url", "")
+        x_handle = "unknown"
+        if x_url:
+            try:
+                parsed_path = urlparse(x_url).path.split("/")
+                if len(parsed_path) > 1:
+                    x_handle = parsed_path[1]
+            except (AttributeError, IndexError):
+                pass
+
+        # Get creation info
+        created_at_btc = proposal.get("created_btc")
+        created_at_timestamp = proposal.get("created_at")
+
+        created_str = "unknown"
+        if created_at_timestamp:
+            try:
+                if isinstance(created_at_timestamp, str):
+                    created_str = created_at_timestamp[:10]
+                else:
+                    created_str = str(created_at_timestamp)[:10]
+            except (AttributeError, ValueError):
+                created_str = str(created_at_timestamp)
+
+        if created_at_btc and created_at_timestamp:
+            created_at = f"BTC Block {created_at_btc} (at {created_str})"
+        elif created_at_btc:
+            created_at = f"BTC Block {created_at_btc}"
+        elif created_at_timestamp:
+            created_at = created_str
+        else:
+            created_at = "unknown"
+
+        # Get status
+        proposal_status = proposal.get("status")
+        passed = proposal.get("passed", False)
+        concluded = proposal.get("concluded_by") is not None
+        yes_votes = safe_int_votes(proposal.get("votes_for", 0))
+        no_votes = safe_int_votes(proposal.get("votes_against", 0))
+
+        if (
+            proposal_status
+            and isinstance(proposal_status, str)
+            and proposal_status == "FAILED"
+        ):
+            proposal_passed = "n/a (failed tx)"
+        elif passed:
+            proposal_passed = "yes"
+        elif concluded:
+            proposal_passed = "no"
+        else:
+            proposal_passed = "pending"
+
+        # handle special case of no votes
+        if concluded and (yes_votes + no_votes == 0):
+            proposal_passed = "n/a (no votes)"
+
+        # Get content
+        content = proposal.get("summary") or proposal.get("content", "")
+        content_preview = content[:500] + "..." if len(content) > 500 else content
+
+        formatted_proposal = f"""\n- #{proposal_id} by @{x_handle} Created: {created_at} Passed: {proposal_passed} Title: {title} Summary: {content_preview}"""
+
+        formatted_proposals.append(formatted_proposal)
+
+    return "\n".join(formatted_proposals)
 
 
 def reset_logging():
@@ -120,12 +227,12 @@ GUIDELINES
 
 VETTING_USER_PROMPT_TEMPLATE = """Evaluate contributor eligibility for future DAO contributions:
 
-DAO INFO: includes AIBTC charter and current order
+DAO INFO: includes DAO name and mission
 {dao_info_for_evaluation}
 
-Contributor: {contributor_name}
+CONTRIBUTOR ID: {contributor_id}
 
-USER'S PAST PROPOSALS: (optional) includes past proposals submitted by the user for this DAO
+CONTRIBUTOR'S PAST PROPOSALS: includes all past proposals submitted by this contributor for this DAO
 {user_past_proposals_for_evaluation}
 
 Output the evaluation as a JSON object, strictly following the system guidelines."""
@@ -179,29 +286,26 @@ async def vet_single_contributor(
     try:
         print(f"🔍 Vetting contributor {index}: {contributor_id}")
 
-        # Format contributor data
+        # Format contributor data using production-style helpers
         proposals = contributor_data.get("proposals", [])
         proposal_count = len(proposals)
-        proposals_summary = "\n".join(
-            [
-                f"- {p.get('title', 'Untitled')} (ID: {p.get('id', 'N/A')}, Status: {p.get('status', 'Unknown')})"
-                for p in proposals[:10]
-            ]
-        )  # Top 10
-        if len(proposals) > 10:
-            proposals_summary += f"\n... and {proposal_count - 10} more."
+        user_past_proposals_for_evaluation = format_proposals_for_context(proposals)
+
+        dao_info = {
+            "dao_id": str(dao.id),
+            "name": dao.name or "unknown",
+            "mission": dao.mission or "unknown",
+        }
+        dao_info_for_evaluation = json.dumps(dao_info, default=str)
 
         messages = [
             {"role": "system", "content": VETTING_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": VETTING_USER_PROMPT_TEMPLATE.format(
-                    dao_name=dao.name or "Unknown DAO",
-                    dao_mission=dao.mission or "No mission provided",
-                    contributor_name=contributor_data.get("name", contributor_id),
+                    dao_info_for_evaluation=dao_info_for_evaluation,
                     contributor_id=contributor_id,
-                    proposal_count=proposal_count,
-                    proposals_summary=proposals_summary,
+                    user_past_proposals_for_evaluation=user_past_proposals_for_evaluation,
                 ),
             },
         ]
@@ -214,9 +318,14 @@ async def vet_single_contributor(
             temperature=args.temperature,
         )
 
+        serializable_proposals = [p for p in proposals]  # Already dicts from model_dump()
         result_dict = {
             "contributor_id": contributor_id,
-            "contributor_data": contributor_data,
+            "contributor_data": {
+                "name": contributor_id,
+                "proposal_count": proposal_count,
+                "proposals": serializable_proposals,
+            },
             "dao_id": str(dao.id),
             "vetting_output": openrouter_response.model_dump(),
             "usage": getattr(openrouter_response, "usage", None),
@@ -392,36 +501,24 @@ Examples:
             print("❌ No proposals found for DAO. Nothing to vet.")
             sys.exit(0)
 
-        # Group by unique contributors (using proposal.creator str)
-        contributors: Dict[str, List[Dict]] = {}
+        # Group by unique contributors (using proposal.creator str), full history with model_dump for serialization
+        contributors: Dict[str, List[Dict[str, Any]]] = {}
         for p in proposals:
             creator = p.creator
             if creator:  # Skip if no creator
                 if creator not in contributors:
                     contributors[creator] = []
-                contributors[creator].append(
-                    {
-                        "id": str(p.id),
-                        "title": p.title or "Untitled",
-                        "content": p.content[:200] + "..."
-                        if p.content and len(p.content) > 200
-                        else p.content or "",
-                        "status": str(p.status),
-                        "passed": p.passed,
-                        "executed": p.executed,
-                    }
-                )
+                contributors[creator].append(p.model_dump())
 
-        contributor_list = list(contributors.items())
+        # Sort contributors by number of proposals descending (most active first)
+        contributor_list = sorted(contributors.items(), key=lambda x: len(x[1]), reverse=True)
         if args.max_contributors > 0:
-            contributor_list = contributor_list[: args.max_contributors]
-        print(f"👥 Unique contributors to vet: {len(contributor_list)}")
+            contributor_list = contributor_list[:args.max_contributors]
+        print(f"👥 Unique contributors to vet: {len(contributor_list)} (sorted by activity)")
 
         if args.dry_run:
             print("\n--- DRY RUN: Contributors that would be vetted ---")
-            for index, (contributor_id, proposals_list) in enumerate(
-                contributor_list, 1
-            ):
+            for index, (contributor_id, proposals_list) in enumerate(contributor_list, 1):
                 print(f"  {index}. {contributor_id} ({len(proposals_list)} proposals)")
             print("Dry run complete. No LLM evaluations performed.\n")
             sys.exit(0)
@@ -430,7 +527,7 @@ Examples:
         for index, (contributor_id, proposals) in enumerate(contributor_list, 1):
             contributor_data = {
                 "name": contributor_id,  # Use ID as name fallback
-                "proposals": proposals,
+                "proposals": proposals,  # Full history dicts
             }
             result = asyncio.run(
                 vet_single_contributor(
