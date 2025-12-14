@@ -603,7 +603,7 @@
             <table class="min-w-full table-striped text-xs">
               <thead><tr><th>ID</th><th>Title</th><th class="hidden md:table-cell">Status</th></tr></thead>
               <tbody>${contrib.proposals.slice(0,10).map(p => {
-                const id = (p.proposal_id || '').slice(0,8);
+                const id = String(p.proposal_id || '').slice(0,8);
                 return `<tr><td class="font-mono">${id}</td><td class="max-w-xs truncate">${escapeHtml(p.title)}</td><td class="hidden md:table-cell">${p.status || 'Unknown'}</td></tr>`;
               }).join('')}</tbody>
             </table>
