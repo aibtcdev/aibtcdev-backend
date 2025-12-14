@@ -322,10 +322,11 @@
           if (arr.length === 0) return "";
           return arr.map((contrib, idx) => {
             const labelCell = idx === 0 ? `<td class="py-3 px-4 border-b border-gray-200 text-sm font-medium text-gray-800 align-top" rowspan="${arr.length}">${label}</td>` : "";
+            const explorerUrl = `https://explorer.hiro.so/address/${contrib.contributor_id}?chain=testnet`;
             return `
               <tr>
                 ${labelCell}
-                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono">${contrib.short_id}</td>
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600"><a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="font-mono hover:underline" title="Full address">${contrib.short_id}</a></td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600">${contrib.proposal_count}</td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono text-right">${contrib.confidence.toFixed(2)}</td>
               </tr>
@@ -458,6 +459,7 @@
           contentDiv.appendChild(card);
         });
         wrapper.appendChild(contentDiv);
+        contentDiv.style.display = "block";
         container.appendChild(wrapper);
 
         // Restore expansion
@@ -499,15 +501,17 @@
         const decisionClass = contrib.decision === true ? "text-green-600 border-green-600" :
                               contrib.decision === false ? "text-red-600 border-red-600" : "text-gray-600 border-gray-600";
         const decisionText = contrib.decision === true ? "ALLOW" : contrib.decision === false ? "BLOCK" : "ERROR";
+        const explorerUrl = `https://explorer.hiro.so/address/${contrib.contributor_id}?chain=testnet`;
         title.innerHTML = `
-          <span class="${decisionClass}">${contrib.short_id} - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals</span>
+          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="${decisionClass} hover:underline font-mono" title="Full address: ${contrib.contributor_id}">${contrib.short_id}</a> - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         section.appendChild(title);
+        title.querySelector(".chevron").classList.add("rotate-90");
 
         const details = document.createElement("div");
         details.className = "details space-y-4";
-        details.style.display = "none";
+        details.style.display = "block";
 
         title.addEventListener("click", () => {
           const collapsed = details.style.display === "none";
