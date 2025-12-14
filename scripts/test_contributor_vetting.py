@@ -6,8 +6,9 @@ This script fetches unique contributors (via proposal.creator) from a DAO's past
 evaluates each for future contribution eligibility (allow/block), and saves raw JSON results.
 
 Usage:
-    python test_contributor_vetting.py --dao-id "123e4567-e89b-12d3-a456-426614174000"
-    python test_contributor_vetting.py --dao-id "DAO_ID" --max-contributors 20 --save-output --model "x-ai/grok-beta"
+    python test_contributor_vetting.py --dao-name "MyDAO" --dry-run
+    python test_contributor_vetting.py --dao-name "MyDAO" --save-output
+    python test_contributor_vetting.py --dao-name "MyDAO" --max-contributors 20 --model "x-ai/grok-beta"
 """
 
 import argparse
