@@ -310,6 +310,8 @@ async def vet_single_contributor(
             },
         ]
 
+        user_prompt_filled = messages[1]["content"]
+
         # Call OpenRouter directly with structured JSON parsing (mirrors evaluation_openrouter_v2.py)
         openrouter_response = await call_openrouter_structured(
             messages,
@@ -327,6 +329,7 @@ async def vet_single_contributor(
                 "proposals": serializable_proposals,
             },
             "dao_id": str(dao.id),
+            "user_prompt_filled": user_prompt_filled,
             "vetting_output": openrouter_response.model_dump(),
             "usage": getattr(openrouter_response, "usage", None),
         }
@@ -349,6 +352,7 @@ async def vet_single_contributor(
             "contributor_id": contributor_id,
             "contributor_data": contributor_data,
             "dao_id": str(dao.id),
+            "user_prompt_filled": None,
             "error": error_msg,
         }
 
@@ -376,6 +380,7 @@ def generate_summary(
     summary = {
         "timestamp": timestamp,
         "dao_id": dao_id,
+        "system_prompt": VETTING_SYSTEM_PROMPT,
         "total_contributors": len(results),
         "allow_count": allow_count,
         "block_count": block_count,
