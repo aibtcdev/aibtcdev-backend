@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.backend.factory import get_backend
-from app.backend.models import ProposalFilter, DAO
+from app.backend.models import ProposalFilter, DAO, DAOFilter
 from app.services.ai.simple_workflows.llm import invoke_structured
 from app.services.ai.simple_workflows.prompts.loader import load_prompt  # Optional, for future
 from pydantic import BaseModel, Field
@@ -225,7 +225,7 @@ def generate_summary(
         "results": results,  # Raw array of result_dicts
     }
 
-    print(f"Vetting Summary - {timestamp} (DAO: {dao_id})")
+    print(f"Vetting Summary - {timestamp} (DAO ID: {dao_id})")
     print("=" * 60)
     print(f"Total Contributors: {len(results)}")
     print(f"Allow: {allow_count} | Block: {block_count} | Errors: {error_count}")
@@ -244,19 +244,22 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Dry run: list contributors without evaluating
+  python test_contributor_vetting.py --dao-name "MyDAO" --dry-run
+  
   # Vet all contributors for a DAO
-  python test_contributor_vetting.py --dao-id "12345678-1234-5678-9012-123456789abc" --save-output
+  python test_contributor_vetting.py --dao-name "MyDAO" --save-output
   
   # Limit to top 10 with custom model
-  python test_contributor_vetting.py --dao-id "DAO_ID" --max-contributors 10 --model "x-ai/grok-beta" --temperature 0.1
+  python test_contributor_vetting.py --dao-name "MyDAO" --max-contributors 10 --model "x-ai/grok-beta" --temperature 0.1
         """,
     )
 
     parser.add_argument(
-        "--dao-id",
+        "--dao-name",
         type=str,
         required=True,
-        help="UUID of the DAO to vet contributors for",
+        help="Name of the DAO to vet contributors for",
     )
 
     parser.add_argument(
@@ -264,6 +267,12 @@ Examples:
         type=int,
         default=50,
         help="Max contributors to vet (default: 50, 0=unlimited)",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Dry run: list contributors without performing LLM evaluations",
     )
 
     parser.add_argument(
@@ -304,8 +313,9 @@ Examples:
 
     print("🚀 Starting DAO Contributor Vetting Test")
     print("=" * 60)
-    print(f"DAO ID: {args.dao_id}")
+    print(f"DAO Name: {args.dao_name}")
     print(f"Max Contributors: {args.max_contributors}")
+    print(f"Dry Run: {args.dry_run}")
     print(f"Model: {args.model or 'default'}")
     print(f"Temperature: {args.temperature}")
     print(f"Debug Level: {args.debug_level}")
@@ -316,16 +326,16 @@ Examples:
     backend = get_backend()
 
     try:
-        # Fetch DAO
-        dao_uuid = UUID(args.dao_id)
-        dao = backend.get_dao(dao_uuid)
-        if not dao:
-            print(f"❌ DAO not found: {args.dao_id}")
+        # Fetch DAO by name
+        daos = backend.list_daos(DAOFilter(name=args.dao_name))
+        if not daos:
+            print(f"❌ DAO '{args.dao_name}' not found.")
             sys.exit(1)
+        dao = daos[0]
         print(f"✅ DAO loaded: {dao.name} (ID: {dao.id})")
 
         # Fetch all proposals for DAO
-        proposals = backend.list_proposals(ProposalFilter(dao_id=dao_uuid))
+        proposals = backend.list_proposals(ProposalFilter(dao_id=dao.id))
         print(f"📊 Found {len(proposals)} proposals")
 
         if not proposals:
@@ -352,6 +362,13 @@ Examples:
         if args.max_contributors > 0:
             contributor_list = contributor_list[:args.max_contributors]
         print(f"👥 Unique contributors to vet: {len(contributor_list)}")
+
+        if args.dry_run:
+            print("\n--- DRY RUN: Contributors that would be vetted ---")
+            for index, (contributor_id, proposals_list) in enumerate(contributor_list, 1):
+                print(f"  {index}. {contributor_id} ({len(proposals_list)} proposals)")
+            print("Dry run complete. No LLM evaluations performed.\n")
+            sys.exit(0)
 
         results = []
         for index, (contributor_id, proposals) in enumerate(contributor_list, 1):
