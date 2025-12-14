@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contributor Vetting Viewer V1</title>
+    <!-- TailwindCSS via CDN for quick styling. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter for clean professional look. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      /* Brand colors for decisions. */
+      .allow-highlight {
+        background-color: #22c55e;
+        color: white;
+      }
+      .block-highlight {
+        background-color: #ef4444;
+        color: white;
+      }
+      .sort-highlight {
+        background-color: #3b82f6;
+        color: white;
+      }
+      /* Striped tables for readability. */
+      .table-striped tbody tr:nth-child(odd) {
+        background-color: #f9fafb;
+      }
+      /* Truncate long text. */
+      .text-truncate {
+        display: inline-block;
+        max-width: 30ch;
+        vertical-align: bottom;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8">
+      <!-- Header -->
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Contributor Vetting Viewer V1</h1>
+        <p class="mt-2 text-lg text-gray-600">
+          Analyze contributor vetting results from JSON reports in ./evals/. View per-contributor details,
+          decisions, reasoning, confidence, past proposals, prompts, and aggregates for prompt tuning.
+        </p>
+      </header>
+
+      <!-- Summary stats injected here -->
+      <section id="summary-container" class="mb-8"></section>
+
+      <!-- Controls: sticky -->
+      <section
+        class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-4 md:flex-row md:items-end sticky top-0 z-10"
+      >
+        <!-- Report selector -->
+        <div
+          class="flex-1"
+          id="baseline-selector-container"
+          style="display: none"
+        >
+          <label
+            for="eval-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Select Vetting Report</label
+          >
+          <select
+            id="eval-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          ></select>
+        </div>
+        <!-- Sort -->
+        <div class="flex-1">
+          <label
+            for="sort-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Sort by</label
+          >
+          <select
+            id="sort-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="confidence-desc">Confidence (High to Low)</option>
+            <option value="confidence-asc">Confidence (Low to High)</option>
+            <option value="proposals-desc">Proposal Count (High to Low)</option>
+            <option value="contributor-id-asc">Contributor ID (A-Z)</option>
+          </select>
+        </div>
+        <!-- Filter -->
+        <div class="flex-1">
+          <label
+            for="contributor-filter-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Filter by Decision</label
+          >
+          <select
+            id="contributor-filter-select"
+            class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Contributors</option>
+            <option value="allow">Allowed</option>
+            <option value="block">Blocked</option>
+            <option value="error">Errors</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Main contributor cards -->
+      <main id="vetting-container"></main>
+    </div>
+
+    <!-- Loading spinner template -->
+    <template id="loading-template">
+      <div
+        class="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"
+      >
+        <svg
+          class="animate-spin h-8 w-8 text-gray-500"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        <p class="mt-4 text-lg font-medium text-gray-600">
+          Loading vetting reports...
+        </p>
+      </div>
+    </template>
+
+    <script type="module">
+      // Global state
+      const vettingData = new Map();
+      const vettingNames = new Map();
+      let currentVettings = [];
+
+      /**
+       * Init: Load manifest, preload reports, render first.
+       */
+      document.addEventListener("DOMContentLoaded", async () => {
+        // Bind controls
+        document.getElementById("sort-select").addEventListener("change", updateVettingView);
+        document.getElementById("contributor-filter-select").addEventListener("change", updateVettingView);
+
+        // Load manifest
+        let manifest = [];
+        try {
+          const resp = await fetch("./evals/vettings-manifest.json");
+          if (resp.ok) {
+            manifest = await resp.json();
+          }
+        } catch (err) {
+          console.warn("No vettings-manifest.json found; skipping.");
+        }
+
+        // Populate selector
+        const selector = document.getElementById("eval-select");
+        manifest.forEach((report) => {
+          vettingNames.set(report.path, report.name || report.path);
+          const option = document.createElement("option");
+          option.value = report.path;
+          option.textContent = report.name || report.path;
+          selector.appendChild(option);
+        });
+
+        if (manifest.length > 0) {
+          document.getElementById("baseline-selector-container").style.display = "block";
+        }
+
+        // Preload reports
+        for (const report of manifest) {
+          try {
+            const response = await fetch(report.path);
+            if (!response.ok) continue;
+            const rawData = await response.json();
+            const processed = processVettingData(rawData);
+            vettingData.set(report.path, processed);
+          } catch (error) {
+            console.warn(`Error loading ${report.path}:`, error);
+          }
+        }
+
+        // Render first
+        const firstReport = manifest.find((r) => vettingData.has(r.path));
+        if (firstReport) {
+          selector.value = firstReport.path;
+          currentVettings = vettingData.get(firstReport.path);
+          updateViewForVetting(firstReport.path);
+        } else {
+          displayError(new Error("No vetting reports loaded. Ensure vettings-manifest.json exists."));
+        }
+      });
+
+      /**
+       * Process raw JSON into usable form with aggregates.
+       */
+      function processVettingData(data) {
+        if (!data || !data.results || !Array.isArray(data.results)) {
+          throw new Error("Invalid vetting data structure");
+        }
+
+        const contributors = data.results.map((item) => {
+          if (item.error) {
+            return {
+              contributor_id: item.contributor_id,
+              short_id: item.contributor_id.slice(0, 8),
+              error: item.error,
+              decision: null,
+              confidence: 0,
+              proposal_count: item.contributor_data?.proposal_count || 0,
+              reasoning: "",
+              notable_proposals: [],
+              proposals: item.contributor_data?.proposals || [],
+              usage: null,
+            };
+          }
+
+          const vetOut = item.vetting_output;
+          return {
+            contributor_id: item.contributor_id,
+            short_id: item.contributor_id.slice(0, 8),
+            decision: vetOut.decision === "allow",
+            confidence: vetOut.confidence_score,
+            reasoning: vetOut.reasoning,
+            proposal_count: vetOut.proposal_count,
+            notable_proposals: vetOut.notable_proposals || [],
+            proposals: item.contributor_data?.proposals || [],
+            user_prompt_filled: item.user_prompt_filled || "",
+            usage: item.usage || null,
+          };
+        });
+
+        // Aggregates
+        const total = contributors.length;
+        const allowed = contributors.filter((c) => c.decision === true).length;
+        const blocked = contributors.filter((c) => c.decision === false).length;
+        const errors = contributors.filter((c) => c.error).length;
+        const allowRate = total > 0 ? (allowed / total) * 100 : 0;
+        const avgConf = contributors.reduce((sum, c) => sum + (c.confidence || 0), 0) / total;
+
+        return {
+          timestamp: data.timestamp,
+          dao_id: data.dao_id,
+          dao_name: data.dao_name || "Unknown DAO",
+          system_prompt: data.system_prompt,
+          overall_stats: { total_contributors: total, allow_count: allowed, block_count: blocked, error_count: errors, allow_rate: allowRate, avg_confidence: avgConf },
+          contributors,
+        };
+      }
+
+      /**
+       * Display error in main container.
+       */
+      function displayError(error) {
+        const container = document.getElementById("vetting-container");
+        container.innerHTML = `<div class="col-span-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert"><strong class="font-bold">Error:</strong> ${error.message}</div>`;
+      }
+
+      /**
+       * Switch active report.
+       */
+      document.getElementById("eval-select").addEventListener("change", (e) => {
+        const path = e.target.value;
+        updateViewForVetting(path);
+      });
+
+      function updateViewForVetting(path) {
+        const vettings = vettingData.get(path);
+        if (!vettings) return;
+        currentVettings = vettings;
+        // Update header
+        const header = document.querySelector("header h1");
+        const name = vettingNames.get(path);
+        header.textContent = `Contributor Vetting Viewer V1${name ? `: ${name}` : ""}`;
+        renderSummary(vettings);
+        updateVettingView();
+      }
+
+      /**
+       * Render collapsible summary with stats and top lists.
+       */
+      function renderSummary(vettings) {
+        const container = document.getElementById("summary-container");
+        if (!vettings || vettings.contributors.length === 0) {
+          container.innerHTML = "";
+          return;
+        }
+
+        const stats = vettings.overall_stats;
+        const topAllowed = [...vettings.contributors]
+          .filter((c) => c.decision === true)
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, 10);
+        const topBlocked = [...vettings.contributors]
+          .filter((c) => c.decision === false && !c.error)
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, 10);
+
+        const createRows = (label, arr) => {
+          if (arr.length === 0) return "";
+          return arr.map((contrib, idx) => {
+            const labelCell = idx === 0 ? `<td class="py-3 px-4 border-b border-gray-200 text-sm font-medium text-gray-800 align-top" rowspan="${arr.length}">${label}</td>` : "";
+            return `
+              <tr>
+                ${labelCell}
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono">${contrib.short_id}</td>
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600">${contrib.proposal_count}</td>
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono text-right">${contrib.confidence.toFixed(2)}</td>
+              </tr>
+            `;
+          }).join("");
+        };
+
+        container.innerHTML = `
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 id="summary-title" class="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center">
+              <span>Key Insights (DAO: ${vettings.dao_name})</span>
+              <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </h2>
+            <div id="summary-content" class="overflow-x-auto space-y-6">
+              <div>
+                <h3 class="font-bold mb-2">Overall Statistics</h3>
+                <table class="min-w-full table-striped text-sm text-gray-600">
+                  <thead><tr><th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statistic</th><th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th></tr></thead>
+                  <tbody>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Total Contributors</td><td class="py-2 px-4 border-b border-gray-200">${stats.total_contributors}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Allow Rate</td><td class="py-2 px-4 border-b border-gray-200">${stats.allow_rate.toFixed(1)}%</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Avg Confidence</td><td class="py-2 px-4 border-b border-gray-200">${stats.avg_confidence.toFixed(2)}</td></tr>
+                    <tr><td class="py-2 px-4 border-b border-gray-200">Errors</td><td class="py-2 px-4 border-b border-gray-200">${stats.error_count}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Top Allowed</h3>
+                <table class="min-w-full table-striped">
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <tbody>${createRows("Top Allowed", topAllowed)}</tbody>
+                </table>
+              </div>
+              <div>
+                <h3 class="font-bold mb-2">Top Blocked</h3>
+                <table class="min-w-full table-striped">
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <tbody>${createRows("Top Blocked", topBlocked)}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Collapsible
+        const title = container.querySelector("#summary-title");
+        const content = container.querySelector("#summary-content");
+        if (title && content) {
+          title.addEventListener("click", () => {
+            const collapsed = content.style.display === "none";
+            content.style.display = collapsed ? "block" : "none";
+            title.querySelector(".chevron").classList.toggle("rotate-90", collapsed);
+          });
+        }
+      }
+
+      /**
+       * Filter/sort and render cards, preserve expansion.
+       */
+      function updateVettingView() {
+        const container = document.getElementById("vetting-container");
+        const expansionState = new Map();
+        container.querySelectorAll("section[data-contributor-id]").forEach((section) => {
+          const cid = section.dataset.contributorId;
+          const details = section.querySelector(".details");
+          if (cid && details) {
+            expansionState.set(cid, details.style.display !== "none");
+          }
+        });
+
+        if (!currentVettings || currentVettings.contributors.length === 0) {
+          container.innerHTML = "";
+          return;
+        }
+
+        // Filter
+        const filterVal = document.getElementById("contributor-filter-select").value;
+        let contributors = currentVettings.contributors;
+        if (filterVal === "allow") contributors = contributors.filter((c) => c.decision === true);
+        else if (filterVal === "block") contributors = contributors.filter((c) => c.decision === false && !c.error);
+        else if (filterVal === "error") contributors = contributors.filter((c) => c.error);
+
+        // Sort
+        const sortVal = document.getElementById("sort-select").value;
+        let [sortField, sortDir] = sortVal.split("-");
+        contributors.sort((a, b) => {
+          let valA, valB;
+          if (sortField === "confidence") {
+            valA = a.confidence || 0;
+            valB = b.confidence || 0;
+          } else if (sortField === "proposals") {
+            valA = a.proposal_count;
+            valB = b.proposal_count;
+          } else {
+            valA = a.contributor_id;
+            valB = b.contributor_id;
+          }
+          return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+        });
+
+        container.innerHTML = "";
+        if (contributors.length === 0) {
+          container.innerHTML = `<div class="text-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"><p class="text-lg font-medium text-gray-600">No contributors match the filter.</p></div>`;
+          return;
+        }
+
+        // Wrapper
+        const wrapper = document.createElement("div");
+        wrapper.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-200";
+
+        const mainTitle = document.createElement("h2");
+        mainTitle.className = "text-2xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 cursor-pointer flex justify-between items-center";
+        mainTitle.innerHTML = `
+          <span>Contributors (${contributors.length})</span>
+          <svg class="w-6 h-6 transform transition-transform chevron rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+        wrapper.appendChild(mainTitle);
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "space-y-8 pt-4";
+
+        mainTitle.addEventListener("click", () => {
+          const collapsed = contentDiv.style.display === "none";
+          contentDiv.style.display = collapsed ? "block" : "none";
+          mainTitle.querySelector(".chevron").classList.toggle("rotate-90", collapsed);
+        });
+
+        contributors.forEach((contrib) => {
+          const card = createContributorCard(contrib);
+          contentDiv.appendChild(card);
+        });
+        wrapper.appendChild(contentDiv);
+        container.appendChild(wrapper);
+
+        // Restore expansion
+        expansionState.forEach((expanded, cid) => {
+          if (expanded) {
+            const section = wrapper.querySelector(`section[data-contributor-id="${cid}"]`);
+            if (section) {
+              const title = section.querySelector("h2");
+              const details = section.querySelector(".details");
+              if (title && details) {
+                details.style.display = "block";
+                title.querySelector(".chevron").classList.add("rotate-90");
+              }
+            }
+          }
+        });
+      }
+
+      /**
+       * Escape HTML.
+       */
+      function escapeHtml(unsafe) {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      /**
+       * Create full contributor card.
+       */
+      function createContributorCard(contrib) {
+        const section = document.createElement("section");
+        section.dataset.contributorId = contrib.contributor_id;
+        const title = document.createElement("h2");
+        title.className = "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
+        const decisionClass = contrib.decision === true ? "text-green-600 border-green-600" :
+                              contrib.decision === false ? "text-red-600 border-red-600" : "text-gray-600 border-gray-600";
+        const decisionText = contrib.decision === true ? "ALLOW" : contrib.decision === false ? "BLOCK" : "ERROR";
+        title.innerHTML = `
+          <span class="${decisionClass}">${contrib.short_id} - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals</span>
+          <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+        section.appendChild(title);
+
+        const details = document.createElement("div");
+        details.className = "details space-y-4";
+        details.style.display = "none";
+
+        title.addEventListener("click", () => {
+          const collapsed = details.style.display === "none";
+          details.style.display = collapsed ? "block" : "none";
+          title.querySelector(".chevron").classList.toggle("rotate-90", collapsed);
+        });
+
+        // Decision badge
+        let outcomeHtml = `<div class="p-4 rounded-md border ${decisionClass}"><p class="font-bold ${decisionClass}">Decision: ${decisionText}</p>`;
+        if (contrib.error) {
+          outcomeHtml += `<p class="text-sm text-red-700">Error: ${escapeHtml(contrib.error)}</p>`;
+        }
+        outcomeHtml += `</div>`;
+
+        // Reasoning
+        const reasoningHtml = `
+          <div class="bg-gray-50 p-4 rounded-md border">
+            <h4 class="font-bold mb-2">Reasoning</h4>
+            <div class="text-sm text-gray-700 whitespace-pre-wrap overflow-auto max-h-48">${escapeHtml(contrib.reasoning)}</div>
+          </div>
+        `;
+
+        // Notable proposals
+        const notableHtml = contrib.notable_proposals.length > 0 ? `
+          <div class="bg-blue-50 p-4 rounded-md border">
+            <h4 class="font-bold mb-2">Notable Proposals</h4>
+            <ul class="text-sm text-blue-800 list-disc pl-5 space-y-1">
+              ${contrib.notable_proposals.map(np => `<li>${escapeHtml(np)}</li>`).join("")}
+            </ul>
+          </div>
+        ` : "";
+
+        // Prompts
+        const promptsHtml = `
+          <details class="bg-indigo-50 p-3 rounded-md">
+            <summary class="font-medium text-indigo-700 cursor-pointer">Prompts (System + User)</summary>
+            <div class="mt-2 space-y-2 text-xs text-gray-600">
+              <details><summary>System Prompt (truncated)</summary><pre class="overflow-x-auto max-h-32">${escapeHtml(currentVettings.system_prompt.slice(0, 1000)) + "..."}</pre></details>
+              <details><summary>User Prompt (truncated)</summary><pre class="overflow-x-auto max-h-32">${escapeHtml(contrib.user_prompt_filled?.slice(0, 2000) || "N/A") + "..."}</pre></details>
+            </div>
+          </details>
+        `;
+
+        // Usage
+        let usageHtml = "";
+        if (contrib.usage) {
+          usageHtml = `
+            <details class="bg-gray-50 p-3 rounded-md">
+              <summary class="font-medium text-gray-700 cursor-pointer">Usage</summary>
+              <pre class="mt-2 text-sm text-gray-600 whitespace-pre-wrap">Input: ${contrib.usage.input_tokens || 0} | Output: ${contrib.usage.output_tokens || 0}</pre>
+            </details>
+          `;
+        }
+
+        // Proposals table
+        const proposalsHtml = `
+          <div class="border-t border-gray-200 pt-4 overflow-x-auto">
+            <h4 class="font-bold mb-2">Past Proposals (${contrib.proposals.length})</h4>
+            <table class="min-w-full table-striped text-sm">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="py-2 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passed</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${contrib.proposals.map((p) => {
+                  const shortId = (p.proposal_id || p.id || "").slice(0, 8);
+                  const title = escapeHtml(p.title || "Untitled");
+                  const status = escapeHtml(p.status || "Unknown");
+                  const passed = p.passed ? "Yes" : p.concluded ? "No" : "Pending";
+                  return `
+                    <tr>
+                      <td class="py-2 px-4 border-b border-gray-200 font-mono">${shortId}</td>
+                      <td class="py-2 px-4 border-b border-gray-200 text-truncate" title="${title}">${title}</td>
+                      <td class="py-2 px-4 border-b border-gray-200">${status}</td>
+                      <td class="py-2 px-4 border-b border-gray-200">${passed}</td>
+                    </tr>
+                  `;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        details.innerHTML = outcomeHtml + reasoningHtml + notableHtml + promptsHtml + usageHtml + proposalsHtml;
+        section.appendChild(details);
+        return section;
+      }
+    </script>
+  </body>
+</html>
