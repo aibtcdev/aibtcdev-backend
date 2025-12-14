@@ -156,13 +156,13 @@
       const vettingNames = new Map();
       let currentVettings = [];
 
-      // Proposal details toggle
-      function toggleProposalDetails(row) {
-        const detailsRow = row.nextElementSibling;
-        if (detailsRow && detailsRow.classList.contains('proposal-details')) {
-          detailsRow.classList.toggle('hidden');
+      // Global event delegation for proposal row clicks (works with dynamic content)
+      document.addEventListener('click', (e) => {
+        const row = e.target.closest('.proposal-row');
+        if (row && row.nextElementSibling && row.nextElementSibling.classList.contains('proposal-details')) {
+          row.nextElementSibling.classList.toggle('hidden');
         }
-      }
+      });
 
       /**
        * Init: Load manifest, preload reports, render first.
@@ -437,7 +437,8 @@
 
         container.innerHTML = "";
         if (contributors.length === 0) {
-          container.innerHTML = `<div class="text-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"><p class="text-lg font-medium text-gray-600">No contributors match the filter.</p></div>`;
+          container.innerHTML = `<div class="text-center p-12 bg-white rounded-xl shadow-sm border border-gray-200"><p class="text-lg font-medium text-gray-600">No contributors match the filter.</p><p class="text-sm text-gray-500 mt-2">(Total filtered: 0 / ${currentVettings.contributors.length})</p></div>`;
+          console.warn('No contributors after filter/sort');
           return;
         }
 
@@ -484,6 +485,8 @@
             }
           }
         });
+
+        console.log(`Rendered ${contributors.length} contributor cards`);
       }
 
       /**
@@ -590,16 +593,16 @@
                 </tr>
               </thead>
               <tbody>
-                ${contrib.proposals.map((p) => {
+                ${contrib.proposals.slice(0, 20).map((p) => {  // Limit to 20 to avoid huge tables
                   const shortId = (p.proposal_id || p.id || "").slice(0, 8);
                   const title = escapeHtml(p.title || "Untitled");
-                  const summary = escapeHtml((p.summary || p.content || "").slice(0, 100)) + (p.summary && p.summary.length > 100 ? "..." : "");
+                  const summary = escapeHtml((p.summary || p.content || "").slice(0, 100)) + ((p.summary || p.content || "").length > 100 ? "..." : "");
                   const status = escapeHtml(p.status || "Unknown");
                   const passed = p.passed ? "Yes" : (p.concluded_by ? "No" : "Pending");
                   const tags = escapeHtml((p.tags || []).slice(0, 3).join(", "));
                   const xUrl = p.x_url ? `<a href="${escapeHtml(p.x_url)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline" title="${escapeHtml(p.x_url)}">View</a>` : "N/A";
                   return `
-                    <tr class="hover:bg-gray-50 cursor-pointer group" onclick="toggleProposalDetails(this)">
+                    <tr class="hover:bg-gray-50 cursor-pointer proposal-row group">
                       <td class="py-2 px-4 border-b border-gray-200 font-mono group-hover:font-bold">${shortId}</td>
                       <td class="py-2 px-4 border-b border-gray-200 text-truncate max-w-[200px]" title="${title}">${title}</td>
                       <td class="py-2 px-4 border-b border-gray-200 text-truncate max-w-[250px]" title="${summary}">${summary}</td>
@@ -614,11 +617,13 @@
                           ${p.tags ? `<div><strong>All Tags:</strong> ${escapeHtml(p.tags.join(', '))}</div>` : ''}
                           ${p.created_at ? `<div><strong>Created:</strong> ${escapeHtml(p.created_at)}</div>` : ''}
                           ${p.votes_for !== undefined && p.votes_against !== undefined ? `<div><strong>Votes:</strong> For: ${p.votes_for}, Against: ${p.votes_against}</div>` : ''}
+                          ${contrib.proposals.length > 20 ? '<div class="col-span-2 text-xs text-gray-500">... and ' + (contrib.proposals.length - 20) + ' more proposals</div>' : ''}
                         </div>
                       </td>
                     </tr>
                   `;
                 }).join("")}
+                ${contrib.proposals.length > 20 ? `<tr><td colspan="6" class="py-4 text-center text-sm text-gray-500 border-t border-gray-200">Showing first 20 of ${contrib.proposals.length} proposals</td></tr>` : ''}
               </tbody>
             </table>
           </div>
