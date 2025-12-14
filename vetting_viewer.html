@@ -248,10 +248,13 @@
         }
 
         const contributors = data.results.map((item) => {
+          const parts = item.contributor_id.split('.');
+          const short_id = parts.length > 1 ? parts.slice(1).join('.') : item.contributor_id.slice(0, 8);
+
           if (item.error) {
             return {
               contributor_id: item.contributor_id,
-              short_id: item.contributor_id.slice(0, 8),
+              short_id,
               error: item.error,
               decision: null,
               confidence: 0,
@@ -267,7 +270,7 @@
           const vetOut = item.vetting_output;
           return {
             contributor_id: item.contributor_id,
-            short_id: item.contributor_id.slice(0, 8),
+            short_id,
             decision: vetOut.decision === "allow",
             confidence: vetOut.confidence_score,
             reasoning: vetOut.reasoning,
