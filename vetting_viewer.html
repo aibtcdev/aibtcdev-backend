@@ -534,16 +534,28 @@
         section.dataset.contributorId = contrib.contributor_id;
         const title = document.createElement("h2");
         title.className = "text-xl font-bold text-gray-800 mb-4 cursor-pointer flex justify-between items-center";
-        const decisionClass = contrib.decision === true ? "text-green-600 border-green-600" :
-                              contrib.decision === false ? "text-red-600 border-red-600" : "text-gray-600 border-gray-600";
+        const decisionClass = contrib.decision === true ? "text-green-600" :
+                              contrib.decision === false ? "text-red-600" : "text-gray-600";
         const decisionText = contrib.decision === true ? "ALLOW" : contrib.decision === false ? "BLOCK" : "ERROR";
         const explorerUrl = `https://explorer.hiro.so/address/${contrib.contributor_id}?chain=testnet`;
+
+        const displayName = contrib.x_handle || contrib.short_id;
+        const nameLinkUrl = contrib.x_handle ? `https://x.com/${contrib.x_handle}` : explorerUrl;
+        const nameLinkTitle = contrib.x_handle ? `View on X: @${contrib.x_handle}` : `Full address: ${contrib.contributor_id}`;
+        const nameLinkClass = contrib.x_handle ? `${decisionClass} hover:underline` : `${decisionClass} hover:underline font-mono`;
+
         title.innerHTML = `
-          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="${decisionClass} hover:underline font-mono" title="Full address: ${contrib.contributor_id}">${contrib.short_id}</a>${contrib.x_handle ? ` (@${contrib.x_handle})` : ''} - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals
+          <a href="${nameLinkUrl}" target="_blank" rel="noopener noreferrer" class="${nameLinkClass}" title="${nameLinkTitle}">${displayName}</a> - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         section.appendChild(title);
         title.querySelector(".chevron").classList.add("rotate-90");
+
+        // Agent account line
+        const agentAccountDiv = document.createElement("div");
+        agentAccountDiv.className = "text-sm text-gray-500 mb-4 pl-1 font-mono border-l-4 border-gray-200";
+        agentAccountDiv.innerHTML = `Agent account: <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="hover:underline text-blue-600" title="View on Explorer">${contrib.contributor_id}</a>`;
+        section.appendChild(agentAccountDiv);
 
         const details = document.createElement("div");
         details.className = "details space-y-4";
