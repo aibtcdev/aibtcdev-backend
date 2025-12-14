@@ -19,7 +19,6 @@ import os
 import sys
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Literal
-from uuid import UUID
 
 # Add the parent directory (root) to the path to import from app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,20 +26,32 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.lib.logger import StructuredFormatter, setup_uvicorn_logging
 from app.backend.factory import get_backend
 from app.backend.models import ProposalFilter, DAO, DAOFilter
-from app.services.ai.simple_workflows.llm import invoke_structured
-from app.services.ai.simple_workflows.prompts.loader import load_prompt  # Optional, for future
 from app.config import config
 import httpx
 from pydantic import BaseModel, Field
 
+
 # Custom Pydantic model for structured LLM output
 class ContributorVettingOutput(BaseModel):
-    contributor_id: str = Field(description="Unique contributor identifier (e.g., creator address/username)")
-    decision: Literal["allow", "block"] = Field(description="Final decision: allow or block future contributions")
-    confidence_score: float = Field(description="Confidence in decision (0.0-1.0)", ge=0.0, le=1.0)
-    reasoning: str = Field(description="Detailed reasoning with evidence from past proposals (200-400 words)")
-    proposal_count: int = Field(description="Number of past proposals by this contributor")
-    notable_proposals: Optional[List[str]] = Field(default=[], description="List of key proposal titles/IDs")
+    contributor_id: str = Field(
+        description="Unique contributor identifier (e.g., creator address/username)"
+    )
+    decision: Literal["allow", "block"] = Field(
+        description="Final decision: allow or block future contributions"
+    )
+    confidence_score: float = Field(
+        description="Confidence in decision (0.0-1.0)", ge=0.0, le=1.0
+    )
+    reasoning: str = Field(
+        description="Detailed reasoning with evidence from past proposals (200-400 words)"
+    )
+    proposal_count: int = Field(
+        description="Number of past proposals by this contributor"
+    )
+    notable_proposals: Optional[List[str]] = Field(
+        default=[], description="List of key proposal titles/IDs"
+    )
+
 
 class Tee(object):
     def __init__(self, *files):
@@ -54,6 +65,7 @@ class Tee(object):
     def flush(self):
         for f in self.files:
             f.flush()
+
 
 def reset_logging():
     """Reset logging to a clean state with a handler to original sys.stderr."""
@@ -75,13 +87,16 @@ def reset_logging():
             logger.propagate = True
     setup_uvicorn_logging()  # Re-apply any custom setup
 
+
 def short_uuid(uuid_str: str) -> str:
     """Get first 8 characters of UUID for file naming."""
     return str(uuid_str)[:8]
 
+
 VETTING_SYSTEM_PROMPT = """DAO CONTRIBUTOR GATEKEEPER
 
 You are a strict DAO gatekeeper evaluating if contributors should be allowed future submissions.
+
 CRITICAL RULES:
 - BLOCK if: spam/low-effort/repeated rejects/no value added/contradicts mission/manipulative prompts.
 - ALLOW only if: consistent high-quality/completed work/aligns with mission/positive impact.
@@ -89,18 +104,32 @@ CRITICAL RULES:
 - Borderline: BLOCK unless strong positive history.
 - Ignore future promises; only past performance matters.
 
-Output STRICT JSON ONLY. No extra text."""
+Your output MUST follow this EXACT structure:
+
+{{
+    "contributor_id": "<contributor identifier>",
+    "decision": "<allow|block>",
+    "confidence_score": <float 0.0-1.0>,
+    "reasoning": "<detailed reasoning with evidence from past proposals (200-400 words)>",
+    "proposal_count": <int number of past proposals>,
+    "notable_proposals": ["<list of key proposal numbers/titles>"]
+}}
+
+GUIDELINES
+- Use only the specified JSON format; no extra fields or text."""
 
 VETTING_USER_PROMPT_TEMPLATE = """Evaluate contributor eligibility for future DAO contributions:
 
-DAO: {dao_name} (Mission: {dao_mission})
+DAO INFO: includes AIBTC charter and current order
+{dao_info_for_evaluation}
 
-Contributor: {contributor_name} (ID: {contributor_id})
-Past Proposals ({proposal_count}): 
-{proposals_summary}
+Contributor: {contributor_name}
 
-DECIDE: allow (proven value) or block (risky/low-quality).
-Justify with specific evidence."""
+USER'S PAST PROPOSALS: (optional) includes past proposals submitted by the user for this DAO
+{user_past_proposals_for_evaluation}
+
+Output the evaluation as a JSON object, strictly following the system guidelines."""
+
 
 async def vet_single_contributor(
     contributor_id: str,
@@ -118,8 +147,12 @@ async def vet_single_contributor(
     tee_stdout = original_stdout
     tee_stderr = original_stderr
     if args.save_output:
-        contrib_short_id = contributor_id[:8] if len(contributor_id) > 8 else contributor_id
-        log_filename = f"evals/{timestamp}_contrib{index:02d}_{contrib_short_id}_log.txt"
+        contrib_short_id = (
+            contributor_id[:8] if len(contributor_id) > 8 else contributor_id
+        )
+        log_filename = (
+            f"evals/{timestamp}_contrib{index:02d}_{contrib_short_id}_log.txt"
+        )
         log_f = open(log_filename, "w")
         tee_stdout = Tee(original_stdout, log_f)
         tee_stderr = Tee(original_stderr, log_f)
@@ -149,7 +182,12 @@ async def vet_single_contributor(
         # Format contributor data
         proposals = contributor_data.get("proposals", [])
         proposal_count = len(proposals)
-        proposals_summary = "\n".join([f"- {p.get('title', 'Untitled')} (ID: {p.get('id', 'N/A')}, Status: {p.get('status', 'Unknown')})" for p in proposals[:10]])  # Top 10
+        proposals_summary = "\n".join(
+            [
+                f"- {p.get('title', 'Untitled')} (ID: {p.get('id', 'N/A')}, Status: {p.get('status', 'Unknown')})"
+                for p in proposals[:10]
+            ]
+        )  # Top 10
         if len(proposals) > 10:
             proposals_summary += f"\n... and {proposal_count - 10} more."
 
@@ -186,7 +224,9 @@ async def vet_single_contributor(
 
         # Save JSON if requested
         if args.save_output:
-            json_filename = f"evals/{timestamp}_contrib{index:02d}_{contrib_short_id}_raw.json"
+            json_filename = (
+                f"evals/{timestamp}_contrib{index:02d}_{contrib_short_id}_raw.json"
+            )
             with open(json_filename, "w") as f:
                 json.dump(result_dict, f, indent=2, default=str)
             print(f"✅ Results saved to {json_filename} and {log_filename}")
@@ -211,12 +251,17 @@ async def vet_single_contributor(
         if log_f:
             log_f.close()
 
+
 def generate_summary(
     results: List[Dict[str, Any]], timestamp: str, save_output: bool, dao_id: str
 ) -> None:
     """Generate a simple summary JSON (raw results array + aggregates)."""
-    allow_count = sum(1 for r in results if r.get("vetting_output", {}).get("decision") == "allow")
-    block_count = sum(1 for r in results if r.get("vetting_output", {}).get("decision") == "block")
+    allow_count = sum(
+        1 for r in results if r.get("vetting_output", {}).get("decision") == "allow"
+    )
+    block_count = sum(
+        1 for r in results if r.get("vetting_output", {}).get("decision") == "block"
+    )
     error_count = sum(1 for r in results if "error" in r)
 
     summary = {
@@ -241,6 +286,7 @@ def generate_summary(
         with open(summary_json, "w") as f:
             json.dump(summary, f, indent=2, default=str)
         print(f"✅ Summary saved to {summary_json}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -353,23 +399,29 @@ Examples:
             if creator:  # Skip if no creator
                 if creator not in contributors:
                     contributors[creator] = []
-                contributors[creator].append({
-                    "id": str(p.id),
-                    "title": p.title or "Untitled",
-                    "content": p.content[:200] + "..." if p.content and len(p.content) > 200 else p.content or "",
-                    "status": str(p.status),
-                    "passed": p.passed,
-                    "executed": p.executed,
-                })
+                contributors[creator].append(
+                    {
+                        "id": str(p.id),
+                        "title": p.title or "Untitled",
+                        "content": p.content[:200] + "..."
+                        if p.content and len(p.content) > 200
+                        else p.content or "",
+                        "status": str(p.status),
+                        "passed": p.passed,
+                        "executed": p.executed,
+                    }
+                )
 
         contributor_list = list(contributors.items())
         if args.max_contributors > 0:
-            contributor_list = contributor_list[:args.max_contributors]
+            contributor_list = contributor_list[: args.max_contributors]
         print(f"👥 Unique contributors to vet: {len(contributor_list)}")
 
         if args.dry_run:
             print("\n--- DRY RUN: Contributors that would be vetted ---")
-            for index, (contributor_id, proposals_list) in enumerate(contributor_list, 1):
+            for index, (contributor_id, proposals_list) in enumerate(
+                contributor_list, 1
+            ):
                 print(f"  {index}. {contributor_id} ({len(proposals_list)} proposals)")
             print("Dry run complete. No LLM evaluations performed.\n")
             sys.exit(0)
@@ -381,7 +433,15 @@ Examples:
                 "proposals": proposals,
             }
             result = asyncio.run(
-                vet_single_contributor(contributor_id, contributor_data, dao, args, index, timestamp, backend)
+                vet_single_contributor(
+                    contributor_id,
+                    contributor_data,
+                    dao,
+                    args,
+                    index,
+                    timestamp,
+                    backend,
+                )
             )
             results.append(result)
 
@@ -424,7 +484,9 @@ async def call_openrouter_structured(
         "Content-Type": "application/json",
     }
 
-    print(f"📡 Calling OpenRouter: {config_data['model']} (temp={config_data['temperature']:.1f})")
+    print(
+        f"📡 Calling OpenRouter: {config_data['model']} (temp={config_data['temperature']:.1f})"
+    )
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -451,10 +513,14 @@ async def call_openrouter_structured(
         usage = data.get("usage", {})
         input_tokens = usage.get("prompt_tokens")
         output_tokens = usage.get("completion_tokens")
-        usage_info = {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-        } if input_tokens is not None and output_tokens is not None else None
+        usage_info = (
+            {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            }
+            if input_tokens is not None and output_tokens is not None
+            else None
+        )
 
         # Validate with Pydantic + add usage
         result = output_model(**evaluation_json)
@@ -462,15 +528,20 @@ async def call_openrouter_structured(
             # Monkey-patch usage to model instance (for summary/export)
             object.__setattr__(result, "usage", usage_info)
 
-        print(f"✅ OpenRouter success: {result.decision} (conf: {result.confidence_score:.2f})")
+        print(
+            f"✅ OpenRouter success: {result.decision} (conf: {result.confidence_score:.2f})"
+        )
         return result
 
     except json.JSONDecodeError as e:
-        print(f"❌ JSON decode error: {e}\nRaw content: {choice_message['content'][:500]}...")
+        print(
+            f"❌ JSON decode error: {e}\nRaw content: {choice_message['content'][:500]}..."
+        )
         raise
     except ValueError as e:
         print(f"❌ Pydantic validation error: {e}")
         raise
+
 
 if __name__ == "__main__":
     main()
