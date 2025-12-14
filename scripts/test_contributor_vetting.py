@@ -39,6 +39,10 @@ class ContributorVettingOutput(BaseModel):
     contributor_id: str = Field(
         description="Unique contributor identifier (e.g., creator address/username)"
     )
+    x_handle: Optional[str] = Field(
+        default=None,
+        description="Primary X/Twitter handle extracted from contributor's proposals"
+    )
     decision: Literal["allow", "block"] = Field(
         description="Final decision: allow or block future contributions"
     )
@@ -215,6 +219,7 @@ Your output MUST follow this EXACT structure:
 
 {{
     "contributor_id": "<contributor identifier>",
+    "x_handle": "<primary X handle or null>",
     "decision": "<allow|block>",
     "confidence_score": <float 0.0-1.0>,
     "reasoning": "<detailed reasoning with evidence from past proposals (200-400 words)>",

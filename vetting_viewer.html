@@ -262,6 +262,7 @@
               reasoning: "",
               notable_proposals: [],
               proposals: item.contributor_data?.proposals || [],
+              x_handle: null,
               usage: null,
               raw_result: item,
             };
@@ -277,6 +278,7 @@
             proposal_count: vetOut.proposal_count,
             notable_proposals: vetOut.notable_proposals || [],
             proposals: item.contributor_data?.proposals || [],
+            x_handle: vetOut.x_handle || null,
             user_prompt_filled: item.user_prompt_filled || "",
             usage: item.usage || null,
             raw_result: item,
@@ -356,6 +358,7 @@
             return `
               <tr>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600"><a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="font-mono hover:underline" title="View on Explorer">${contrib.contributor_id}</a></td>
+                <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600">${contrib.x_handle || 'N/A'}</td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600">${contrib.proposal_count}</td>
                 <td class="py-3 px-4 border-b border-gray-200 text-sm text-gray-600 font-mono text-right">${contrib.confidence.toFixed(2)}</td>
               </tr>
@@ -385,14 +388,14 @@
               <div>
                 <h3 class="font-bold mb-2">Top Allowed</h3>
                 <table class="min-w-full table-striped">
-                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">X Handle</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
                   <tbody>${createRows(topAllowed)}</tbody>
                 </table>
               </div>
               <div>
                 <h3 class="font-bold mb-2">Top Blocked</h3>
                 <table class="min-w-full table-striped">
-                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
+                  <thead><tr><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contributor</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">X Handle</th><th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposals</th><th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th></tr></thead>
                   <tbody>${createRows(topBlocked)}</tbody>
                 </table>
               </div>
@@ -536,7 +539,7 @@
         const decisionText = contrib.decision === true ? "ALLOW" : contrib.decision === false ? "BLOCK" : "ERROR";
         const explorerUrl = `https://explorer.hiro.so/address/${contrib.contributor_id}?chain=testnet`;
         title.innerHTML = `
-          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="${decisionClass} hover:underline font-mono" title="Full address: ${contrib.contributor_id}">${contrib.short_id}</a> - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals
+          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" class="${decisionClass} hover:underline font-mono" title="Full address: ${contrib.contributor_id}">${contrib.short_id}</a>${contrib.x_handle ? ` (@${contrib.x_handle})` : ''} - ${decisionText} (Conf: ${contrib.confidence.toFixed(2)}) - ${contrib.proposal_count} Proposals
           <svg class="w-6 h-6 transform transition-transform chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         `;
         section.appendChild(title);
