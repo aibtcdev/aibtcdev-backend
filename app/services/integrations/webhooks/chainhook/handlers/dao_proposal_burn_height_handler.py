@@ -204,13 +204,17 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             burn_height = self._get_burn_height(tx_data)
 
             if burn_height is None:
-                self.logger.info("Burn height unavailable from chainhook data → skipping")
+                self.logger.info(
+                    "Burn height unavailable from chainhook data → skipping"
+                )
                 return
 
             # Skip if we've already processed this burn height in this session
             burn_height_key = f"burn_{burn_height}"
             if burn_height_key in self._processed_burn_heights:
-                self.logger.info(f"Skipping already-processed burn_height={burn_height}")
+                self.logger.info(
+                    f"Skipping already-processed burn_height={burn_height}"
+                )
                 return
 
             self.logger.info(f"Processing burn height: {burn_height}")
@@ -225,7 +229,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 )
             )
 
-            self.logger.info(f"Fetched {len(proposals)} DEPLOYED proposals for burn_height={burn_height}")
+            self.logger.info(
+                f"Fetched {len(proposals)} DEPLOYED proposals for burn_height={burn_height}"
+            )
 
             # Filter proposals that should start or end at this burn height
             vote_proposals = [
@@ -269,7 +275,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 or veto_start_proposals
                 or veto_end_proposals
             ):
-                self.logger.info(f"No proposals match criteria for burn_height={burn_height}")
+                self.logger.info(
+                    f"No proposals match criteria for burn_height={burn_height}"
+                )
                 return
 
             self.logger.info(
@@ -310,7 +318,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto window start Discord message already exists
             if self._discord_message_exists(proposal.id, dao.id, "veto_window_open"):
-                self.logger.debug(f"Veto window start Discord message already exists for proposal {proposal.id}, skipping")
+                self.logger.debug(
+                    f"Veto window start Discord message already exists for proposal {proposal.id}, skipping"
+                )
                 continue
 
             # Create unique identifier for this message
@@ -348,7 +358,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto window end Discord message already exists
             if self._discord_message_exists(proposal.id, dao.id, "veto_window_closed"):
-                self.logger.debug(f"Veto window end Discord message already exists for proposal {proposal.id}, skipping")
+                self.logger.debug(
+                    f"Veto window end Discord message already exists for proposal {proposal.id}, skipping"
+                )
                 continue
 
             # Create unique identifier for this message
@@ -427,9 +439,13 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Get agents holding governance tokens
             agents = self._get_agent_token_holders(dao.id)
-            self.logger.info(f"Proposal {proposal.id}/DAO {dao.id}: {len(agents)} token-holding agents")
+            self.logger.info(
+                f"Proposal {proposal.id}/DAO {dao.id}: {len(agents)} token-holding agents"
+            )
             if not agents:
-                self.logger.warning(f"No agents found holding tokens for DAO {dao.id} (proposal {proposal.id})")
+                self.logger.warning(
+                    f"No agents found holding tokens for DAO {dao.id} (proposal {proposal.id})"
+                )
                 continue
 
             # Create vote queue messages for each agent
@@ -441,7 +457,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                     dao.id,
                     agent["wallet_id"],
                 ):
-                    self.logger.info(f"Skipping duplicate vote_message: proposal={proposal.id}, wallet={agent['wallet_id']}")
+                    self.logger.info(
+                        f"Skipping duplicate vote_message: proposal={proposal.id}, wallet={agent['wallet_id']}"
+                    )
                     continue
 
                 message_data = {
