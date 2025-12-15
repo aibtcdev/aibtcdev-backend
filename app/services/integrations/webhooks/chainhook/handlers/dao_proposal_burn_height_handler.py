@@ -310,7 +310,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto window start Discord message already exists
             if self._discord_message_exists(proposal.id, dao.id, "veto_window_open"):
-                self.logger.info(f"Skipping duplicate discord_message (veto_window_open) for proposal={proposal.id}")
+                self.logger.debug(f"Veto window start Discord message already exists for proposal {proposal.id}, skipping")
                 continue
 
             # Create unique identifier for this message
@@ -348,7 +348,7 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Check if a veto window end Discord message already exists
             if self._discord_message_exists(proposal.id, dao.id, "veto_window_closed"):
-                self.logger.info(f"Skipping duplicate discord_message (veto_window_closed) for proposal={proposal.id}")
+                self.logger.debug(f"Veto window end Discord message already exists for proposal {proposal.id}, skipping")
                 continue
 
             # Create unique identifier for this message
@@ -393,7 +393,9 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 proposal.id,
                 dao.id,
             ):
-                self.logger.info(f"Skipping duplicate conclude_message for proposal={proposal.id}")
+                self.logger.debug(
+                    f"Conclude queue message already exists for proposal {proposal.id}, skipping"
+                )
                 continue
 
             # For conclude messages, we only need to create one message per proposal
