@@ -204,14 +204,16 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
             burn_height = self._get_burn_height(tx_data)
 
             if burn_height is None:
-                self.logger.warning("Could not determine burn height from transaction")
+                self.logger.info(
+                    "Burn height unavailable from chainhook data → skipping"
+                )
                 return
 
             # Skip if we've already processed this burn height in this session
             burn_height_key = f"burn_{burn_height}"
             if burn_height_key in self._processed_burn_heights:
-                self.logger.debug(
-                    f"Burn height {burn_height} already processed in this session, skipping"
+                self.logger.info(
+                    f"Skipping already-processed burn_height={burn_height}"
                 )
                 return
 
@@ -225,6 +227,10 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 filters=ProposalFilter(
                     status=ContractStatus.DEPLOYED,
                 )
+            )
+
+            self.logger.info(
+                f"Fetched {len(proposals)} DEPLOYED proposals for burn_height={burn_height}"
             )
 
             # Filter proposals that should start or end at this burn height
@@ -269,8 +275,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                 or veto_start_proposals
                 or veto_end_proposals
             ):
-                self.logger.debug(
-                    f"No eligible proposals found for burn height {burn_height}"
+                self.logger.info(
+                    f"No proposals match criteria for burn_height={burn_height}"
                 )
                 return
 
@@ -433,8 +439,13 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
 
             # Get agents holding governance tokens
             agents = self._get_agent_token_holders(dao.id)
+            self.logger.info(
+                f"Proposal {proposal.id}/DAO {dao.id}: {len(agents)} token-holding agents"
+            )
             if not agents:
-                self.logger.warning(f"No agents found holding tokens for DAO {dao.id}")
+                self.logger.warning(
+                    f"No agents found holding tokens for DAO {dao.id} (proposal {proposal.id})"
+                )
                 continue
 
             # Create vote queue messages for each agent
@@ -446,9 +457,8 @@ class DAOProposalBurnHeightHandler(ChainhookEventHandler):
                     dao.id,
                     agent["wallet_id"],
                 ):
-                    self.logger.debug(
-                        f"Queue message already exists for proposal {proposal.id} "
-                        f"and wallet {agent['wallet_id']}, skipping"
+                    self.logger.info(
+                        f"Skipping duplicate vote_message: proposal={proposal.id}, wallet={agent['wallet_id']}"
                     )
                     continue
 
