@@ -393,3 +393,174 @@ async def write_epitaph_request(
             exc_info=e,
         )
         raise HTTPException(status_code=500, detail=f"Failed to write epitaph: {str(e)}")
+
+
+# =============================================================================
+# MCP Integration Endpoints
+# =============================================================================
+
+
+@router.get("/{agent_id}/capabilities")
+async def get_agent_capabilities(
+    agent_id: int,
+    network: str = Query("mainnet", description="Network (mainnet/testnet)"),
+) -> JSONResponse:
+    """Get available MCP tools for an agent based on their level.
+
+    Returns tools grouped by category that the agent can use.
+    """
+    try:
+        from app.services.bitcoin_agents.mcp_service import get_mcp_service
+
+        logger.debug("Getting agent capabilities", extra={"agent_id": agent_id, "network": network})
+
+        mcp_service = get_mcp_service(network)
+        result = await mcp_service.get_available_tools(agent_id)
+
+        if not result.get("success"):
+            raise HTTPException(status_code=404, detail=result.get("error", "Unknown error"))
+
+        return JSONResponse(content=result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to get agent capabilities",
+            extra={"agent_id": agent_id, "error": str(e)},
+            exc_info=e,
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to get capabilities: {str(e)}")
+
+
+@router.post("/{agent_id}/execute")
+async def execute_agent_action(
+    agent_id: int,
+    tool_name: str = Query(..., description="Name of the tool to execute"),
+    network: str = Query("mainnet", description="Network (mainnet/testnet)"),
+) -> JSONResponse:
+    """Execute an MCP action on behalf of an agent.
+
+    Checks tier-based access before execution.
+    Awards XP on successful completion.
+
+    Note: Tool arguments should be passed in the request body for complex operations.
+    This endpoint is for simple tool invocations.
+    """
+    try:
+        from app.services.bitcoin_agents.mcp_service import get_mcp_service
+
+        logger.info(
+            "Execute agent action",
+            extra={"agent_id": agent_id, "tool": tool_name, "network": network},
+        )
+
+        mcp_service = get_mcp_service(network)
+
+        # Execute with empty args - full implementation would parse request body
+        # Tools are auto-initialized based on agent level via get_tools_for_agent
+        result = await mcp_service.execute_action(
+            agent_id=agent_id,
+            tool_name=tool_name,
+            tool_args={},
+            tools_map=None,  # Auto-initialized by MCP service
+        )
+
+        if not result.get("success"):
+            status_code = 403 if "requires" in result.get("error", "") else 400
+            return JSONResponse(status_code=status_code, content=result)
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(
+            "Failed to execute agent action",
+            extra={"agent_id": agent_id, "tool": tool_name, "error": str(e)},
+            exc_info=e,
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to execute action: {str(e)}")
+
+
+@router.post("/{agent_id}/visit/{host_agent_id}")
+async def agent_visit(
+    agent_id: int,
+    host_agent_id: int,
+    network: str = Query("mainnet", description="Network (mainnet/testnet)"),
+) -> JSONResponse:
+    """Have one agent visit another agent.
+
+    Both agents gain XP from the interaction.
+    Rate limited to prevent farming (once per hour per pair).
+    """
+    try:
+        from app.services.bitcoin_agents.mcp_service import get_mcp_service
+
+        logger.info(
+            "Agent visit",
+            extra={"visitor": agent_id, "host": host_agent_id, "network": network},
+        )
+
+        mcp_service = get_mcp_service(network)
+        result = await mcp_service.agent_visit(agent_id, host_agent_id)
+
+        if not result.get("success"):
+            return JSONResponse(status_code=400, content=result)
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(
+            "Failed to process agent visit",
+            extra={"visitor": agent_id, "host": host_agent_id, "error": str(e)},
+            exc_info=e,
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to process visit: {str(e)}")
+
+
+@router.get("/tier-info")
+async def get_tier_info() -> JSONResponse:
+    """Get information about evolution tiers and their capabilities.
+
+    Returns XP thresholds and tools available at each tier.
+    """
+    from app.services.bitcoin_agents.mcp_service import TIER_CAPABILITIES, get_tools_for_level
+
+    tiers = [
+        {
+            "level": 0,
+            "name": "Hatchling",
+            "xp_required": 0,
+            "tools_count": len(get_tools_for_level(0)),
+            "new_capabilities": ["Read-only operations", "Balance queries", "Contract info"],
+        },
+        {
+            "level": 1,
+            "name": "Junior",
+            "xp_required": 500,
+            "tools_count": len(get_tools_for_level(1)),
+            "new_capabilities": ["STX transfers", "Token transfers", "Deposits"],
+        },
+        {
+            "level": 2,
+            "name": "Senior",
+            "xp_required": 2000,
+            "tools_count": len(get_tools_for_level(2)),
+            "new_capabilities": ["DEX trading (Faktory, Bitflow)", "Contract approvals"],
+        },
+        {
+            "level": 3,
+            "name": "Elder",
+            "xp_required": 10000,
+            "tools_count": len(get_tools_for_level(3)),
+            "new_capabilities": ["DAO voting", "Proposals", "Social posting"],
+        },
+        {
+            "level": 4,
+            "name": "Legendary",
+            "xp_required": 50000,
+            "tools_count": len(get_tools_for_level(4)),
+            "new_capabilities": ["Full autonomy", "Deploy agents", "Create proposals"],
+        },
+    ]
+
+    return JSONResponse(content={"tiers": tiers})

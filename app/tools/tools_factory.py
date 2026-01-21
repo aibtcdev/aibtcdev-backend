@@ -85,6 +85,11 @@ from .wallet import (
     WalletSIP10SendTool,
 )
 from .x_credentials import CollectXCredentialsTool
+from .bitcoin_agents import (
+    GetAgentTool,
+    CheckAgentStatusTool,
+    GetGlobalStatsTool,
+)
 
 logger = configure_logger(__name__)
 
@@ -192,6 +197,11 @@ def initialize_tools(
         "agent_account_approve_contract": AgentAccountApproveContractTool(wallet_id),
         "agent_account_revoke_contract": AgentAccountRevokeContractTool(wallet_id),
         # --- END MODIFIED AGENT ACCOUNT TOOLS ---
+        # --- BITCOIN AGENTS TOOLS ---
+        "bitcoin_agents_get_agent": GetAgentTool(),
+        "bitcoin_agents_check_status": CheckAgentStatusTool(),
+        "bitcoin_agents_get_stats": GetGlobalStatsTool(),
+        # --- END BITCOIN AGENTS TOOLS ---
     }
 
     return tools
