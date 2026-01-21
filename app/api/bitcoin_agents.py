@@ -3,9 +3,10 @@
 Provides CRUD endpoints for Tamagotchi-style AI agents with on-chain lifecycle.
 """
 
-from typing import List, Optional
+import os
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from starlette.responses import JSONResponse
 
 from app.backend.models import (
@@ -24,9 +25,34 @@ logger = configure_logger(__name__)
 # Create the router
 router = APIRouter(prefix="/bitcoin-agents", tags=["bitcoin-agents"])
 
-# Contract constants
-CONTRACT_ADDRESS_MAINNET = "SP000000000000000000000000000000.bitcoin-agents"  # TODO: Update after deployment
-CONTRACT_ADDRESS_TESTNET = "ST000000000000000000000000000000.bitcoin-agents"  # TODO: Update after deployment
+# Contract constants - can be overridden by environment variables
+CONTRACT_ADDRESS_MAINNET = os.getenv(
+    "BITCOIN_AGENTS_CONTRACT_MAINNET",
+    "SP000000000000000000000000000000.bitcoin-agents"  # Placeholder until deployment
+)
+CONTRACT_ADDRESS_TESTNET = os.getenv(
+    "BITCOIN_AGENTS_CONTRACT_TESTNET",
+    "ST000000000000000000000000000000.bitcoin-agents"  # Placeholder until deployment
+)
+
+# Valid networks
+VALID_NETWORKS = ("mainnet", "testnet")
+
+
+def validate_network(network: str) -> str:
+    """Validate network parameter."""
+    if network not in VALID_NETWORKS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid network '{network}'. Must be one of: {', '.join(VALID_NETWORKS)}"
+        )
+    return network
+
+
+def get_contract_address(network: str) -> str:
+    """Get contract address for the specified network."""
+    validate_network(network)
+    return CONTRACT_ADDRESS_MAINNET if network == "mainnet" else CONTRACT_ADDRESS_TESTNET
 
 # Food tier pricing (in sats)
 FOOD_TIERS = {
@@ -166,7 +192,7 @@ async def get_food_tiers() -> JSONResponse:
 
 @router.get("/{agent_id}")
 async def get_agent(
-    agent_id: int,
+    agent_id: int = Path(..., ge=0, description="Agent ID (non-negative integer)"),
     network: str = Query("mainnet", description="Network (mainnet/testnet)"),
 ) -> JSONResponse:
     """Get a specific agent by ID.
@@ -174,6 +200,7 @@ async def get_agent(
     Returns agent details including computed hunger/health state.
     """
     try:
+        validate_network(network)
         logger.debug("Getting agent", extra={"agent_id": agent_id, "network": network})
 
         # TODO: Implement actual contract read
@@ -189,7 +216,7 @@ async def get_agent(
 
 @router.get("/{agent_id}/status")
 async def get_agent_status(
-    agent_id: int,
+    agent_id: int = Path(..., ge=0, description="Agent ID (non-negative integer)"),
     network: str = Query("mainnet", description="Network (mainnet/testnet)"),
 ) -> JSONResponse:
     """Get computed hunger/health status for an agent.
@@ -197,6 +224,7 @@ async def get_agent_status(
     Returns current computed state based on blocks elapsed since last fed.
     """
     try:
+        validate_network(network)
         logger.debug("Getting agent status", extra={"agent_id": agent_id, "network": network})
 
         # TODO: Call contract's get-computed-state function
@@ -215,7 +243,7 @@ async def get_agent_status(
 
 @router.get("/{agent_id}/death-certificate")
 async def get_death_certificate(
-    agent_id: int,
+    agent_id: int = Path(..., ge=0, description="Agent ID (non-negative integer)"),
     network: str = Query("mainnet", description="Network (mainnet/testnet)"),
 ) -> JSONResponse:
     """Get death certificate for a dead agent.
@@ -223,6 +251,7 @@ async def get_death_certificate(
     Returns death certificate details including epitaph if set.
     """
     try:
+        validate_network(network)
         logger.debug(
             "Getting death certificate",
             extra={"agent_id": agent_id, "network": network},
