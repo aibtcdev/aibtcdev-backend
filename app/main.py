@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, daos, tools, webhooks, profiles
+from app.api import agents, bitcoin_agents, daos, tools, webhooks, profiles
 from app.config import config
 from app.lib.logger import configure_logger, setup_uvicorn_logging
 from app.middleware.logging import LoggingMiddleware
@@ -42,6 +42,7 @@ async def health_check():
 app.include_router(tools.router)
 app.include_router(webhooks.router)
 app.include_router(agents.router)
+app.include_router(bitcoin_agents.router)
 app.include_router(profiles.router)
 app.include_router(daos.router)
 

@@ -1095,3 +1095,134 @@ class JobCooldownBase(CustomBaseModel):
 class JobCooldown(JobCooldownBase):
     id: UUID
     updated_at: Optional[datetime] = None
+
+
+#
+# BITCOIN AGENTS (Tamagotchi-style AI agents)
+#
+class BitcoinAgentStatus(str, Enum):
+    """Status of a Bitcoin Agent."""
+
+    ALIVE = "alive"
+    DEAD = "dead"
+
+    def __str__(self):
+        return self.value
+
+
+class BitcoinAgentLevel(str, Enum):
+    """Evolution level of a Bitcoin Agent."""
+
+    HATCHLING = "hatchling"  # 0-499 XP
+    JUNIOR = "junior"  # 500-1999 XP
+    SENIOR = "senior"  # 2000-9999 XP
+    ELDER = "elder"  # 10000-49999 XP
+    LEGENDARY = "legendary"  # 50000+ XP
+
+    def __str__(self):
+        return self.value
+
+
+class BitcoinAgentBase(CustomBaseModel):
+    """Base model for Bitcoin Agents."""
+
+    # On-chain data
+    agent_id: Optional[int] = None  # On-chain agent ID
+    owner: Optional[str] = None  # Stacks address
+    name: Optional[str] = None  # Agent name (string-utf8 64)
+    hunger: Optional[int] = None  # 0-100
+    health: Optional[int] = None  # 0-100
+    xp: Optional[int] = None  # Total XP earned
+    level: Optional[BitcoinAgentLevel] = BitcoinAgentLevel.HATCHLING
+    birth_block: Optional[int] = None  # Block when minted
+    last_fed_block: Optional[int] = None  # Block when last fed
+    total_fed_count: Optional[int] = None  # Total times fed
+    status: Optional[BitcoinAgentStatus] = BitcoinAgentStatus.ALIVE
+
+    # Computed state (from get-computed-state)
+    computed_hunger: Optional[int] = None
+    computed_health: Optional[int] = None
+
+    # Bitcoin Face
+    face_svg_url: Optional[str] = None
+    face_image_url: Optional[str] = None
+    face_cached_at: Optional[datetime] = None
+
+    # Contract info
+    contract_address: Optional[str] = None  # bitcoin-agents.clar address
+    network: Optional[str] = "mainnet"  # mainnet or testnet
+
+    # Linked profile (optional)
+    profile_id: Optional[UUID] = None
+
+
+class BitcoinAgentCreate(BitcoinAgentBase):
+    pass
+
+
+class BitcoinAgent(BitcoinAgentBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class BitcoinAgentFilter(CustomBaseModel):
+    """Filter model for Bitcoin Agents."""
+
+    agent_id: Optional[int] = None
+    owner: Optional[str] = None
+    name: Optional[str] = None
+    level: Optional[BitcoinAgentLevel] = None
+    status: Optional[BitcoinAgentStatus] = None
+    profile_id: Optional[UUID] = None
+    network: Optional[str] = None
+
+    # Range filters
+    xp_gte: Optional[int] = None
+    xp_lte: Optional[int] = None
+    hunger_lte: Optional[int] = None  # Filter for hungry agents
+    health_lte: Optional[int] = None  # Filter for unhealthy agents
+
+
+#
+# BITCOIN AGENT DEATH CERTIFICATES
+#
+class DeathCertificateBase(CustomBaseModel):
+    """Base model for Bitcoin Agent death certificates."""
+
+    agent_id: Optional[int] = None  # On-chain agent ID
+    bitcoin_agent_db_id: Optional[UUID] = None  # Reference to BitcoinAgent record
+    name: Optional[str] = None
+    owner: Optional[str] = None
+    birth_block: Optional[int] = None
+    death_block: Optional[int] = None
+    cause: Optional[str] = None  # "starvation", "neglect"
+    final_level: Optional[BitcoinAgentLevel] = None
+    total_xp: Optional[int] = None
+    total_fed_count: Optional[int] = None
+    epitaph: Optional[str] = None  # Owner-written memorial (string-utf8 256)
+    network: Optional[str] = "mainnet"
+
+
+class DeathCertificateCreate(DeathCertificateBase):
+    pass
+
+
+class DeathCertificate(DeathCertificateBase):
+    id: UUID
+    created_at: datetime
+
+
+class DeathCertificateFilter(CustomBaseModel):
+    """Filter model for death certificates."""
+
+    agent_id: Optional[int] = None
+    owner: Optional[str] = None
+    final_level: Optional[BitcoinAgentLevel] = None
+    cause: Optional[str] = None
+    network: Optional[str] = None
+
+    # Range filters for lifespan queries
+    death_block_gte: Optional[int] = None
+    death_block_lte: Optional[int] = None
+    total_xp_gte: Optional[int] = None
