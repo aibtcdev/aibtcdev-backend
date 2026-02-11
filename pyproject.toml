@@ -5,7 +5,7 @@ description = "FastAPI backend for AIBTC"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp==3.13.2",
+    "aiohttp==3.13.3",
     "apscheduler==3.11.1",
     "cachetools==6.2.2",
     "fastapi==0.123.7",
