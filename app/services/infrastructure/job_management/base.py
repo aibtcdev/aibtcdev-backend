@@ -314,12 +314,33 @@ class BaseTask(ABC, Generic[T]):
         """
         pass
 
-    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
+    # Broadcast error substrings that indicate a transient on-chain condition and
+    # should cause the queue message to be re-tried rather than marked as failed.
+    RETRYABLE_BROADCAST_ERRORS: tuple = (
+        "NotEnoughFunds",
+        "ConflictingNonceInMempool",
+        "ContractAlreadyExists",
+    )
+
+    def _should_retry_on_error(
+        self, error: Exception, context: Optional[JobContext] = None
+    ) -> bool:
         """Determine if a specific error should trigger a retry.
+
+        Checks both Python exception type and the error message string so that
+        broadcast errors surfaced through ``parse_agent_tool_result_strict``
+        (e.g. ``NotEnoughFunds``, ``ConflictingNonceInMempool``,
+        ``ContractAlreadyExists``) are also caught.
 
         Override this method to implement custom retry logic based on error type.
         """
-        # Default: retry on network errors, API timeouts, temporary failures
+        error_str = str(error)
+        # Retry on known transient broadcast errors returned by the TypeScript layer
+        for broadcast_error in self.RETRYABLE_BROADCAST_ERRORS:
+            if broadcast_error in error_str:
+                return True
+
+        # Retry on network errors, API timeouts, temporary failures
         retry_errors = (
             ConnectionError,
             TimeoutError,

@@ -245,6 +245,16 @@ class STXTransferTask(BaseTask[STXTransferResult]):
                     }
                 else:
                     error_msg = parsed_result.ts_message or "Unknown STX transfer error"
+                    # Check whether this is a transient broadcast error that should
+                    # be retried.  If so, leave the message unprocessed so the job
+                    # executor will pick it up again on the next cycle.
+                    broadcast_error = Exception(error_msg)
+                    if self._should_retry_on_error(broadcast_error):
+                        logger.warning(
+                            f"STX transfer failed with retryable broadcast error, "
+                            f"will retry: {error_msg}"
+                        )
+                        return {"success": False, "error": error_msg, "retry": True}
                     logger.error(f"STX transfer failed: {error_msg}")
                     final_result = {
                         "success": False,
@@ -288,23 +298,22 @@ class STXTransferTask(BaseTask[STXTransferResult]):
 
         return messages
 
-    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
-        """Determine if error should trigger retry."""
-        # Retry on network errors, blockchain timeouts
-        retry_errors = (
-            ConnectionError,
-            TimeoutError,
-        )
+    def _should_retry_on_error(
+        self, error: Exception, context: Optional[JobContext] = None
+    ) -> bool:
+        """Determine if error should trigger retry.
 
+        Delegates to base class which recognises transient broadcast errors
+        (``NotEnoughFunds``, ``ConflictingNonceInMempool``,
+        ``ContractAlreadyExists``) in addition to network-level failures.
+        """
         # Don't retry on validation errors
         if "invalid message data" in str(error).lower():
             return False
         if "missing" in str(error).lower() and "required" in str(error).lower():
             return False
-        if "insufficient funds" in str(error).lower():
-            return False
 
-        return isinstance(error, retry_errors)
+        return super()._should_retry_on_error(error, context)
 
     async def _handle_execution_error(
         self, error: Exception, context: JobContext

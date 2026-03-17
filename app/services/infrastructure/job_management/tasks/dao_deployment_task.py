@@ -340,21 +340,22 @@ class DAODeploymentTask(BaseTask[DAODeploymentResult]):
                 deployments_successful=0,
             )
 
-    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
-        """Determine if DAO deployment error should trigger retry."""
-        # Retry on network errors, temporary blockchain issues
-        retry_errors = (
-            ConnectionError,
-            TimeoutError,
-        )
+    def _should_retry_on_error(
+        self, error: Exception, context: Optional[JobContext] = None
+    ) -> bool:
+        """Determine if DAO deployment error should trigger retry.
 
+        Delegates to base class which recognises transient broadcast errors
+        (``NotEnoughFunds``, ``ConflictingNonceInMempool``,
+        ``ContractAlreadyExists``) in addition to network-level failures.
+        """
         # Don't retry on validation errors or tool configuration issues
         if "Missing required parameter" in str(error):
             return False
         if "Tools not properly initialized" in str(error):
             return False
 
-        return isinstance(error, retry_errors)
+        return super()._should_retry_on_error(error, context)
 
     async def _handle_execution_error(
         self, error: Exception, context: JobContext

@@ -345,6 +345,7 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
             contract_already_exists = False
             if parsed_result.ts_success is False:
                 tool_output_message_str = str(parsed_result.ts_data)
+                ts_error_msg = parsed_result.ts_message or tool_output_message_str
                 # handle special case - already deployed contract
                 if "ContractAlreadyExists" in tool_output_message_str:
                     logger.warning(
@@ -352,6 +353,20 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
                     )
                     contract_already_exists = True
                 else:
+                    # Check whether this is a transient broadcast error that should
+                    # be retried.  If so, leave the message unprocessed so the job
+                    # executor will pick it up again on the next cycle.
+                    broadcast_error = Exception(ts_error_msg)
+                    if self._should_retry_on_error(broadcast_error):
+                        logger.warning(
+                            "Deployer tool failed with retryable broadcast error, "
+                            "will retry",
+                            extra={
+                                "ts_success": parsed_result.ts_success,
+                                "ts_message": ts_error_msg,
+                            },
+                        )
+                        return {"success": False, "error": ts_error_msg, "retry": True}
                     error_msg = "Deployer tool failed in TypeScript layer"
                     logger.error(
                         error_msg,
@@ -604,21 +619,22 @@ class AgentAccountDeployerTask(BaseTask[AgentAccountDeployResult]):
 
         return messages
 
-    def _should_retry_on_error(self, error: Exception, context: JobContext) -> bool:
-        """Determine if error should trigger retry."""
-        # Retry on network errors, blockchain timeouts
-        retry_errors = (
-            ConnectionError,
-            TimeoutError,
-        )
+    def _should_retry_on_error(
+        self, error: Exception, context: Optional[JobContext] = None
+    ) -> bool:
+        """Determine if error should trigger retry.
 
+        Delegates to base class which recognises transient broadcast errors
+        (``NotEnoughFunds``, ``ConflictingNonceInMempool``,
+        ``ContractAlreadyExists``) in addition to network-level failures.
+        """
         # Don't retry on validation errors
         if "invalid message data" in str(error).lower():
             return False
         if "missing" in str(error).lower() and "required" in str(error).lower():
             return False
 
-        return isinstance(error, retry_errors)
+        return super()._should_retry_on_error(error, context)
 
     async def _handle_execution_error(
         self, error: Exception, context: JobContext
