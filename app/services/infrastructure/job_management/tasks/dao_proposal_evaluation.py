@@ -353,21 +353,22 @@ class DAOProposalEvaluationTask(BaseTask[DAOProposalEvaluationResult]):
             )
 
             if evaluation_output is None:
-                error_msg = f"Evaluation failed for proposal {proposal_id}"
-                logger.error(
-                    "Evaluation returned None (v2)",
+                logger.warning(
+                    "Evaluation returned None (v2) — defaulting to REJECT vote",
                     extra={
                         "proposal_id": str(proposal_id),
                     },
                 )
-                return {"success": False, "error": error_msg}
+                evaluation_data = {}
+                decision_str = "REJECT"
+                approval = False
+            else:
+                # Map EvaluationOutput to legacy structures
+                evaluation_data = evaluation_output.model_dump()
 
-            # Map EvaluationOutput to legacy structures
-            evaluation_data = evaluation_output.model_dump()
-
-            # Map decision ("APPROVE"/"REJECT") to boolean
-            decision_str = evaluation_data.get("decision", "REJECT")
-            approval = decision_str == "APPROVE"
+                # Map decision ("APPROVE"/"REJECT") to boolean
+                decision_str = evaluation_data.get("decision", "REJECT")
+                approval = decision_str == "APPROVE"
 
             overall_score = evaluation_data.get("final_score", 0)
             confidence = evaluation_data.get("confidence", 0.0)
