@@ -106,7 +106,16 @@ class StacksAPIClient:
                         ) from e
 
                     if e.response.status_code == 429:
-                        # Rate limited - use exponential backoff
+                        # Rate limited - log headers for diagnosis then use exponential backoff
+                        self.logger.warning(
+                            "429 Too Many Requests from Stacks API",
+                            extra={
+                                "endpoint": path,
+                                "response_headers": dict(e.response.headers),
+                                "attempt": attempt + 1,
+                                "max_retries": self.config.max_retries + 1,
+                            },
+                        )
                         if attempt < self.config.max_retries:
                             sleep_time = self._calculate_backoff(attempt)
                             self.logger.warning(

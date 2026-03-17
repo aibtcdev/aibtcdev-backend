@@ -253,11 +253,14 @@ class BaseHiroApi:
             return response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                logger.error(
-                    "API rate limit exceeded",
+                logger.warning(
+                    "429 Too Many Requests from Hiro API",
                     extra={
                         "request": {"method": method, "endpoint": endpoint},
-                        "response": {"status_code": e.response.status_code},
+                        "response": {
+                            "status_code": e.response.status_code,
+                            "headers": dict(e.response.headers),
+                        },
                         "error": str(e),
                     },
                 )
@@ -332,11 +335,14 @@ class BaseHiroApi:
                 return await response.json()
         except aiohttp.ClientError as e:
             if isinstance(e, aiohttp.ClientResponseError) and e.status == 429:
-                logger.error(
-                    "Async API rate limit exceeded",
+                logger.warning(
+                    "429 Too Many Requests from Hiro API (async)",
                     extra={
                         "request": {"method": method, "endpoint": endpoint},
-                        "response": {"status_code": e.status},
+                        "response": {
+                            "status_code": e.status,
+                            "headers": dict(e.headers) if e.headers else {},
+                        },
                         "error": str(e),
                     },
                 )

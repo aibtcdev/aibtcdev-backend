@@ -716,7 +716,17 @@ class TweetTask(BaseTask[TweetProcessingResult]):
             import tweepy
 
             if isinstance(error, tweepy.TooManyRequests):
-                logger.warning("Twitter API rate limit reached, will retry later")
+                response_headers = {}
+                if hasattr(error, "response") and error.response is not None:
+                    response_headers = dict(error.response.headers)
+                logger.warning(
+                    "429 Too Many Requests from Twitter API, will retry later",
+                    extra={
+                        "status_code": 429,
+                        "response_headers": response_headers,
+                        "error": str(error),
+                    },
+                )
                 return None  # Let default retry handling take over
 
             if isinstance(error, tweepy.ServiceUnavailable):

@@ -188,9 +188,11 @@ async def call_openrouter(
         )
         if response.status_code == 429:
             logger.warning(
-                "OpenRouter rate limit exceeded",
+                "429 Too Many Requests from OpenRouter",
                 extra={
                     "status_code": response.status_code,
+                    "endpoint": f"{config_data['base_url']}/chat/completions",
+                    "response_headers": dict(response.headers),
                     "response_text": response.text,
                 },
             )

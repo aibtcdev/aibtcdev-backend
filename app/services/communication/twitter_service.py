@@ -148,8 +148,16 @@ class TwitterService:
             return None
 
         except tweepy.TooManyRequests as e:
-            logger.error(
-                f"Failed to post tweet with media: 429 Too Many Requests - {str(e)}"
+            response_headers = {}
+            if hasattr(e, "response") and e.response is not None:
+                response_headers = dict(e.response.headers)
+            logger.warning(
+                "429 Too Many Requests from Twitter (post_tweet_with_media)",
+                extra={
+                    "status_code": 429,
+                    "response_headers": response_headers,
+                    "error": str(e),
+                },
             )
             raise
         except Exception as e:
@@ -262,7 +270,17 @@ class TwitterService:
                 return None
 
         except tweepy.TooManyRequests as e:
-            logger.error(f"Failed to post tweet: 429 Too Many Requests - {str(e)}")
+            response_headers = {}
+            if hasattr(e, "response") and e.response is not None:
+                response_headers = dict(e.response.headers)
+            logger.warning(
+                "429 Too Many Requests from Twitter (post_tweet)",
+                extra={
+                    "status_code": 429,
+                    "response_headers": response_headers,
+                    "error": str(e),
+                },
+            )
             raise
         except Exception as e:
             logger.error(f"Failed to post tweet: {str(e)}")
