@@ -18,6 +18,7 @@ from app.backend.factory import backend
 from app.backend.models import Proposal, ProposalFilter
 from app.config import config
 from app.lib.logger import configure_logger
+from app.lib.utils import estimate_usage_cost
 from app.services.ai.simple_workflows.processors.twitter import (
     fetch_tweet,
     format_tweet,
@@ -659,6 +660,27 @@ Recent Community Sentiment: Positive
                 f"[EvaluationProcessorOpenRouter:{proposal_id_str}] Raw LLM response: {content[:500]}..."
             )
 
+            # Parse usage information and estimate cost
+            usage = response.get("usage")
+            logger.debug(
+                f"[EvaluationProcessorOpenRouter:{proposal_id_str}] OpenRouter usage: {usage}"
+            )
+            usage_input_tokens = usage.get("prompt_tokens") if usage else None
+            usage_output_tokens = usage.get("completion_tokens") if usage else None
+            usage_est_cost = None
+            if usage_input_tokens and usage_output_tokens:
+                usage_est_cost = estimate_usage_cost(
+                    usage_input_tokens,
+                    usage_output_tokens,
+                    model or config.chat_llm.default_model,
+                )
+            token_usage = {
+                "raw_response": content,
+                "usage_input_tokens": str(usage_input_tokens),
+                "usage_output_tokens": str(usage_output_tokens),
+                "usage_est_cost": str(usage_est_cost),
+            }
+
             # Parse the JSON response into AIBTC BREW model first
             try:
                 content_dict = json.loads(content)
@@ -676,7 +698,7 @@ Recent Community Sentiment: Positive
                     result = convert_aibtc_brew_to_standard_format(
                         aibtc_result,
                         images_processed=len(all_proposal_images),
-                        token_usage={"raw_response": content},
+                        token_usage=token_usage,
                     )
                 else:
                     logger.debug(
@@ -690,7 +712,7 @@ Recent Community Sentiment: Positive
                         explanation=standard_result.explanation,
                         flags=standard_result.flags,
                         summary=standard_result.summary,
-                        token_usage={"raw_response": content},
+                        token_usage=token_usage,
                         images_processed=len(all_proposal_images),
                     )
             except json.JSONDecodeError as e:
