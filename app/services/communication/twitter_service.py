@@ -775,9 +775,11 @@ class TwitterService:
 
                 # Sort replies by creation time
                 replies.sort(
-                    key=lambda x: x.created_at
-                    if hasattr(x, "created_at") and x.created_at
-                    else ""
+                    key=lambda x: (
+                        x.created_at
+                        if hasattr(x, "created_at") and x.created_at
+                        else ""
+                    )
                 )
 
                 return {
@@ -817,9 +819,11 @@ class TwitterService:
                 # Sort all tweets by creation time
                 all_tweets = [original_tweet] + all_conversation_tweets
                 all_tweets.sort(
-                    key=lambda x: x.created_at
-                    if hasattr(x, "created_at") and x.created_at
-                    else ""
+                    key=lambda x: (
+                        x.created_at
+                        if hasattr(x, "created_at") and x.created_at
+                        else ""
+                    )
                 )
 
                 # Find the position of the target tweet
@@ -925,9 +929,9 @@ class TwitterService:
 
             # Sort by creation time
             replies.sort(
-                key=lambda x: x.created_at
-                if hasattr(x, "created_at") and x.created_at
-                else ""
+                key=lambda x: (
+                    x.created_at if hasattr(x, "created_at") and x.created_at else ""
+                )
             )
 
             logger.info(f"Found {len(replies)} replies to tweet {tweet_id}")

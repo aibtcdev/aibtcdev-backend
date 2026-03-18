@@ -1,3 +1,5 @@
+> **⚠️ This repository is scheduled for archive.** This project has been retired.
+
 # aibtcdev-backend
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
